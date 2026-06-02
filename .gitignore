@@ -1,0 +1,22 @@
+# Secrets — NEVER commit (full Telegram account access lives here)
+.env
+.env.*
+secrets/
+*.session
+*.session-journal
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Local data / scratch
+*.sqlite
+*.db
+data/
+.DS_Store
