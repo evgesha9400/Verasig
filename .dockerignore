@@ -1,0 +1,16 @@
+# Never copy host-only / secret / generated artifacts into the image.
+.venv/
+.git/
+secrets/
+.env
+.env.*
+*.session
+*.session-journal
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store

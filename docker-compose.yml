@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: verasig
+      POSTGRES_PASSWORD: verasig
+      POSTGRES_DB: verasig
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verasig"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    env_file: [.env]
+    volumes:
+      - ./secrets:/secrets:ro     # read-only provided secrets (gitignored)
+      - tgsession:/session        # writable Telegram session (named volume)
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["health"]
+
+volumes:
+  pgdata: {}
+  tgsession: {}
