@@ -7,4 +7,5 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://verasig:verasig@db:5432/verasig"
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
+    telegram_phone: str | None = None
     session_path: str = "/session/telegram.session"
