@@ -1,0 +1,48 @@
+[project]
+name = "verasig"
+version = "0.1.0"
+description = "Proof-first Telegram signal-provider verification (Stage 0, local observer)"
+readme = "README.md"
+authors = [
+    { name = "Evgeny", email = "aleshiner@mail.ru" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.4",
+    "pydantic>=2",
+    "pydantic-settings>=2.14.1",
+    "sqlalchemy>=2.0.50",
+    "streamlit>=1.58.0",
+    "telethon>=1.43.2",
+    "typer>=0.26.7",
+]
+
+[project.scripts]
+verasig = "verasig.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.9.17,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.15",
+    "testcontainers[postgres]>=4.14.2",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["verasig"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
