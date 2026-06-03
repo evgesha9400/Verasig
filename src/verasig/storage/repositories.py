@@ -60,3 +60,17 @@ def count_messages(session: Session, channel_id: int) -> int:
         .select_from(RawMessageRow)
         .where(RawMessageRow.channel_id == channel_id)
     )
+
+
+def find_channel(session: Session, reference: str | int) -> ChannelRow | None:
+    handle = _reference_to_handle(reference)
+    if handle is None:
+        return session.get(ChannelRow, int(reference))
+    return session.scalar(select(ChannelRow).where(ChannelRow.handle == handle))
+
+
+def _reference_to_handle(reference: str | int) -> str | None:
+    text = str(reference)
+    if text.lstrip("-").isdigit():
+        return None  # numeric -> look up by id
+    return text.removeprefix("https://t.me/").removeprefix("t.me/").lstrip("@")

@@ -1,9 +1,23 @@
+from datetime import datetime, timezone
+
 import pytest
 from typer.testing import CliRunner
 
-from verasig.cli import app
+from verasig.cli import app, format_stats
+from verasig.domain.channel import TelegramChannel
 
 runner = CliRunner()
+
+
+def _channel(**overrides) -> TelegramChannel:
+    base = {
+        "channel_id": 7,
+        "title": "Pilot",
+        "is_private": False,
+        "first_seen_at": datetime(2026, 6, 3, tzinfo=timezone.utc),
+    }
+    base.update(overrides)
+    return TelegramChannel(**base)
 
 
 @pytest.fixture(autouse=True)
@@ -37,3 +51,24 @@ def test_whoami_without_session_exits_with_login_hint(tmp_path, monkeypatch):
     result = runner.invoke(app, ["whoami"])
     assert result.exit_code == 1
     assert "run `login` first" in result.stderr
+
+
+def test_backfill_without_credentials_exits_with_hint():
+    result = runner.invoke(app, ["backfill", "@pilot"])
+    assert result.exit_code == 1
+    assert "VERASIG_TELEGRAM_API_ID" in result.stderr
+
+
+def test_format_stats_renders_handle_cursor_and_subs():
+    channel = _channel(
+        handle="pilot", subscriber_count=100, captured_through_message_id=42
+    )
+    assert (
+        format_stats(channel, 30)
+        == "Pilot · @pilot · id=7 · captured=30 · cursor=42 · subs=100"
+    )
+
+
+def test_format_stats_omits_handle_subs_and_marks_empty_cursor():
+    channel = _channel(title="Private", is_private=True)
+    assert format_stats(channel, 0) == "Private · id=7 · captured=0 · cursor=none"
