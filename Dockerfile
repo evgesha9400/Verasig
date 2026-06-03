@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.9.17
 WORKDIR /app
 
 # 1) Install dependencies only — cached unless pyproject.toml / uv.lock change.
@@ -11,4 +11,5 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 RUN uv sync --frozen --no-dev
 
-ENTRYPOINT ["uv", "run", "verasig"]
+# --no-sync: run from the baked --no-dev env (offline, no runtime re-download).
+ENTRYPOINT ["uv", "run", "--no-sync", "verasig"]
