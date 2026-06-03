@@ -11,6 +11,7 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
+from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
 
 
@@ -26,6 +27,9 @@ class TelegramDeliveryEvent(BaseModel):
 
 @runtime_checkable
 class TelegramSource(Protocol):
+    # resolve: @handle | t.me link | numeric id -> channel identity + metadata.
+    async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
+
     # backfill: chunked + resumable — one committable batch at a time.
     def backfill_batches(
         self, channel_id: int, after_message_id: int | None, batch_size: int

@@ -8,3 +8,12 @@ def test_telegram_phone_loads_from_env(monkeypatch):
 
 def test_telegram_phone_defaults_to_none():
     assert Settings(_env_file=None).telegram_phone is None
+
+
+def test_backfill_batch_size_defaults_to_200():
+    assert Settings(_env_file=None).backfill_batch_size == 200
+
+
+def test_backfill_batch_size_loads_from_env(monkeypatch):
+    monkeypatch.setenv("VERASIG_BACKFILL_BATCH_SIZE", "50")
+    assert Settings().backfill_batch_size == 50
