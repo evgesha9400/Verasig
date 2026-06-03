@@ -3,7 +3,11 @@ from datetime import datetime, timezone
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
-from verasig.foundation.telegram_source import TelegramDeliveryEvent, TelegramSource
+from verasig.foundation.telegram_source import (
+    TelegramDeliveryEvent,
+    TelegramSource,
+    TelethonSource,
+)
 
 
 def _instant() -> datetime:
@@ -78,3 +82,8 @@ def test_source_missing_live_events_does_not_satisfy_protocol():
             yield []
 
     assert not isinstance(BackfillOnly(), TelegramSource)
+
+
+def test_telethon_source_satisfies_protocol():
+    # structural conformance only (no client / no network)
+    assert isinstance(TelethonSource(client=None), TelegramSource)
