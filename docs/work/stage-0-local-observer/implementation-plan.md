@@ -45,13 +45,19 @@
 **Files:**
 - Create: `pyproject.toml`, `Dockerfile`, `docker-compose.yml`, `.env.example`, `.gitignore`, `alembic.ini`
 - Create: `src/verasig/config.py`, `src/verasig/foundation/db.py`, `src/verasig/cli.py`
-- Test: `tests/conftest.py`, `tests/integration/test_foundation.py`
+- Create: `migrations/env.py`, `migrations/versions/0001_baseline.py`
+- Test: `tests/conftest.py`, `tests/integration/test_foundation.py`, `tests/integration/test_migrations.py`
+
+**Resolved gaps (grill, 2026-06-03):**
+- **A — DB driver:** psycopg3. Add `psycopg[binary]`; config default URL `postgresql+psycopg://…`; conftest replace `psycopg2→psycopg` unchanged.
+- **B — secrets/session:** split paths — `./secrets:/secrets:ro` (read-only inputs) + `tgsession:/session` (writable session); `session_path="/session/telegram.session"`.
+- **C — Alembic:** full scaffold in Slice 0 — `migrations/env.py` (Base + Settings URL) + empty `0001_baseline.py` + an `alembic upgrade head` test on the testcontainer (satisfies test-plan "migrations apply").
 
 - [ ] **Step 1: Init uv project + dev deps**
 
 ```bash
 uv init --package --name verasig .
-uv add sqlalchemy alembic "pydantic>=2" pydantic-settings typer httpx telethon streamlit
+uv add sqlalchemy alembic "pydantic>=2" pydantic-settings typer httpx telethon streamlit "psycopg[binary]"
 uv add --dev pytest pytest-asyncio testcontainers[postgres] ruff
 ```
 
@@ -80,10 +86,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="VERASIG_", env_file=".env")
-    database_url: str = "postgresql://verasig:verasig@db:5432/verasig"
+    database_url: str = "postgresql+psycopg://verasig:verasig@db:5432/verasig"
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
-    session_path: str = "/secrets/telegram.session"
+    session_path: str = "/session/telegram.session"
 ```
 
 - [ ] **Step 5: Verify config test passes**
@@ -138,6 +144,28 @@ def make_session_factory(url: str):
 - [ ] **Step 9: Verify health test passes**
 
 Run: `uv run pytest -v` → PASS.
+
+- [ ] **Step 9a: Write the failing Alembic apply test (Gap C)**
+
+```python
+# tests/integration/test_migrations.py
+from alembic import command
+from alembic.config import Config
+
+def test_migrations_apply(pg_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.upgrade(cfg, "head")        # no error == migrations apply
+```
+Run: `uv run pytest tests/integration/test_migrations.py -v` → FAIL (no alembic env yet).
+
+- [ ] **Step 9b: Scaffold Alembic + empty baseline**
+
+`uv run alembic init migrations`, then wire `migrations/env.py`:
+- import `Base` from `verasig.foundation.db`; `target_metadata = Base.metadata`
+- resolve URL from `Settings().database_url`, overridable via `config.get_main_option("sqlalchemy.url")` (tests inject the testcontainer URL).
+
+Add an empty baseline `migrations/versions/0001_baseline.py` (`down_revision = None`, `def upgrade(): pass`, `def downgrade(): pass`). Verify Step 9a → PASS. Commit.
 
 - [ ] **Step 10: CLI `health` subcommand**
 
