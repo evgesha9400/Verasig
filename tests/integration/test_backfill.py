@@ -1,0 +1,89 @@
+from datetime import datetime, timezone
+
+import pytest
+from fakes import FakeSource, FakeStreamInterrupted
+
+from verasig.domain.channel import TelegramChannel
+from verasig.domain.message import RawTelegramMessage
+from verasig.services.ingestion.backfill import backfill
+from verasig.storage import repositories as repo
+
+
+def _instant() -> datetime:
+    return datetime(2026, 6, 3, 12, 0, tzinfo=timezone.utc)
+
+
+def _channel() -> TelegramChannel:
+    return TelegramChannel(
+        channel_id=1,
+        handle="pilot",
+        title="Pilot",
+        is_private=False,
+        first_seen_at=_instant(),
+    )
+
+
+def _messages(count: int) -> list[RawTelegramMessage]:
+    return [
+        RawTelegramMessage(
+            channel_id=1,
+            message_id=i,
+            posted_at=_instant(),
+            captured_at=_instant(),
+            has_media=False,
+            raw_payload={"id": i},
+        )
+        for i in range(1, count + 1)
+    ]
+
+
+async def test_backfill_persists_all_messages(session_factory):
+    source = FakeSource(_channel(), _messages(5))
+    result = await backfill(source, "@pilot", session_factory, batch_size=2)
+    assert result.inserted == 5
+    assert result.captured_through_message_id == 5
+    with session_factory() as session:
+        assert repo.count_messages(session, 1) == 5
+
+
+async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
+    await backfill(FakeSource(_channel(), _messages(5)), "@pilot", session_factory, 2)
+    rerun = FakeSource(_channel(), _messages(5))
+    result = await backfill(rerun, "@pilot", session_factory, batch_size=2)
+    assert result.inserted == 0
+    assert rerun.requested_afters[0] == 5  # resumed at cursor, not 0
+    with session_factory() as session:
+        assert repo.count_messages(session, 1) == 5
+
+
+async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
+    messages = _messages(6)
+    crashed = FakeSource(_channel(), messages, fail_after_batch=1)
+    with pytest.raises(FakeStreamInterrupted):
+        await backfill(crashed, "@pilot", session_factory, batch_size=2)
+    with session_factory() as session:
+        assert repo.count_messages(session, 1) == 2
+        assert repo.read_cursor(session, 1) == 2
+
+    resumed = FakeSource(_channel(), messages)
+    result = await backfill(resumed, "@pilot", session_factory, batch_size=2)
+    assert resumed.requested_afters[0] == 2
+    assert all(message_id > 2 for message_id in resumed.yielded_ids)
+    assert result.captured_through_message_id == 6
+    with session_factory() as session:
+        assert repo.count_messages(session, 1) == 6
+
+
+async def test_backfill_commits_each_batch_before_pulling_the_next(session_factory):
+    def assert_prior_batches_persisted(index: int, yielded_so_far: int) -> None:
+        if index > 0:
+            with session_factory() as session:
+                assert repo.count_messages(session, 1) == yielded_so_far
+
+    source = FakeSource(
+        _channel(), _messages(2000), before_batch=assert_prior_batches_persisted
+    )
+    result = await backfill(source, "@pilot", session_factory, batch_size=200)
+    assert result.inserted == 2000
+    with session_factory() as session:
+        assert repo.count_messages(session, 1) == 2000
