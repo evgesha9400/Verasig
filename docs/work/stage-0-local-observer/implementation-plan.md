@@ -283,7 +283,8 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 **Files:**
 - Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/storage/repositories.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
-- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telegram_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`backfill`, +`stats`)
+- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telegram_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
+- Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the Slice-2 tables before `backfill` (`docker compose run --rm app migrate`).
 - Test: `tests/fixtures/messages/*.jsonl`, `tests/integration/test_backfill.py`, `tests/unit/test_fake_source.py` (+ Protocol conformance)
 
 ---
