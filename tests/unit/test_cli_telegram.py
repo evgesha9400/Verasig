@@ -7,7 +7,9 @@ runner = CliRunner()
 
 
 @pytest.fixture(autouse=True)
-def _clear_telegram_env(monkeypatch):
+def _isolate_env(tmp_path, monkeypatch):
+    # run in a temp CWD so the developer's real .env is never read by Settings
+    monkeypatch.chdir(tmp_path)
     for var in (
         "VERASIG_TELEGRAM_API_ID",
         "VERASIG_TELEGRAM_API_HASH",
