@@ -13,6 +13,7 @@ from sqlalchemy import engine_from_config, pool
 
 from verasig.config import Settings
 from verasig.foundation.db import Base
+from verasig.storage import models  # noqa: F401  (register tables on Base.metadata)
 
 config = context.config
 
