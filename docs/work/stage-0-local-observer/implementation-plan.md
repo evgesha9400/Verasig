@@ -236,12 +236,24 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 ## Slice 1: Telegram session & login
 
-- **Input:** `telegram_api_id`/`hash`/phone (env), interactive code/2FA (once).
-- **Output:** persisted `StringSession` in the mounted volume; non-interactive client for all other commands.
-- **Decisive test (unit):** session-string round-trips; missing session raises a clear `SessionMissingError("run `login` first")`.
-- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9).
+- **Input:** `telegram_api_id`/`hash`/`phone` (env), interactive code/2FA (once).
+- **Output:** persisted `StringSession` (bare UTF-8 string at `session_path`); non-interactive client for all other commands.
+- **Decisive test (unit):** session-string round-trips (`save`→`load`); missing/empty session raises `SessionMissingError("run `login` first")`; absent creds raise `CredentialsMissingError`.
+- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9) — Protocol-only stub this slice; `backfill_batches`/`live_events` are implemented in Slices 2/11. Slice 1's own seam is the session store + guarded client factory in `telegram_session.py`.
 - **Acceptance:** `docker compose run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
-- **Note:** tests never authenticate against real Telegram — the `login` flow is exercised manually; logic (load/persist/guard) is unit-tested with a fake string.
+- **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are exercised manually; only load/persist/guard + the pure `format_account` formatter are unit-tested.
+
+**Resolved gaps (grill, 2026-06-03):**
+- **Seam (Q1):** ship **both** `foundation/telegram_source.py` (full async `TelegramSource` Protocol, Protocol-only) **and** `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — Slice 1 stubs the Protocol, does not implement its methods.
+- **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `telegram_source.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in Slice 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
+- **login UX (Q3):** add `telegram_phone: str | None` to `Settings` + `.env(.example)`; `client.start(phone=settings.telegram_phone)` prompts for code + 2FA interactively. api_id/hash stay env-sourced.
+- **Creds absent (Q4):** `make_client` raises `CredentialsMissingError("set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH")` (creds-check **before** session-load) so Slice-0 `health` keeps working with creds Optional.
+- **whoami (Q5):** one line incl. phone — `logged in as @handle · First Last · id=N · +phone`; missing username/last_name omitted gracefully. Pure `format_account(user) -> str` is table-tested with a stub; live `get_me()` is manual.
+
+**Files:**
+- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/foundation/telegram_source.py`, `src/verasig/foundation/telegram_session.py`
+- Edit: `src/verasig/config.py` (+`telegram_phone`), `src/verasig/cli.py` (+`login`, +`whoami`), `.env`, `.env.example`
+- Test: `tests/unit/test_domain_message.py`, `tests/unit/test_telegram_source.py`, `tests/unit/test_telegram_session.py`
 
 ---
 
