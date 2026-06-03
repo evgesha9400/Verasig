@@ -1,6 +1,8 @@
 # Secrets — NEVER commit (full Telegram account access lives here)
 .env
 .env.*
+# but the template IS tracked (fresh clone: cp .env.example .env)
+!.env.example
 secrets/
 *.session
 *.session-journal
