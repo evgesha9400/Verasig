@@ -40,6 +40,16 @@ def health() -> None:
 
 
 @app.command()
+def migrate() -> None:
+    """Apply database migrations (alembic upgrade head)."""
+    from alembic import command
+    from alembic.config import Config
+
+    command.upgrade(Config("alembic.ini"), "head")
+    typer.echo("migrations applied")
+
+
+@app.command()
 def login() -> None:
     """Authenticate the Telegram account once (interactive); persist the session."""
     settings = Settings()
