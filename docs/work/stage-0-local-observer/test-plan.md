@@ -43,7 +43,7 @@ tests/fixtures/
 | 8 Deletion | present→absent ⇒ CONFIRMED w/ content; id-gap ⇒ SUSPECTED; contiguous ⇒ none | two snapshots | CONFIRMED retains original text |
 | 9 Scorecard | each metric fn; weighted-normalized composite; every component has evidence_refs; re-weight changes score | computed inputs | 100% components traceable |
 | 10 Simulation | market fill=next open; limit unfilled→UNFILLED; **same-candle tie→stop_first**; MFE/MAE; policy injectable | `klines/*.json` | known signal→expected R |
-| 11 Live | event→row; delete→CONFIRMED w/ timestamp; dedup vs backfill | fake event stream | post+delete ⇒ evidence |
+| 11 Live | push→row (`mode=PUSH`); delayed/absent push→poll catch-up **deduped** (arrives once); delete→CONFIRMED w/ ts | fake event stream + fake clock | median `captured_at − posted_at` ≤ poll interval |
 
 ## 4. Representative test specs (write these first, watch them fail)
 

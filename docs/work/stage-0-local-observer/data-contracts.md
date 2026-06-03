@@ -14,6 +14,7 @@ ExtractionMethod = DETERMINISTIC | LLM_FALLBACK
 DeletionConfidence = CONFIRMED | SUSPECTED
 DeletionMethod = SNAPSHOT_DIFF | ID_GAP | LIVE_EVENT
 SimOutcomeKind = R_MULTIPLE | MARK_TO_MARKET | UNFILLED
+DeliveryMode  = PUSH | POLL | CATCH_UP               # live message delivery path (latency provenance)
 ```
 
 ## 2. Sources & capture
@@ -223,11 +224,21 @@ class ExecutionPolicy(Protocol):
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome: ...
 # v0: ProviderStatedPolicy; future: CustomRiskPolicy
 
-# foundation/telegram_session.py
+# foundation/telegram_source.py   (async seam — supersedes the old sync backfill()/stream(); see ADR 0004)
+class TelegramDeliveryEvent(BaseModel):  # live message + its latency provenance
+    message: RawTelegramMessage
+    mode: DeliveryMode               # PUSH | POLL | CATCH_UP
+    captured_at: datetime
+    source_pts: int?                 # channel pts at delivery, when known
+    gap_closed: bool                 # this delivery resolved a detected pts gap
+
 class TelegramSource(Protocol):
-    def backfill(self, channel_id: int) -> Iterator[RawTelegramMessage]: ...
-    def stream(self, channel_id: int) -> AsyncIterator[Event]: ...   # live slice
-# adapter: TelethonSource; FakeSource (tests, fixture corpora)
+    # backfill: chunked + resumable — yields one committable batch at a time, never full history
+    def backfill_batches(self, channel_id: int, after_message_id: int?,
+                         batch_size: int) -> AsyncIterator[list[RawTelegramMessage]]: ...
+    # live: ONE global socket, many channels; hybrid push + short-poll behind this method
+    def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramDeliveryEvent]: ...
+# adapter: TelethonSource (push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
 ```
 
 **Every external dependency (Telegram, LLM CLI, market data, Postgres) sits behind one of these Protocols** so unit tests run pure and offline; integration tests use ephemeral Postgres + recorded fixtures. No test ever calls the real CLI or real Telegram.

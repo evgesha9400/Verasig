@@ -6,7 +6,7 @@
 
 **Architecture:** One uv-built Python image (Typer CLI subcommands + Streamlit UI) over a Postgres container. `domain/` pure contracts ← `services/` logic ← `storage/`+`foundation/` IO; UI/CLI are thin adapters. Every external dependency sits behind a Protocol so tests run offline.
 
-**Tech Stack:** Python 3.12, uv, Telethon, Postgres 16, SQLAlchemy 2.0 + Alembic, Pydantic v2, Typer, httpx, Streamlit, pytest (+ testcontainers), ruff. LLM fallback = Claude/Codex CLI via subprocess.
+**Tech Stack:** Python 3.12, uv, Telethon (hybrid push+poll live — [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)), Postgres 16, SQLAlchemy 2.0 + Alembic, Pydantic v2, Typer, httpx, Streamlit, pytest (+ testcontainers), ruff. LLM fallback = Claude/Codex CLI via subprocess.
 
 ---
 
@@ -495,10 +495,14 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ## Slice 11: Live listener daemon (FINAL slice overall)
 
-- **Input:** running Telethon session.
-- **Output:** continuous `RawTelegramMessage` capture + real-time `DeletedSignalEvidence` (LIVE_EVENT, precise timing).
-- **Decisive tests (unit/integration, fake event stream):** new-message event ⇒ row; delete event ⇒ CONFIRMED evidence with timestamp; dedup vs backfill.
-- **Acceptance:** run `app live <channel>`, post + delete a test message ⇒ captured then CONFIRMED-deleted with timestamps.
+- **Input:** running Telethon session + pilot `channel_ids`.
+- **Output:** continuous `RawTelegramMessage` capture via **hybrid push+poll** (passive `events.NewMessage` + bounded short-poll closing `pts` gaps, deduped on `(channel_id, message_id)`) + real-time `DeletedSignalEvidence` (LIVE_EVENT, precise timing). Capture is **queue-first**: persist the row immediately, parse/score async — never block the update loop.
+- **Contract:** `TelegramSource.live_events(channel_ids)` → `TelegramDeliveryEvent` (`mode`, `captured_at`, `pts`); see [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md).
+- **Decisive tests (unit/integration, fake event stream):**
+  - push event ⇒ row tagged `mode=PUSH`; delayed/absent push then poll ⇒ same message arrives **once** (`mode=POLL`/`CATCH_UP`), deduped vs push and vs backfill.
+  - delete event ⇒ CONFIRMED evidence with timestamp.
+  - **latency:** with a fake clock, median `captured_at − posted_at` ≤ the configured poll interval.
+- **Acceptance:** run `app live <channels>`, post + delete a test message ⇒ captured (within the poll interval) then CONFIRMED-deleted with timestamps.
 
 ---
 

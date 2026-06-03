@@ -89,7 +89,7 @@ Telegram ──backfill──▶ RawTelegramMessage ──candidate filter──
 | Concern | Choice | Why |
 |---|---|---|
 | Runtime / deps | Python 3.12 + **uv** | mandated; fast, reproducible |
-| Telegram | **Telethon** | most established user-account client, best corpus |
+| Telegram | **Telethon** (hybrid push+poll live; [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)) | one client for backfill + live; ~30s channel-push delay is MTProto batching, solved by active gap-close poll — not a library swap |
 | DB | **Postgres 16** (container) | relational joins + concurrency; production-path |
 | ORM / migrations | **SQLAlchemy 2.0** + **Alembic** | robust, best corpus, append-only friendly |
 | Contracts | **Pydantic v2** | validated canonical schemas |
@@ -173,6 +173,7 @@ verasig/
 - [ ] ≥3 pilot channels backfilled; **100%** of accessible messages captured, append-only, idempotent re-run = 0 dupes.
 - [ ] Backfill is **resumable** from a persisted cursor; a mid-run kill + restart resumes and **does not refetch** captured messages.
 - [ ] Pipeline runs in **bounded chunks**; peak memory stays flat on a large channel (no full-history RAM load).
+- [ ] **Live latency:** median `posted_at → captured_at` ≤ the configured short-poll interval on pilot channels (hybrid push+poll closes MTProto channel-push batching; [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)).
 - [ ] Distillation loop produces `ParserRule`s and a labeled **golden corpus** for each pilot channel.
 - [ ] Deterministic extraction **precision ≥ 95%** on the golden corpus; recall measured + reported.
 - [ ] **100%** of LLM-fallback successes emit exactly one `ParserDriftWarning`.
@@ -189,6 +190,7 @@ verasig/
 |---|---|
 | Telegram content-licensing / AI-scraping terms (history + LLM over content) | **Unresolved — operator accepted the risk for Stage 0** on a dedicated throwaway account. Practice/test on real signal chats; revisit before any paid launch. |
 | Telegram API rate/behaviour limits on user sessions | Resumable cursor + chunked pagination + flood-wait backoff; **no needless rescrape**; throwaway account. |
+| Telegram channel-push latency on user accounts (~30s batching) | Hybrid push + bounded short-poll closes `pts` gaps inside the adapter; latency is measured (`posted_at → captured_at`) and gated; TDLib/Pytdbot is the documented escape hatch. See [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md). |
 | User-account ban / ToS | Accepted, documented; **throwaway account required**. |
 | Provider scoring → regulatory risk before paid launch | Out of scope (no paid launch); conservative, evidence-only copy. |
 | Optimal score formula | Deferred; re-weightable design is the hedge. |
