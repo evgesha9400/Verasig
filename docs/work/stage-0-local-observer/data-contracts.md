@@ -233,12 +233,14 @@ class TelegramDeliveryEvent(BaseModel):  # live message + its latency provenance
     gap_closed: bool                 # this delivery resolved a detected pts gap
 
 class TelegramSource(Protocol):
+    # resolve: @handle | t.me link | numeric id → channel identity + metadata (Slice 2)
+    async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
     # backfill: chunked + resumable — yields one committable batch at a time, never full history
     def backfill_batches(self, channel_id: int, after_message_id: int?,
                          batch_size: int) -> AsyncIterator[list[RawTelegramMessage]]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
     def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramDeliveryEvent]: ...
-# adapter: TelethonSource (push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
+# adapter: TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
 ```
 
 **Every external dependency (Telegram, LLM CLI, market data, Postgres) sits behind one of these Protocols** so unit tests run pure and offline; integration tests use ephemeral Postgres + recorded fixtures. No test ever calls the real CLI or real Telegram.

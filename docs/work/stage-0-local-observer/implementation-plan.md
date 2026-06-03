@@ -270,7 +270,21 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
   - persists every message with full provenance; unique `(channel_id, message_id)`; **idempotent re-run adds 0**; raw table never UPDATEd.
   - **resume:** run backfill, kill after batch 1 (FakeSource raises mid-stream), restart → continues from cursor, final row count correct, **0 refetched ids** (FakeSource asserts it was never asked for ids ≤ cursor).
   - **chunking:** FakeSource of 10k messages with batch=200 → at most batch-size objects materialized at once (assert via a counting/streaming fake).
-- **Acceptance:** backfill a real (throwaway-account) channel → row count == accessible count; mid-run kill + restart resumes with no refetch and no dupes; `app stats <channel>` prints capture count + cursor.
+- **Acceptance:** backfill a real channel → row count == accessible count; mid-run kill + restart resumes with no refetch and no dupes; `app stats <channel>` prints capture count + cursor.
+
+**Resolved gaps (grill, 2026-06-03):**
+- **Channel resolve (Q1):** add `async resolve_channel(reference: str | int) -> TelegramChannel` to the `TelegramSource` Protocol (synced into data-contracts §9). `backfill` resolves first (→ id, title, handle, subscriber_count), upserts the `TelegramChannel` row, then streams `backfill_batches(channel_id, after=cursor, batch)`. CLI accepts `@handle` / id / `t.me` link; `FakeSource.resolve_channel` returns a canned channel.
+- **Defaults (reversible, taken inline):**
+  - `raw_payload` ORM column → Postgres **JSONB**; idempotency → `INSERT … ON CONFLICT (channel_id, message_id) DO NOTHING`.
+  - cursor `captured_through_message_id` = committed high-water mark; paginate **oldest→newest**, resume via `after_message_id=cursor`; batch insert + cursor advance in **one transaction**.
+  - `backfill_batch_size: int = 200` added to `Settings`.
+  - `stats <ref>` prints `@handle id=N · title · captured=X · cursor=Y · subs=Z`.
+  - Test fixtures: synthetic anonymized `fixtures/messages/*.jsonl` driven by `FakeSource`; real `TelethonSource` (resolve + `iter_messages(reverse=True, min_id=cursor)` + flood-wait backoff) is **manual-acceptance only**, never in tests.
+
+**Files:**
+- Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/storage/repositories.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
+- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telegram_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`backfill`, +`stats`)
+- Test: `tests/fixtures/messages/*.jsonl`, `tests/integration/test_backfill.py`, `tests/unit/test_fake_source.py` (+ Protocol conformance)
 
 ---
 
