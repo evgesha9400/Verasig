@@ -9,29 +9,11 @@ links provenance and records the outcome). Pure and offline.
 """
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import EntryType, Side, TradeIntent
-
-_THOUSANDS = {"K", "К"}  # latin + cyrillic
-_MILLIONS = {"M", "М"}
-
-
-def _to_decimal(raw: str) -> Decimal | None:
-    cleaned = raw.strip().replace(",", "").replace(" ", "")
-    if not cleaned:
-        return None
-    suffix = cleaned[-1].upper()
-    multiplier = Decimal(1)
-    if suffix in _THOUSANDS:
-        multiplier, cleaned = Decimal(1000), cleaned[:-1]
-    elif suffix in _MILLIONS:
-        multiplier, cleaned = Decimal(1_000_000), cleaned[:-1]
-    try:
-        return Decimal(cleaned) * multiplier
-    except InvalidOperation:
-        return None
+from verasig.services.numbers import to_decimal
 
 
 def _first(groups: dict, field_map: dict[str, str], target: str) -> str | None:
@@ -55,10 +37,10 @@ def _entry(
     low = _first(groups, field_map, "entry_low")
     high = _first(groups, field_map, "entry_high")
     if low and high:
-        return _to_decimal(low), _to_decimal(high), EntryType.LIMIT_RANGE
+        return to_decimal(low), to_decimal(high), EntryType.LIMIT_RANGE
     single = _first(groups, field_map, "entry")
     if single:
-        price = _to_decimal(single)
+        price = to_decimal(single)
         return price, price, EntryType.LIMIT_SINGLE
     return None, None, EntryType.MARKET
 
@@ -79,11 +61,11 @@ def _build_signal(rule: ParserRule, groups: dict) -> TradeIntent | None:
         entry_type=entry_type,
         entry_low=entry_low,
         entry_high=entry_high,
-        stop_loss=_to_decimal(stop_raw) if stop_raw else None,
+        stop_loss=to_decimal(stop_raw) if stop_raw else None,
         take_profits=[
             price
             for raw in _all(groups, rule.field_map, "take_profit")
-            if (price := _to_decimal(raw)) is not None
+            if (price := to_decimal(raw)) is not None
         ],
     )
 
