@@ -338,6 +338,9 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Note:** real external-LLM distillation is gated behind operator go-ahead (selected examples → real LLM; see Start verdict). The seed filter + rule application are pure/offline and fixture-testable now. A local `FilterGemma`/`ParserGemma` is deferred to a later stage (ADR 0005).
 
 **Resolved gaps (grill, 2026-06-04) — Slices 3 + 4 execute as ONE pass:**
+
+> **Status (2026-06-04): IMPLEMENTED — green + committed** on `feature/stage-0-foundation`. 161 tests pass, ruff clean. Filter recall + parser precision = **1.00** on the golden corpus (gate 0.95); planted filter-miss → exactly one `FilterDriftWarning`; Streamlit workbench `AppTest` smoke (label→distil→filter→iterate) green. Real-LLM `ClaudeCliDistiller` Distil + UI-over-real-content remain **go-ahead-gated manual acceptance** (no test touches the real CLI). Next: Slice 5 (LLM fallback).
+
 - **Scope:** build the entire merged slice now — seed filter + distillation (incl. Streamlit workbench + real `ClaudeCliDistiller`) **and** all of Slice 4 (deterministic extraction). The real-LLM Distil + UI-over-real-content stay **go-ahead-gated manual acceptance**; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
 - **3/4 boundary:** Slice 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until Slice 5), precision ≥ 0.95 harness.
 - **Exchange seam:** `foundation/exchange.py` = `Exchange` Protocol (`is_listed`/`base_symbols`) + bundled `StaticExchange` seed + `FakeExchange` (tests); real `BybitExchange(httpx)` deferred to Slice 9.
