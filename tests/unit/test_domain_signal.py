@@ -11,8 +11,38 @@ from verasig.domain.signal import (
     ExtractionMethod,
     Side,
     SignalEventType,
+    TradeIntent,
     UnrecognizedSignal,
 )
+
+
+def test_trade_intent_constructs_with_symbol_and_side():
+    intent = TradeIntent(symbol="BTCUSDT", side=Side.LONG)
+    assert intent.symbol == "BTCUSDT"
+    assert intent.side is Side.LONG
+
+
+def test_trade_intent_normalizes_symbol_to_upper_and_appends_usdt():
+    assert TradeIntent(symbol="btc", side=Side.LONG).symbol == "BTCUSDT"
+    assert TradeIntent(symbol="ETHUSDT", side=Side.SHORT).symbol == "ETHUSDT"
+
+
+def test_trade_intent_rejects_empty_symbol():
+    with pytest.raises(ValidationError):
+        TradeIntent(symbol="", side=Side.LONG)
+
+
+def test_trade_intent_is_provenance_free():
+    assert "event_id" not in TradeIntent.model_fields
+    assert "channel_id" not in TradeIntent.model_fields
+
+
+def test_extracted_signal_extends_trade_intent():
+    assert issubclass(ExtractedSignal, TradeIntent)
+
+
+def test_extracted_signal_normalizes_symbol_via_inherited_validator():
+    assert _signal(symbol="btc").symbol == "BTCUSDT"
 
 
 def _signal(**overrides) -> ExtractedSignal:
