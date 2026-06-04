@@ -337,9 +337,31 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); operator labels a pilot channel via the UI; both rule kinds produced; residue shrinks each pass; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on `is_signal`; parser precision/recall on `expected`), not the candidate subset.
 - **Note:** real external-LLM distillation is gated behind operator go-ahead (selected examples → real LLM; see Start verdict). The seed filter + rule application are pure/offline and fixture-testable now. A local `FilterGemma`/`ParserGemma` is deferred to a later stage (ADR 0005).
 
+**Resolved gaps (grill, 2026-06-04) — Slices 3 + 4 execute as ONE pass:**
+- **Scope:** build the entire merged slice now — seed filter + distillation (incl. Streamlit workbench + real `ClaudeCliDistiller`) **and** all of Slice 4 (deterministic extraction). The real-LLM Distil + UI-over-real-content stay **go-ahead-gated manual acceptance**; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
+- **3/4 boundary:** Slice 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until Slice 5), precision ≥ 0.95 harness.
+- **Exchange seam:** `foundation/exchange.py` = `Exchange` Protocol (`is_listed`/`base_symbols`) + bundled `StaticExchange` seed + `FakeExchange` (tests); real `BybitExchange(httpx)` deferred to Slice 9.
+- **Distiller output:** LLM emits JSON `{filter_rule, parser_rules}` (pattern content only); shared `parse_distiller_output` tolerantly extracts (bare or ```json-fenced) + Pydantic-validates; the adapter stamps `rule_id`/`version`/`created_at`/`distilled_from_label_ids` (provenance never hallucinated).
+- **MatchReason:** frozen 3-value enum kept — `DIRECTIONAL_KEYWORD` (long/short/buy/sell + RU), `SYMBOL_TOKEN` (Exchange-listed), `PRICE_SHAPED` (subsumes trade-structure keywords/emoji + price patterns).
+- **Persistence:** migration `0003` adds all 7 tables — `raw_signal_event`, `extracted_signal`, `unrecognized_signal`, `filter_rule`, `parser_rule`, `golden_label`, `filter_drift_warning`; list/map fields + `GoldenLabel.expected` as JSONB; conftest TRUNCATE extended.
+- **Fixtures:** synthetic anonymized `tests/fixtures/{messages,labels}/pilot.jsonl` (~50 msgs, EN+RU; signals / partials / chatter + ≥1 planted filter-miss). Oracle for filter-recall ≥ 0.95 (denominator = `GoldenLabel.is_signal`) + parser-precision ≥ 0.95 (`expected`).
+- **UI:** full 4-view workbench (Candidates | Unflagged | ⚠ Drift | 🎲 Audit) — pure presenter in `services/distillation/workbench.py`, thin `ui/workbench.py`, `AppTest` smoke.
+- **CLI:** `candidates` (derive) · `workbench` (Streamlit) · `extract` (candidates → signal/unrecognized) · `sweep` (advisory parse-all → late-materialize `PARSER_BACKFILL` + `FilterDriftWarning`). `candidates`/`extract`/`sweep` are offline; only the workbench Distil-click reaches the real LLM.
+- **Decided inline (doc/precedent):** enums co-located with their entity (`DeliveryMode` precedent); `uuid4` / `datetime.now(tz=utc)` defaults (tests pass explicit instants); `candidate_text` = verbatim text; media-only/blank → non-candidate; late-materialization idempotent on `(channel_id, message_id)`.
+
+**Files (this pass):**
+- `domain/`: `event.py` `signal.py` `filter_rule.py` `parser_rule.py` `label.py` `drift.py`
+- `foundation/exchange.py`
+- `services/ingestion/candidate_filter.py` (seed + FilterRule apply + derivation + advisory sweep), `services/extraction/{deterministic_parser.py, extract_service.py}`, `services/distillation/{rule_distiller.py, workbench.py}`
+- `storage/models.py` (+7 rows), `storage/repositories.py`, `migrations/versions/0003_*.py`
+- `ui/app.py` `ui/workbench.py`; `cli.py` (+`candidates`/`workbench`/`extract`/`sweep`), `config.py` (+`distiller_command`)
+- `tests/unit/*`, `tests/integration/*`, `tests/fixtures/{messages,labels,cli}/*`, `tests/fakes.py` (+`FakeExchange`, +`FakeDistiller`)
+
 ---
 
 ## Slice 4: Deterministic extraction → ExtractedSignal | UnrecognizedSignal
+
+> **Absorbed into the Slice 3 pass (grill 2026-06-04).** The contracts + parser + `ExtractService` + precision harness below are built together with Slice 3; the steps remain as the TDD micro-pattern. Slice 5 (LLM fallback) stays the next slice.
 
 **Outcome:** apply `ParserRule`s to a `RawSignalEvent`, producing exactly one of `{ExtractedSignal, UnrecognizedSignal}`, enforcing `symbol`+`side` required and side normalization.
 
