@@ -11,6 +11,7 @@ price-shaped number). Media-only / blank messages are never candidates.
 import re
 
 from verasig.domain.event import MatchReason, MaterializationPath, RawSignalEvent
+from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.foundation.exchange import Exchange
 
@@ -72,3 +73,12 @@ def seed_candidate(
         materialized_by=MaterializationPath.SEED_HEURISTIC,
         matched_reasons=reasons,
     )
+
+
+def apply_filter_rule(rule: FilterRule, text: str) -> bool:
+    """A distilled FilterRule flags a candidate iff ANY include pattern matches
+    (recall-first, OR-joined) and NO exclude carve-out matches. Pattern flags
+    (e.g. inline ``(?i)``) are respected verbatim, as the distiller emits them."""
+    if any(re.search(pattern, text) for pattern in rule.exclude_patterns):
+        return False
+    return any(re.search(pattern, text) for pattern in rule.include_patterns)
