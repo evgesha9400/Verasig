@@ -28,6 +28,15 @@ def _event(text: str) -> RawSignalEvent:
     )
 
 
+def test_signal_carries_event_linkage_and_method():
+    event = _event("BTC long entry 65000")
+    signal = ExtractService(rules=[RULE]).extract(event).signal
+    assert signal.event_id == event.id
+    assert signal.channel_id == 7
+    assert signal.rule_id == "r1"
+    assert signal.extraction_method is ExtractionMethod.DETERMINISTIC
+
+
 def test_match_yields_exactly_one_signal_outcome():
     outcome = ExtractService(rules=[RULE]).extract(_event("BTC long entry 65000"))
     assert isinstance(outcome.signal, ExtractedSignal)

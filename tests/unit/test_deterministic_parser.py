@@ -1,8 +1,7 @@
 from decimal import Decimal
 
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.parser_rule import ParserRule
-from verasig.domain.signal import EntryType, ExtractionMethod, Side
+from verasig.domain.signal import EntryType, Side
 from verasig.services.extraction.deterministic_parser import parse
 
 _PAT_RANGE = (
@@ -32,66 +31,47 @@ RULE = ParserRule(
 )
 
 
-def _event(text: str) -> RawSignalEvent:
-    return RawSignalEvent(
-        channel_id=7,
-        message_id=1,
-        candidate_text=text,
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-    )
-
-
 def test_full_single_entry_signal_parses_all_fields():
-    event = _event("BTC long entry 65000 sl 64000 tp 67000")
-    signal = parse(RULE, event)
-    assert (signal.symbol, signal.side) == ("BTCUSDT", Side.LONG)
-    assert signal.entry_type is EntryType.LIMIT_SINGLE
-    assert signal.entry_low == signal.entry_high == Decimal("65000")
-    assert signal.stop_loss == Decimal("64000")
-    assert signal.take_profits == [Decimal("67000")]
-
-
-def test_signal_carries_event_linkage_and_method():
-    event = _event("BTC long entry 65000")
-    signal = parse(RULE, event)
-    assert signal.event_id == event.id
-    assert signal.channel_id == 7
-    assert signal.rule_id == "pilot-parser-v1"
-    assert signal.extraction_method is ExtractionMethod.DETERMINISTIC
+    intent = parse(RULE, "BTC long entry 65000 sl 64000 tp 67000")
+    assert (intent.symbol, intent.side) == ("BTCUSDT", Side.LONG)
+    assert intent.entry_type is EntryType.LIMIT_SINGLE
+    assert intent.entry_low == intent.entry_high == Decimal("65000")
+    assert intent.stop_loss == Decimal("64000")
+    assert intent.take_profits == [Decimal("67000")]
 
 
 def test_market_entry_has_no_price():
-    signal = parse(RULE, _event("ETH sell market"))
-    assert (signal.symbol, signal.side) == ("ETHUSDT", Side.SHORT)
-    assert signal.entry_type is EntryType.MARKET
-    assert signal.stop_loss is None
-    assert signal.take_profits == []
+    intent = parse(RULE, "ETH sell market")
+    assert (intent.symbol, intent.side) == ("ETHUSDT", Side.SHORT)
+    assert intent.entry_type is EntryType.MARKET
+    assert intent.stop_loss is None
+    assert intent.take_profits == []
 
 
 def test_range_entry_sets_low_high_and_range_type():
-    signal = parse(RULE, _event("SOL long entry 140-145 sl 135 tp 160"))
-    assert signal.entry_type is EntryType.LIMIT_RANGE
-    assert signal.entry_low == Decimal("140")
-    assert signal.entry_high == Decimal("145")
-    assert signal.stop_loss == Decimal("135")
+    intent = parse(RULE, "SOL long entry 140-145 sl 135 tp 160")
+    assert intent.entry_type is EntryType.LIMIT_RANGE
+    assert intent.entry_low == Decimal("140")
+    assert intent.entry_high == Decimal("145")
+    assert intent.stop_loss == Decimal("135")
 
 
 def test_multiple_take_profits_are_ordered():
-    signal = parse(RULE, _event("BTC buy entry 65000 tp1 67000 tp2 68000"))
-    assert signal.side is Side.LONG
-    assert signal.take_profits == [Decimal("67000"), Decimal("68000")]
+    intent = parse(RULE, "BTC buy entry 65000 tp1 67000 tp2 68000")
+    assert intent.side is Side.LONG
+    assert intent.take_profits == [Decimal("67000"), Decimal("68000")]
 
 
 def test_k_suffix_prices_expand_to_thousands():
-    signal = parse(RULE, _event("BTC long entry 65k sl 64k tp 67k"))
-    assert signal.entry_low == Decimal("65000")
-    assert signal.stop_loss == Decimal("64000")
-    assert signal.take_profits == [Decimal("67000")]
+    intent = parse(RULE, "BTC long entry 65k sl 64k tp 67k")
+    assert intent.entry_low == Decimal("65000")
+    assert intent.stop_loss == Decimal("64000")
+    assert intent.take_profits == [Decimal("67000")]
 
 
 def test_no_side_yields_no_signal():
-    assert parse(RULE, _event("BTC looking strong today")) is None
+    assert parse(RULE, "BTC looking strong today") is None
 
 
 def test_unrelated_chatter_yields_no_signal():
-    assert parse(RULE, _event("gm everyone, lovely day")) is None
+    assert parse(RULE, "gm everyone, lovely day") is None

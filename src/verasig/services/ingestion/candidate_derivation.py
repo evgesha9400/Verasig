@@ -83,7 +83,7 @@ def derive_candidates(
 
 
 def _parses(parser_rules: list[ParserRule], event: RawSignalEvent) -> bool:
-    return any(parse(rule, event) is not None for rule in parser_rules)
+    return any(parse(rule, event.candidate_text) is not None for rule in parser_rules)
 
 
 def sweep_advisory(

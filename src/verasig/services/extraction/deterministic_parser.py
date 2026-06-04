@@ -1,19 +1,18 @@
 """Deterministic ParserRule application (data-contracts.md §3; plan Slice 4).
 
-`parse` applies a `ParserRule`'s ordered regexes to a `RawSignalEvent`'s
-candidate text and maps the named groups (via `field_map`) onto a canonical
-`ExtractedSignal`. Required = symbol + side (side normalized via `side_aliases`);
-absent entry price ⇒ `MARKET`; a low/high pair ⇒ `LIMIT_RANGE`; a single ⇒
-`LIMIT_SINGLE`. No match (or missing symbol/side) ⇒ `None` (the caller records an
-`UnrecognizedSignal`). Pure and offline.
+`parse` applies a `ParserRule`'s ordered regexes to a message's candidate text
+and maps the named groups (via `field_map`) onto a provenance-free `TradeIntent`.
+Required = symbol + side (side normalized via `side_aliases`; symbol normalized
+by `TradeIntent`); absent entry price ⇒ `MARKET`; a low/high pair ⇒ `LIMIT_RANGE`;
+a single ⇒ `LIMIT_SINGLE`. No match (or missing symbol/side) ⇒ `None` (the caller
+links provenance and records the outcome). Pure and offline.
 """
 
 import re
 from decimal import Decimal, InvalidOperation
 
-from verasig.domain.event import RawSignalEvent
 from verasig.domain.parser_rule import ParserRule
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, TradeIntent
 
 _THOUSANDS = {"K", "К"}  # latin + cyrillic
 _MILLIONS = {"M", "М"}
@@ -33,11 +32,6 @@ def _to_decimal(raw: str) -> Decimal | None:
         return Decimal(cleaned) * multiplier
     except InvalidOperation:
         return None
-
-
-def _normalize_symbol(raw: str) -> str:
-    symbol = raw.upper()
-    return symbol if symbol.endswith("USDT") else f"{symbol}USDT"
 
 
 def _first(groups: dict, field_map: dict[str, str], target: str) -> str | None:
@@ -69,9 +63,7 @@ def _entry(
     return None, None, EntryType.MARKET
 
 
-def _build_signal(
-    rule: ParserRule, event: RawSignalEvent, groups: dict
-) -> ExtractedSignal | None:
+def _build_signal(rule: ParserRule, groups: dict) -> TradeIntent | None:
     symbol_raw = _first(groups, rule.field_map, "symbol")
     side_raw = _first(groups, rule.field_map, "side")
     if not symbol_raw or not side_raw:
@@ -81,10 +73,8 @@ def _build_signal(
         return None
     entry_low, entry_high, entry_type = _entry(groups, rule.field_map)
     stop_raw = _first(groups, rule.field_map, "stop_loss")
-    return ExtractedSignal(
-        event_id=event.id,
-        channel_id=event.channel_id,
-        symbol=_normalize_symbol(symbol_raw),
+    return TradeIntent(
+        symbol=symbol_raw,
         side=side,
         entry_type=entry_type,
         entry_low=entry_low,
@@ -95,16 +85,15 @@ def _build_signal(
             for raw in _all(groups, rule.field_map, "take_profit")
             if (price := _to_decimal(raw)) is not None
         ],
-        rule_id=rule.rule_id,
     )
 
 
-def parse(rule: ParserRule, event: RawSignalEvent) -> ExtractedSignal | None:
+def parse(rule: ParserRule, candidate_text: str) -> TradeIntent | None:
     for pattern in rule.patterns:
-        match = re.search(pattern, event.candidate_text, re.IGNORECASE | re.DOTALL)
+        match = re.search(pattern, candidate_text, re.IGNORECASE | re.DOTALL)
         if match is None:
             continue
-        signal = _build_signal(rule, event, match.groupdict())
-        if signal is not None:
-            return signal
+        intent = _build_signal(rule, match.groupdict())
+        if intent is not None:
+            return intent
     return None

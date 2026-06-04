@@ -9,12 +9,11 @@ gated. Reused by the workbench recall meter.
 
 from dataclasses import dataclass
 
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
-from verasig.domain.signal import ExtractedSignal
+from verasig.domain.signal import TradeIntent
 from verasig.services.extraction.deterministic_parser import parse
 from verasig.services.ingestion.candidate_filter import apply_filter_rule
 
@@ -46,21 +45,15 @@ def filter_recall(
 
 def _parse_message(
     message: RawTelegramMessage, parser_rules: list[ParserRule]
-) -> ExtractedSignal | None:
-    event = RawSignalEvent(
-        channel_id=message.channel_id,
-        message_id=message.message_id,
-        candidate_text=message.text or "",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-    )
+) -> TradeIntent | None:
     for rule in parser_rules:
-        signal = parse(rule, event)
-        if signal is not None:
-            return signal
+        intent = parse(rule, message.text or "")
+        if intent is not None:
+            return intent
     return None
 
 
-def _is_correct(label: GoldenLabel | None, signal: ExtractedSignal) -> bool:
+def _is_correct(label: GoldenLabel | None, signal: TradeIntent) -> bool:
     if label is None or not label.is_signal or label.expected is None:
         return False
     return signal.symbol == label.expected.symbol and signal.side == label.expected.side
