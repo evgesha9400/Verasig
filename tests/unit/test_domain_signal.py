@@ -41,6 +41,10 @@ def test_extracted_signal_extends_trade_intent():
     assert issubclass(ExtractedSignal, TradeIntent)
 
 
+def test_extracted_signal_has_no_parser_confidence():
+    assert "parser_confidence" not in ExtractedSignal.model_fields
+
+
 def test_extracted_signal_normalizes_symbol_via_inherited_validator():
     assert _signal(symbol="btc").symbol == "BTCUSDT"
 
@@ -68,7 +72,6 @@ def test_extracted_signal_defaults_provenance_and_optionals():
     assert isinstance(signal.id, UUID)
     assert signal.event_type is SignalEventType.NEW_ENTRY
     assert signal.extraction_method is ExtractionMethod.DETERMINISTIC
-    assert signal.parser_confidence == 1.0
     assert signal.take_profits == []
     assert signal.entry_type is None
     assert signal.stop_loss is None

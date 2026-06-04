@@ -76,7 +76,6 @@ class ExtractedSignal(TradeIntent):
     channel_id: int
     event_type: SignalEventType = SignalEventType.NEW_ENTRY
     references_message_id: int | None = None
-    parser_confidence: float = 1.0
     extraction_method: ExtractionMethod = ExtractionMethod.DETERMINISTIC
     rule_id: str | None = None
     extracted_at: datetime = Field(default_factory=_now)

@@ -109,7 +109,6 @@ class ExtractedSignalRow(Base):
     take_profits: Mapped[list] = mapped_column(JSONB, nullable=False)
     leverage: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     confidence: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
-    parser_confidence: Mapped[float] = mapped_column(Float, nullable=False)
     extraction_method: Mapped[str] = mapped_column(String, nullable=False)
     rule_id: Mapped[str | None] = mapped_column(String, nullable=True)
     extracted_at: Mapped[datetime] = mapped_column(

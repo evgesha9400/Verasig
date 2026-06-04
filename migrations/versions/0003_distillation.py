@@ -52,7 +52,6 @@ def upgrade() -> None:
         sa.Column("take_profits", postgresql.JSONB(), nullable=False),
         sa.Column("leverage", sa.Numeric(), nullable=True),
         sa.Column("confidence", sa.Numeric(), nullable=True),
-        sa.Column("parser_confidence", sa.Float(), nullable=False),
         sa.Column("extraction_method", sa.String(), nullable=False),
         sa.Column("rule_id", sa.String(), nullable=True),
         sa.Column("extracted_at", sa.DateTime(timezone=True), nullable=False),
