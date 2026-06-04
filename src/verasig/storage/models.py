@@ -92,6 +92,7 @@ class RawSignalEventRow(Base):
 
 class ExtractedSignalRow(Base):
     __tablename__ = "extracted_signal"
+    __table_args__ = (UniqueConstraint("event_id", name="uq_extracted_signal_event"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     event_id: Mapped[UUID] = mapped_column(
@@ -118,6 +119,9 @@ class ExtractedSignalRow(Base):
 
 class UnrecognizedSignalRow(Base):
     __tablename__ = "unrecognized_signal"
+    __table_args__ = (
+        UniqueConstraint("event_id", name="uq_unrecognized_signal_event"),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     event_id: Mapped[UUID] = mapped_column(
@@ -204,6 +208,24 @@ class FilterDriftWarningRow(Base):
     source_label_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("golden_label.id"), nullable=True
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class ParserDriftWarningRow(Base):
+    __tablename__ = "parser_drift_warning"
+    __table_args__ = (UniqueConstraint("event_id", name="uq_parser_drift_event"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    event_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("raw_signal_event.id"), nullable=False
+    )
+    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    deterministic_result: Mapped[str] = mapped_column(String, nullable=False)
+    fallback_result: Mapped[str] = mapped_column(String, nullable=False)
+    # plain Uuid, not a FK: re-extract churns the extracted PK; a FK would cascade
+    fallback_signal_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

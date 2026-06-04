@@ -33,6 +33,7 @@ _ALL_TABLES = ", ".join(
         "parser_rule",
         "golden_label",
         "filter_drift_warning",
+        "parser_drift_warning",
     ]
 )
 

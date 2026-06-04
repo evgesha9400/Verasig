@@ -6,24 +6,28 @@ its `first_seen_at` and the `captured_through_message_id` cursor are preserved
 across re-resolves — only the cursor's own monotonic advance moves it.
 """
 
-from sqlalchemy import func, select
+from uuid import UUID
+
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.drift import FilterDriftWarning
+from verasig.domain.drift import FilterDriftWarning, ParserDriftWarning
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
+from verasig.services.extraction.extract_service import ExtractOutcome
 from verasig.storage.models import (
     ChannelRow,
     ExtractedSignalRow,
     FilterDriftWarningRow,
     FilterRuleRow,
     GoldenLabelRow,
+    ParserDriftWarningRow,
     ParserRuleRow,
     RawMessageRow,
     RawSignalEventRow,
@@ -383,37 +387,34 @@ def read_drift_warnings(session: Session, channel_id: int) -> list[FilterDriftWa
     ]
 
 
+def _extracted_values(signal: ExtractedSignal) -> dict:
+    return {
+        "id": signal.id,
+        "event_id": signal.event_id,
+        "channel_id": signal.channel_id,
+        "symbol": signal.symbol,
+        "side": signal.side.value,
+        "event_type": signal.event_type.value,
+        "references_message_id": signal.references_message_id,
+        "entry_type": signal.entry_type.value if signal.entry_type else None,
+        "entry_low": signal.entry_low,
+        "entry_high": signal.entry_high,
+        "stop_loss": signal.stop_loss,
+        "take_profits": _str_list(signal.take_profits),
+        "leverage": signal.leverage,
+        "confidence": signal.confidence,
+        "extraction_method": signal.extraction_method.value,
+        "rule_id": signal.rule_id,
+        "extracted_at": signal.extracted_at,
+    }
+
+
 def insert_extracted_signals(session: Session, signals: list[ExtractedSignal]) -> int:
     if not signals:
         return 0
     statement = (
         pg_insert(ExtractedSignalRow)
-        .values(
-            [
-                {
-                    "id": signal.id,
-                    "event_id": signal.event_id,
-                    "channel_id": signal.channel_id,
-                    "symbol": signal.symbol,
-                    "side": signal.side.value,
-                    "event_type": signal.event_type.value,
-                    "references_message_id": signal.references_message_id,
-                    "entry_type": (
-                        signal.entry_type.value if signal.entry_type else None
-                    ),
-                    "entry_low": signal.entry_low,
-                    "entry_high": signal.entry_high,
-                    "stop_loss": signal.stop_loss,
-                    "take_profits": _str_list(signal.take_profits),
-                    "leverage": signal.leverage,
-                    "confidence": signal.confidence,
-                    "extraction_method": signal.extraction_method.value,
-                    "rule_id": signal.rule_id,
-                    "extracted_at": signal.extracted_at,
-                }
-                for signal in signals
-            ]
-        )
+        .values([_extracted_values(signal) for signal in signals])
         .returning(ExtractedSignalRow.id)
     )
     return len(session.execute(statement).fetchall())
@@ -447,6 +448,16 @@ def read_extracted_signals(session: Session, channel_id: int) -> list[ExtractedS
     ]
 
 
+def _unrecognized_values(item: UnrecognizedSignal) -> dict:
+    return {
+        "id": item.id,
+        "event_id": item.event_id,
+        "reason": item.reason,
+        "attempted_methods": [method.value for method in item.attempted_methods],
+        "created_at": item.created_at,
+    }
+
+
 def insert_unrecognized_signals(
     session: Session, items: list[UnrecognizedSignal]
 ) -> int:
@@ -454,20 +465,129 @@ def insert_unrecognized_signals(
         return 0
     statement = (
         pg_insert(UnrecognizedSignalRow)
-        .values(
-            [
-                {
-                    "id": item.id,
-                    "event_id": item.event_id,
-                    "reason": item.reason,
-                    "attempted_methods": [
-                        method.value for method in item.attempted_methods
-                    ],
-                    "created_at": item.created_at,
-                }
-                for item in items
-            ]
-        )
+        .values([_unrecognized_values(item) for item in items])
         .returning(UnrecognizedSignalRow.id)
     )
     return len(session.execute(statement).fetchall())
+
+
+def read_unrecognized_signals(
+    session: Session, channel_id: int
+) -> list[UnrecognizedSignal]:
+    rows = session.scalars(
+        select(UnrecognizedSignalRow)
+        .join(RawSignalEventRow, UnrecognizedSignalRow.event_id == RawSignalEventRow.id)
+        .where(RawSignalEventRow.channel_id == channel_id)
+    ).all()
+    return [
+        UnrecognizedSignal(
+            id=row.id,
+            event_id=row.event_id,
+            reason=row.reason,
+            attempted_methods=row.attempted_methods,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
+def _parser_drift_values(drift: ParserDriftWarning, fallback_signal_id: UUID) -> dict:
+    return {
+        "id": drift.id,
+        "event_id": drift.event_id,
+        "channel_id": drift.channel_id,
+        "deterministic_result": drift.deterministic_result,
+        "fallback_result": drift.fallback_result,
+        "fallback_signal_id": fallback_signal_id,
+        "created_at": drift.created_at,
+    }
+
+
+def read_parser_drift_warnings(
+    session: Session, channel_id: int
+) -> list[ParserDriftWarning]:
+    rows = session.scalars(
+        select(ParserDriftWarningRow).where(
+            ParserDriftWarningRow.channel_id == channel_id
+        )
+    ).all()
+    return [
+        ParserDriftWarning(
+            id=row.id,
+            event_id=row.event_id,
+            channel_id=row.channel_id,
+            deterministic_result=row.deterministic_result,
+            fallback_result=row.fallback_result,
+            fallback_signal_id=row.fallback_signal_id,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
+def _excluded_except(statement, row_type, keep: set[str]) -> dict:
+    return {
+        column.name: getattr(statement.excluded, column.name)
+        for column in row_type.__table__.columns
+        if column.name not in keep
+    }
+
+
+def _delete_outcome_row(session: Session, row_type, event_id: UUID) -> None:
+    session.execute(delete(row_type).where(row_type.event_id == event_id))
+
+
+def _upsert_extracted_signal(session: Session, signal: ExtractedSignal) -> UUID:
+    statement = pg_insert(ExtractedSignalRow).values(_extracted_values(signal))
+    statement = statement.on_conflict_do_update(
+        index_elements=["event_id"],
+        set_=_excluded_except(statement, ExtractedSignalRow, {"id", "event_id"}),
+    ).returning(ExtractedSignalRow.id)
+    return session.execute(statement).scalar_one()
+
+
+def _upsert_unrecognized_signal(session: Session, item: UnrecognizedSignal) -> None:
+    statement = pg_insert(UnrecognizedSignalRow).values(_unrecognized_values(item))
+    statement = statement.on_conflict_do_update(
+        index_elements=["event_id"],
+        set_=_excluded_except(statement, UnrecognizedSignalRow, {"id", "event_id"}),
+    )
+    session.execute(statement)
+
+
+def _upsert_parser_drift(
+    session: Session, drift: ParserDriftWarning, fallback_signal_id: UUID
+) -> None:
+    statement = pg_insert(ParserDriftWarningRow).values(
+        _parser_drift_values(drift, fallback_signal_id)
+    )
+    statement = statement.on_conflict_do_update(
+        index_elements=["event_id"],
+        set_=_excluded_except(statement, ParserDriftWarningRow, {"id", "event_id"}),
+    )
+    session.execute(statement)
+
+
+def _record_extracted(
+    session: Session, signal: ExtractedSignal, drift_warnings: list
+) -> None:
+    stored_id = _upsert_extracted_signal(session, signal)
+    _delete_outcome_row(session, UnrecognizedSignalRow, signal.event_id)
+    if drift_warnings:
+        _upsert_parser_drift(session, drift_warnings[0], stored_id)
+    else:
+        _delete_outcome_row(session, ParserDriftWarningRow, signal.event_id)
+
+
+def _record_unrecognized(session: Session, item: UnrecognizedSignal) -> None:
+    _upsert_unrecognized_signal(session, item)
+    _delete_outcome_row(session, ExtractedSignalRow, item.event_id)
+    _delete_outcome_row(session, ParserDriftWarningRow, item.event_id)
+
+
+def record_outcome(session: Session, outcome: ExtractOutcome) -> None:
+    """Recompute one event's projection: upsert the winner, drop the loser + drift."""
+    if outcome.signal is not None:
+        _record_extracted(session, outcome.signal, outcome.drift_warnings)
+    elif outcome.unrecognized is not None:
+        _record_unrecognized(session, outcome.unrecognized)
