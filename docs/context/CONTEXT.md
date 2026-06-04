@@ -23,8 +23,12 @@ The recall-first, **advisory** stage that flags a `RawTelegramMessage` as a `Raw
 
 ### Extraction
 
+**TradeIntent**:
+The provider's trade as parsed from message text — direction and price levels, independent of which message it came from. Required: `symbol` and `side`; optional: entry, stop, targets, leverage, provider-stated confidence. This is what **both** the deterministic parser and the LLM fallback produce; it carries **no** event linkage and **no** extraction provenance.
+_Avoid_: signal, order, trade (bare).
+
 **ExtractedSignal**:
-The canonical, flexible trading intent parsed from a `RawSignalEvent`. Required fields: `symbol` and `side` only. Everything else (entry, stop, targets, leverage, confidence) is optional. Replaces the docs' old term `Signal`.
+A `TradeIntent` **recorded against** a `RawSignalEvent` — the canonical extraction output. Adds the event linkage (`event_id`, `channel_id`), the lifecycle role (`event_type`, defaulting `NEW_ENTRY` at extraction), and the provenance (`extraction_method`, `rule_id`). The extractors supply only the `TradeIntent`; the `ExtractService` attaches everything else. Replaces the docs' old term `Signal`.
 _Avoid_: Signal, parsed signal, trade.
 
 **UnrecognizedSignal**:

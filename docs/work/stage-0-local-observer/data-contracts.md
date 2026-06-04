@@ -1,6 +1,6 @@
 # Stage 0 — Data Contracts
 
-Canonical Pydantic contracts (`domain/`) + service interfaces. **Contracts are frozen before implementation** (TDD writes tests against these). SQLAlchemy ORM rows in `storage/models.py` mirror these 1:1 and are append-only (insert-only; no UPDATE/DELETE on raw tables).
+Canonical Pydantic contracts (`domain/`) + service interfaces. **Contracts are frozen before implementation** (TDD writes tests against these). SQLAlchemy ORM rows in `storage/models.py` mirror these 1:1. **Raw capture** tables (`raw_telegram_message`, `raw_signal_event`) are append-only (insert-only; no UPDATE/DELETE). **Derived extraction-outcome** tables (`extracted_signal`, `unrecognized_signal`, `parser_drift_warning`) are **recomputable per-event projections**: a re-extract upserts the outcome keyed on `event_id` (one-of enforced by a single `record_outcome` write) — see [ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md), which amends [ADR 0001](../../adr/0001-two-layer-raw-capture.md).
 
 Notation: `?` = optional, `[]` = list, enums in `UPPER`.
 
@@ -60,14 +60,9 @@ RawSignalEvent:                      # ADVISORY signal candidate (priority/triag
 ## 3. Extraction
 
 ```python
-ExtractedSignal:                     # canonical, flexible; required = symbol+side
-    id: uuid
-    event_id: uuid                   # → RawSignalEvent
-    channel_id: int
+TradeIntent:                         # the trade parsed FROM TEXT; provenance-free; required = symbol+side
     symbol: str                      # REQUIRED, normalized e.g. "BTCUSDT"
     side: Side                       # REQUIRED
-    event_type: SignalEventType      # NEW_ENTRY | MODIFY | CLOSE
-    references_message_id: int?      # for MODIFY/CLOSE (from reply_to or text)
     entry_type: EntryType?
     entry_low: Decimal?              # single → low==high
     entry_high: Decimal?
@@ -75,9 +70,15 @@ ExtractedSignal:                     # canonical, flexible; required = symbol+si
     take_profits: list[Decimal]      # ordered, may be empty
     leverage: Decimal?
     confidence: Decimal?             # provider-stated, if any
-    parser_confidence: float         # 0..1, extractor's confidence
-    extraction_method: ExtractionMethod
-    rule_id: str?                    # which ParserRule matched
+
+ExtractedSignal(TradeIntent):        # a TradeIntent RECORDED against an event (adds linkage + provenance)
+    id: uuid
+    event_id: uuid                   # → RawSignalEvent
+    channel_id: int
+    event_type: SignalEventType      # NEW_ENTRY | MODIFY | CLOSE (lifecycle; defaults NEW_ENTRY at extraction)
+    references_message_id: int?      # for MODIFY/CLOSE (set in lifecycle, Slice 6)
+    extraction_method: ExtractionMethod   # DETERMINISTIC | LLM_FALLBACK — also the parse-reliability signal (Slice 8)
+    rule_id: str?                    # which ParserRule matched (null for LLM_FALLBACK)
     extracted_at: datetime
 
 UnrecognizedSignal:                  # extraction produced nothing usable
@@ -87,6 +88,8 @@ UnrecognizedSignal:                  # extraction produced nothing usable
     attempted_methods: list[ExtractionMethod]
     created_at: datetime
 ```
+
+**Shape vs linkage ([ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md)):** the extractors (`parse`, `extract`) produce only a `TradeIntent` from text; the `ExtractService` attaches event linkage + `extraction_method` (one `_link` site for both the deterministic and fallback paths). `parser_confidence` is **dropped** — `extraction_method` (DETERMINISTIC vs LLM_FALLBACK) is the honest, non-fabricated parse-reliability signal; Slice 8 derives its scorecard component from the `extraction_method` distribution + the unrecognized rate.
 
 **Invariant:** every `RawSignalEvent` yields **exactly one** of `{ExtractedSignal, UnrecognizedSignal}`. The candidate filter is advisory ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)): deterministic parsing may also run over non-candidate `RawTelegramMessage`s; a hit there **late-materializes** a `RawSignalEvent` (`materialized_by=PARSER_BACKFILL`) and emits a `FilterDriftWarning`. The 1:1 invariant binds each materialized event, not each raw message.
 
@@ -238,8 +241,10 @@ class MarketData(Protocol):
 
 # services/extraction/llm_fallback.py
 class LlmExtractor(Protocol):
-    def extract(self, candidate_text: str) -> ExtractedSignal | None: ...
-# adapters: ClaudeCliExtractor, CodexCliExtractor (subprocess); FakeExtractor (tests)
+    def extract(self, candidate_text: str) -> TradeIntent | None: ...   # text in, trade-shape out; service links
+# adapter: ClaudeCliExtractor(command="claude"|"codex", runner=...) (subprocess, runner-injectable); FakeExtractor (tests)
+# the deterministic parser is SYMMETRIC: parse(rule, candidate_text) -> TradeIntent | None
+# both feed ExtractService._link, which stamps event_id/channel_id/extraction_method/rule_id
 
 # services/distillation/rule_distiller.py  (one labeling pass → both rule kinds; ADR 0005)
 class RuleDistiller(Protocol):
