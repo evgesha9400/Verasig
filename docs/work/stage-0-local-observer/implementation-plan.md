@@ -303,6 +303,32 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
   - **Seed (cold start):** a pure, recall-first heuristic — candidate if the text holds an exchange-listed symbol/base coin (via an `Exchange` Protocol seam, e.g. a `Bybit` adapter + `FakeExchange` in tests), a directional keyword (EN+RU), or a trade-structure keyword/emoji. `matched_reasons: list[MatchReason]`; `candidate_text` = verbatim message text; media-only/blank → not a candidate.
   - **Distillation:** operator labels `is_signal` (+ expected fields for positives) in the Streamlit workbench; the external LLM distils a recall-first `FilterRule` and precision-first `ParserRule`s; rules applied, matched messages filtered, residue + a random unflagged sample re-presented; repeat. Only operator-selected examples leave the machine (privacy §10); bulk text is scanned only by local deterministic rules.
   - **Advisory gate:** deterministic rules may run over all `RawTelegramMessage`s; a hit on a non-candidate **late-materializes** a `RawSignalEvent` (`materialized_by=PARSER_BACKFILL`) + emits a `FilterDriftWarning`.
+- **UI — distillation workbench (Streamlit):** the operator must reach *beyond* candidates, not just label inside a pre-filtered list.
+
+  ```
+  ┌ Distillation workbench — @channel ───────────────────────────────────┐
+  │ View: ( Candidates | Unflagged | ⚠ Drift | 🎲 Audit )                 │
+  │ Recall vs GoldenLabel:  filter 0.93   parser P 0.96    Residue: 41    │
+  ├───────────────────────────────────────────────────────────────────── │
+  │ #1042  "BTC long entry 65k SL 64k TP 67k"            [✓ signal][fields]│
+  │ #1044  "gm frens wagmi"                               [✗ not]          │
+  │ #1047  "зашёл по эфиру, стоп под лоем"     ⚠ filter-miss [✓ signal][…] │
+  ├───────────────────────────────────────────────────────────────────── │
+  │ [ Distil rules from labels ] → FilterRule v3 (recall) + ParserRule r7 │
+  └─────────────────────────────────────────────────────────────────────  ┘
+  ```
+
+  - **View switcher** — `Candidates` (flagged, priority order) · `Unflagged` (the rest) · `⚠ Drift` (the `FilterDriftWarning` queue) · `🎲 Audit` (random unflagged sample, to discover missed formats). A hard gate would only ever show `Candidates`.
+  - **One label, two grounds** — `✓/✗ signal` trains the `FilterRule`; `[fields]` trains the `ParserRule`s. Single pass, two objectives.
+  - **Filter-recall meter (vs `GoldenLabel`)** — the gate's miss-rate is *visible* (it was unmeasurable under a hard gate).
+  - **Distil action** — one button emits a recall-first `FilterRule` + precision-first `ParserRule`s; matched messages drop out; residue + a fresh random sample re-present.
+  - **Loop:** label → distil → matched drop out → residue + audit sample re-presented → repeat until residue is small and recall holds.
+- **Runtime behaviour (advisory, not a wall):**
+  - candidate derivation sets **priority**, blocks nothing;
+  - the **cheap deterministic parser sweeps all** `RawTelegramMessage`s in bounded batches; a hit on a non-candidate late-materializes a `RawSignalEvent` (`PARSER_BACKFILL`) + a `FilterDriftWarning`;
+  - the **expensive LLM fallback stays scoped to candidates/residue** (cost + §10 unchanged) — only the cheap parse went broad;
+  - filter misses are therefore **recoverable + visible**, never silent; each drift warning is a labeled example for the next distillation;
+  - **cold start:** before any labels, the workbench shows seed-heuristic hits first **plus** a chronological/random sample so the operator can bootstrap the first labels without a working filter.
 - **Decisive tests:**
   - unit (pure, table-driven): seed filter — chatter→reject; directional/symbol/price→accept; `matched_reasons` recorded; recall-first over-include; `Exchange` symbols injected (offline).
   - unit (pure): `FilterRule`/`ParserRule` application is pure + table-driven against fixtures; `FakeDistiller(labels)` returns a `FilterRule` + `ParserRule`s.
