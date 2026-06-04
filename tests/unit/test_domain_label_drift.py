@@ -4,7 +4,11 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from verasig.domain.drift import FilterDriftWarning, MissDiscoveredBy
+from verasig.domain.drift import (
+    FilterDriftWarning,
+    MissDiscoveredBy,
+    ParserDriftWarning,
+)
 from verasig.domain.label import GoldenLabel
 from verasig.domain.signal import ExtractedSignal, Side
 
@@ -55,6 +59,23 @@ def test_filter_drift_warning_links_late_materialized_event():
     )
     assert warning.event_id == event_id
     assert warning.filter_rule_version == 3
+
+
+def test_parser_drift_warning_constructs_with_defaults():
+    fallback_signal_id = uuid4()
+    warning = ParserDriftWarning(
+        event_id=uuid4(), channel_id=7, fallback_signal_id=fallback_signal_id
+    )
+    assert warning.fallback_signal_id == fallback_signal_id
+    assert warning.deterministic_result == "no_match"
+    assert warning.fallback_result == "extracted"
+    assert isinstance(warning.id, UUID)
+    assert isinstance(warning.created_at, datetime)
+
+
+def test_parser_drift_warning_requires_fallback_signal_id():
+    with pytest.raises(ValidationError):
+        ParserDriftWarning(event_id=uuid4(), channel_id=7)
 
 
 def test_miss_discovered_by_has_the_three_discovery_paths():

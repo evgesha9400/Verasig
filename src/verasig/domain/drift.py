@@ -1,9 +1,10 @@
-"""Candidate-filter false-negative record (data-contracts.md §1, §4; ADR 0005).
+"""Drift records — false-negative evidence for the next distillation (§1, §4).
 
-A `FilterDriftWarning` is emitted whenever the candidate filter missed a message
-that later proved to be a signal — found by a background deterministic parse, an
-operator audit, or the LLM. Surfaces filter false negatives so each becomes a
-labeled example for the next distillation; symmetric to `ParserDriftWarning`.
+A `FilterDriftWarning` records a candidate-filter miss (a message that later
+proved a signal; found by background parse, operator audit, or the LLM). A
+`ParserDriftWarning` records a deterministic-parser miss that the LLM fallback
+then extracted. Both surface false negatives so each becomes a labeled example
+for the next distillation (ADR 0005, 0006).
 """
 
 from datetime import datetime, timezone
@@ -31,4 +32,14 @@ class FilterDriftWarning(BaseModel):
     miss_discovered_by: MissDiscoveredBy
     event_id: UUID | None = None  # the late-materialized RawSignalEvent, if any
     source_label_id: UUID | None = None  # the GoldenLabel that proved it, if any
+    created_at: datetime = Field(default_factory=_now)
+
+
+class ParserDriftWarning(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    event_id: UUID  # → RawSignalEvent the deterministic parser did not extract
+    channel_id: int
+    deterministic_result: str = "no_match"
+    fallback_result: str = "extracted"
+    fallback_signal_id: UUID  # the ExtractedSignal the fallback produced
     created_at: datetime = Field(default_factory=_now)
