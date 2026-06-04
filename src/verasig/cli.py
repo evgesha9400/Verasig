@@ -8,7 +8,8 @@ import typer
 from sqlalchemy import text
 
 from verasig.config import Settings
-from verasig.domain.signal import ExtractionMethod
+from verasig.domain.lifecycle import FoldedSignal, FoldStep
+from verasig.domain.signal import ExtractionMethod, SignalEventType
 from verasig.foundation.db import make_engine, make_session_factory
 from verasig.foundation.exchange import StaticExchange
 from verasig.foundation.telegram_session import (
@@ -28,6 +29,7 @@ from verasig.services.ingestion.candidate_derivation import (
     derive_candidates,
     sweep_advisory,
 )
+from verasig.services.lifecycle.fold import fold
 from verasig.storage import repositories as repo
 
 app = typer.Typer(help="Verasig — local observer CLI.")
@@ -137,6 +139,53 @@ def format_stats(channel, message_count: int) -> str:
     return " · ".join(parts)
 
 
+def _num(value) -> str:
+    return f"{value}"
+
+
+def _format_take_profits(values: list) -> str:
+    return f"[{', '.join(_num(value) for value in values)}]"
+
+
+def _format_levels(step: FoldStep) -> str:
+    parts = []
+    if step.effective_stop_loss is not None:
+        parts.append(f"sl={_num(step.effective_stop_loss)}")
+    if step.effective_take_profits:
+        parts.append(f"tps={_format_take_profits(step.effective_take_profits)}")
+    parts.append(f"size={_num(step.effective_size)}")
+    if step.effective_entry is not None:
+        parts.append(f"entry={_num(step.effective_entry)}")
+    return " ".join(parts)
+
+
+def _format_leg_note(step: FoldStep) -> str:
+    if step.leg_size is None or step.leg_size == 0:
+        return ""
+    if step.leg_size > 0:
+        return "  (add)"
+    return "  (reduce)" if step.event_type is SignalEventType.MODIFY else ""
+
+
+def _format_step(step: FoldStep) -> str:
+    when = step.at.strftime("%H:%M")
+    kind = step.event_type.value
+    return f"  {when} {kind:<9} {_format_levels(step)}{_format_leg_note(step)}"
+
+
+def _format_header(folded: FoldedSignal) -> str:
+    closed = folded.closed_at.strftime("%Y-%m-%dT%H:%MZ") if folded.closed_at else "-"
+    return (
+        f"{folded.symbol} {folded.side.value}  root={str(folded.root_signal_id)[:8]}  "
+        f"steps={len(folded.timeline)}  closed={closed}"
+    )
+
+
+def format_folded(folded: FoldedSignal) -> str:
+    rows = [_format_step(step) for step in folded.timeline]
+    return "\n".join([_format_header(folded), *rows])
+
+
 def _resolve_channel_id(session_factory, reference: str) -> int:
     with session_factory() as session:
         channel = repo.find_channel(session, reference)
@@ -152,6 +201,23 @@ def candidates(reference: str) -> None:
     channel_id = _resolve_channel_id(session_factory, reference)
     created = derive_candidates(session_factory, channel_id, StaticExchange())
     typer.echo(f"candidates derived: channel {channel_id} · +{created} new")
+
+
+@app.command()
+def lifecycle(reference: str) -> None:
+    """Fold a channel's lifecycles and print each timeline (offline, read-only)."""
+    session_factory = make_session_factory(Settings().database_url)
+    channel_id = _resolve_channel_id(session_factory, reference)
+    for folded in _fold_channel(session_factory, channel_id):
+        typer.echo(format_folded(folded))
+
+
+def _fold_channel(session_factory, channel_id: int) -> list[FoldedSignal]:
+    with session_factory() as session:
+        signals = repo.read_extracted_signals(session, channel_id)
+        events = repo.read_signal_events(session, channel_id)
+        messages = repo.read_messages(session, channel_id)
+    return fold(signals, events, messages)
 
 
 @dataclass
