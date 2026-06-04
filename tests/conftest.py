@@ -22,13 +22,27 @@ def migrated_engine(pg_url):
     engine.dispose()
 
 
+_ALL_TABLES = ", ".join(
+    [
+        "raw_telegram_message",
+        "telegram_channel",
+        "raw_signal_event",
+        "extracted_signal",
+        "unrecognized_signal",
+        "filter_rule",
+        "parser_rule",
+        "golden_label",
+        "filter_drift_warning",
+    ]
+)
+
+
 @pytest.fixture
 def session_factory(migrated_engine):
-    # clean slate per test (raw + channel tables); FK cascade clears children
+    # clean slate per test; CASCADE clears FK children, explicit list covers
+    # the nullable-FK rule tables (global rules would otherwise survive)
     with migrated_engine.begin() as connection:
-        connection.execute(
-            text("TRUNCATE raw_telegram_message, telegram_channel CASCADE")
-        )
+        connection.execute(text(f"TRUNCATE {_ALL_TABLES} CASCADE"))
     return sessionmaker(bind=migrated_engine, future=True)
 
 
