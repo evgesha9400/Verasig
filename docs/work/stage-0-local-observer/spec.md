@@ -23,8 +23,8 @@
 - Telegram **user-account** session ingestion (Telethon).
 - Public + private channel **history backfill** (first) and a **live listener** (last slice).
 - Append-only `RawTelegramMessage` capture.
-- Candidate filter → `RawSignalEvent`.
-- Human-assisted **distillation loop** → `ParserRule`s + golden corpus (Streamlit).
+- Candidate filter (**advisory**, seed + distilled) → `RawSignalEvent` ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)).
+- Human-assisted **distillation loop** → `FilterRule` + `ParserRule`s + golden corpus (Streamlit).
 - Deterministic extraction → `ExtractedSignal` | `UnrecognizedSignal`.
 - LLM fallback via **Claude/Codex CLI** (behind an interface) → `ParserDriftWarning`.
 - Signal **lifecycle folding** (entry + modifications + close, linked by `reply_to`).
@@ -115,10 +115,11 @@ verasig/
 │   ├── foundation/
 │   │   ├── db.py               # engine, session, Base
 │   │   ├── telegram_session.py # Telethon factory + login flow
+│   │   ├── exchange.py         # Exchange Protocol + Bybit adapter (supported_symbols)
 │   │   └── market_data.py      # BybitKlineClient (httpx) + MarketData interface
 │   ├── domain/             # PURE contracts (no IO)
 │   │   ├── channel.py  message.py  event.py  signal.py  lifecycle.py
-│   │   ├── parser_rule.py  drift.py  deletion.py  score.py
+│   │   ├── filter_rule.py  parser_rule.py  drift.py  deletion.py  score.py
 │   ├── storage/
 │   │   ├── models.py       # SQLAlchemy ORM (append-only tables)
 │   │   └── repositories.py # insert-only repos + queries
@@ -174,7 +175,7 @@ verasig/
 - [ ] Backfill is **resumable** from a persisted cursor; a mid-run kill + restart resumes and **does not refetch** captured messages.
 - [ ] Pipeline runs in **bounded chunks**; peak memory stays flat on a large channel (no full-history RAM load).
 - [ ] **Live latency:** median `posted_at → captured_at` ≤ the configured short-poll interval on pilot channels (hybrid push+poll closes MTProto channel-push batching; [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)).
-- [ ] Distillation loop produces `ParserRule`s and a labeled **golden corpus** for each pilot channel.
+- [ ] Distillation loop produces a `FilterRule` + `ParserRule`s and a labeled **golden corpus** for each pilot channel.
 - [ ] Deterministic extraction **precision ≥ 95%** on the golden corpus; recall measured + reported.
 - [ ] **100%** of LLM-fallback successes emit exactly one `ParserDriftWarning`.
 - [ ] Lifecycle folding correctly applies entry→modify→close threads; no phantom lifecycles.
@@ -188,7 +189,7 @@ verasig/
 
 | Risk | Stance for Stage 0 |
 |---|---|
-| Telegram content-licensing / AI-scraping terms (history + LLM over content) | **Unresolved — operator accepted the risk for Stage 0** on a dedicated throwaway account. Practice/test on real signal chats; revisit before any paid launch. |
+| Telegram content-licensing / AI-scraping terms (history + LLM over content) | **Unresolved — operator accepted the risk for Stage 0** on a dedicated throwaway account. Practice/test on real signal chats; revisit before any paid launch. Mitigated by [ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md): only operator-selected examples reach the external LLM (rule distillation); bulk channel text is scanned only by local deterministic rules. |
 | Telegram API rate/behaviour limits on user sessions | Resumable cursor + chunked pagination + flood-wait backoff; **no needless rescrape**; throwaway account. |
 | Telegram channel-push latency on user accounts (~30s batching) | Hybrid push + bounded short-poll closes `pts` gaps inside the adapter; latency is measured (`posted_at → captured_at`) and gated; TDLib/Pytdbot is the documented escape hatch. See [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md). |
 | User-account ban / ToS | Accepted, documented; **throwaway account required**. |

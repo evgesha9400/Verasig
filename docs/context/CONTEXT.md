@@ -15,11 +15,11 @@ One captured message exactly as received, stored immutably and append-only. The 
 _Avoid_: message record, raw event (that is something else — see below).
 
 **RawSignalEvent**:
-A `RawTelegramMessage` that a cheap candidate filter flagged as a signal candidate, plus the exact text slice handed to extraction. A subset of messages — chatter never becomes one.
+A `RawTelegramMessage` the candidate filter flagged as a signal candidate, plus the exact text slice handed to extraction. An **advisory** subset — it sets priority/triage (what the LLM and the operator UI see), not eligibility; deterministic parsing may still run over all messages, and a `RawSignalEvent` may be **late-materialized** when a background parse or audit finds a missed signal ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
 _Avoid_: signal, raw message. Note: this **supersedes** the old definition where `RawSignalEvent` meant "original source content" — that role now belongs to `RawTelegramMessage`.
 
 **Candidate filter**:
-The cheap, recall-first heuristic that decides whether a `RawTelegramMessage` becomes a `RawSignalEvent`. Over-includes on purpose; precision is recovered downstream.
+The recall-first, **advisory** stage that flags a `RawTelegramMessage` as a `RawSignalEvent`. Over-includes on purpose; precision is recovered downstream. It runs a cheap hand-coded **seed heuristic** for cold start, then provider-specific `FilterRule`s distilled from the golden corpus. Not a hard gate ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
 
 ### Extraction
 
@@ -42,12 +42,16 @@ A later extracted event that patches an earlier signal (e.g. add stop, move to b
 
 ### Parsing rules
 
+**FilterRule**:
+A declarative, versioned, provider-specific **inclusion** rule (recall-first include/exclude patterns) deciding whether a `RawTelegramMessage` is a `RawSignalEvent`. Distilled from `GoldenLabel.is_signal`; shares a regex engine with `ParserRule` but is a distinct entity — it decides inclusion, the parser maps fields.
+_Avoid_: candidate regex, keyword list (those are the cold-start seed, not the distilled rule).
+
 **ParserRule**:
-A declarative, versioned, provider-specific extraction rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch. Hand-authored via human-assisted distillation, never autonomously mined.
+A declarative, versioned, provider-specific **extraction** rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch. Distilled from `GoldenLabel.expected` fields via human-assisted distillation, never autonomously mined.
 _Avoid_: parser, regex, grammar.
 
 **Distillation loop**:
-The human-assisted UI cycle: operator highlights signal messages → AI distills `ParserRule`s from the examples → rules applied and matched messages filtered → residue re-presented → repeat until the operator is satisfied. The human labels become the golden corpus.
+The human-assisted UI cycle: operator highlights signal messages → AI distills both a `FilterRule` (from `is_signal`) and `ParserRule`s (from `expected` fields) from the examples → rules applied and matched messages filtered → residue re-presented → repeat until the operator is satisfied. One labeling pass, two objectives; the human labels become the golden corpus.
 
 **Golden corpus**:
 The operator-labeled set of messages (signal / not-signal + expected fields) used as ground truth for parser precision and recall.
@@ -55,6 +59,10 @@ The operator-labeled set of messages (signal / not-signal + expected fields) use
 **ParserDriftWarning**:
 A record emitted whenever deterministic parsing misses but LLM fallback succeeds — signalling the deterministic rules have fallen behind a provider's format. One warning per fallback success.
 _Avoid_: parser error, fallback log.
+
+**FilterDriftWarning**:
+A record emitted whenever the candidate filter missed a message that later proved to be a signal — a background deterministic parse, an operator audit, or the LLM found a signal the filter did not flag. Surfaces filter false negatives so they feed back into the next distillation; symmetric to `ParserDriftWarning`.
+_Avoid_: filter error, missed-candidate log.
 
 ### Deletion
 

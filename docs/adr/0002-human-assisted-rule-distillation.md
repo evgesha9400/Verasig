@@ -9,3 +9,7 @@ We did this to honour the explicit no-auto-research scope while still avoiding p
 - The UI (Streamlit) is a first-class interactive workbench, not a read-only report.
 - Parser precision/recall is measurable against the human golden corpus from day one.
 - Autonomous rule generation remains a possible later stage, gated behind validation data.
+
+## Amendment (ADR 0005)
+
+The same loop now distils the **candidate filter** as well, not just the parser. Per [ADR 0005](0005-distilled-filter-and-advisory-gate.md): one `GoldenLabel` pass feeds both a distilled `FilterRule` (from `is_signal`) and `ParserRule`s (from `expected` fields) in a single workbench cycle (classify `is_signal` first, then fill fields for positives). The filter-distillation prompt is deliberately **recall-first** (loose, OR-joined include rules), unlike the precision-first parser prompt. A cheap hand-coded heuristic remains only as a cold-start seed; filter misses surface as `FilterDriftWarning`, symmetric to `ParserDriftWarning`.

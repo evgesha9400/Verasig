@@ -15,6 +15,9 @@ DeletionConfidence = CONFIRMED | SUSPECTED
 DeletionMethod = SNAPSHOT_DIFF | ID_GAP | LIVE_EVENT
 SimOutcomeKind = R_MULTIPLE | MARK_TO_MARKET | UNFILLED
 DeliveryMode  = PUSH | POLL | CATCH_UP               # live message delivery path (latency provenance)
+MatchReason   = DIRECTIONAL_KEYWORD | SYMBOL_TOKEN | PRICE_SHAPED   # seed candidate heuristic, recall-first
+MaterializationPath = SEED_HEURISTIC | FILTER_RULE | PARSER_BACKFILL | HUMAN_AUDIT  # how a RawSignalEvent was flagged
+MissDiscoveredBy = PARSER_BACKFILL | HUMAN_AUDIT | LLM_FALLBACK     # who found a filter false negative (FilterDriftWarning)
 ```
 
 ## 2. Sources & capture
@@ -43,12 +46,14 @@ RawTelegramMessage:                  # immutable, append-only, 100% capture
     forwards: int?
     raw_payload: json                # full Telethon dict, verbatim
 
-RawSignalEvent:                      # subset flagged as signal candidate
+RawSignalEvent:                      # ADVISORY signal candidate (priority/triage, not a hard gate); may be late-materialized — ADR 0005
     id: uuid
     channel_id: int
-    message_id: int                  # → RawTelegramMessage
-    candidate_text: str              # exact slice fed to extraction
-    matched_reason: str              # which heuristic fired (audit)
+    message_id: int                  # → RawTelegramMessage; (channel_id, message_id) unique
+    candidate_text: str              # exact slice fed to extraction (verbatim message text)
+    materialized_by: MaterializationPath   # SEED_HEURISTIC | FILTER_RULE | PARSER_BACKFILL | HUMAN_AUDIT
+    matched_reasons: list[MatchReason]     # seed heuristics that fired (audit); may be empty when materialized by a rule/path
+    filter_rule_id: str?             # the FilterRule that flagged it, if any (null for seed/backfill/audit)
     created_at: datetime
 ```
 
@@ -83,12 +88,24 @@ UnrecognizedSignal:                  # extraction produced nothing usable
     created_at: datetime
 ```
 
-**Invariant:** every `RawSignalEvent` yields **exactly one** of `{ExtractedSignal, UnrecognizedSignal}`.
+**Invariant:** every `RawSignalEvent` yields **exactly one** of `{ExtractedSignal, UnrecognizedSignal}`. The candidate filter is advisory ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)): deterministic parsing may also run over non-candidate `RawTelegramMessage`s; a hit there **late-materializes** a `RawSignalEvent` (`materialized_by=PARSER_BACKFILL`) and emits a `FilterDriftWarning`. The 1:1 invariant binds each materialized event, not each raw message.
 
 ## 4. Parser rules & drift
 
 ```python
-ParserRule:                          # declarative + escape hatch
+FilterRule:                          # declarative INCLUSION rule (recall-first); distilled from is_signal labels — ADR 0005
+    rule_id: str                     # stable id (PK)
+    channel_id: int?                 # null = global / seed
+    version: int
+    include_patterns: list[str]      # ordered regexes; ANY match → candidate (OR-joined, recall-first)
+    exclude_patterns: list[str]      # optional carve-outs (rare; precision is recovered downstream)
+    matched_reason_template: str     # audit label written to RawSignalEvent.matched_reasons / filter_rule_id
+    recall_target: float             # recall the distillation aims to hold on labeled positives
+    python_filter: str?              # dotted path; escape hatch (mirrors ParserRule.python_extractor)
+    created_at: datetime
+    distilled_from_label_ids: list[uuid]   # provenance → golden corpus
+
+ParserRule:                          # declarative EXTRACTION rule + escape hatch
     rule_id: str                     # stable id (PK)
     channel_id: int?                 # null = global
     version: int
@@ -98,6 +115,16 @@ ParserRule:                          # declarative + escape hatch
     python_extractor: str?           # dotted path; escape hatch
     created_at: datetime
     distilled_from_label_ids: list[uuid]   # provenance → golden corpus
+
+FilterDriftWarning:                  # candidate filter missed a message that proved to be a signal — ADR 0005
+    id: uuid
+    channel_id: int
+    message_id: int                  # → RawTelegramMessage the filter did not flag
+    filter_rule_version: int?        # the FilterRule version that missed it (null = seed heuristic)
+    miss_discovered_by: MissDiscoveredBy   # PARSER_BACKFILL | HUMAN_AUDIT | LLM_FALLBACK
+    event_id: uuid?                  # the late-materialized RawSignalEvent, if one was created
+    source_label_id: uuid?           # the GoldenLabel that proved it a signal, if any
+    created_at: datetime
 
 ParserDriftWarning:                  # det miss + fallback success
     id: uuid
@@ -214,10 +241,11 @@ class LlmExtractor(Protocol):
     def extract(self, candidate_text: str) -> ExtractedSignal | None: ...
 # adapters: ClaudeCliExtractor, CodexCliExtractor (subprocess); FakeExtractor (tests)
 
-# services/distillation/rule_distiller.py
+# services/distillation/rule_distiller.py  (one labeling pass → both rule kinds; ADR 0005)
 class RuleDistiller(Protocol):
-    def distill(self, labels: list[GoldenLabel]) -> list[ParserRule]: ...
-# adapter: ClaudeCliDistiller; FakeDistiller (tests)
+    def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule: ...        # recall-first, from is_signal
+    def distill_parsers(self, labels: list[GoldenLabel]) -> list[ParserRule]: ...  # precision-first, from expected fields
+# adapter: ClaudeCliDistiller (distinct recall-first vs precision-first prompts); FakeDistiller (tests)
 
 # services/scoring/policies.py
 class ExecutionPolicy(Protocol):

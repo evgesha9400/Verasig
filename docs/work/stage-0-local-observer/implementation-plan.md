@@ -13,7 +13,7 @@
 ## How to read this plan
 
 - Slices are **vertical and dependency-ordered**: each ends green, committed, and demonstrable.
-- Slice 0 and Slice 5 are fully fleshed to TDD micro-steps as the pattern; remaining slices give the frozen contract (input/output/test/acceptance + the decisive test) and are expanded just-in-time at execution per `subagent-driven-development`.
+- Slice 0 and Slice 4 are fully fleshed to TDD micro-steps as the pattern; remaining slices give the frozen contract (input/output/test/acceptance + the decisive test) and are expanded just-in-time at execution per `subagent-driven-development`.
 - Contracts referenced here are frozen in `data-contracts.md`; metrics in `test-plan.md`.
 - **Commit after every passing step** (conventional commits). **Never skip a test.**
 
@@ -25,15 +25,14 @@
 0 Foundation
 └─1 Session/login
   └─2 Backfill (RawTelegramMessage)
-    └─3 Candidate filter (RawSignalEvent)
-      └─4 Distillation loop (ParserRule + golden corpus)   ── needs UI + CLI distiller
-        └─5 Deterministic extract (ExtractedSignal|Unrecognized)
-          ├─6 LLM fallback + drift
-          ├─7 Lifecycle fold
-          └─8 Deletion evidence (snapshot-diff + id-gap)
-            └─9 Hygiene scorecard + ProviderScore/Explanation
-              └─10 Simulation (Bybit klines, conservative)   ← FINAL scoring slice
-                └─11 Live listener daemon                     ← FINAL slice overall
+    └─3 Candidate seed filter + unified distillation (FilterRule + ParserRule + golden corpus; advisory RawSignalEvent)   ── needs UI + CLI distiller
+      └─4 Deterministic extract (ExtractedSignal|Unrecognized)
+        ├─5 LLM fallback + drift
+        ├─6 Lifecycle fold
+        └─7 Deletion evidence (snapshot-diff + id-gap)
+          └─8 Hygiene scorecard + ProviderScore/Explanation
+            └─9 Simulation (Bybit klines, conservative)   ← FINAL scoring slice
+              └─10 Live listener daemon                     ← FINAL slice overall
 ```
 
 ---
@@ -239,7 +238,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Input:** `telegram_api_id`/`hash`/`phone` (env), interactive code/2FA (once).
 - **Output:** persisted `StringSession` (bare UTF-8 string at `session_path`); non-interactive client for all other commands.
 - **Decisive test (unit):** session-string round-trips (`save`→`load`); missing/empty session raises `SessionMissingError("run `login` first")`; absent creds raise `CredentialsMissingError`.
-- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9) — Protocol-only stub this slice; `backfill_batches`/`live_events` are implemented in Slices 2/11. Slice 1's own seam is the session store + guarded client factory in `telegram_session.py`.
+- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9) — Protocol-only stub this slice; `backfill_batches`/`live_events` are implemented in Slices 2/10. Slice 1's own seam is the session store + guarded client factory in `telegram_session.py`.
 - **Acceptance:** `docker compose run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
 - **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are exercised manually; only load/persist/guard + the pure `format_account` formatter are unit-tested.
 
@@ -289,29 +288,32 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 ---
 
-## Slice 3: Candidate filter → RawSignalEvent
+## Slice 3: Candidate seed filter + unified distillation → FilterRule + ParserRule + golden corpus
 
-- **Input:** `RawTelegramMessage`.
-- **Output:** `RawSignalEvent` for candidates only (+ `matched_reason`).
-- **Decisive tests (unit, pure, table-driven):** chatter → reject; directional-keyword/symbol/price-shaped → accept; `matched_reason` recorded. Recall-first (over-include).
-- **Acceptance:** on the labeled corpus, candidate **recall ≥ 0.95** of human-labeled signals (false positives acceptable — extraction filters them).
-
----
-
-## Slice 4: Distillation loop → ParserRule + golden corpus
+> Merges the former candidate-filter and distillation-loop slices ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)). The candidate filter is **advisory** (priority/triage, not a hard gate); its rules are **distilled** from the same `GoldenLabel` pass that produces parser rules.
 
 - **Input:** a channel's `RawTelegramMessage` corpus.
-- **Output:** `ParserRule`s + `GoldenLabel`s (the golden corpus).
-- **Contracts:** `RuleDistiller` Protocol; `ParserRule`, `GoldenLabel` (`data-contracts.md`).
+- **Output:**
+  - advisory `RawSignalEvent`s — first from a cheap **seed heuristic**, then from distilled `FilterRule`s;
+  - `FilterRule` (recall-first, from `is_signal`) + `ParserRule`s (precision-first, from `expected` fields), distilled in one workbench loop;
+  - `GoldenLabel`s (the golden corpus);
+  - `FilterDriftWarning`s when a background parse / audit finds a signal the filter missed.
+- **Contracts:** `RawSignalEvent` (advisory, §2), `FilterRule`, `ParserRule`, `FilterDriftWarning`, `GoldenLabel` (§4); `RuleDistiller` Protocol (`distill_filter` + `distill_parsers`, §9).
+- **Seam / mechanism (ADR 0005):**
+  - **Seed (cold start):** a pure, recall-first heuristic — candidate if the text holds an exchange-listed symbol/base coin (via an `Exchange` Protocol seam, e.g. a `Bybit` adapter + `FakeExchange` in tests), a directional keyword (EN+RU), or a trade-structure keyword/emoji. `matched_reasons: list[MatchReason]`; `candidate_text` = verbatim message text; media-only/blank → not a candidate.
+  - **Distillation:** operator labels `is_signal` (+ expected fields for positives) in the Streamlit workbench; the external LLM distils a recall-first `FilterRule` and precision-first `ParserRule`s; rules applied, matched messages filtered, residue + a random unflagged sample re-presented; repeat. Only operator-selected examples leave the machine (privacy §10); bulk text is scanned only by local deterministic rules.
+  - **Advisory gate:** deterministic rules may run over all `RawTelegramMessage`s; a hit on a non-candidate **late-materializes** a `RawSignalEvent` (`materialized_by=PARSER_BACKFILL`) + emits a `FilterDriftWarning`.
 - **Decisive tests:**
-  - unit: `FakeDistiller(labels) → ParserRule`; rule-application (`apply(rule, text)→fields|None`) is pure and table-driven against fixtures.
-  - integration: labels + rules persist; **re-applying distilled rules reproduces the labels** at ≥ target precision.
-  - smoke (optional): Streamlit `AppTest` drives highlight → distill → filter → iterate; cursor advances to earliest labeled message.
-- **Acceptance:** operator labels a pilot channel via the UI; rules produced; residue shrinks each pass; operator stops when satisfied; golden corpus saved.
+  - unit (pure, table-driven): seed filter — chatter→reject; directional/symbol/price→accept; `matched_reasons` recorded; recall-first over-include; `Exchange` symbols injected (offline).
+  - unit (pure): `FilterRule`/`ParserRule` application is pure + table-driven against fixtures; `FakeDistiller(labels)` returns a `FilterRule` + `ParserRule`s.
+  - integration: labels + rules persist; **re-applying distilled rules reproduces the labels** (filter recall ≥ target on `is_signal`; parser ≥ target precision on `expected`); a planted filter miss emits exactly one `FilterDriftWarning`.
+  - smoke (optional): Streamlit `AppTest` drives label → distil(filter+parser) → filter → iterate; residue + unflagged sample shrink.
+- **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); operator labels a pilot channel via the UI; both rule kinds produced; residue shrinks each pass; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on `is_signal`; parser precision/recall on `expected`), not the candidate subset.
+- **Note:** real external-LLM distillation is gated behind operator go-ahead (selected examples → real LLM; see Start verdict). The seed filter + rule application are pure/offline and fixture-testable now. A local `FilterGemma`/`ParserGemma` is deferred to a later stage (ADR 0005).
 
 ---
 
-## Slice 5: Deterministic extraction → ExtractedSignal | UnrecognizedSignal
+## Slice 4: Deterministic extraction → ExtractedSignal | UnrecognizedSignal
 
 **Outcome:** apply `ParserRule`s to a `RawSignalEvent`, producing exactly one of `{ExtractedSignal, UnrecognizedSignal}`, enforcing `symbol`+`side` required and side normalization.
 
@@ -459,7 +461,7 @@ class ExtractService:
         for rule in self.rules:
             s = parse(rule, event.candidate_text)
             if s: return ExtractOutcome(signal=s, drift_warnings=[])
-        # fallback wired in Slice 6
+        # fallback wired in Slice 5
         return ExtractOutcome(unrecognized=_unrecognized(event, "no_match"), drift_warnings=[])
 ```
 
@@ -473,7 +475,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 6: LLM fallback + ParserDriftWarning
+## Slice 5: LLM fallback + ParserDriftWarning
 
 - **Input:** `RawSignalEvent` that missed deterministic parsing.
 - **Output:** `ExtractedSignal` (method=`LLM_FALLBACK`) or `UnrecognizedSignal`; **one `ParserDriftWarning` per fallback success**.
@@ -483,7 +485,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 7: Signal lifecycle fold
+## Slice 6: Signal lifecycle fold
 
 - **Input:** `ExtractedSignal`s + `reply_to` links, time-ordered.
 - **Output:** `FoldedSignal` (entry + applied modifications + optional close).
@@ -492,7 +494,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 8: Deletion evidence
+## Slice 7: Deletion evidence
 
 - **Input:** two backfill snapshots (live events later).
 - **Output:** `DeletedSignalEvidence` — `CONFIRMED` (snapshot-diff, content retained) + `SUSPECTED` (id-gap).
@@ -501,7 +503,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 9: Hygiene scorecard + ProviderScore/Explanation
+## Slice 8: Hygiene scorecard + ProviderScore/Explanation
 
 - **Input:** events, signals, drift, deletions, active-user proxy (sim components null/pending).
 - **Output:** `ProviderScore` + `ProviderScoreExplanation`.
@@ -510,7 +512,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 10: Simulation (FINAL scoring slice)
+## Slice 9: Simulation (FINAL scoring slice)
 
 - **Input:** `FoldedSignal`s + Bybit klines + `ExecutionPolicy`.
 - **Output:** `SimOutcome` per signal (R-multiple/MTM, MFE/MAE) → fills sim components of `ProviderScore`.
@@ -520,7 +522,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 11: Live listener daemon (FINAL slice overall)
+## Slice 10: Live listener daemon (FINAL slice overall)
 
 - **Input:** running Telethon session + pilot `channel_ids`.
 - **Output:** continuous `RawTelegramMessage` capture via **hybrid push+poll** (passive `events.NewMessage` + bounded short-poll closing `pts` gaps, deduped on `(channel_id, message_id)`) + real-time `DeletedSignalEvidence` (LIVE_EVENT, precise timing). Capture is **queue-first**: persist the row immediately, parse/score async — never block the update loop.
@@ -538,13 +540,13 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 **Start now — partially.** The plan and contracts are clear and frozen. Two preconditions and one gate:
 
 1. **Precondition — git (CLAUDE.md mandates it):** `git init`, create `main` (+ `develop`), commit the docs, then branch `feature/stage-0-foundation`. The repo currently has no VCS.
-2. **Start immediately (no external/legal exposure):** Slices **0, 3, 5, 7, 8, 9, 10** are pure-logic / fixture-driven — build them TDD against committed fixtures with **zero** Telegram, LLM, or network calls. This is the bulk of the engine and proves the thesis on recorded data.
-3. **Reality slices — operator has given go-ahead (accepted risk).** Slices **1, 2, 4, 6, 11** touch a real Telegram account and/or send real channel content to an LLM. The operator **accepted the legal risk for Stage 0** on a **dedicated throwaway Telegram account** (Telegram content-licensing + AI-scraping terms remain unresolved; revisit before paid launch). Constraints: resumable + chunked (spec §4.1) — **no rescrape on restart**, process in batches, never load full history into RAM.
+2. **Start immediately (no external/legal exposure):** Slices **0, 4, 6, 7, 8, 9** — plus the **seed filter + rule-application** of Slice 3 — are pure-logic / fixture-driven — build them TDD against committed fixtures with **zero** Telegram, LLM, or network calls. This is the bulk of the engine and proves the thesis on recorded data.
+3. **Reality slices — operator has given go-ahead (accepted risk).** Slices **1, 2, 5, 10** — plus **Slice 3's distillation sub-step** (external LLM over operator-selected examples only) — touch a real Telegram account and/or a real LLM. The operator **accepted the legal risk for Stage 0** on a **dedicated throwaway Telegram account** (Telegram content-licensing + AI-scraping terms remain unresolved; revisit before paid launch). Per ADR 0005, bulk channel text is never sent to the external LLM. Constraints: resumable + chunked (spec §4.1) — **no rescrape on restart**, process in batches, never load full history into RAM.
 
-> Recommended first move: git init → Slice 0 → Slices 3/5/7/8 against fixtures, then bring real Telegram online (Slices 1→2→4) on the throwaway account.
+> Recommended first move: git init → Slice 0 → Slice 3's seed filter + Slices 4/6/7 against fixtures, then bring real Telegram online (Slices 1→2) and run Slice 3's distillation on the throwaway account.
 
 ## Self-review notes
 
-- **Spec coverage:** every entity in `data-contracts.md` maps to a slice (channel/message→2, event→3, rule/label→4, signal/unrecognized→5, drift→6, folded→7, deletion→8, score/explanation→9, sim→10); live→11. ✓
-- **Type consistency:** `ExtractedSignal` fields, `Side`/`EntryType` enums, `ExtractOutcome`, and Protocol names match across slices and `data-contracts.md`. ✓
-- **No placeholders:** Slices 0 and 5 carry full code; later slices carry frozen contracts + decisive tests, expanded JIT at execution per the chosen execution skill. ✓
+- **Spec coverage:** every entity in `data-contracts.md` maps to a slice (channel/message→2; event + FilterRule/ParserRule + GoldenLabel + FilterDriftWarning→3; signal/unrecognized→4; parser-drift→5; folded→6; deletion→7; score/explanation→8; sim→9; live→10). ✓
+- **Type consistency:** `ExtractedSignal` fields, `Side`/`EntryType`/`MatchReason`/`MaterializationPath` enums, `ExtractOutcome`, `FilterRule`/`ParserRule`, and Protocol names match across slices and `data-contracts.md`. ✓
+- **No placeholders:** Slices 0 and 4 carry full code; later slices carry frozen contracts + decisive tests, expanded JIT at execution per the chosen execution skill. ✓
