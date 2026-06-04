@@ -101,27 +101,54 @@ def _str_list(values: list) -> list[str]:
     return [str(value) for value in values]
 
 
+def _row_to_message(row: RawMessageRow) -> RawTelegramMessage:
+    return RawTelegramMessage(
+        channel_id=row.channel_id,
+        message_id=row.message_id,
+        text=row.text,
+        sender_id=row.sender_id,
+        posted_at=row.posted_at,
+        captured_at=row.captured_at,
+        reply_to_message_id=row.reply_to_message_id,
+        edit_date=row.edit_date,
+        has_media=row.has_media,
+        views=row.views,
+        forwards=row.forwards,
+        raw_payload=row.raw_payload,
+    )
+
+
 def read_messages(session: Session, channel_id: int) -> list[RawTelegramMessage]:
     rows = session.scalars(
         select(RawMessageRow).where(RawMessageRow.channel_id == channel_id)
     ).all()
-    return [
-        RawTelegramMessage(
-            channel_id=row.channel_id,
-            message_id=row.message_id,
-            text=row.text,
-            sender_id=row.sender_id,
-            posted_at=row.posted_at,
-            captured_at=row.captured_at,
-            reply_to_message_id=row.reply_to_message_id,
-            edit_date=row.edit_date,
-            has_media=row.has_media,
-            views=row.views,
-            forwards=row.forwards,
-            raw_payload=row.raw_payload,
+    return [_row_to_message(row) for row in rows]
+
+
+def read_message_page(
+    session: Session, channel_id: int, after_message_id: int, limit: int
+) -> list[RawTelegramMessage]:
+    """One bounded page of messages with id > cursor (keyset pagination)."""
+    rows = session.scalars(
+        select(RawMessageRow)
+        .where(
+            RawMessageRow.channel_id == channel_id,
+            RawMessageRow.message_id > after_message_id,
         )
-        for row in rows
-    ]
+        .order_by(RawMessageRow.message_id)
+        .limit(limit)
+    ).all()
+    return [_row_to_message(row) for row in rows]
+
+
+def candidate_message_ids(session: Session, channel_id: int) -> set[int]:
+    return set(
+        session.scalars(
+            select(RawSignalEventRow.message_id).where(
+                RawSignalEventRow.channel_id == channel_id
+            )
+        ).all()
+    )
 
 
 def insert_signal_events(session: Session, events: list[RawSignalEvent]) -> int:
