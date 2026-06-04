@@ -39,10 +39,15 @@ _Avoid_: failed signal, error.
 Trade direction, normalized to `LONG` or `SHORT`. `buy` maps to `LONG`, `sell` maps to `SHORT`.
 
 **Signal lifecycle**:
-The ordered chain of an entry `ExtractedSignal` plus later modification/close events that reference it (via Telegram `reply_to`). A signal is multi-message **only when explicit linking evidence exists** — no phantom lifecycles. A complete one-shot signal stays single.
+The ordered chain of an entry `ExtractedSignal` plus later modification/close messages that reference it (via Telegram `reply_to`). A signal is multi-message **only when explicit linking evidence exists** — no phantom lifecycles. A complete one-shot signal stays single. Folded into a `FoldedSignal` by the lifecycle service.
 
 **SignalModification**:
-A later extracted event that patches an earlier signal (e.g. add stop, move to breakeven, close). Classified as `modify` or `close`; references the original message.
+A later message in a signal's reply chain that patches the live position — move stop (incl. to breakeven), set/move take-profits, **scale in (average) or reduce by a stated multiplier**, or fully close. Classified `MODIFY` or `CLOSE`. A modification need **not** be an `ExtractedSignal` (a reply like "move SL to BE" carries no `side`); it is recognized at fold-time from the `reply_to` chain, not by the parser.
+_Avoid_: edit, correction.
+
+**FoldedSignal**:
+The folded view of a `Signal lifecycle`: the entry plus its applied modifications as a time-ordered timeline of the **effective** stop, take-profits, position size, and average entry (after any averaging-in or reduction). Derived and recomputable from durable inputs — never stored. A standalone complete signal folds to a single-step timeline.
+_Avoid_: merged signal, final signal.
 
 ### Parsing rules
 

@@ -530,25 +530,27 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 - **Input:** `RawSignalEvent` that missed deterministic parsing.
 - **Output:** `ExtractedSignal` (method=`LLM_FALLBACK`) or `UnrecognizedSignal`; **one `ParserDriftWarning` per fallback success**.
-- **Contracts:** `LlmExtractor` Protocol; adapters `ClaudeCliExtractor`/`CodexCliExtractor` (subprocess parse) + `FakeExtractor`.
+- **Contracts:** `LlmExtractor` Protocol; adapter `ClaudeCliExtractor` (subprocess parse; Codex via `command="codex"` — a named subclass is trivial later, YAGNI) + `FakeExtractor`.
 - **Decisive tests (unit):** fallback called **only** on deterministic miss; success ⇒ exactly one drift warning (100% coverage metric); CLI-output parser tested against `fixtures/cli/extract_*.txt`; **real CLI never invoked**.
 - **Acceptance:** replay corpus → unmatched events route to fallback → drift warnings 1:1 with fallback successes; gated behind operator go-ahead (real content → real LLM; see Start verdict).
 
 **Resolved gaps (grill, 2026-06-04) — see [ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md):**
 
+> **Status (2026-06-04): IMPLEMENTED — green + committed** on `feature/stage-0-foundation`. **193 tests pass**, ruff clean. Deterministic miss → LLM fallback → exactly one `ParserDriftWarning` per fallback success (1:1 coverage); `record_outcome` upserts the winning outcome as a recomputable per-event projection (idempotent re-extract = +0; clean `unrecognized ↔ extracted` transitions, stale sibling + drift cleared). `extract --no-llm` flag + `extractor_fallback_enabled` off-switch; CLI seam `_make_fallback_extractor` monkeypatched in tests (FakeExtractor), CLI-output parsing pinned to `cli/extract_*.txt` — **no test touches the real CLI**. Real-LLM extraction stays go-ahead-gated manual acceptance. Next: Slice 6 (lifecycle fold).
+
 - **Shape/linkage split (root fix of the §3-vs-§9 collision):** new `TradeIntent` (provenance-free trade levels) + `ExtractedSignal(TradeIntent)` (linkage). Both extractors symmetric `text -> TradeIntent | None` (`parse(rule, candidate_text)`, `extract(candidate_text)`); `ExtractService._link(intent, event, method, rule_id)` is the single linkage site. Refactors the (absorbed) Slice-4 deterministic parser + simplifies `evaluation.py` (drops its dummy event). The linkage assertion moves from the parser test to the service test.
-- **LLM output = exactly `TradeIntent`** (one task; no self-grading, no lifecycle classification). Shared tolerant `_extract_json` (lifted from `rule_distiller`); `parse_extractor_output(stdout) -> TradeIntent | None` returns `None` on unparseable/missing symbol+side (a fallback miss, not a crash — unlike the distiller which raises). Fixtures: `cli/extract_pilot.txt` (success) + `cli/extract_miss.txt` (→ None).
+- **LLM output = exactly `TradeIntent`** (one task; no self-grading, no lifecycle classification). Shared tolerant `find_json_object` (new `services/json_extract.py`, shared with `rule_distiller`); `parse_extractor_output(stdout) -> TradeIntent | None` returns `None` on unparseable/missing symbol+side (a fallback miss, not a crash — unlike the distiller which raises). Fixtures: `cli/extract_pilot.txt` (success) + `cli/extract_miss.txt` (→ None).
 - **`parser_confidence` dropped** from the contract — redundant with `extraction_method`; Slice 8 derives its parse-reliability component from the `extraction_method` distribution + unrecognized rate.
 - **Fallback ON by default**, disableable: `Settings.extractor_fallback_enabled: bool = True` (+ `.env`) and a per-run `extract --no-llm` flag; `Settings.extractor_command: str = "claude"`. The operator authorised the real LLM for Stage 0 (Start verdict); the off-switch is for offline/free runs. CLI seam `_make_fallback_extractor` is monkeypatched in tests (FakeExtractor) — **no test touches the real CLI**.
 - **`ExtractService.extract(event)` wiring:** deterministic match → `_link(…, DETERMINISTIC, rule.rule_id)`, fallback not called; miss + no fallback → `UnrecognizedSignal(reason="no_match", attempted=[DETERMINISTIC])`; miss + fallback success → `_link(…, LLM_FALLBACK, None)` + one `ParserDriftWarning(deterministic_result="no_match", fallback_result="extracted", fallback_signal_id=…)`; miss + fallback fail (None) → `UnrecognizedSignal(reason="fallback_failed", attempted=[DETERMINISTIC, LLM_FALLBACK])`.
-- **Persistence — recomputable projection (ADR 0006):** `record_outcome(session, outcome, drift=None)` upserts the winning outcome `ON CONFLICT(event_id) DO UPDATE`, deletes the losing sibling, and upserts/clears the `parser_drift_warning`. `UNIQUE(event_id)` on `extracted_signal`, `unrecognized_signal`, `parser_drift_warning`. Re-extract is `+0` and transitions `unrecognized -> extracted` cleanly. Raw tables stay append-only.
+- **Persistence — recomputable projection (ADR 0006):** `record_outcome(session, outcome)` (drift travels inside `ExtractOutcome.drift_warnings`, not a separate arg) upserts the winning outcome `ON CONFLICT(event_id) DO UPDATE`, deletes the losing sibling, and upserts/clears the `parser_drift_warning`. `UNIQUE(event_id)` on `extracted_signal`, `unrecognized_signal`, `parser_drift_warning`. Re-extract is `+0` and transitions `unrecognized -> extracted` cleanly. Raw tables stay append-only.
 - **Adapter:** one `ClaudeCliExtractor(command=…, runner=…)` mirroring `ClaudeCliDistiller` (Codex via `command="codex"`; a named subclass is trivial later — YAGNI). `FakeExtractor(returns=…, calls)` in `tests/fakes.py`.
 - **Migrations:** edit `0003` to drop the now-dead `parser_confidence` column; add `0004` (`parser_drift_warning` table + `UNIQUE(event_id)` on `extracted_signal`/`unrecognized_signal`). conftest TRUNCATE list extended.
 - **Out of scope:** the workbench ⚠ Drift view stays filter-drift only (no parser-drift UI this slice).
 
 **Files:**
 - `domain/signal.py` (+`TradeIntent`, `ExtractedSignal(TradeIntent)`, −`parser_confidence`), `domain/drift.py` (+`ParserDriftWarning`)
-- `services/extraction/llm_fallback.py` (new: `LlmExtractor` Protocol + `parse_extractor_output` + `ClaudeCliExtractor` + shared `_extract_json`), `services/extraction/deterministic_parser.py` (→ `TradeIntent`), `services/extraction/extract_service.py` (wire fallback + `_link` + drift), `services/distillation/evaluation.py` (→ `TradeIntent`, drop dummy event), `services/ingestion/candidate_derivation.py` (`parse(rule, text)`)
+- `services/extraction/llm_fallback.py` (new: `LlmExtractor` Protocol + `parse_extractor_output` + `ClaudeCliExtractor`) + `services/json_extract.py` (new: shared `find_json_object`), `services/extraction/deterministic_parser.py` (→ `TradeIntent`), `services/extraction/extract_service.py` (wire fallback + `_link` + drift), `services/distillation/evaluation.py` (→ `TradeIntent`, drop dummy event), `services/ingestion/candidate_derivation.py` (`parse(rule, text)`)
 - `storage/models.py` (−`parser_confidence`, +`ParserDriftWarningRow`, +`UNIQUE`), `storage/repositories.py` (+`record_outcome`, +`read_parser_drift_warnings`), `migrations/versions/0003_*.py` (edit), `migrations/versions/0004_*.py` (new)
 - `config.py` (+`extractor_fallback_enabled`, +`extractor_command`), `cli.py` (`extract --no-llm` + `_make_fallback_extractor` + `record_outcome` + drift count in output)
 - `tests/fakes.py` (+`FakeExtractor`), `tests/fixtures/cli/extract_pilot.txt` + `extract_miss.txt`, unit + integration tests; `tests/conftest.py` (TRUNCATE +`parser_drift_warning`)
@@ -557,10 +559,26 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ## Slice 6: Signal lifecycle fold
 
-- **Input:** `ExtractedSignal`s + `reply_to` links, time-ordered.
-- **Output:** `FoldedSignal` (entry + applied modifications + optional close).
-- **Decisive tests (unit, pure):** entry then "move SL to BE" reply ⇒ effective SL updated at modification time; CLOSE terminates; **standalone complete signal stays single-step (no phantom lifecycle)**; out-of-order updates handled.
-- **Acceptance:** a crafted entry→modify→close thread folds to the expected effective-parameter timeline.
+- **Input:** a channel's `ExtractedSignal` entries + their `RawTelegramMessage`s (`reply_to_message_id` for links, `posted_at` for the true timeline).
+- **Output:** in-memory `FoldedSignal` (entry + applied modifications + optional close) — recomputable, never stored.
+- **Decisive tests (unit, pure):** entry then "move SL to BE" reply ⇒ effective SL updated at modification time (= effective entry); average-in ⇒ effective size + size-weighted entry (priced legs); market-price add ⇒ `leg_price`/`effective_entry` pending (None, Slice-9 fill); reduce lowers size without moving entry; CLOSE (keyword or `size → 0`) terminates with `closed_at`; **standalone complete signal stays single-step (no phantom lifecycle)**; out-of-order updates handled (sort by `posted_at`); different-symbol reply starts its own root.
+- **Acceptance:** a crafted entry→modify→close thread folds to the expected effective-parameter timeline; `verasig lifecycle <ref>` prints it.
+
+**Resolved gaps (grill, 2026-06-05) — see [ADR 0007](../../adr/0007-lifecycle-fold-pure-recomputable.md):**
+
+- **Placement:** new pure `services/lifecycle/` fold — `fold(entry_signals, messages, version) -> list[FoldedSignal]`. Extractors stay pure `text -> TradeIntent` (NEW_ENTRY only); no DB writes, no migration. Lifecycle classification happens at fold-time, not in extraction.
+- **Modifications are not signals:** a reply ("move SL to BE") carries no `side`, so it is never an `ExtractedSignal`; it is recognized from the `reply_to` chain. `event_type`/`references_message_id` live in the folded view, never written back to `extracted_signal`.
+- **Storage = recompute:** `FoldedSignal` is in-memory + `fold_version`-stamped; auditable by recompute over append-only messages + recomputable signals (the fold adds no new information; its sources never vanish — unlike `DeletedSignalEvidence`). `SimOutcome.folded_signal_id := root_signal_id`.
+- **Contract growth ([data-contracts §5](data-contracts.md)):** `FoldStep` += `source_message_id`, `event_type`, `effective_size`, `effective_entry?`, `leg_size?`, `leg_price?`; `source_signal_id` pinned to `root_signal_id`; `FoldedSignal` += `fold_version`.
+- **Modify semantics:** SL (incl. BE := current `effective_entry`), TP (stated set replaces), average-in (+leg, stated multiplier, price or market), reduce (size↓, entry unchanged), full close. Effective state carries forward cumulatively. Position size = equal-weight legs × stated multipliers (no `size` field on `TradeIntent`). Market legs (`leg_price=None`) → `effective_entry=None`, resolved by Slice 9.
+- **Threading:** transitive `reply_to` walk to the nearest entry root; symbol-guarded membership (same/no symbol joins; different symbol starts its own root); CLOSE by full-close keyword (EN+RU) or `effective_size → 0`.
+- **Surface:** read-only `verasig lifecycle <ref>` (reads DB, folds, prints; no writes, offline). Out of scope: scoring/sim/deletion/live (Slices 7–10), market-price fills (Slice 9).
+
+**Files (this pass):**
+- `domain/lifecycle.py` (`FoldStep`, `FoldedSignal`, `FOLD_VERSION`)
+- `services/lifecycle/__init__.py`, `services/lifecycle/fold.py` (pure fold + thread resolution), `services/lifecycle/patch.py` (pure lifecycle patch classifier: SL/BE/TP/add/reduce/close + multipliers + price, EN+RU)
+- `cli.py` (+`lifecycle`)
+- `tests/unit/test_lifecycle_patch.py`, `tests/unit/test_lifecycle_fold.py` (crafted threads), `tests/integration/test_cli_lifecycle.py`
 
 ---
 

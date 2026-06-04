@@ -76,7 +76,7 @@ ExtractedSignal(TradeIntent):        # a TradeIntent RECORDED against an event (
     event_id: uuid                   # → RawSignalEvent
     channel_id: int
     event_type: SignalEventType      # NEW_ENTRY | MODIFY | CLOSE (lifecycle; defaults NEW_ENTRY at extraction)
-    references_message_id: int?      # for MODIFY/CLOSE (set in lifecycle, Slice 6)
+    references_message_id: int?      # reserved; lifecycle linkage is computed in FoldStep.source_message_id, not on this row (ADR 0007)
     extraction_method: ExtractionMethod   # DETERMINISTIC | LLM_FALLBACK — also the parse-reliability signal (Slice 8)
     rule_id: str?                    # which ParserRule matched (null for LLM_FALLBACK)
     extracted_at: datetime
@@ -150,21 +150,32 @@ GoldenLabel:                         # operator ground truth from distillation
 ## 5. Lifecycle (folded view)
 
 ```python
-FoldedSignal:                        # derived; not stored raw, computed in sim slice
-    root_signal_id: uuid             # the NEW_ENTRY
+FoldedSignal:                        # derived; recomputable from durable inputs, NEVER stored (ADR 0007)
+    root_signal_id: uuid             # the NEW_ENTRY ExtractedSignal id == SimOutcome.folded_signal_id
     symbol: str
     side: Side
-    timeline: list[FoldStep]         # entry + each modification, time-ordered
-    closed_at: datetime?             # if a CLOSE was applied
+    timeline: list[FoldStep]         # entry + each applied modification, time-ordered by posted_at
+    closed_at: datetime?             # set when a CLOSE applied or effective_size reached 0
+    fold_version: int                # lifecycle-logic version (reproducibility of a past fold)
 
-FoldStep:
-    at: datetime
-    source_signal_id: uuid
+FoldStep:                            # the effective position state AFTER this step
+    at: datetime                     # the source message's posted_at (the true timeline)
+    source_signal_id: uuid           # = root_signal_id (the durable entry signal)
+    source_message_id: int           # the message that caused this step (entry or reply)
+    event_type: SignalEventType      # NEW_ENTRY | MODIFY | CLOSE
     effective_stop_loss: Decimal?
     effective_take_profits: list[Decimal]
+    effective_size: Decimal          # cumulative position size (stated multipliers; entry = 1)
+    effective_entry: Decimal?        # size-weighted avg of PRICED legs; None ⇒ a market leg is pending (Slice 9 fills)
+    leg_size: Decimal?               # this step's size delta (+average-in / −reduce); None for SL/TP-only modifies
+    leg_price: Decimal?              # this step's leg price; None ⇒ market-at-`at` (Slice 9 fills from klines)
 ```
 
-**Rule:** a `FoldedSignal` is multi-step **only** when ≥1 `MODIFY`/`CLOSE` references it. A standalone complete `NEW_ENTRY` folds to a single-step timeline.
+**Rules ([ADR 0007](../../adr/0007-lifecycle-fold-pure-recomputable.md)):**
+- A `FoldedSignal` is multi-step **only** when ≥1 `MODIFY`/`CLOSE` is in its `reply_to` chain. A standalone complete `NEW_ENTRY` folds to a single-step timeline (no phantom lifecycle).
+- Modifications are **not** `ExtractedSignal`s — they are recognized at fold-time from the `reply_to` chain (transitive, symbol-guarded), so `event_type`/`references_message_id` live in the **folded view**, never written back to `extracted_signal`.
+- Effective state carries forward cumulatively; `move SL to BE` ⇒ `effective_stop_loss := effective_entry` (pending if a market leg is unresolved); a reduce lowers `effective_size` without moving `effective_entry`; a full close (or `effective_size → 0`) sets `closed_at`.
+- Market-price legs (`leg_price = None`) and the resulting `effective_entry = None` are resolved by Slice 9 sim against klines — the existing `EntryType.MARKET` fill pattern.
 
 ## 6. Deletion
 
@@ -212,7 +223,7 @@ ProviderScoreExplanation:
 
 ```python
 SimOutcome:
-    folded_signal_id: uuid
+    folded_signal_id: uuid           # == FoldedSignal.root_signal_id (NEW_ENTRY id); fold is in-memory (ADR 0007)
     kind: SimOutcomeKind             # R_MULTIPLE | MARK_TO_MARKET | UNFILLED
     r_multiple: float?               # when stop present
     pct_return: float?               # when MTM
