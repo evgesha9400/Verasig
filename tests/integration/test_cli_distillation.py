@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
+from fakes import FakeExtractor
 from typer.testing import CliRunner
 
 from verasig.cli import app
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
+from verasig.domain.signal import Side, TradeIntent
 from verasig.storage import repositories as repo
 
 runner = CliRunner()
@@ -89,11 +91,47 @@ def test_extract_cli_produces_signals(session_factory, monkeypatch, pg_url):
     _add_rule(session_factory, _LONG_RULE)
     monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
     runner.invoke(app, ["candidates", "@pilot"])
-    result = runner.invoke(app, ["extract", "@pilot"])
+    result = runner.invoke(app, ["extract", "@pilot", "--no-llm"])
     assert result.exit_code == 0
-    assert "1 signals" in result.output
+    assert "1 det" in result.output
     with session_factory() as session:
         assert len(repo.read_extracted_signals(session, 7)) == 1
+
+
+def test_extract_cli_with_injected_fallback_emits_drift(
+    session_factory, monkeypatch, pg_url
+):
+    _populate(session_factory)  # no parser rule → deterministic miss on the candidate
+    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setattr(
+        "verasig.cli._make_fallback_extractor",
+        lambda settings: FakeExtractor(
+            returns=TradeIntent(symbol="BTC", side=Side.LONG)
+        ),
+    )
+    runner.invoke(app, ["candidates", "@pilot"])
+    result = runner.invoke(app, ["extract", "@pilot"])
+    assert result.exit_code == 0
+    assert "1 llm" in result.output
+    assert "+1 parser-drift" in result.output
+    with session_factory() as session:
+        signals = repo.read_extracted_signals(session, 7)
+        drifts = repo.read_parser_drift_warnings(session, 7)
+    assert len(signals) == 1 and signals[0].extraction_method == "LLM_FALLBACK"
+    assert len(drifts) == 1
+
+
+def test_extract_cli_no_llm_yields_unrecognized(session_factory, monkeypatch, pg_url):
+    _populate(session_factory)  # no parser rule, fallback disabled → unrecognized
+    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    runner.invoke(app, ["candidates", "@pilot"])
+    result = runner.invoke(app, ["extract", "@pilot", "--no-llm"])
+    assert result.exit_code == 0
+    assert "1 unrecognized" in result.output
+    assert "+0 parser-drift" in result.output
+    with session_factory() as session:
+        assert repo.read_extracted_signals(session, 7) == []
+        assert len(repo.read_unrecognized_signals(session, 7)) == 1
 
 
 def test_sweep_cli_recovers_filter_miss(session_factory, monkeypatch, pg_url):

@@ -1,12 +1,14 @@
 import asyncio
 import os
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 import typer
 from sqlalchemy import text
 
 from verasig.config import Settings
+from verasig.domain.signal import ExtractionMethod
 from verasig.foundation.db import make_engine, make_session_factory
 from verasig.foundation.exchange import StaticExchange
 from verasig.foundation.telegram_session import (
@@ -19,7 +21,8 @@ from verasig.foundation.telegram_session import (
     save_session_string,
 )
 from verasig.foundation.telegram_source import TelethonSource
-from verasig.services.extraction.extract_service import ExtractService
+from verasig.services.extraction.extract_service import ExtractOutcome, ExtractService
+from verasig.services.extraction.llm_fallback import ClaudeCliExtractor, LlmExtractor
 from verasig.services.ingestion.backfill import backfill as run_backfill
 from verasig.services.ingestion.candidate_derivation import (
     derive_candidates,
@@ -151,34 +154,69 @@ def candidates(reference: str) -> None:
     typer.echo(f"candidates derived: channel {channel_id} · +{created} new")
 
 
+@dataclass
+class _ExtractTally:
+    deterministic: int = 0
+    llm: int = 0
+    unrecognized: int = 0
+    drift: int = 0
+
+
 @app.command()
-def extract(reference: str) -> None:
-    """Apply ParserRules to candidates → ExtractedSignal | UnrecognizedSignal."""
-    session_factory = make_session_factory(Settings().database_url)
+def extract(
+    reference: str,
+    no_llm: bool = typer.Option(
+        False, "--no-llm", help="disable the LLM fallback (offline, deterministic only)"
+    ),
+) -> None:
+    """Apply ParserRules (+ optional LLM fallback) → ExtractedSignal | Unrecognized."""
+    settings = Settings()
+    session_factory = make_session_factory(settings.database_url)
     channel_id = _resolve_channel_id(session_factory, reference)
-    signals, unrecognized = _extract_candidates(session_factory, channel_id)
+    fallback = _resolve_fallback(settings, no_llm)
+    tally = _extract_candidates(session_factory, channel_id, fallback)
     typer.echo(
-        f"extracted: channel {channel_id} · {signals} signals "
-        f"· {unrecognized} unrecognized"
+        f"extracted: channel {channel_id} · {tally.deterministic} det "
+        f"· {tally.llm} llm · {tally.unrecognized} unrecognized "
+        f"· +{tally.drift} parser-drift"
     )
 
 
-def _extract_candidates(session_factory, channel_id: int) -> tuple[int, int]:
+def _make_fallback_extractor(settings: Settings) -> LlmExtractor:
+    return ClaudeCliExtractor(command=settings.extractor_command)
+
+
+def _resolve_fallback(settings: Settings, no_llm: bool) -> LlmExtractor | None:
+    if no_llm or not settings.extractor_fallback_enabled:
+        return None
+    return _make_fallback_extractor(settings)
+
+
+def _tally_outcome(tally: _ExtractTally, outcome: ExtractOutcome) -> None:
+    if outcome.signal is None:
+        tally.unrecognized += 1
+    elif outcome.signal.extraction_method is ExtractionMethod.LLM_FALLBACK:
+        tally.llm += 1
+    else:
+        tally.deterministic += 1
+    tally.drift += len(outcome.drift_warnings)
+
+
+def _extract_candidates(
+    session_factory, channel_id: int, fallback: LlmExtractor | None
+) -> _ExtractTally:
     with session_factory() as session:
-        service = ExtractService(repo.read_parser_rules(session, channel_id))
+        rules = repo.read_parser_rules(session, channel_id)
         events = repo.read_signal_events(session, channel_id)
-    signals, unrecognized = [], []
-    for event in events:
-        outcome = service.extract(event)
-        if outcome.signal is not None:
-            signals.append(outcome.signal)
-        else:
-            unrecognized.append(outcome.unrecognized)
+    service = ExtractService(rules, fallback=fallback)
+    tally = _ExtractTally()
     with session_factory() as session:
-        repo.insert_extracted_signals(session, signals)
-        repo.insert_unrecognized_signals(session, unrecognized)
+        for event in events:
+            outcome = service.extract(event)
+            repo.record_outcome(session, outcome)
+            _tally_outcome(tally, outcome)
         session.commit()
-    return len(signals), len(unrecognized)
+    return tally
 
 
 @app.command()

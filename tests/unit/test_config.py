@@ -26,3 +26,21 @@ def test_distiller_command_defaults_to_claude():
 def test_distiller_command_loads_from_env(monkeypatch):
     monkeypatch.setenv("VERASIG_DISTILLER_COMMAND", "codex")
     assert Settings().distiller_command == "codex"
+
+
+def test_extractor_fallback_enabled_defaults_to_true():
+    assert Settings(_env_file=None).extractor_fallback_enabled is True
+
+
+def test_extractor_fallback_enabled_loads_from_env(monkeypatch):
+    monkeypatch.setenv("VERASIG_EXTRACTOR_FALLBACK_ENABLED", "false")
+    assert Settings().extractor_fallback_enabled is False
+
+
+def test_extractor_command_defaults_to_claude():
+    assert Settings(_env_file=None).extractor_command == "claude"
+
+
+def test_extractor_command_loads_from_env(monkeypatch):
+    monkeypatch.setenv("VERASIG_EXTRACTOR_COMMAND", "codex")
+    assert Settings().extractor_command == "codex"
