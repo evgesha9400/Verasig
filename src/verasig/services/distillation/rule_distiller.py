@@ -10,7 +10,6 @@ invokes the real CLI (the subprocess runner is injectable).
 """
 
 import json
-import re
 import subprocess
 from collections.abc import Callable
 from typing import Protocol, runtime_checkable
@@ -18,6 +17,7 @@ from typing import Protocol, runtime_checkable
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.parser_rule import ParserRule
+from verasig.services.json_extract import find_json_object
 
 _FILTER_KEYS = {
     "include_patterns",
@@ -35,10 +35,10 @@ class RuleDistiller(Protocol):
 
 
 def _extract_json(stdout: str) -> dict:
-    span = re.search(r"\{.*\}", stdout, re.DOTALL)
-    if span is None:
+    raw = find_json_object(stdout)
+    if raw is None:
         raise ValueError("no JSON object in distiller output")
-    return json.loads(span.group(0))
+    return json.loads(raw)
 
 
 def _content(payload: dict, allowed: set[str]) -> dict:

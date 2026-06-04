@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator, Callable
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
+from verasig.domain.signal import TradeIntent
 from verasig.foundation.exchange import normalize_base_symbol
 from verasig.services.distillation.rule_distiller import parse_distiller_output
 
@@ -91,3 +92,15 @@ class FakeDistiller:
 
     def distill_parsers(self, labels: list[GoldenLabel]):
         return self._parse(labels)[1]
+
+
+class FakeExtractor:
+    """Offline LlmExtractor: returns a canned TradeIntent (or None), counts calls."""
+
+    def __init__(self, returns: TradeIntent | None = None) -> None:
+        self._returns = returns
+        self.calls = 0
+
+    def extract(self, candidate_text: str) -> TradeIntent | None:
+        self.calls += 1
+        return self._returns
