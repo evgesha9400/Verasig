@@ -10,3 +10,4 @@ class Settings(BaseSettings):
     telegram_phone: str | None = None
     session_path: str = "/session/telegram.session"
     backfill_batch_size: int = 200
+    distiller_command: str = "claude"  # LLM CLI for rule distillation (go-ahead-gated)

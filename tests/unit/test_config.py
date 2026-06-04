@@ -17,3 +17,12 @@ def test_backfill_batch_size_defaults_to_200():
 def test_backfill_batch_size_loads_from_env(monkeypatch):
     monkeypatch.setenv("VERASIG_BACKFILL_BATCH_SIZE", "50")
     assert Settings().backfill_batch_size == 50
+
+
+def test_distiller_command_defaults_to_claude():
+    assert Settings(_env_file=None).distiller_command == "claude"
+
+
+def test_distiller_command_loads_from_env(monkeypatch):
+    monkeypatch.setenv("VERASIG_DISTILLER_COMMAND", "codex")
+    assert Settings().distiller_command == "codex"

@@ -1,10 +1,14 @@
 import asyncio
+import os
+import subprocess
+from pathlib import Path
 
 import typer
 from sqlalchemy import text
 
 from verasig.config import Settings
 from verasig.foundation.db import make_engine, make_session_factory
+from verasig.foundation.exchange import StaticExchange
 from verasig.foundation.telegram_session import (
     CredentialsMissingError,
     SessionMissingError,
@@ -15,7 +19,12 @@ from verasig.foundation.telegram_session import (
     save_session_string,
 )
 from verasig.foundation.telegram_source import TelethonSource
+from verasig.services.extraction.extract_service import ExtractService
 from verasig.services.ingestion.backfill import backfill as run_backfill
+from verasig.services.ingestion.candidate_derivation import (
+    derive_candidates,
+    sweep_advisory,
+)
 from verasig.storage import repositories as repo
 
 app = typer.Typer(help="Verasig — local observer CLI.")
@@ -123,6 +132,78 @@ def format_stats(channel, message_count: int) -> str:
     if channel.subscriber_count is not None:
         parts.append(f"subs={channel.subscriber_count}")
     return " · ".join(parts)
+
+
+def _resolve_channel_id(session_factory, reference: str) -> int:
+    with session_factory() as session:
+        channel = repo.find_channel(session, reference)
+    if channel is None:
+        raise _fail(ValueError(f"no channel matching {reference!r}; run backfill"))
+    return channel.channel_id
+
+
+@app.command()
+def candidates(reference: str) -> None:
+    """Derive advisory RawSignalEvents from stored messages (seed + FilterRules)."""
+    session_factory = make_session_factory(Settings().database_url)
+    channel_id = _resolve_channel_id(session_factory, reference)
+    created = derive_candidates(session_factory, channel_id, StaticExchange())
+    typer.echo(f"candidates derived: channel {channel_id} · +{created} new")
+
+
+@app.command()
+def extract(reference: str) -> None:
+    """Apply ParserRules to candidates → ExtractedSignal | UnrecognizedSignal."""
+    session_factory = make_session_factory(Settings().database_url)
+    channel_id = _resolve_channel_id(session_factory, reference)
+    signals, unrecognized = _extract_candidates(session_factory, channel_id)
+    typer.echo(
+        f"extracted: channel {channel_id} · {signals} signals "
+        f"· {unrecognized} unrecognized"
+    )
+
+
+def _extract_candidates(session_factory, channel_id: int) -> tuple[int, int]:
+    with session_factory() as session:
+        service = ExtractService(repo.read_parser_rules(session, channel_id))
+        events = repo.read_signal_events(session, channel_id)
+    signals, unrecognized = [], []
+    for event in events:
+        outcome = service.extract(event)
+        if outcome.signal is not None:
+            signals.append(outcome.signal)
+        else:
+            unrecognized.append(outcome.unrecognized)
+    with session_factory() as session:
+        repo.insert_extracted_signals(session, signals)
+        repo.insert_unrecognized_signals(session, unrecognized)
+        session.commit()
+    return len(signals), len(unrecognized)
+
+
+@app.command()
+def sweep(reference: str) -> None:
+    """Advisory parser sweep over all messages → PARSER_BACKFILL + drift."""
+    session_factory = make_session_factory(Settings().database_url)
+    channel_id = _resolve_channel_id(session_factory, reference)
+    with session_factory() as session:
+        parser_rules = repo.read_parser_rules(session, channel_id)
+    recovered, drift = sweep_advisory(session_factory, channel_id, parser_rules)
+    typer.echo(f"sweep: channel {channel_id} · +{recovered} recovered · +{drift} drift")
+
+
+@app.command()
+def workbench(reference: str) -> None:
+    """Launch the Streamlit distillation workbench (real-LLM Distil gated)."""
+    session_factory = make_session_factory(Settings().database_url)
+    channel_id = _resolve_channel_id(session_factory, reference)
+    _launch_workbench(channel_id)
+
+
+def _launch_workbench(channel_id: int) -> None:
+    app_path = Path(__file__).parent / "ui" / "app.py"
+    environment = {**os.environ, "VERASIG_WORKBENCH_CHANNEL": str(channel_id)}
+    subprocess.run(["streamlit", "run", str(app_path)], env=environment, check=False)
 
 
 if __name__ == "__main__":
