@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator, Callable
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
+from verasig.foundation.exchange import normalize_base_symbol
 
 
 class FakeStreamInterrupted(RuntimeError):
@@ -53,3 +54,16 @@ class FakeSource:
 
     async def live_events(self, channel_ids: list[int]):
         yield None  # unused in Slice 2
+
+
+class FakeExchange:
+    """In-memory Exchange for offline seed-filter tests (injected symbol set)."""
+
+    def __init__(self, symbols: set[str]) -> None:
+        self._symbols = {normalize_base_symbol(symbol) for symbol in symbols}
+
+    def base_symbols(self) -> set[str]:
+        return set(self._symbols)
+
+    def is_listed(self, token: str) -> bool:
+        return normalize_base_symbol(token) in self._symbols
