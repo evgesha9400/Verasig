@@ -1,0 +1,93 @@
+"""Precision/recall harness over a labeled corpus (test-plan §5; ADR 0005).
+
+Pure + offline. Filter **recall** is measured on `GoldenLabel.is_signal` (the
+advisory gate's miss-rate; denominator = GoldenLabel, not the candidate subset).
+Parser **precision** is measured on the required `expected` fields (symbol+side)
+of the messages the parser extracts from; parser **recall** is reported, not
+gated. Reused by the workbench recall meter.
+"""
+
+from dataclasses import dataclass
+
+from verasig.domain.event import MaterializationPath, RawSignalEvent
+from verasig.domain.filter_rule import FilterRule
+from verasig.domain.label import GoldenLabel
+from verasig.domain.message import RawTelegramMessage
+from verasig.domain.parser_rule import ParserRule
+from verasig.domain.signal import ExtractedSignal
+from verasig.services.extraction.deterministic_parser import parse
+from verasig.services.ingestion.candidate_filter import apply_filter_rule
+
+
+@dataclass(frozen=True)
+class EvalReport:
+    filter_recall: float
+    parser_precision: float
+    parser_recall: float
+    signal_count: int
+    extracted_count: int
+
+
+def _ratio(numerator: int, denominator: int) -> float:
+    return 1.0 if denominator == 0 else numerator / denominator
+
+
+def filter_recall(
+    messages: list[RawTelegramMessage], labels: list[GoldenLabel], rule: FilterRule
+) -> float:
+    signal_ids = {label.message_id for label in labels if label.is_signal}
+    flagged = {
+        message.message_id
+        for message in messages
+        if message.text and apply_filter_rule(rule, message.text)
+    }
+    return _ratio(len(signal_ids & flagged), len(signal_ids))
+
+
+def _parse_message(
+    message: RawTelegramMessage, parser_rules: list[ParserRule]
+) -> ExtractedSignal | None:
+    event = RawSignalEvent(
+        channel_id=message.channel_id,
+        message_id=message.message_id,
+        candidate_text=message.text or "",
+        materialized_by=MaterializationPath.SEED_HEURISTIC,
+    )
+    for rule in parser_rules:
+        signal = parse(rule, event)
+        if signal is not None:
+            return signal
+    return None
+
+
+def _is_correct(label: GoldenLabel | None, signal: ExtractedSignal) -> bool:
+    if label is None or not label.is_signal or label.expected is None:
+        return False
+    return signal.symbol == label.expected.symbol and signal.side == label.expected.side
+
+
+def evaluate(
+    messages: list[RawTelegramMessage],
+    labels: list[GoldenLabel],
+    filter_rule: FilterRule,
+    parser_rules: list[ParserRule],
+) -> EvalReport:
+    labels_by_id = {label.message_id: label for label in labels}
+    signal_ids = {label.message_id for label in labels if label.is_signal}
+    predictions = {
+        message.message_id: signal
+        for message in messages
+        if message.text and (signal := _parse_message(message, parser_rules))
+    }
+    true_positives = sum(
+        1
+        for message_id, signal in predictions.items()
+        if _is_correct(labels_by_id.get(message_id), signal)
+    )
+    return EvalReport(
+        filter_recall=filter_recall(messages, labels, filter_rule),
+        parser_precision=_ratio(true_positives, len(predictions)),
+        parser_recall=_ratio(true_positives, len(signal_ids)),
+        signal_count=len(signal_ids),
+        extracted_count=len(predictions),
+    )

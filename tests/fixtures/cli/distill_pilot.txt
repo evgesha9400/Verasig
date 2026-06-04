@@ -15,7 +15,7 @@ I reviewed the labeled examples and distilled the rules below.
   "parser_rules": [
     {
       "patterns": [
-        "(?i)(?P<symbol>[A-Z]{2,10})\\s+(?P<side>long|short|buy|sell)(?:.*?entry[:\\s]+(?P<entry>[\\d.,]+k?))?(?:.*?sl[:\\s]+(?P<sl>[\\d.,]+k?))?(?:.*?tp[:\\s]+(?P<tp>[\\d.,]+k?))?"
+        "(?i)(?P<symbol>[A-Z]{2,10})\\s+(?P<side>long|short|buy|sell|лонг|шорт)(?:.*?(?:entry|вход)[:\\s]+(?P<entry>[\\d.,]+k?))?(?:.*?(?:sl|стоп)[:\\s]+(?P<sl>[\\d.,]+k?))?(?:.*?(?:tp|тейк)[:\\s]+(?P<tp>[\\d.,]+k?))?"
       ],
       "field_map": {
         "symbol": "symbol",
@@ -28,7 +28,9 @@ I reviewed the labeled examples and distilled the rules below.
         "long": "LONG",
         "buy": "LONG",
         "short": "SHORT",
-        "sell": "SHORT"
+        "sell": "SHORT",
+        "лонг": "LONG",
+        "шорт": "SHORT"
       }
     }
   ]

@@ -1,0 +1,40 @@
+{"channel_id": 7, "message_id": 1, "text": "BTC long entry 65000 sl 64000 tp 67000", "posted_at": "2026-06-04T12:00:00Z", "captured_at": "2026-06-04T12:00:00Z", "has_media": false, "raw_payload": {"id": 1}}
+{"channel_id": 7, "message_id": 2, "text": "ETH sell market", "posted_at": "2026-06-04T12:01:00Z", "captured_at": "2026-06-04T12:01:00Z", "has_media": false, "raw_payload": {"id": 2}}
+{"channel_id": 7, "message_id": 3, "text": "SOL long entry 140 sl 135 tp 160", "posted_at": "2026-06-04T12:02:00Z", "captured_at": "2026-06-04T12:02:00Z", "has_media": false, "raw_payload": {"id": 3}}
+{"channel_id": 7, "message_id": 4, "text": "BNB buy entry 600 sl 580 tp 640", "posted_at": "2026-06-04T12:03:00Z", "captured_at": "2026-06-04T12:03:00Z", "has_media": false, "raw_payload": {"id": 4}}
+{"channel_id": 7, "message_id": 5, "text": "XRP short entry 0.62 sl 0.65 tp 0.55", "posted_at": "2026-06-04T12:04:00Z", "captured_at": "2026-06-04T12:04:00Z", "has_media": false, "raw_payload": {"id": 5}}
+{"channel_id": 7, "message_id": 6, "text": "ADA long entry 0.45 sl 0.42 tp 0.50", "posted_at": "2026-06-04T12:05:00Z", "captured_at": "2026-06-04T12:05:00Z", "has_media": false, "raw_payload": {"id": 6}}
+{"channel_id": 7, "message_id": 7, "text": "AVAX long entry 38 sl 35 tp 44", "posted_at": "2026-06-04T12:06:00Z", "captured_at": "2026-06-04T12:06:00Z", "has_media": false, "raw_payload": {"id": 7}}
+{"channel_id": 7, "message_id": 8, "text": "LINK short entry 18 sl 19.5 tp 15", "posted_at": "2026-06-04T12:07:00Z", "captured_at": "2026-06-04T12:07:00Z", "has_media": false, "raw_payload": {"id": 8}}
+{"channel_id": 7, "message_id": 9, "text": "DOGE long entry 0.16 sl 0.15 tp 0.18", "posted_at": "2026-06-04T12:08:00Z", "captured_at": "2026-06-04T12:08:00Z", "has_media": false, "raw_payload": {"id": 9}}
+{"channel_id": 7, "message_id": 10, "text": "MATIC buy entry 0.9 sl 0.85 tp 1.0", "posted_at": "2026-06-04T12:09:00Z", "captured_at": "2026-06-04T12:09:00Z", "has_media": false, "raw_payload": {"id": 10}}
+{"channel_id": 7, "message_id": 11, "text": "BTC short entry 68000 sl 69000 tp 65000", "posted_at": "2026-06-04T12:10:00Z", "captured_at": "2026-06-04T12:10:00Z", "has_media": false, "raw_payload": {"id": 11}}
+{"channel_id": 7, "message_id": 12, "text": "DOT long entry 7.5 sl 7 tp 8.5", "posted_at": "2026-06-04T12:11:00Z", "captured_at": "2026-06-04T12:11:00Z", "has_media": false, "raw_payload": {"id": 12}}
+{"channel_id": 7, "message_id": 13, "text": "BTC лонг вход 65000 стоп 64000 тейк 67000", "posted_at": "2026-06-04T12:12:00Z", "captured_at": "2026-06-04T12:12:00Z", "has_media": false, "raw_payload": {"id": 13}}
+{"channel_id": 7, "message_id": 14, "text": "ETH шорт вход 3500 стоп 3600 тейк 3300", "posted_at": "2026-06-04T12:13:00Z", "captured_at": "2026-06-04T12:13:00Z", "has_media": false, "raw_payload": {"id": 14}}
+{"channel_id": 7, "message_id": 15, "text": "SOL лонг вход 140 стоп 135 тейк 160", "posted_at": "2026-06-04T12:14:00Z", "captured_at": "2026-06-04T12:14:00Z", "has_media": false, "raw_payload": {"id": 15}}
+{"channel_id": 7, "message_id": 16, "text": "ADA лонг вход 0.45 стоп 0.42 тейк 0.5", "posted_at": "2026-06-04T12:15:00Z", "captured_at": "2026-06-04T12:15:00Z", "has_media": false, "raw_payload": {"id": 16}}
+{"channel_id": 7, "message_id": 17, "text": "BTC long", "posted_at": "2026-06-04T12:16:00Z", "captured_at": "2026-06-04T12:16:00Z", "has_media": false, "raw_payload": {"id": 17}}
+{"channel_id": 7, "message_id": 18, "text": "ETH short setup forming get ready", "posted_at": "2026-06-04T12:17:00Z", "captured_at": "2026-06-04T12:17:00Z", "has_media": false, "raw_payload": {"id": 18}}
+{"channel_id": 7, "message_id": 19, "text": "AVAX buy now market order", "posted_at": "2026-06-04T12:18:00Z", "captured_at": "2026-06-04T12:18:00Z", "has_media": false, "raw_payload": {"id": 19}}
+{"channel_id": 7, "message_id": 20, "text": "LINK long entry 18 tp 22", "posted_at": "2026-06-04T12:19:00Z", "captured_at": "2026-06-04T12:19:00Z", "has_media": false, "raw_payload": {"id": 20}}
+{"channel_id": 7, "message_id": 21, "text": "gm frens wagmi", "posted_at": "2026-06-04T12:20:00Z", "captured_at": "2026-06-04T12:20:00Z", "has_media": false, "raw_payload": {"id": 21}}
+{"channel_id": 7, "message_id": 22, "text": "good morning everyone, lovely day", "posted_at": "2026-06-04T12:21:00Z", "captured_at": "2026-06-04T12:21:00Z", "has_media": false, "raw_payload": {"id": 22}}
+{"channel_id": 7, "message_id": 23, "text": "when is the next pump?", "posted_at": "2026-06-04T12:22:00Z", "captured_at": "2026-06-04T12:22:00Z", "has_media": false, "raw_payload": {"id": 23}}
+{"channel_id": 7, "message_id": 24, "text": "когда памп? всем привет", "posted_at": "2026-06-04T12:23:00Z", "captured_at": "2026-06-04T12:23:00Z", "has_media": false, "raw_payload": {"id": 24}}
+{"channel_id": 7, "message_id": 25, "text": "any news on the spot ETF approval?", "posted_at": "2026-06-04T12:24:00Z", "captured_at": "2026-06-04T12:24:00Z", "has_media": false, "raw_payload": {"id": 25}}
+{"channel_id": 7, "message_id": 26, "text": "thanks for all the calls this week", "posted_at": "2026-06-04T12:25:00Z", "captured_at": "2026-06-04T12:25:00Z", "has_media": false, "raw_payload": {"id": 26}}
+{"channel_id": 7, "message_id": 27, "text": "market looking calm today", "posted_at": "2026-06-04T12:26:00Z", "captured_at": "2026-06-04T12:26:00Z", "has_media": false, "raw_payload": {"id": 27}}
+{"channel_id": 7, "message_id": 28, "text": "BTC looking strong, what do you think?", "posted_at": "2026-06-04T12:27:00Z", "captured_at": "2026-06-04T12:27:00Z", "has_media": false, "raw_payload": {"id": 28}}
+{"channel_id": 7, "message_id": 29, "text": "посмотрите на график, интересно", "posted_at": "2026-06-04T12:28:00Z", "captured_at": "2026-06-04T12:28:00Z", "has_media": false, "raw_payload": {"id": 29}}
+{"channel_id": 7, "message_id": 30, "text": "who else is holding through this?", "posted_at": "2026-06-04T12:29:00Z", "captured_at": "2026-06-04T12:29:00Z", "has_media": false, "raw_payload": {"id": 30}}
+{"channel_id": 7, "message_id": 31, "text": "lol that move was brutal", "posted_at": "2026-06-04T12:30:00Z", "captured_at": "2026-06-04T12:30:00Z", "has_media": false, "raw_payload": {"id": 31}}
+{"channel_id": 7, "message_id": 32, "text": "gn everyone, see you tomorrow", "posted_at": "2026-06-04T12:31:00Z", "captured_at": "2026-06-04T12:31:00Z", "has_media": false, "raw_payload": {"id": 32}}
+{"channel_id": 7, "message_id": 33, "text": "что по рынку сегодня?", "posted_at": "2026-06-04T12:32:00Z", "captured_at": "2026-06-04T12:32:00Z", "has_media": false, "raw_payload": {"id": 33}}
+{"channel_id": 7, "message_id": 34, "text": "great community here, glad to join", "posted_at": "2026-06-04T12:33:00Z", "captured_at": "2026-06-04T12:33:00Z", "has_media": false, "raw_payload": {"id": 34}}
+{"channel_id": 7, "message_id": 35, "text": "is it too late to enter?", "posted_at": "2026-06-04T12:34:00Z", "captured_at": "2026-06-04T12:34:00Z", "has_media": false, "raw_payload": {"id": 35}}
+{"channel_id": 7, "message_id": 36, "text": "DCA is the way imo", "posted_at": "2026-06-04T12:35:00Z", "captured_at": "2026-06-04T12:35:00Z", "has_media": false, "raw_payload": {"id": 36}}
+{"channel_id": 7, "message_id": 37, "text": "stay patient and trust the process", "posted_at": "2026-06-04T12:36:00Z", "captured_at": "2026-06-04T12:36:00Z", "has_media": false, "raw_payload": {"id": 37}}
+{"channel_id": 7, "message_id": 38, "text": "please stop asking for signals", "posted_at": "2026-06-04T12:37:00Z", "captured_at": "2026-06-04T12:37:00Z", "has_media": false, "raw_payload": {"id": 38}}
+{"channel_id": 7, "message_id": 39, "text": "the team is doing great work", "posted_at": "2026-06-04T12:38:00Z", "captured_at": "2026-06-04T12:38:00Z", "has_media": false, "raw_payload": {"id": 39}}
+{"channel_id": 7, "message_id": 40, "text": "patience is key in this market", "posted_at": "2026-06-04T12:39:00Z", "captured_at": "2026-06-04T12:39:00Z", "has_media": false, "raw_payload": {"id": 40}}
