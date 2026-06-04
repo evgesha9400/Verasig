@@ -1,12 +1,17 @@
+from fakes import FakeExtractor
+
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import (
     ExtractedSignal,
     ExtractionMethod,
     Side,
+    TradeIntent,
     UnrecognizedSignal,
 )
 from verasig.services.extraction.extract_service import ExtractService
+
+SOME_INTENT = TradeIntent(symbol="BTC", side=Side.LONG)
 
 RULE = ParserRule(
     rule_id="r1",
@@ -26,6 +31,42 @@ def _event(text: str) -> RawSignalEvent:
         candidate_text=text,
         materialized_by=MaterializationPath.SEED_HEURISTIC,
     )
+
+
+def test_fallback_success_emits_exactly_one_drift():
+    event = _event("totally unparseable chatter")
+    out = ExtractService(rules=[], fallback=FakeExtractor(returns=SOME_INTENT)).extract(
+        event
+    )
+    assert isinstance(out.signal, ExtractedSignal)
+    assert out.signal.symbol == "BTCUSDT"
+    assert out.signal.extraction_method is ExtractionMethod.LLM_FALLBACK
+    assert out.signal.rule_id is None
+    assert out.unrecognized is None
+    assert len(out.drift_warnings) == 1
+    assert out.drift_warnings[0].fallback_signal_id == out.signal.id
+    assert out.drift_warnings[0].event_id == event.id
+
+
+def test_fallback_not_called_when_deterministic_matches():
+    fb = FakeExtractor(returns=SOME_INTENT)
+    out = ExtractService(rules=[RULE], fallback=fb).extract(
+        _event("BTC long entry 65000")
+    )
+    assert out.signal.extraction_method is ExtractionMethod.DETERMINISTIC
+    assert fb.calls == 0  # cost guard: a deterministic win short-circuits the LLM
+
+
+def test_fallback_failure_yields_unrecognized_fallback_failed():
+    out = ExtractService(rules=[], fallback=FakeExtractor(returns=None)).extract(
+        _event("nothing here")
+    )
+    assert out.signal is None
+    assert out.unrecognized.reason == "fallback_failed"
+    assert out.unrecognized.attempted_methods == [
+        ExtractionMethod.DETERMINISTIC,
+        ExtractionMethod.LLM_FALLBACK,
+    ]
 
 
 def test_signal_carries_event_linkage_and_method():
