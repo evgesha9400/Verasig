@@ -76,10 +76,15 @@ _Avoid_: filter error, missed-candidate log.
 ### Deletion
 
 **DeletedSignalEvidence**:
-Proof that a message a provider posted later disappeared. Two confidence tiers:
-- `CONFIRMED` — a previously-captured message is now absent (snapshot-diff); original content is retained.
-- `SUSPECTED` — an id-gap heuristic flagged a likely deletion; content was never captured.
+Proof that a message a provider posted later disappeared — typically a losing signal erased to clean up a track record. Two confidence tiers:
+- `CONFIRMED` — a message we had **captured** is now absent from the channel; its original content is **retained** as proof.
+- `SUSPECTED` — a gap in the message numbering, absent from **both** our capture and the channel now; a likely pre-capture deletion whose content we never had.
+Only deletions of **signal** messages feed a provider's `ProviderScore`; deleting non-signal chatter counts for nothing. `SUSPECTED` evidence is reported per `TelegramChannel`.
 _Avoid_: deletion, removed message.
+
+**Rescan**:
+Re-reading a `TelegramChannel`'s **current** live message set and comparing it to what we captured, to find `DeletedSignalEvidence`. The capture layer is append-only, so a deletion is only visible by this live comparison — never by re-reading our own store.
+_Avoid_: re-backfill (that is capture, which never re-reads), refetch.
 
 ### Scoring
 

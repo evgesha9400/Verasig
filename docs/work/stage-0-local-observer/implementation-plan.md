@@ -584,10 +584,29 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ## Slice 7: Deletion evidence
 
-- **Input:** two backfill snapshots (live events later).
-- **Output:** `DeletedSignalEvidence` — `CONFIRMED` (snapshot-diff, content retained) + `SUSPECTED` (id-gap).
-- **Decisive tests (unit, pure):** present-then-absent ⇒ CONFIRMED with original text + `was_signal_candidate`; id-gap in sequence ⇒ SUSPECTED (no content); contiguous ids ⇒ nothing.
-- **Acceptance:** delete a message between two re-scans ⇒ CONFIRMED evidence retaining the original content.
+- **Input:** the channel's **stored** `RawTelegramMessage`s + a **fresh live message-id re-fetch** (`TelegramSource.live_message_ids`); `LIVE_EVENT` deletions arrive in Slice 10.
+- **Output:** persisted `DeletedSignalEvidence` — `CONFIRMED`/`SNAPSHOT_DIFF` (`stored − live`, content retained) + `SUSPECTED`/`ID_GAP` (`range − stored − live`, absent from both, no content).
+- **Decisive tests (unit, pure):** present-then-absent ⇒ CONFIRMED with original text + correct `was_signal_candidate`; id-gap absent from both ⇒ SUSPECTED (no content); contiguous / all-still-live ⇒ nothing.
+- **Acceptance:** delete a captured message, then `rescan` ⇒ CONFIRMED evidence retaining the original content; `deletions <ref>` prints it.
+
+**Resolved gaps (grill, 2026-06-05) — see [ADR 0008](../../adr/0008-deletion-evidence-durable-projection.md):**
+
+- **Diff model (Q1):** raw capture is insert-only, so detection is **stored set vs a fresh live re-fetch** (full history), never two stored backfills. `CONFIRMED = stored − live` (original text + `first_seen_at` retained from the stored row).
+- **SUSPECTED (Q2):** `range − stored − live` over `range = [min..max]` of `stored ∪ live` — a slot **absent from both** snapshots. The live set rescues still-present content/service ids, so the Slice-8 deletion rate is not flooded; contiguous/all-live ⇒ nothing.
+- **Seam (Q3):** new `async live_message_ids(channel_id) -> set[int]` on `TelegramSource` (amends §9); `TelethonSource` projects ids from `iter_messages` (manual acceptance); `FakeSource` returns a canned set (offline tests).
+- **What is evidence (Q4):** **store all** confirmed deletions (chatter incl., for audit); **score + display only** `was_signal_candidate` ones (chatter affects nothing — enforced at score/display, detector stays complete); `SUSPECTED` shown per channel.
+- **Idempotency (Q5):** durable projection (NOT recomputable — the live snapshot is ephemeral). One row per `(channel_id, message_id)` (`UNIQUE`); rescan `+0`; `SUSPECTED→CONFIRMED` upgrades only (guarded); first-noticed `detected_at` preserved.
+- **Surface (Q6):** gated `rescan <ref>` (re-fetch + detect + store; aborts on empty/failed re-fetch) + offline `deletions <ref>` (read stored: signal-confirmed with text + per-channel suspected count). Mirrors `backfill` vs `stats`/`lifecycle`.
+- **Clock seam:** pure `detect_deletions(...)` takes `detected_at` (deterministic tests); the model defaults `_now()`.
+- **Decided inline (convention):** `domain/deletion.py` (StrEnums co-located, `uuid4`/`_now` defaults); `services/deletion/{diff,rescan}.py` (pure core + gated orchestration, mirroring `lifecycle/` + `backfill.py`); no test touches real Telegram.
+
+**Files (this pass):**
+- `domain/deletion.py` (`DeletionConfidence`, `DeletionMethod`, `DeletedSignalEvidence`)
+- `services/deletion/__init__.py`, `services/deletion/diff.py` (pure `detect_deletions`), `services/deletion/rescan.py` (gated re-fetch → detect → persist)
+- `foundation/telegram_source.py` (+`live_message_ids` on the Protocol + `TelethonSource`)
+- `storage/models.py` (+`DeletedSignalEvidenceRow`), `storage/repositories.py` (+`upsert_deletion_evidence`, +`read_deletion_evidence`), `migrations/versions/0005_deletion_evidence.py`
+- `cli.py` (+`rescan`, +`deletions`, +formatters)
+- `tests/fakes.py` (+`FakeSource.live_message_ids`), `tests/unit/test_deletion_diff.py`, `tests/integration/test_deletion_evidence.py`, `tests/integration/test_cli_deletions.py`, `tests/conftest.py` (TRUNCATE +`deleted_signal_evidence`)
 
 ---
 

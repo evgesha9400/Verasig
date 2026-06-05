@@ -192,6 +192,13 @@ DeletedSignalEvidence:
     was_signal_candidate: bool       # was a RawSignalEvent?
 ```
 
+**Detection ([ADR 0008](../../adr/0008-deletion-evidence-durable-projection.md)):** a deletion is found by **re-fetching the channel's current live message-id set** (`TelegramSource.live_message_ids`, §9) and diffing it against the durable **stored** set. Raw capture is insert-only, so a deleted message never leaves our DB — two *stored* backfills can never reveal it. Over `range = [min..max]` of `stored ∪ live`:
+- `CONFIRMED` / `SNAPSHOT_DIFF` = `stored − live` — we captured it, it is gone now; `original_text` + `first_seen_at` (the stored `captured_at`) are **retained**.
+- `SUSPECTED` / `ID_GAP` = `range − stored − live` — a slot present in **neither** snapshot (never captured, now gone); no content. A still-present message (content or service action) sits in `live` and is therefore **never** flagged.
+- contiguous / all-still-live ⇒ no evidence. `LIVE_EVENT` deletions arrive in Slice 10.
+
+**Storage (durable, NOT recomputable — a third table class):** unlike the recomputable extraction projection ([ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md)) and the in-memory fold ([ADR 0007](../../adr/0007-lifecycle-fold-pure-recomputable.md)), `DeletedSignalEvidence` is **persisted** because the live snapshot it is computed against is ephemeral (it cannot be reconstructed from durable inputs). One row per `(channel_id, message_id)`: a rescan is idempotent (`+0`); a `SUSPECTED` may upgrade to `CONFIRMED` but a `CONFIRMED` never downgrades; the first-noticed `detected_at` is preserved. **All** confirmed deletions are stored (audit), but only `was_signal_candidate` ones feed the Slice-8 deletion-behaviour score — chatter deletions affect nothing; `SUSPECTED` is surfaced per channel.
+
 ## 7. Scoring
 
 ```python
@@ -282,6 +289,8 @@ class TelegramSource(Protocol):
     # backfill: chunked + resumable — yields one committable batch at a time, never full history
     def backfill_batches(self, channel_id: int, after_message_id: int?,
                          batch_size: int) -> AsyncIterator[list[RawTelegramMessage]]: ...
+    # deletion rescan: the channel's CURRENT live message-id set, for snapshot-diff (Slice 7, ADR 0008)
+    async def live_message_ids(self, channel_id: int) -> set[int]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
     def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramDeliveryEvent]: ...
 # adapter: TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
