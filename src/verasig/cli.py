@@ -8,6 +8,7 @@ import typer
 from sqlalchemy import text
 
 from verasig.config import Settings
+from verasig.domain.deletion import DeletedSignalEvidence, DeletionConfidence
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.signal import ExtractionMethod, SignalEventType
 from verasig.foundation.db import make_engine, make_session_factory
@@ -22,6 +23,8 @@ from verasig.foundation.telegram_session import (
     save_session_string,
 )
 from verasig.foundation.telegram_source import TelethonSource
+from verasig.services.deletion.rescan import RescanAborted
+from verasig.services.deletion.rescan import rescan as run_rescan
 from verasig.services.extraction.extract_service import ExtractOutcome, ExtractService
 from verasig.services.extraction.llm_fallback import ClaudeCliExtractor, LlmExtractor
 from verasig.services.ingestion.backfill import backfill as run_backfill
@@ -186,6 +189,40 @@ def format_folded(folded: FoldedSignal) -> str:
     return "\n".join([_format_header(folded), *rows])
 
 
+def _deletion_header(channel) -> str:
+    parts = [channel.title]
+    if channel.handle:
+        parts.append(f"@{channel.handle}")
+    parts.append(f"id={channel.channel_id}")
+    return " · ".join(parts)
+
+
+def _is_signal_deletion(item: DeletedSignalEvidence) -> bool:
+    return item.confidence is DeletionConfidence.CONFIRMED and item.was_signal_candidate
+
+
+def _format_deleted_signal(item: DeletedSignalEvidence) -> str:
+    when = item.first_seen_at.strftime("%Y-%m-%dT%H:%MZ") if item.first_seen_at else "-"
+    return f'  #{item.message_id} {when} "{item.original_text or ""}"'
+
+
+def _count_suspected(evidence: list[DeletedSignalEvidence]) -> int:
+    return sum(
+        1 for item in evidence if item.confidence is DeletionConfidence.SUSPECTED
+    )
+
+
+def format_deletions(channel, evidence: list[DeletedSignalEvidence]) -> str:
+    """Header + signal-confirmed deletions (chatter hidden) + suspected-gap count."""
+    signals = sorted(
+        (item for item in evidence if _is_signal_deletion(item)),
+        key=lambda item: item.message_id,
+    )
+    rows = [_format_deleted_signal(item) for item in signals]
+    footer = f"SUSPECTED gaps: {_count_suspected(evidence)}"
+    return "\n".join([_deletion_header(channel), *rows, footer])
+
+
 def _resolve_channel_id(session_factory, reference: str) -> int:
     with session_factory() as session:
         channel = repo.find_channel(session, reference)
@@ -218,6 +255,42 @@ def _fold_channel(session_factory, channel_id: int) -> list[FoldedSignal]:
         events = repo.read_signal_events(session, channel_id)
         messages = repo.read_messages(session, channel_id)
     return fold(signals, events, messages)
+
+
+@app.command()
+def rescan(reference: str) -> None:
+    """Re-fetch live ids, diff vs stored, persist DeletedSignalEvidence (gated)."""
+    settings = Settings()
+    try:
+        client = make_client(settings)
+    except (CredentialsMissingError, SessionMissingError) as error:
+        raise _fail(error) from error
+    session_factory = make_session_factory(settings.database_url)
+    try:
+        result = asyncio.run(_connected_rescan(client, reference, session_factory))
+    except (RescanAborted, ValueError) as error:
+        raise _fail(error) from error
+    typer.echo(
+        f"rescan {reference}: {result.confirmed} confirmed "
+        f"· {result.suspected} suspected · +{result.written} new"
+    )
+
+
+async def _connected_rescan(client, reference, session_factory):
+    async with client:
+        return await run_rescan(TelethonSource(client), reference, session_factory)
+
+
+@app.command()
+def deletions(reference: str) -> None:
+    """Print stored deletion evidence: signal-confirmed text + suspected-gap count."""
+    session_factory = make_session_factory(Settings().database_url)
+    with session_factory() as session:
+        channel = repo.find_channel(session, reference)
+        if channel is None:
+            raise _fail(ValueError(f"no channel matching {reference!r}; run backfill"))
+        evidence = repo.read_deletion_evidence(session, channel.channel_id)
+    typer.echo(format_deletions(channel, evidence))
 
 
 @dataclass
