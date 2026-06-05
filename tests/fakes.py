@@ -25,11 +25,13 @@ class FakeSource:
         channel: TelegramChannel,
         messages: list[RawTelegramMessage],
         *,
+        live_ids: set[int] | None = None,
         fail_after_batch: int | None = None,
         before_batch: Callable[[int, int], None] | None = None,
     ) -> None:
         self.channel = channel
         self.messages = sorted(messages, key=lambda message: message.message_id)
+        self.live_ids = set() if live_ids is None else set(live_ids)
         self.fail_after_batch = fail_after_batch
         self.before_batch = before_batch
         self.requested_afters: list[int | None] = []
@@ -54,6 +56,9 @@ class FakeSource:
             self.yielded_ids.extend(message.message_id for message in batch)
             yielded += len(batch)
             yield batch
+
+    async def live_message_ids(self, channel_id: int) -> set[int]:
+        return set(self.live_ids)  # canned live snapshot for rescan tests
 
     async def live_events(self, channel_ids: list[int]):
         yield None  # unused in Slice 2

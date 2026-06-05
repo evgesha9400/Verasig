@@ -39,6 +39,9 @@ class TelegramSource(Protocol):
         self, channel_id: int, after_message_id: int | None, batch_size: int
     ) -> AsyncIterator[list[RawTelegramMessage]]: ...
 
+    # deletion rescan: the channel's CURRENT live message-id set (Slice 7, ADR 0008).
+    async def live_message_ids(self, channel_id: int) -> set[int]: ...
+
     # live: one global socket, many channels; hybrid push + short-poll inside.
     def live_events(
         self, channel_ids: list[int]
@@ -99,6 +102,10 @@ class TelethonSource:
             forwards=getattr(message, "forwards", None),
             raw_payload=_json_safe(message.to_dict()),
         )
+
+    async def live_message_ids(self, channel_id: int) -> set[int]:
+        # full live id set for snapshot-diff (manual acceptance, never in tests)
+        return {message.id async for message in self._client.iter_messages(channel_id)}
 
     async def live_events(
         self, channel_ids: list[int]
