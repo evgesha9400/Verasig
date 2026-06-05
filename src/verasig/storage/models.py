@@ -229,3 +229,31 @@ class ParserDriftWarningRow(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+# --- Slice 7: durable, NON-recomputable deletion evidence (ADR 0008) ----------
+# UNIQUE(channel_id, message_id) makes rescans idempotent; the upsert upgrades
+# SUSPECTED→CONFIRMED only and preserves the first-noticed detected_at.
+
+
+class DeletedSignalEvidenceRow(Base):
+    __tablename__ = "deleted_signal_evidence"
+    __table_args__ = (
+        UniqueConstraint("channel_id", "message_id", name="uq_deleted_evidence_msg"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=False
+    )
+    message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    confidence: Mapped[str] = mapped_column(String, nullable=False)
+    method: Mapped[str] = mapped_column(String, nullable=False)
+    original_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    was_signal_candidate: Mapped[bool] = mapped_column(Boolean, nullable=False)

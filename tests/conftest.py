@@ -34,6 +34,7 @@ _ALL_TABLES = ", ".join(
         "golden_label",
         "filter_drift_warning",
         "parser_drift_warning",
+        "deleted_signal_evidence",
     ]
 )
 
