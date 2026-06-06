@@ -13,6 +13,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.channel import TelegramChannel
+from verasig.domain.channel_reference import (
+    ChannelReference,
+    ChannelReferenceKind,
+    ChannelReferenceResolutionError,
+    channel_lookup_handle,
+    normalize_channel_title,
+    parse_channel_reference,
+)
 from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.domain.drift import FilterDriftWarning, ParserDriftWarning
 from verasig.domain.event import RawSignalEvent
@@ -85,17 +93,32 @@ def count_messages(session: Session, channel_id: int) -> int:
 
 
 def find_channel(session: Session, reference: str | int) -> ChannelRow | None:
-    handle = _reference_to_handle(reference)
+    parsed = parse_channel_reference(reference)
+    if parsed.kind is ChannelReferenceKind.ID:
+        return session.get(ChannelRow, int(parsed.value))
+    if parsed.kind is ChannelReferenceKind.TITLE:
+        return _find_channel_by_title(session, str(parsed.value))
+    return _find_channel_by_handle(session, parsed)
+
+
+def _find_channel_by_handle(
+    session: Session, reference: ChannelReference
+) -> ChannelRow | None:
+    handle = channel_lookup_handle(reference)
     if handle is None:
-        return session.get(ChannelRow, int(reference))
+        return None
     return session.scalar(select(ChannelRow).where(ChannelRow.handle == handle))
 
 
-def _reference_to_handle(reference: str | int) -> str | None:
-    text = str(reference)
-    if text.lstrip("-").isdigit():
-        return None  # numeric -> look up by id
-    return text.removeprefix("https://t.me/").removeprefix("t.me/").lstrip("@")
+def _find_channel_by_title(session: Session, title: str) -> ChannelRow | None:
+    wanted = normalize_channel_title(title)
+    rows = session.scalars(select(ChannelRow)).all()
+    matches = [row for row in rows if normalize_channel_title(row.title) == wanted]
+    if len(matches) > 1:
+        raise ChannelReferenceResolutionError(
+            f"Found multiple captured channels with title {title!r}; use numeric id."
+        )
+    return matches[0] if matches else None
 
 
 # --- Events, extraction outputs, rules, golden corpus, drift -------------------

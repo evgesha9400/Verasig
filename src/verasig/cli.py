@@ -188,13 +188,20 @@ def format_live_result(result: LiveIngestionResult) -> str:
     )
 
 
+def _find_known_channel(session, reference: str | int):
+    try:
+        return repo.find_channel(session, reference)
+    except ChannelReferenceResolutionError as error:
+        raise _fail(error) from error
+
+
 @app.command()
 def stats(reference: str) -> None:
     """Print capture count + cursor for an already-backfilled channel."""
     settings = Settings()
     session_factory = make_session_factory(settings.database_url)
     with session_factory() as session:
-        channel = repo.find_channel(session, reference)
+        channel = _find_known_channel(session, reference)
         if channel is None:
             raise _fail(ValueError(f"no channel matching {reference!r}; run backfill"))
         typer.echo(
@@ -328,7 +335,7 @@ def format_explanation(explanation: ProviderScoreExplanation) -> str:
 
 def _resolve_channel_id(session_factory, reference: str) -> int:
     with session_factory() as session:
-        channel = repo.find_channel(session, reference)
+        channel = _find_known_channel(session, reference)
     if channel is None:
         raise _fail(ValueError(f"no channel matching {reference!r}; run backfill"))
     return channel.channel_id
@@ -479,7 +486,7 @@ def deletions(reference: str) -> None:
     """Print stored deletion evidence: signal-confirmed text + suspected-gap count."""
     session_factory = make_session_factory(Settings().database_url)
     with session_factory() as session:
-        channel = repo.find_channel(session, reference)
+        channel = _find_known_channel(session, reference)
         if channel is None:
             raise _fail(ValueError(f"no channel matching {reference!r}; run backfill"))
         evidence = repo.read_deletion_evidence(session, channel.channel_id)

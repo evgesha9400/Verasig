@@ -61,6 +61,14 @@ def test_stats_resolves_by_numeric_id(session_factory, monkeypatch, pg_url):
     assert "captured=3" in result.output
 
 
+def test_stats_resolves_by_exact_title(session_factory, monkeypatch, pg_url):
+    _populate(session_factory)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
+    result = runner.invoke(app, ["stats", "title:Pilot"])
+    assert result.exit_code == 0
+    assert "captured=3" in result.output
+
+
 def test_stats_unknown_channel_exits_nonzero(session_factory, monkeypatch, pg_url):
     monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["stats", "@ghost"])
