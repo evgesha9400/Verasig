@@ -70,7 +70,7 @@ def test_live_cli_wires_source_session_and_persists_message(
     session_factory, monkeypatch, pg_url
 ):
     source = FakeLiveSource([_delivery()])
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     monkeypatch.setattr("verasig.cli.make_client", lambda settings: FakeClient())
     monkeypatch.setattr("verasig.cli._make_live_source", lambda client: source)
 

@@ -87,7 +87,7 @@ def _seed_lifecycle(session_factory) -> None:
 
 def test_lifecycle_cli_prints_folded_timeline(session_factory, monkeypatch, pg_url):
     _seed_lifecycle(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["lifecycle", "@pilot"])
     assert result.exit_code == 0
     output = result.output
@@ -103,6 +103,6 @@ def test_lifecycle_cli_prints_folded_timeline(session_factory, monkeypatch, pg_u
 
 
 def test_lifecycle_cli_unknown_channel_exits_nonzero(monkeypatch, pg_url):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["lifecycle", "@ghost"])
     assert result.exit_code == 1

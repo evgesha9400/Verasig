@@ -77,7 +77,7 @@ def test_deletions_cli_shows_signals_hides_chatter_counts_gaps(
     session_factory, monkeypatch, pg_url
 ):
     _seed_evidence(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["deletions", "@pilot"])
     assert result.exit_code == 0
     output = result.output
@@ -88,6 +88,6 @@ def test_deletions_cli_shows_signals_hides_chatter_counts_gaps(
 
 
 def test_deletions_cli_unknown_channel_exits_nonzero(monkeypatch, pg_url):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["deletions", "@ghost"])
     assert result.exit_code == 1

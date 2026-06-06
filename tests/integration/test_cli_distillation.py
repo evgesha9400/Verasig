@@ -78,7 +78,7 @@ def _add_rule(session_factory, rule) -> None:
 
 def test_candidates_cli_derives_seed_events(session_factory, monkeypatch, pg_url):
     _populate(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["candidates", "@pilot"])
     assert result.exit_code == 0
     assert "+1 new" in result.output  # only the BTC long signal is seed-flagged
@@ -89,7 +89,7 @@ def test_candidates_cli_derives_seed_events(session_factory, monkeypatch, pg_url
 def test_extract_cli_produces_signals(session_factory, monkeypatch, pg_url):
     _populate(session_factory)
     _add_rule(session_factory, _LONG_RULE)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     runner.invoke(app, ["candidates", "@pilot"])
     result = runner.invoke(app, ["extract", "@pilot", "--no-llm"])
     assert result.exit_code == 0
@@ -102,7 +102,7 @@ def test_extract_cli_with_injected_fallback_emits_drift(
     session_factory, monkeypatch, pg_url
 ):
     _populate(session_factory)  # no parser rule → deterministic miss on the candidate
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     monkeypatch.setattr(
         "verasig.cli._make_fallback_extractor",
         lambda settings: FakeExtractor(
@@ -123,7 +123,7 @@ def test_extract_cli_with_injected_fallback_emits_drift(
 
 def test_extract_cli_no_llm_yields_unrecognized(session_factory, monkeypatch, pg_url):
     _populate(session_factory)  # no parser rule, fallback disabled → unrecognized
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     runner.invoke(app, ["candidates", "@pilot"])
     result = runner.invoke(app, ["extract", "@pilot", "--no-llm"])
     assert result.exit_code == 0
@@ -137,7 +137,7 @@ def test_extract_cli_no_llm_yields_unrecognized(session_factory, monkeypatch, pg
 def test_sweep_cli_recovers_filter_miss(session_factory, monkeypatch, pg_url):
     _populate(session_factory)
     _add_rule(session_factory, _SLANG_RULE)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     runner.invoke(app, ["candidates", "@pilot"])  # candidates = {1}
     result = runner.invoke(app, ["sweep", "@pilot"])
     assert result.exit_code == 0
@@ -150,14 +150,14 @@ def test_sweep_cli_recovers_filter_miss(session_factory, monkeypatch, pg_url):
 def test_candidates_cli_unknown_channel_exits_nonzero(
     session_factory, monkeypatch, pg_url
 ):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["candidates", "@ghost"])
     assert result.exit_code == 1
 
 
 def test_workbench_cli_launches_for_known_channel(session_factory, monkeypatch, pg_url):
     _populate(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     launched: list[int] = []
     monkeypatch.setattr("verasig.cli._launch_workbench", launched.append)
     result = runner.invoke(app, ["workbench", "@pilot"])
@@ -168,6 +168,6 @@ def test_workbench_cli_launches_for_known_channel(session_factory, monkeypatch, 
 def test_workbench_cli_unknown_channel_exits_nonzero(
     session_factory, monkeypatch, pg_url
 ):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["workbench", "@ghost"])
     assert result.exit_code == 1

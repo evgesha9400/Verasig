@@ -45,7 +45,7 @@ def _populate(session_factory) -> None:
 
 def test_stats_prints_capture_count_and_cursor(session_factory, monkeypatch, pg_url):
     _populate(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["stats", "@pilot"])
     assert result.exit_code == 0
     assert "id=7" in result.output
@@ -55,13 +55,13 @@ def test_stats_prints_capture_count_and_cursor(session_factory, monkeypatch, pg_
 
 def test_stats_resolves_by_numeric_id(session_factory, monkeypatch, pg_url):
     _populate(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["stats", "7"])
     assert result.exit_code == 0
     assert "captured=3" in result.output
 
 
 def test_stats_unknown_channel_exits_nonzero(session_factory, monkeypatch, pg_url):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["stats", "@ghost"])
     assert result.exit_code == 1

@@ -67,9 +67,10 @@ uv add --dev pytest pytest-asyncio testcontainers[postgres] ruff
 from verasig.config import Settings
 
 def test_settings_load_from_env(monkeypatch):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", "postgresql://u:p@db:5432/verasig")
+    monkeypatch.setenv("VERASIG_DB_HOST", "db")
+    monkeypatch.setenv("VERASIG_DB_NAME", "verasig")
     s = Settings()
-    assert s.database_url.endswith("/verasig")
+    assert s.database_url == "postgresql+psycopg://verasig:verasig@db:5432/verasig"
 ```
 
 - [ ] **Step 3: Run it, verify it fails**
@@ -84,11 +85,20 @@ Expected: FAIL — `ModuleNotFoundError: verasig.config`.
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="VERASIG_", env_file=".env")
-    database_url: str = "postgresql+psycopg://verasig:verasig@db:5432/verasig"
+    model_config = SettingsConfigDict(env_prefix="VERASIG_", env_file=".env", extra="ignore")
+    database_url_override: str | None = None
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "verasig"
+    db_user: str = "verasig"
+    db_password: str = "verasig"
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
     session_path: str = "/session/telegram.session"
+
+    @property
+    def database_url(self) -> str:
+        return self.database_url_override or ...
 ```
 
 - [ ] **Step 5: Verify config test passes**

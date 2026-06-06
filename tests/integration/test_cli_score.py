@@ -126,7 +126,7 @@ def test_score_cli_prints_scorecard_and_explanation(
     session_factory, monkeypatch, pg_url
 ):
     _seed_score(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
 
     result = runner.invoke(app, ["score", "@pilot"])
 
@@ -149,7 +149,7 @@ def test_score_cli_prints_scorecard_and_explanation(
 
 
 def test_score_cli_unknown_channel_exits_nonzero(monkeypatch, pg_url):
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
 
     result = runner.invoke(app, ["score", "@ghost"])
 
@@ -161,7 +161,7 @@ def test_score_cli_can_include_simulation_from_market_data(
 ):
     _seed_score(session_factory)
     market_data = FakeMarketData()
-    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     monkeypatch.setattr("verasig.cli._make_market_data", lambda: market_data)
 
     result = runner.invoke(
