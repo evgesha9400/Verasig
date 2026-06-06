@@ -9,6 +9,7 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
+from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import (
     EntryType,
     ExtractedSignal,
@@ -17,12 +18,14 @@ from verasig.domain.signal import (
     UnrecognizedSignal,
 )
 from verasig.services.scoring.hygiene import (
+    SIGNAL_FREQUENCY_ANCHOR_PER_DAY,
     ExcludedMeasurement,
     HygieneMeasurement,
     measure_completeness,
     measure_deletion_behaviour,
     measure_evidence_availability,
     measure_parser_confidence,
+    measure_signal_frequency,
 )
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
@@ -40,6 +43,17 @@ def _event(suffix: int, message_id: int) -> RawSignalEvent:
         candidate_text="BTC long",
         materialized_by=MaterializationPath.SEED_HEURISTIC,
         created_at=_BASE,
+    )
+
+
+def _message(message_id: int, day: int) -> RawTelegramMessage:
+    return RawTelegramMessage(
+        channel_id=7,
+        message_id=message_id,
+        posted_at=_BASE.replace(day=_BASE.day + day),
+        captured_at=_BASE.replace(day=_BASE.day + day),
+        has_media=False,
+        raw_payload={"id": message_id},
     )
 
 
@@ -235,3 +249,31 @@ def test_evidence_availability_uses_snapshot_diff_as_clean_rescan_proof():
         "channel:7",
         "deletion:00000000-0000-0000-0000-000000000031",
     ]
+
+
+def test_signal_frequency_measures_candidates_per_window_day():
+    measurement = measure_signal_frequency(
+        events=[_event(40, 1), _event(41, 2)],
+        messages=[_message(10, 0), _message(11, 2)],
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.name == "signal_frequency"
+    assert measurement.raw_value == 1.0
+    assert measurement.normalized == pytest.approx(
+        1.0 / SIGNAL_FREQUENCY_ANCHOR_PER_DAY
+    )
+    assert measurement.evidence_refs == [
+        "event:00000000-0000-0000-0000-000000000040",
+        "event:00000000-0000-0000-0000-000000000041",
+        "message:7/10",
+        "message:7/11",
+    ]
+
+
+def test_signal_frequency_excludes_empty_message_window():
+    measurement = measure_signal_frequency(events=[_event(42, 1)], messages=[])
+
+    assert isinstance(measurement, ExcludedMeasurement)
+    assert measurement.name == "signal_frequency"
+    assert measurement.note == "signal_frequency: not measured — no captured messages"

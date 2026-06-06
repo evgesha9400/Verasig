@@ -8,7 +8,10 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.event import RawSignalEvent
+from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import ExtractedSignal, ExtractionMethod, UnrecognizedSignal
+
+SIGNAL_FREQUENCY_ANCHOR_PER_DAY = 10.0
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,10 @@ def _deletion_ref(evidence: DeletedSignalEvidence) -> str:
 
 def _channel_ref(channel_id: int) -> str:
     return f"channel:{channel_id}"
+
+
+def _message_ref(message: RawTelegramMessage) -> str:
+    return f"message:{message.channel_id}/{message.message_id}"
 
 
 def _signal_ref(signal: ExtractedSignal) -> str:
@@ -206,4 +213,44 @@ def measure_evidence_availability(
         evidence_refs=_evidence_availability_refs(
             channel_id, id_gaps, _snapshot_diff_deletions(proof)
         ),
+    )
+
+
+def _window_days(messages: list[RawTelegramMessage]) -> float:
+    first = min(message.posted_at for message in messages)
+    last = max(message.posted_at for message in messages)
+    elapsed_days = (last - first).total_seconds() / 86_400
+    return max(1.0, elapsed_days)
+
+
+def _window_boundary_refs(messages: list[RawTelegramMessage]) -> list[str]:
+    first = min(messages, key=lambda message: message.posted_at)
+    last = max(messages, key=lambda message: message.posted_at)
+    refs = [_message_ref(first)]
+    if last.message_id != first.message_id or last.channel_id != first.channel_id:
+        refs.append(_message_ref(last))
+    return refs
+
+
+def _normalize_signal_frequency(raw_value: float) -> float:
+    return min(1.0, raw_value / SIGNAL_FREQUENCY_ANCHOR_PER_DAY)
+
+
+def measure_signal_frequency(
+    events: list[RawSignalEvent],
+    messages: list[RawTelegramMessage],
+) -> Measurement:
+    if not messages:
+        return ExcludedMeasurement(
+            name="signal_frequency",
+            note="signal_frequency: not measured — no captured messages",
+        )
+    raw_value = len(events) / _window_days(messages)
+    refs = [_event_ref(event) for event in events]
+    refs.extend(_window_boundary_refs(messages))
+    return HygieneMeasurement(
+        name="signal_frequency",
+        raw_value=raw_value,
+        normalized=_normalize_signal_frequency(raw_value),
+        evidence_refs=refs,
     )
