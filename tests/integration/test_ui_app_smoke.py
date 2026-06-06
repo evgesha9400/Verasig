@@ -59,6 +59,13 @@ def _metric(app_test, label: str) -> float:
     raise AssertionError(f"no metric labeled {label!r}")
 
 
+def _button(app_test, label: str, occurrence: int = 0):
+    matches = [button for button in app_test.button if button.label == label]
+    if len(matches) <= occurrence:
+        raise AssertionError(f"no button labeled {label!r} at occurrence {occurrence}")
+    return matches[occurrence]
+
+
 def test_workbench_loop_label_distil_filter_iterate():
     app_test = AppTest.from_file(_APP)
     app_test.session_state["bootstrap"] = _bootstrap()
@@ -78,7 +85,23 @@ def test_workbench_view_switcher_renders_each_panel():
     app_test = AppTest.from_file(_APP)
     app_test.session_state["bootstrap"] = _bootstrap()
     app_test.run()
-    for view in ("Candidates", "Unflagged", "⚠ Drift", "🎲 Audit"):
+    for view in ("Candidates", "Unflagged", "Drift", "Audit", "All"):
         app_test.radio[0].set_value(view)
         app_test.run()
         assert not app_test.exception
+
+
+def test_workbench_saves_operator_noise_label_in_loop():
+    app_test = AppTest.from_file(_APP)
+    app_test.session_state["bootstrap"] = _bootstrap()
+    app_test.run()
+    app_test.radio[0].set_value("Unflagged")
+    app_test.run()
+
+    _button(app_test, "Noise").click()
+    app_test.run()
+
+    assert not app_test.exception
+    assert _metric(app_test, "labels") == 2
+    assert _metric(app_test, "noise") == 1
+    assert app_test.session_state["labels_by_message"][2].is_signal is False
