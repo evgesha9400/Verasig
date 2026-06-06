@@ -1,1 +1,1 @@
-"""Distillation services: rule distiller (filter + parser) and the workbench loop."""
+"""Distillation services: rule distiller, evaluation, and stored rule support."""

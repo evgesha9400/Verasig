@@ -15,7 +15,7 @@ One captured message exactly as received, stored immutably and append-only. The 
 _Avoid_: message record, raw event (that is something else — see below).
 
 **RawSignalEvent**:
-A `RawTelegramMessage` the candidate filter flagged as a signal candidate, plus the exact text slice handed to extraction. An **advisory** subset — it sets priority/triage (what the LLM and the operator UI see), not eligibility; deterministic parsing may still run over all messages, and a `RawSignalEvent` may be **late-materialized** when a background parse or audit finds a missed signal ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
+A `RawTelegramMessage` the candidate filter flagged as a signal candidate, plus the exact text slice handed to extraction. An **advisory** subset — it sets priority/triage for later review and LLM use, not eligibility; deterministic parsing may still run over all messages, and a `RawSignalEvent` may be **late-materialized** when a background parse or audit finds a missed signal ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
 _Avoid_: signal, raw message. Note: this **supersedes** the old definition where `RawSignalEvent` meant "original source content" — that role now belongs to `RawTelegramMessage`.
 
 **Candidate filter**:
@@ -60,7 +60,7 @@ A declarative, versioned, provider-specific **extraction** rule (ordered pattern
 _Avoid_: parser, regex, grammar.
 
 **Distillation loop**:
-The human-assisted UI cycle: operator highlights signal messages → AI distills both a `FilterRule` (from `is_signal`) and `ParserRule`s (from `expected` fields) from the examples → rules applied and matched messages filtered → residue re-presented → repeat until the operator is satisfied. One labeling pass, two objectives; the human labels become the golden corpus.
+The human-assisted labeling cycle: operator labels signal messages → AI distills both a `FilterRule` (from `is_signal`) and `ParserRule`s (from `expected` fields) from the examples → rules are applied and measured against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus.
 
 **Golden corpus**:
 The operator-labeled set of messages (signal / not-signal + expected fields) used as ground truth for parser precision and recall.

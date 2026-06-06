@@ -153,21 +153,3 @@ def test_candidates_cli_unknown_channel_exits_nonzero(
     monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
     result = runner.invoke(app, ["candidates", "@ghost"])
     assert result.exit_code == 1
-
-
-def test_workbench_cli_launches_for_known_channel(session_factory, monkeypatch, pg_url):
-    _populate(session_factory)
-    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
-    launched: list[int] = []
-    monkeypatch.setattr("verasig.cli._launch_workbench", launched.append)
-    result = runner.invoke(app, ["workbench", "@pilot"])
-    assert result.exit_code == 0
-    assert launched == [7]  # resolved channel id, no real Streamlit launched
-
-
-def test_workbench_cli_unknown_channel_exits_nonzero(
-    session_factory, monkeypatch, pg_url
-):
-    monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", pg_url)
-    result = runner.invoke(app, ["workbench", "@ghost"])
-    assert result.exit_code == 1

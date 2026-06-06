@@ -9,7 +9,6 @@ Tests are the spec made executable. **Red → green → commit** for every step.
 | **unit** | pure `domain/` + `services/` logic | none (fakes injected) | ms |
 | **integration** | `storage/` repos + full pipeline | ephemeral Postgres (testcontainers) | seconds |
 | **contract** | adapters satisfy their Protocol | recorded fixtures (CLI stdout, klines, msgs) | ms |
-| **smoke** (optional) | Streamlit via `streamlit.testing.AppTest` | fakes | seconds |
 
 - **No test touches real Telegram, the real LLM CLI, the real Bybit API, or the network.**
 - Real-adapter behaviour is pinned with **recorded fixtures** (canned stdout / JSON), not live calls.

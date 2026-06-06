@@ -1,9 +1,6 @@
 import asyncio
-import os
-import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 
 import typer
 from sqlalchemy import text
@@ -567,26 +564,6 @@ def sweep(reference: str) -> None:
         parser_rules = repo.read_parser_rules(session, channel_id)
     recovered, drift = sweep_advisory(session_factory, channel_id, parser_rules)
     typer.echo(f"sweep: channel {channel_id} · +{recovered} recovered · +{drift} drift")
-
-
-@app.command()
-def workbench(reference: str) -> None:
-    """Launch the Streamlit distillation workbench."""
-    session_factory = make_session_factory(Settings().database_url)
-    channel_id = _resolve_channel_id(session_factory, reference)
-    _launch_workbench(channel_id)
-
-
-def _launch_workbench(channel_id: int) -> None:
-    app_path = Path(__file__).parent / "ui" / "app.py"
-    environment = {**os.environ, "VERASIG_WORKBENCH_CHANNEL": str(channel_id)}
-    command = [
-        "streamlit",
-        "run",
-        str(app_path),
-        "--server.address=0.0.0.0",
-    ]
-    subprocess.run(command, env=environment, check=False)
 
 
 if __name__ == "__main__":

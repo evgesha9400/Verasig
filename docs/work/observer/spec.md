@@ -24,14 +24,14 @@
 - Public + private channel **history backfill** and **live listener**.
 - Append-only `RawTelegramMessage` capture.
 - Candidate filter (**advisory**, seed + distilled) → `RawSignalEvent` ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)).
-- Human-assisted **distillation loop** → `FilterRule` + `ParserRule`s + golden corpus (Streamlit).
+- Human-assisted **distillation loop** → `FilterRule` + `ParserRule`s + golden corpus.
 - Deterministic extraction → `ExtractedSignal` | `UnrecognizedSignal`.
 - LLM fallback via **Claude/Codex CLI** (behind an interface) → `ParserDriftWarning`.
 - Signal **lifecycle folding** (entry + modifications + close, linked by `reply_to`).
 - `DeletedSignalEvidence` (CONFIRMED snapshot-diff + SUSPECTED id-gap).
 - Conservative **simulation** vs Bybit public klines (pluggable `ExecutionPolicy`).
 - Re-weightable `ProviderScore` + `ProviderScoreExplanation`.
-- Local **Streamlit** workbench + scorecard.
+- Operator review UI and scorecard are removed from this implementation; future framework TBD.
 
 ### Out (non-goals)
 - Demo execution · live execution · Bybit order placement · exchange credentials.
@@ -48,15 +48,15 @@
 │   db (Postgres)   telegram session (volume)   secrets/ mount (.env)      │
 ├──────────────────────────────────────────────────────────────────────── │
 │  SERVICE  (one image, many commands — typer CLI)                         │
-│   login → backfill → candidates → distill(UI) → extract → fallback       │
-│         → lifecycle → deletion → score → simulate → live → dashboard(UI) │
+│   login → backfill → candidates → extract → fallback                     │
+│         → lifecycle → deletion → score → simulate → live                 │
 └──────────────────────────────────────────────────────────────────────── ┘
 ```
 
 - **Foundation** = concrete IO edge: SQLAlchemy engine/session setup, Telethon session/source adapters, `StaticExchange` seed adapter, Bybit market-data client.
 - **Storage** = sibling persistence edge: SQLAlchemy ORM rows and repositories for append-only capture, recomputable projections, and durable evidence.
-- **Service** = one uv-built Python image; each pipeline step is a CLI subcommand; UI commands launch Streamlit. The live daemon is the same image run long-lived.
-- **Dependency rule:** `domain/` (pure contracts) ← `services/` (logic) ← `storage/`+`foundation/` (IO). UI and CLI are thin adapters over services. Logic never imports IO frameworks directly.
+- **Service** = one uv-built Python image; each pipeline step is a CLI subcommand. The live daemon is the same image run long-lived.
+- **Dependency rule:** `domain/` (pure contracts) ← `services/` (logic) ← `storage/`+`foundation/` (IO). CLI is a thin adapter over services. Logic never imports IO frameworks directly.
 
 ### Data flow
 ```
@@ -74,7 +74,7 @@ Telegram ──backfill──▶ RawTelegramMessage ──candidate filter──
    Bybit klines ──▶ simulate(folded signal, policy) ──▶  lifecycle fold
                               │                                      │
                               ▼                                      ▼
-                        Simulated outcome ─────────▶ ProviderScore + ProviderScoreExplanation ─▶ Streamlit scorecard
+                        Simulated outcome ─────────▶ ProviderScore + ProviderScoreExplanation
 ```
 
 ## 4.1 Processing model — resumable & chunked (hard requirement)
@@ -97,7 +97,6 @@ Telegram ──backfill──▶ RawTelegramMessage ──candidate filter──
 | CLI | **Typer** | typed subcommands |
 | Market data | **httpx** client behind interface | public klines = simple GET; trivially fakeable |
 | LLM fallback | **Claude / Codex CLI** via subprocess, behind interface | reuses user auth; fake in tests |
-| UI | **Streamlit** | least code, task-concentrated corpus, one container |
 | Tests | **pytest** (+ pytest-asyncio, testcontainers-postgres) | TDD; ephemeral DB |
 | Lint/format | **ruff** | mandated |
 
@@ -133,8 +132,6 @@ verasig/
 │   │   ├── lifecycle/      fold.py
 │   │   ├── deletion/       detect.py
 │   │   └── scoring/        simulator.py  policies.py  hygiene.py  scorecard.py
-│   └── ui/
-│       ├── app.py  workbench.py  scorecard.py
 └── tests/
     ├── conftest.py
     ├── fixtures/           # canned messages, CLI outputs, klines (golden corpora)
@@ -185,7 +182,7 @@ verasig/
 - [ ] `DeletedSignalEvidence` produced: CONFIRMED (snapshot-diff, content retained) + SUSPECTED (id-gap).
 - [ ] Conservative simulation yields R-multiple / MTM outcomes + MFE/MAE for signals with sufficient fields.
 - [ ] `ProviderScore` computed; **100%** of components traceable via `ProviderScoreExplanation`.
-- [ ] Operator opens the Streamlit scorecard and classifies each pilot source **good/bad/untradeable** with evidence links.
+- [ ] Operator classification UI is future work; current scoring is CLI/evidence-first.
 - [ ] `pytest` green; `ruff` clean; no secrets in git.
 
 ## 10. Risks & open items (carry forward)

@@ -4,9 +4,9 @@
 
 **Goal:** Prove Verasig can score Telegram signal-provider quality from captured messages, fully local (docker compose), observe-only, no execution.
 
-**Architecture:** One uv-built Python image (Typer CLI subcommands + Streamlit UI) over a Postgres container. `domain/` pure contracts ← `services/` logic ← `storage/` repositories + `foundation/` adapters; UI/CLI are thin adapters. Every external dependency sits behind a Protocol so tests run offline.
+**Architecture:** One uv-built Python image (Typer CLI subcommands) over a Postgres container. `domain/` pure contracts ← `services/` logic ← `storage/` repositories + `foundation/` adapters; CLI is a thin adapter. Every external dependency sits behind a Protocol so tests run offline.
 
-**Tech Stack:** Python 3.12, uv, Telethon (hybrid push+poll live — [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)), Postgres 16, SQLAlchemy 2.0 + Alembic, Pydantic v2, Typer, httpx, Streamlit, pytest (+ testcontainers), ruff. LLM fallback = Claude/Codex CLI via subprocess.
+**Tech Stack:** Python 3.12, uv, Telethon (hybrid push+poll live — [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)), Postgres 16, SQLAlchemy 2.0 + Alembic, Pydantic v2, Typer, httpx, pytest (+ testcontainers), ruff. LLM fallback = Claude/Codex CLI via subprocess. Operator UI framework is TBD and not implemented.
 
 ---
 
@@ -25,7 +25,7 @@
 0 Foundation
 └─1 Session/login
   └─2 Backfill (RawTelegramMessage)
-    └─3 Candidate seed filter + unified distillation (FilterRule + ParserRule + golden corpus; advisory RawSignalEvent)   ── needs UI + CLI distiller
+    └─3 Candidate seed filter + unified distillation (FilterRule + ParserRule + golden corpus; advisory RawSignalEvent)
       └─4 Deterministic extract (ExtractedSignal|Unrecognized)
         ├─5 LLM fallback + drift
         ├─6 Lifecycle fold
@@ -56,7 +56,7 @@
 
 ```bash
 uv init --package --name verasig .
-uv add sqlalchemy alembic "pydantic>=2" pydantic-settings typer httpx telethon streamlit "psycopg[binary]"
+uv add sqlalchemy alembic "pydantic>=2" pydantic-settings typer httpx telethon "psycopg[binary]"
 uv add --dev pytest pytest-asyncio testcontainers[postgres] ruff
 ```
 
@@ -305,67 +305,47 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Input:** a channel's `RawTelegramMessage` corpus.
 - **Output:**
   - advisory `RawSignalEvent`s — first from a cheap **seed heuristic**, then from distilled `FilterRule`s;
-  - `FilterRule` (recall-first, from `is_signal`) + `ParserRule`s (precision-first, from `expected` fields), distilled in one workbench loop;
+  - `FilterRule` (recall-first, from `is_signal`) + `ParserRule`s (precision-first, from `expected` fields), distilled from the golden corpus;
   - `GoldenLabel`s (the golden corpus);
   - `FilterDriftWarning`s when a background parse / audit finds a signal the filter missed.
 - **Contracts:** `RawSignalEvent` (advisory, §2), `FilterRule`, `ParserRule`, `FilterDriftWarning`, `GoldenLabel` (§4); `RuleDistiller` Protocol (`distill_filter` + `distill_parsers`, §9).
 - **Seam / mechanism (ADR 0005):**
   - **Seed (cold start):** a pure, recall-first heuristic — candidate if the text holds an exchange-listed symbol/base coin (via an `Exchange` Protocol seam, e.g. a `Bybit` adapter + `FakeExchange` in tests), a directional keyword (EN+RU), or a trade-structure keyword/emoji. `matched_reasons: list[MatchReason]`; `candidate_text` = verbatim message text; media-only/blank → not a candidate.
-  - **Distillation:** operator labels `is_signal` (+ expected fields for positives) in the Streamlit workbench; the external LLM distils a recall-first `FilterRule` and precision-first `ParserRule`s; rules applied, matched messages filtered, residue + a random unflagged sample re-presented; repeat. Only operator-selected examples leave the machine (privacy §10); bulk text is scanned only by local deterministic rules.
+  - **Distillation:** operator labels `is_signal` (+ expected fields for positives); the external LLM distils a recall-first `FilterRule` and precision-first `ParserRule`s. Only operator-selected examples leave the machine (privacy §10); bulk text is scanned only by local deterministic rules.
   - **Advisory gate:** deterministic rules may run over all `RawTelegramMessage`s; a hit on a non-candidate **late-materializes** a `RawSignalEvent` (`materialized_by=PARSER_BACKFILL`) + emits a `FilterDriftWarning`.
-- **UI — distillation workbench (Streamlit):** the operator must reach *beyond* candidates, not just label inside a pre-filtered list.
-
-  ```
-  ┌ Distillation workbench — @channel ───────────────────────────────────┐
-  │ View: ( Candidates | Unflagged | ⚠ Drift | 🎲 Audit )                 │
-  │ Recall vs GoldenLabel:  filter 0.93   parser P 0.96    Residue: 41    │
-  ├───────────────────────────────────────────────────────────────────── │
-  │ #1042  "BTC long entry 65k SL 64k TP 67k"            [✓ signal][fields]│
-  │ #1044  "gm frens wagmi"                               [✗ not]          │
-  │ #1047  "зашёл по эфиру, стоп под лоем"     ⚠ filter-miss [✓ signal][…] │
-  ├───────────────────────────────────────────────────────────────────── │
-  │ [ Distil rules from labels ] → FilterRule v3 (recall) + ParserRule r7 │
-  └─────────────────────────────────────────────────────────────────────  ┘
-  ```
-
-  - **View switcher** — `Candidates` (flagged, priority order) · `Unflagged` (the rest) · `⚠ Drift` (the `FilterDriftWarning` queue) · `🎲 Audit` (random unflagged sample, to discover missed formats). A hard gate would only ever show `Candidates`.
-  - **One label, two grounds** — `✓/✗ signal` trains the `FilterRule`; `[fields]` trains the `ParserRule`s. Single pass, two objectives.
-  - **Filter-recall meter (vs `GoldenLabel`)** — the gate's miss-rate is *visible* (it was unmeasurable under a hard gate).
-  - **Distil action** — one button emits a recall-first `FilterRule` + precision-first `ParserRule`s; matched messages drop out; residue + a fresh random sample re-present.
-  - **Loop:** label → distil → matched drop out → residue + audit sample re-presented → repeat until residue is small and recall holds.
+- **Operator review surface:** removed from current implementation. Future UI framework and workflow must be designed separately; no previous UI implementation remains.
 - **Runtime behaviour (advisory, not a wall):**
   - candidate derivation sets **priority**, blocks nothing;
   - the **cheap deterministic parser sweeps all** `RawTelegramMessage`s in bounded batches; a hit on a non-candidate late-materializes a `RawSignalEvent` (`PARSER_BACKFILL`) + a `FilterDriftWarning`;
   - the **expensive LLM fallback stays scoped to candidates/residue** (cost + §10 unchanged) — only the cheap parse went broad;
   - filter misses are therefore **recoverable + visible**, never silent; each drift warning is a labeled example for the next distillation;
-  - **cold start:** before any labels, the workbench shows seed-heuristic hits first **plus** a chronological/random sample so the operator can bootstrap the first labels without a working filter.
+  - **cold start:** before any labels, seed-heuristic hits plus sampled raw messages should bootstrap labels in the future operator surface.
 - **Decisive tests:**
   - unit (pure, table-driven): seed filter — chatter→reject; directional/symbol/price→accept; `matched_reasons` recorded; recall-first over-include; `Exchange` symbols injected (offline).
   - unit (pure): `FilterRule`/`ParserRule` application is pure + table-driven against fixtures; `FakeDistiller(labels)` returns a `FilterRule` + `ParserRule`s.
   - integration: labels + rules persist; **re-applying distilled rules reproduces the labels** (filter recall ≥ target on `is_signal`; parser ≥ target precision on `expected`); a planted filter miss emits exactly one `FilterDriftWarning`.
-  - smoke (optional): Streamlit `AppTest` drives label → distil(filter+parser) → filter → iterate; residue + unflagged sample shrink.
-- **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); operator labels a pilot channel via the UI; both rule kinds produced; residue shrinks each pass; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on `is_signal`; parser precision/recall on `expected`), not the candidate subset.
+- **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); both rule kinds produced; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on `is_signal`; parser precision/recall on `expected`), not the candidate subset.
 - **Note:** real external-LLM distillation sends only operator-selected examples to the real LLM. The seed filter + rule application are pure/offline and fixture-testable. A local `FilterGemma`/`ParserGemma` is outside current scope until a later product version (ADR 0005).
 
 **Resolved gaps (grill, 2026-06-04) — work items 3 + 4 execute as one pass:**
 
-- **Scope:** build seed filter + distillation (including Streamlit workbench + real `ClaudeCliDistiller`) **and** all of work item 4 (deterministic extraction). Real-LLM interactions use operator-selected examples only; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
+- **Scope:** build seed filter + distillation backend (including real `ClaudeCliDistiller`) **and** all of work item 4 (deterministic extraction). Real-LLM interactions use operator-selected examples only; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
 - **3/4 boundary:** work item 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until work item 5), precision ≥ 0.95 harness.
 - **Exchange seam:** `domain/protocols.py` owns the `Exchange` Protocol (`is_listed`/`base_symbols`); `foundation/static_exchange.py` owns the bundled `StaticExchange` seed; `FakeExchange` lives in tests. Real `BybitExchange(httpx)` remains outside current scope until work item 9.
 - **Distiller output:** LLM emits JSON `{filter_rule, parser_rules}` (pattern content only); shared `parse_distiller_output` tolerantly extracts (bare or ```json-fenced) + Pydantic-validates; the adapter stamps `rule_id`/`version`/`created_at`/`distilled_from_label_ids` (provenance never hallucinated).
 - **MatchReason:** frozen 3-value enum kept — `DIRECTIONAL_KEYWORD` (long/short/buy/sell + RU), `SYMBOL_TOKEN` (Exchange-listed), `PRICE_SHAPED` (subsumes trade-structure keywords/emoji + price patterns).
 - **Persistence:** migration `0003` adds all 7 tables — `raw_signal_event`, `extracted_signal`, `unrecognized_signal`, `filter_rule`, `parser_rule`, `golden_label`, `filter_drift_warning`; list/map fields + `GoldenLabel.expected` as JSONB; conftest TRUNCATE extended.
 - **Fixtures:** synthetic anonymized `tests/fixtures/{messages,labels}/pilot.jsonl` (~50 msgs, EN+RU; signals / partials / chatter + ≥1 planted filter-miss). Oracle for filter-recall ≥ 0.95 (denominator = `GoldenLabel.is_signal`) + parser-precision ≥ 0.95 (`expected`).
-- **UI:** full 4-view workbench (Candidates | Unflagged | ⚠ Drift | 🎲 Audit) — pure presenter in `services/distillation/workbench.py`, thin `ui/workbench.py`, `AppTest` smoke.
-- **CLI:** `candidates` (derive) · `workbench` (Streamlit) · `extract` (candidates → signal/unrecognized) · `sweep` (advisory parse-all → late-materialize `PARSER_BACKFILL` + `FilterDriftWarning`). `candidates`/`extract`/`sweep` are offline; only the workbench Distil-click reaches the real LLM.
+- **UI:** removed from this implementation; future framework TBD.
+- **CLI:** `candidates` (derive) · `extract` (candidates → signal/unrecognized) · `sweep` (advisory parse-all → late-materialize `PARSER_BACKFILL` + `FilterDriftWarning`).
 - **Decided inline (doc/precedent):** enums co-located with their entity (`DeliveryMode` precedent); `uuid4` / `datetime.now(tz=utc)` defaults (tests pass explicit instants); `candidate_text` = verbatim text; media-only/blank → non-candidate; late-materialization idempotent on `(channel_id, message_id)`.
 
 **Files (this pass):**
 - `domain/`: `event.py` `signal.py` `filter_rule.py` `parser_rule.py` `label.py` `drift.py`
 - `foundation/static_exchange.py`
-- `services/ingestion/candidate_filter.py` (seed + FilterRule apply + derivation + advisory sweep), `services/extraction/{deterministic_parser.py, extract_service.py}`, `services/distillation/{rule_distiller.py, workbench.py}`
+- `services/ingestion/candidate_filter.py` (seed + FilterRule apply + derivation + advisory sweep), `services/extraction/{deterministic_parser.py, extract_service.py}`, `services/distillation/rule_distiller.py`
 - `storage/models.py` (+7 rows), `storage/repositories.py`, `migrations/versions/0003_*.py`
-- `ui/app.py` `ui/workbench.py`; `cli.py` (+`candidates`/`workbench`/`extract`/`sweep`), `config.py` (+`distiller_command`)
+- `cli.py` (+`candidates`/`extract`/`sweep`), `config.py` (+`distiller_command`)
 - `tests/unit/*`, `tests/integration/*`, `tests/fixtures/{messages,labels,cli}/*`, `tests/fakes.py` (+`FakeExchange`, +`FakeDistiller`)
 
 ---
@@ -552,7 +532,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 - **Persistence — recomputable projection (ADR 0006):** `record_outcome(session, outcome)` (drift travels inside `ExtractOutcome.drift_warnings`, not a separate arg) upserts the winning outcome `ON CONFLICT(event_id) DO UPDATE`, deletes the losing sibling, and upserts/clears the `parser_drift_warning`. `UNIQUE(event_id)` on `extracted_signal`, `unrecognized_signal`, `parser_drift_warning`. Re-extract is `+0` and transitions `unrecognized -> extracted` cleanly. Raw tables stay append-only.
 - **Adapter:** one `ClaudeCliExtractor(command=…, runner=…)` mirroring `ClaudeCliDistiller` (Codex via `command="codex"`; a named subclass is trivial later — YAGNI). `FakeExtractor(returns=…, calls)` in `tests/fakes.py`.
 - **Migrations:** edit `0003` to drop the now-dead `parser_confidence` column; add `0004` (`parser_drift_warning` table + `UNIQUE(event_id)` on `extracted_signal`/`unrecognized_signal`). conftest TRUNCATE list extended.
-- **Out of scope:** the workbench ⚠ Drift view stays filter-drift only (no parser-drift UI here).
+- **Out of scope:** parser-drift UI is not implemented.
 
 **Files:**
 - `domain/signal.py` (+`TradeIntent`, `ExtractedSignal(TradeIntent)`, −`parser_confidence`), `domain/drift.py` (+`ParserDriftWarning`)
@@ -631,7 +611,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 - **Per-component math:** deletion = 1−(CONFIRMED∧signal ÷ `RawSignalEvent` count); completeness = mean(present-{entry,stop,≥1 TP} ÷ 3, MARKET counts as entry); parser_confidence = DETERMINISTIC ÷ total candidates; evidence_availability = captured ÷ (captured + `ID_GAP`) — emitted only when a rescan provably ran (≥1 row `method ∈ {SNAPSHOT_DIFF, ID_GAP}`; `LIVE_EVENT` excluded), else excluded + noted (a never-rescanned channel never reads 1.0); frequency = candidates ÷ window-days; proxy raw=`subscriber_count`, normalized=mean(saturate{subs, median views, median forwards}) over available, name `active_user_proxy` (never a quality claim).
 - **evidence_refs:** typed-prefix grammar (`channel:` / `message:<ch>/<msg>` / `event:` / `signal:` / `unrecognized:` / `deletion:` / `parser_drift:` / `filter_drift:`), naming every row used to **measure** the value (numerator + denominator) so a measured 0.0 still traces; bulk message-corpus denominators anchor on `channel:<id>` (deterministic `count_messages`), not thousands of `message:` refs.
 - **Placement:** pure `services/scoring/hygiene.py` (un-weighted metric measurements: raw / normalized / evidence_refs / notes, or excluded+note) + `services/scoring/scorecard.py` (apply `ScoreWeights` → `ScoreComponent.contribution = normalized×weight`, sum `score`, stamp `computed_at`/`weights_version`, gather `notes` → build `ProviderScore` + `ProviderScoreExplanation`). Repo reads stay in the CLI, mirroring `_fold_channel`. work item 9 adds `simulator.py` + `policies.py` alongside.
-- **Surface:** offline `verasig score <ref>` (read repos → pure builder → `format_score` + `format_explanation`); unknown channel exits 1. Mirrors `stats`/`lifecycle`/`deletions`. No persistence and no Streamlit scorecard here.
+- **Surface:** offline `verasig score <ref>` (read repos → pure builder → `format_score` + `format_explanation`); unknown channel exits 1. Mirrors `stats`/`lifecycle`/`deletions`. No persistence and no scorecard UI here.
 
 **Files (this pass):**
 - `domain/score.py` (`ScoreComponent`, `ProviderScore`, `ProviderScoreExplanation`, `ScoreWeights`, `DEFAULT_WEIGHTS`, `WEIGHTS_VERSION="v0"`, `_now`)

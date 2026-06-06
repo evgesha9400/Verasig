@@ -4,7 +4,7 @@ Pure + offline. Filter **recall** is measured on `GoldenLabel.is_signal` (the
 advisory gate's miss-rate; denominator = GoldenLabel, not the candidate subset).
 Parser **precision** is measured on the required `expected` fields (symbol+side)
 of the messages the parser extracts from; parser **recall** is reported, not
-gated. Reused by the workbench recall meter.
+gated.
 """
 
 from dataclasses import dataclass
