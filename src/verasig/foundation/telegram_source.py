@@ -3,7 +3,7 @@
 `TelegramSource` is the Protocol every consumer codes against; tests inject a
 fake. `TelethonSource` is the real adapter — its `resolve_channel`/
 `backfill_batches` are exercised by manual acceptance against a real account
-(never in tests); `live_events` arrives in Slice 11.
+(never in tests); `live_events` is exercised by manual Slice 10 acceptance.
 """
 
 import json
@@ -29,6 +29,18 @@ class TelegramDeliveryEvent(BaseModel):
     gap_closed: bool
 
 
+class TelegramDeletionEvent(BaseModel):
+    """A live deletion notice for one message id."""
+
+    channel_id: int
+    message_id: int
+    detected_at: datetime
+    source_pts: int | None = None
+
+
+TelegramLiveEvent = TelegramDeliveryEvent | TelegramDeletionEvent
+
+
 @runtime_checkable
 class TelegramSource(Protocol):
     # resolve: @handle | t.me link | numeric id -> channel identity + metadata.
@@ -45,7 +57,7 @@ class TelegramSource(Protocol):
     # live: one global socket, many channels; hybrid push + short-poll inside.
     def live_events(
         self, channel_ids: list[int]
-    ) -> AsyncIterator[TelegramDeliveryEvent]: ...
+    ) -> AsyncIterator[TelegramLiveEvent]: ...
 
 
 def _json_safe(payload: dict) -> dict:
@@ -109,6 +121,6 @@ class TelethonSource:
 
     async def live_events(
         self, channel_ids: list[int]
-    ) -> AsyncIterator[TelegramDeliveryEvent]:
-        raise NotImplementedError("live listener arrives in Slice 11")
+    ) -> AsyncIterator[TelegramLiveEvent]:
+        raise NotImplementedError("live listener arrives in Slice 10")
         yield  # pragma: no cover - marks this as an async generator

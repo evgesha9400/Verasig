@@ -124,6 +124,15 @@ def _row_to_message(row: RawMessageRow) -> RawTelegramMessage:
     )
 
 
+def read_message(
+    session: Session, channel_id: int, message_id: int
+) -> RawTelegramMessage | None:
+    row = session.get(RawMessageRow, (channel_id, message_id))
+    if row is None:
+        return None
+    return _row_to_message(row)
+
+
 def read_messages(session: Session, channel_id: int) -> list[RawTelegramMessage]:
     rows = session.scalars(
         select(RawMessageRow).where(RawMessageRow.channel_id == channel_id)
