@@ -21,6 +21,7 @@ from verasig.services.scoring.hygiene import (
     HygieneMeasurement,
     measure_completeness,
     measure_deletion_behaviour,
+    measure_evidence_availability,
     measure_parser_confidence,
 )
 
@@ -51,6 +52,18 @@ def _deletion(suffix: int, message_id: int) -> DeletedSignalEvidence:
         method=DeletionMethod.SNAPSHOT_DIFF,
         detected_at=_BASE,
         was_signal_candidate=True,
+    )
+
+
+def _id_gap(suffix: int, message_id: int) -> DeletedSignalEvidence:
+    return DeletedSignalEvidence(
+        id=_uuid(suffix),
+        channel_id=7,
+        message_id=message_id,
+        confidence=DeletionConfidence.SUSPECTED,
+        method=DeletionMethod.ID_GAP,
+        detected_at=_BASE,
+        was_signal_candidate=False,
     )
 
 
@@ -177,3 +190,48 @@ def test_parser_confidence_excludes_empty_candidate_denominator():
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "parser_confidence"
     assert measurement.note == "parser_confidence: not measured — no candidates"
+
+
+def test_evidence_availability_excludes_without_rescan_proof():
+    measurement = measure_evidence_availability(
+        channel_id=7,
+        message_count=10,
+        deletions=[],
+    )
+
+    assert isinstance(measurement, ExcludedMeasurement)
+    assert measurement.name == "evidence_availability"
+    assert measurement.note == "evidence_availability: not measured — run rescan"
+
+
+def test_evidence_availability_penalizes_id_gaps():
+    measurement = measure_evidence_availability(
+        channel_id=7,
+        message_count=9,
+        deletions=[_id_gap(30, 10)],
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.name == "evidence_availability"
+    assert measurement.raw_value == pytest.approx(0.9)
+    assert measurement.normalized == pytest.approx(0.9)
+    assert measurement.evidence_refs == [
+        "channel:7",
+        "deletion:00000000-0000-0000-0000-000000000030",
+    ]
+
+
+def test_evidence_availability_uses_snapshot_diff_as_clean_rescan_proof():
+    measurement = measure_evidence_availability(
+        channel_id=7,
+        message_count=10,
+        deletions=[_deletion(31, 2)],
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.raw_value == 1.0
+    assert measurement.normalized == 1.0
+    assert measurement.evidence_refs == [
+        "channel:7",
+        "deletion:00000000-0000-0000-0000-000000000031",
+    ]
