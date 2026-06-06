@@ -153,14 +153,19 @@ class ProviderStatedPolicy:
         if fill is None or stop is None or target is None:
             return _unfilled(self, folded)
         risk = _risk(fill.price, stop)
-        for bar in fill.bars:
+        for index, bar in enumerate(fill.bars):
+            life_bars = fill.bars[: index + 1]
             touches_stop = _touches_stop(folded, bar, stop)
             touches_target = _touches_target(folded, bar, target)
             if touches_stop:
-                return _r_outcome(self, folded, fill, risk, bar, "stop", Decimal(-1))
+                return _r_outcome(
+                    self, folded, fill, life_bars, risk, bar, "stop", Decimal(-1)
+                )
             if touches_target:
                 multiple = abs(target - fill.price) / risk
-                return _r_outcome(self, folded, fill, risk, bar, "tp", multiple)
+                return _r_outcome(
+                    self, folded, fill, life_bars, risk, bar, "tp", multiple
+                )
         return _unfilled(self, folded)
 
 
@@ -180,6 +185,7 @@ def _r_outcome(
     policy: object,
     folded: FoldedSignal,
     fill: _EntryFill,
+    life_bars: list[Kline],
     risk: Decimal,
     bar: Kline,
     exit_reason: str,
@@ -189,8 +195,8 @@ def _r_outcome(
         folded_signal_id=folded.root_signal_id,
         kind=SimOutcomeKind.R_MULTIPLE,
         r_multiple=float(r_multiple),
-        mfe=_mfe(folded.side, fill.price, risk, fill.bars),
-        mae=_mae(folded.side, fill.price, risk, fill.bars),
+        mfe=_mfe(folded.side, fill.price, risk, life_bars),
+        mae=_mae(folded.side, fill.price, risk, life_bars),
         entry_fill_at=fill.at,
         exit_at=bar.open_time,
         exit_reason=exit_reason,

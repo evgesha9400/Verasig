@@ -110,3 +110,27 @@ def test_limit_entry_stays_unfilled_when_price_never_reaches_entry():
     assert outcome.exit_at is None
     assert outcome.exit_reason == "unfilled"
     assert outcome.r_multiple is None
+
+
+def test_mfe_and_mae_stop_at_the_exit_candle():
+    folded = _folded()
+    bars = [
+        _bar(high=Decimal("104"), low=Decimal("99")),
+        _bar(
+            open_time=_BASE + timedelta(minutes=1),
+            high=Decimal("110"),
+            low=Decimal("97"),
+        ),
+        _bar(
+            open_time=_BASE + timedelta(minutes=2),
+            high=Decimal("130"),
+            low=Decimal("90"),
+        ),
+    ]
+
+    outcome = ProviderStatedPolicy().simulate(folded, bars)
+
+    assert outcome.exit_reason == "tp"
+    assert outcome.r_multiple == pytest.approx(2.0)
+    assert outcome.mfe == pytest.approx(2.0)
+    assert outcome.mae == pytest.approx(0.6)
