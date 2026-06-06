@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
@@ -11,6 +13,7 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.score import DEFAULT_WEIGHTS, WEIGHTS_VERSION, ScoreWeights
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.services.scoring.hygiene import ExcludedMeasurement, HygieneMeasurement
 from verasig.services.scoring.scorecard import build_provider_score, build_scorecard
 
@@ -96,6 +99,21 @@ def _snapshot_rescan_proof(suffix: int) -> DeletedSignalEvidence:
         method=DeletionMethod.SNAPSHOT_DIFF,
         detected_at=_computed_at(),
         was_signal_candidate=False,
+    )
+
+
+def _sim_outcome(signal: ExtractedSignal) -> SimOutcome:
+    return SimOutcome(
+        folded_signal_id=signal.id,
+        kind=SimOutcomeKind.R_MULTIPLE,
+        r_multiple=2.0,
+        mfe=2.0,
+        mae=0.25,
+        entry_fill_at=_computed_at(),
+        exit_at=_computed_at(),
+        exit_reason="tp",
+        policy="ProviderStatedPolicy",
+        tie_break="stop_first",
     )
 
 
@@ -232,3 +250,32 @@ def test_provider_score_builder_measures_all_present_slice8_components():
     ]
     assert score.score == 0.5
     assert explanation.breakdown == score.components
+
+
+def test_provider_score_builder_adds_simulation_components_when_outcomes_exist():
+    event = _event(4, 10)
+    signal = _signal(5, event.id)
+    score, explanation = build_provider_score(
+        channel=_channel(),
+        messages=[_message(10), _message(11)],
+        message_count=2,
+        events=[event],
+        signals=[signal],
+        unrecognized=[],
+        deletions=[_snapshot_rescan_proof(6)],
+        sim_outcomes=[_sim_outcome(signal)],
+        computed_at=_computed_at(),
+    )
+
+    assert score.simulated_count == 1
+    assert [component.name for component in score.components[:2]] == [
+        "sim_expectancy",
+        "drawdown",
+    ]
+    assert score.components[0].normalized == 1.0
+    assert score.components[0].contribution == pytest.approx(0.30)
+    assert score.components[1].normalized == 0.75
+    assert score.components[1].contribution == pytest.approx(0.15)
+    assert score.score == pytest.approx(0.95)
+    assert "sim_expectancy: pending Slice 9 simulation" not in explanation.notes
+    assert "drawdown: pending Slice 9 simulation" not in explanation.notes

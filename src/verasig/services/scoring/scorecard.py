@@ -13,6 +13,7 @@ from verasig.domain.score import (
     ScoreWeights,
 )
 from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
+from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.services.scoring.hygiene import (
     ChannelLike,
     ExcludedMeasurement,
@@ -21,15 +22,17 @@ from verasig.services.scoring.hygiene import (
     measure_active_user_proxy,
     measure_completeness,
     measure_deletion_behaviour,
+    measure_drawdown,
     measure_evidence_availability,
     measure_parser_confidence,
     measure_signal_frequency,
+    measure_sim_expectancy,
 )
 
-_PENDING_SIM_NOTES = [
-    "sim_expectancy: pending Slice 9 simulation",
-    "drawdown: pending Slice 9 simulation",
-]
+_SIM_NOTES_BY_COMPONENT = {
+    "sim_expectancy": "sim_expectancy: pending Slice 9 simulation",
+    "drawdown": "drawdown: pending Slice 9 simulation",
+}
 
 
 def _component_weight(measurement: HygieneMeasurement, weights: ScoreWeights) -> float:
@@ -70,11 +73,24 @@ def _measurement_notes(measurement: Measurement) -> list[str]:
     return measurement.notes
 
 
+def _missing_sim_notes(measurements: list[Measurement]) -> list[str]:
+    names = {measurement.name for measurement in measurements}
+    return [note for name, note in _SIM_NOTES_BY_COMPONENT.items() if name not in names]
+
+
 def _notes(measurements: list[Measurement]) -> list[str]:
-    notes = list(_PENDING_SIM_NOTES)
+    notes = _missing_sim_notes(measurements)
     for measurement in measurements:
         notes.extend(_measurement_notes(measurement))
     return notes
+
+
+def _is_simulated(outcome: SimOutcome) -> bool:
+    return outcome.kind is not SimOutcomeKind.UNFILLED
+
+
+def _simulated_count(outcomes: list[SimOutcome]) -> int:
+    return sum(1 for outcome in outcomes if _is_simulated(outcome))
 
 
 def build_scorecard(
@@ -82,6 +98,7 @@ def build_scorecard(
     signal_count: int,
     computed_at: datetime,
     measurements: list[Measurement],
+    simulated_count: int = 0,
     weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> tuple[ProviderScore, ProviderScoreExplanation]:
     """Build ProviderScore + ProviderScoreExplanation from un-weighted metrics."""
@@ -92,7 +109,7 @@ def build_scorecard(
         score=score_value,
         components=components,
         signal_count=signal_count,
-        simulated_count=0,
+        simulated_count=simulated_count,
         computed_at=computed_at,
         weights_version=weights.version,
     )
@@ -113,8 +130,11 @@ def _measurements(
     signals: list[ExtractedSignal],
     unrecognized: list[UnrecognizedSignal],
     deletions: list[DeletedSignalEvidence],
+    sim_outcomes: list[SimOutcome],
 ) -> list[Measurement]:
     return [
+        measure_sim_expectancy(sim_outcomes),
+        measure_drawdown(sim_outcomes),
         measure_deletion_behaviour(events, deletions),
         measure_completeness(signals),
         measure_parser_confidence(signals, unrecognized),
@@ -133,9 +153,11 @@ def build_provider_score(
     unrecognized: list[UnrecognizedSignal],
     deletions: list[DeletedSignalEvidence],
     computed_at: datetime,
+    sim_outcomes: list[SimOutcome] | None = None,
     weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> tuple[ProviderScore, ProviderScoreExplanation]:
     """Build the Slice-8 scorecard from durable channel inputs."""
+    outcomes = [] if sim_outcomes is None else sim_outcomes
     return build_scorecard(
         channel_id=channel.channel_id,
         signal_count=len(signals),
@@ -148,6 +170,8 @@ def build_provider_score(
             signals,
             unrecognized,
             deletions,
+            outcomes,
         ),
+        simulated_count=_simulated_count(outcomes),
         weights=weights,
     )
