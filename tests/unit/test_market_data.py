@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from verasig.foundation.market_data import BybitKlineClient
+from verasig.foundation.bybit_market_data import BybitKlineClient
 
 _FIXTURE = Path("tests/fixtures/klines/bybit_linear_btcusdt_response.json")
 

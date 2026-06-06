@@ -8,7 +8,7 @@ from verasig.domain.event import MaterializationPath
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
-from verasig.foundation.exchange import StaticExchange
+from verasig.foundation.static_exchange import StaticExchange
 from verasig.services.ingestion.candidate_derivation import (
     derive_candidates,
     sweep_advisory,

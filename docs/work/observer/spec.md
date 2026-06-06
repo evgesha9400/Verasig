@@ -53,7 +53,8 @@
 └──────────────────────────────────────────────────────────────────────── ┘
 ```
 
-- **Foundation** = storage + comms config: Postgres, Telethon session, Bybit market-data client.
+- **Foundation** = concrete IO edge: SQLAlchemy engine/session setup, Telethon session/source adapters, `StaticExchange` seed adapter, Bybit market-data client.
+- **Storage** = sibling persistence edge: SQLAlchemy ORM rows and repositories for append-only capture, recomputable projections, and durable evidence.
 - **Service** = one uv-built Python image; each pipeline step is a CLI subcommand; UI commands launch Streamlit. The live daemon is the same image run long-lived.
 - **Dependency rule:** `domain/` (pure contracts) ← `services/` (logic) ← `storage/`+`foundation/` (IO). UI and CLI are thin adapters over services. Logic never imports IO frameworks directly.
 
@@ -111,12 +112,13 @@ verasig/
 ├── docs/                   # business/ context/ adr/ work/
 ├── src/verasig/
 │   ├── cli.py              # typer entrypoint: all subcommands
-│   ├── config.py           # pydantic-settings (foundation)
+│   ├── config.py           # pydantic-settings runtime config
 │   ├── foundation/
 │   │   ├── db.py               # engine, session, Base
 │   │   ├── telegram_session.py # Telethon factory + login flow
-│   │   ├── exchange.py         # StaticExchange cold-start adapter
-│   │   └── market_data.py      # BybitKlineClient (httpx) adapter
+│   │   ├── telethon_source.py      # TelethonSource capture adapter
+│   │   ├── static_exchange.py      # StaticExchange cold-start adapter
+│   │   └── bybit_market_data.py    # BybitKlineClient (httpx) adapter
 │   ├── domain/             # PURE contracts (no IO)
 │   │   ├── channel.py  message.py  telegram.py  protocols.py
 │   │   ├── event.py  signal.py  lifecycle.py

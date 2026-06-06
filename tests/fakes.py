@@ -11,7 +11,7 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import TradeIntent
-from verasig.foundation.exchange import normalize_base_symbol
+from verasig.foundation.static_exchange import normalize_base_symbol
 from verasig.services.distillation.rule_distiller import parse_distiller_output
 
 

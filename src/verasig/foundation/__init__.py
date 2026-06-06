@@ -1,1 +1,1 @@
-"""Foundation layer: storage and communication IO (db, telegram, market data)."""
+"""Foundation layer: concrete external adapters plus DB/session setup."""

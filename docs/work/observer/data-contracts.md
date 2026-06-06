@@ -308,7 +308,7 @@ class TelegramSource(Protocol):
     async def live_message_ids(self, channel_id: int) -> set[int]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
     def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramLiveEvent]: ...
-# adapter: foundation/telegram_source.py TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
+# adapter: foundation/telethon_source.py TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
 ```
 
 **Every external dependency (Telegram, LLM CLI, market data, Postgres) sits behind one of these Protocols** so unit tests run pure and offline; integration tests use ephemeral Postgres + recorded fixtures. No test ever calls the real CLI or real Telegram.

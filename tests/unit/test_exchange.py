@@ -1,7 +1,7 @@
 from fakes import FakeExchange
 
 from verasig.domain.protocols import Exchange
-from verasig.foundation.exchange import StaticExchange
+from verasig.foundation.static_exchange import StaticExchange
 
 
 def test_static_exchange_lists_major_base_coins():

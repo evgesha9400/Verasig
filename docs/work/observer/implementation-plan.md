@@ -4,7 +4,7 @@
 
 **Goal:** Prove Verasig can score Telegram signal-provider quality from captured messages, fully local (docker compose), observe-only, no execution.
 
-**Architecture:** One uv-built Python image (Typer CLI subcommands + Streamlit UI) over a Postgres container. `domain/` pure contracts ← `services/` logic ← `storage/`+`foundation/` IO; UI/CLI are thin adapters. Every external dependency sits behind a Protocol so tests run offline.
+**Architecture:** One uv-built Python image (Typer CLI subcommands + Streamlit UI) over a Postgres container. `domain/` pure contracts ← `services/` logic ← `storage/` repositories + `foundation/` adapters; UI/CLI are thin adapters. Every external dependency sits behind a Protocol so tests run offline.
 
 **Tech Stack:** Python 3.12, uv, Telethon (hybrid push+poll live — [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md)), Postgres 16, SQLAlchemy 2.0 + Alembic, Pydantic v2, Typer, httpx, Streamlit, pytest (+ testcontainers), ruff. LLM fallback = Claude/Codex CLI via subprocess.
 
@@ -253,14 +253,14 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are verified outside automated tests; only load/persist/guard + the pure `format_account` formatter are unit-tested.
 
 **Resolved gaps (grill, 2026-06-03):**
-- **Seam (Q1):** ship `domain/protocols.py` (full async `TelegramSource` Protocol), `domain/telegram.py` (live event contracts), `foundation/telegram_source.py` (`TelethonSource` adapter), and `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
+- **Seam (Q1):** ship `domain/protocols.py` (full async `TelegramSource` Protocol), `domain/telegram.py` (live event contracts), `foundation/telethon_source.py` (`TelethonSource` adapter), and `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
 - **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `domain/telegram.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in work item 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
 - **login UX (Q3):** add `telegram_phone: str | None` to `Settings` + `.env(.example)`; `client.start(phone=settings.telegram_phone)` prompts for code + 2FA interactively. api_id/hash stay env-sourced.
 - **Creds absent (Q4):** `make_client` raises `CredentialsMissingError("set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH")` (creds-check **before** session-load) so work item-0 `health` keeps working with creds Optional.
 - **whoami (Q5):** one line incl. phone — `logged in as @handle · First Last · id=N · +phone`; missing username/last_name omitted gracefully. Pure `format_account(user) -> str` is table-tested with a stub; live `get_me()` is verified outside automated tests.
 
 **Files:**
-- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/domain/telegram.py`, `src/verasig/domain/protocols.py`, `src/verasig/foundation/telegram_source.py`, `src/verasig/foundation/telegram_session.py`
+- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/domain/telegram.py`, `src/verasig/domain/protocols.py`, `src/verasig/foundation/telethon_source.py`, `src/verasig/foundation/telegram_session.py`
 - Edit: `src/verasig/config.py` (+`telegram_phone`), `src/verasig/cli.py` (+`login`, +`whoami`), `.env`, `.env.example`
 - Test: `tests/unit/test_domain_message.py`, `tests/unit/test_telegram_source.py`, `tests/unit/test_telegram_session.py`
 
@@ -292,7 +292,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 **Files:**
 - Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/storage/repositories.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
-- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telegram_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
+- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telethon_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
 - Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the work item-2 tables before `backfill` (`docker compose run --rm app migrate`).
 - Test: `tests/fixtures/messages/*.jsonl`, `tests/integration/test_backfill.py`, `tests/unit/test_fake_source.py` (+ Protocol conformance)
 
@@ -351,7 +351,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 - **Scope:** build seed filter + distillation (including Streamlit workbench + real `ClaudeCliDistiller`) **and** all of work item 4 (deterministic extraction). Real-LLM interactions use operator-selected examples only; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
 - **3/4 boundary:** work item 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until work item 5), precision ≥ 0.95 harness.
-- **Exchange seam:** `foundation/exchange.py` = `Exchange` Protocol (`is_listed`/`base_symbols`) + bundled `StaticExchange` seed + `FakeExchange` (tests); real `BybitExchange(httpx)` outside current scope until work item 9.
+- **Exchange seam:** `domain/protocols.py` owns the `Exchange` Protocol (`is_listed`/`base_symbols`); `foundation/static_exchange.py` owns the bundled `StaticExchange` seed; `FakeExchange` lives in tests. Real `BybitExchange(httpx)` remains outside current scope until work item 9.
 - **Distiller output:** LLM emits JSON `{filter_rule, parser_rules}` (pattern content only); shared `parse_distiller_output` tolerantly extracts (bare or ```json-fenced) + Pydantic-validates; the adapter stamps `rule_id`/`version`/`created_at`/`distilled_from_label_ids` (provenance never hallucinated).
 - **MatchReason:** frozen 3-value enum kept — `DIRECTIONAL_KEYWORD` (long/short/buy/sell + RU), `SYMBOL_TOKEN` (Exchange-listed), `PRICE_SHAPED` (subsumes trade-structure keywords/emoji + price patterns).
 - **Persistence:** migration `0003` adds all 7 tables — `raw_signal_event`, `extracted_signal`, `unrecognized_signal`, `filter_rule`, `parser_rule`, `golden_label`, `filter_drift_warning`; list/map fields + `GoldenLabel.expected` as JSONB; conftest TRUNCATE extended.
@@ -362,7 +362,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 **Files (this pass):**
 - `domain/`: `event.py` `signal.py` `filter_rule.py` `parser_rule.py` `label.py` `drift.py`
-- `foundation/exchange.py`
+- `foundation/static_exchange.py`
 - `services/ingestion/candidate_filter.py` (seed + FilterRule apply + derivation + advisory sweep), `services/extraction/{deterministic_parser.py, extract_service.py}`, `services/distillation/{rule_distiller.py, workbench.py}`
 - `storage/models.py` (+7 rows), `storage/repositories.py`, `migrations/versions/0003_*.py`
 - `ui/app.py` `ui/workbench.py`; `cli.py` (+`candidates`/`workbench`/`extract`/`sweep`), `config.py` (+`distiller_command`)
@@ -609,7 +609,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 **Files (this pass):**
 - `domain/deletion.py` (`DeletionConfidence`, `DeletionMethod`, `DeletedSignalEvidence`)
 - `services/deletion/__init__.py`, `services/deletion/diff.py` (pure `detect_deletions`), `services/deletion/rescan.py` (gated re-fetch → detect → persist)
-- `domain/protocols.py` (+`live_message_ids` on `TelegramSource`), `foundation/telegram_source.py` (+`TelethonSource`)
+- `domain/protocols.py` (+`live_message_ids` on `TelegramSource`), `foundation/telethon_source.py` (+`TelethonSource`)
 - `storage/models.py` (+`DeletedSignalEvidenceRow`), `storage/repositories.py` (+`upsert_deletion_evidence`, +`read_deletion_evidence`), `migrations/versions/0005_deletion_evidence.py`
 - `cli.py` (+`rescan`, +`deletions`, +formatters)
 - `tests/fakes.py` (+`FakeSource.live_message_ids`), `tests/unit/test_deletion_diff.py`, `tests/integration/test_deletion_evidence.py`, `tests/integration/test_cli_deletions.py`, `tests/conftest.py` (TRUNCATE +`deleted_signal_evidence`)

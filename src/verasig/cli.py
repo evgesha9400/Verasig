@@ -22,9 +22,9 @@ from verasig.domain.score import (
 from verasig.domain.score import _now as _score_now
 from verasig.domain.signal import ExtractedSignal, ExtractionMethod, SignalEventType
 from verasig.domain.simulation import SimOutcome
+from verasig.foundation.bybit_market_data import BybitKlineClient
 from verasig.foundation.db import make_engine, make_session_factory
-from verasig.foundation.exchange import StaticExchange
-from verasig.foundation.market_data import BybitKlineClient
+from verasig.foundation.static_exchange import StaticExchange
 from verasig.foundation.telegram_session import (
     CredentialsMissingError,
     SessionMissingError,
@@ -34,7 +34,7 @@ from verasig.foundation.telegram_session import (
     run_login,
     save_session_string,
 )
-from verasig.foundation.telegram_source import TelethonSource
+from verasig.foundation.telethon_source import TelethonSource
 from verasig.services.deletion.rescan import RescanAborted
 from verasig.services.deletion.rescan import rescan as run_rescan
 from verasig.services.extraction.extract_service import ExtractOutcome, ExtractService

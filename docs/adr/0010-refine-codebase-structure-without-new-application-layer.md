@@ -6,7 +6,7 @@ The target direction is:
 
 - `domain/` remains the pure contract package and becomes the single catalog for Protocol seams.
 - `services/` remains feature-cohesive and keeps both pure logic and thin orchestration files together when they change together.
-- `foundation/` is clarified as the IO edge: concrete external adapters, database/session setup, and optionally storage if we choose to fold `storage/` into it.
+- `foundation/` is clarified as the concrete IO edge: external adapters plus database/session setup. `storage/` remains a sibling persistence edge for ORM rows and repositories.
 - File names must make purity explicit: pure modules use names like `diff`, `fold`, `hygiene`, `scorecard`, `deterministic_parser`; IO orchestration modules use names like `backfill`, `live`, `rescan`, `extract_service`.
 - Protocol definitions are centralized away from concrete adapters so importing a seam never imports heavy IO libraries such as Telethon or httpx.
 
@@ -23,9 +23,11 @@ This keeps the repo aligned with the observer spec's local, one-image MVP while 
 
 ## Consequences
 
-- `foundation/` must be renamed internally or documented so it no longer overlaps ambiguously with `storage/`.
-- Protocols should move to a pure home, likely `domain/protocols.py`, with event contracts such as `TelegramDeliveryEvent` and `TelegramDeletionEvent` moved to pure domain modules.
-- Concrete adapters should import and implement Protocols, not define them beside heavy IO dependencies.
+- `foundation/` is documented as concrete external adapters plus DB/session setup, so it no longer overlaps ambiguously with `storage/`.
+- `storage/` remains a sibling persistence edge for SQLAlchemy ORM rows and repositories.
+- Protocols live in the pure `domain/protocols.py` home, with event contracts such as `TelegramDeliveryEvent` and `TelegramDeletionEvent` in pure domain modules.
+- Concrete adapters import and implement Protocols, not define them beside heavy IO dependencies.
+- Foundation adapter filenames now name their concrete implementations: `telethon_source.py`, `bybit_market_data.py`, and `static_exchange.py`.
 - `services/` modules should be audited for naming clarity. Pure cores and orchestration wrappers may live in the same feature package, but the file names must disclose which role they play.
 - Any later full application split should be justified by concrete growth pressure, not by aesthetic layering.
-- The next implementation pass should be small and mechanical: move Protocols first, then clarify `foundation`/`storage`, then rename files only where the current name hides purity or IO.
+- The next implementation pass should be small and mechanical: finish the service-file naming audit and rename only where the current name hides purity or IO.

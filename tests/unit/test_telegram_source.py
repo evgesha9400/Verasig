@@ -9,7 +9,7 @@ from verasig.domain.telegram import (
     TelegramDeletionEvent,
     TelegramDeliveryEvent,
 )
-from verasig.foundation.telegram_source import TelethonSource
+from verasig.foundation.telethon_source import TelethonSource
 
 
 def _instant() -> datetime:

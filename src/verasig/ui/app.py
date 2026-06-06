@@ -13,7 +13,7 @@ import streamlit as st
 
 from verasig.config import Settings
 from verasig.foundation.db import make_session_factory
-from verasig.foundation.exchange import StaticExchange
+from verasig.foundation.static_exchange import StaticExchange
 from verasig.services.distillation.rule_distiller import ClaudeCliDistiller
 from verasig.services.distillation.workbench import distil_step
 from verasig.storage import repositories as repo
