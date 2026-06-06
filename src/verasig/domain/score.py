@@ -1,8 +1,40 @@
 """Provider score contracts (data-contracts.md §7; ADR 0009)."""
 
-from pydantic import BaseModel
+from datetime import datetime, timezone
+
+from pydantic import BaseModel, Field
 
 WEIGHTS_VERSION = "v0"
+
+
+def _now() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
+class ScoreComponent(BaseModel):
+    name: str
+    raw_value: float
+    normalized: float
+    weight: float
+    contribution: float
+    evidence_refs: list[str]
+
+
+class ProviderScore(BaseModel):
+    channel_id: int
+    score: float
+    components: list[ScoreComponent]
+    signal_count: int
+    simulated_count: int
+    computed_at: datetime = Field(default_factory=_now)
+    weights_version: str
+
+
+class ProviderScoreExplanation(BaseModel):
+    channel_id: int
+    score: float
+    breakdown: list[ScoreComponent]
+    notes: list[str]
 
 
 class ScoreWeights(BaseModel):
