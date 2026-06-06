@@ -282,7 +282,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Acceptance:** backfill a real channel → row count == accessible count; mid-run kill + restart resumes with no refetch and no dupes; `app stats <channel>` prints capture count + cursor.
 
 **Resolved gaps (grill, 2026-06-03):**
-- **Channel resolve (Q1):** add `async resolve_channel(reference: str | int) -> TelegramChannel` to the `TelegramSource` Protocol (synced into data-contracts §9). `backfill` resolves first (→ id, title, handle, subscriber_count), upserts the `TelegramChannel` row, then streams `backfill_batches(channel_id, after=cursor, batch)`. CLI accepts `@handle` / id / `t.me` link; `FakeSource.resolve_channel` returns a canned channel.
+- **Channel resolve (Q1):** add `async resolve_channel(reference: str | int) -> TelegramChannel` to the `TelegramSource` Protocol (synced into data-contracts §9). `backfill` resolves first (→ id, title, handle, subscriber_count), upserts the `TelegramChannel` row, then streams `backfill_batches(channel_id, after=cursor, batch)`. CLI accepts `@handle` / bare handle / id / `t.me` link / `title:<exact joined dialog title>` / non-username title; `FakeSource.resolve_channel` returns a canned channel.
 - **Defaults (reversible, taken inline):**
   - `raw_payload` ORM column → Postgres **JSONB**; idempotency → `INSERT … ON CONFLICT (channel_id, message_id) DO NOTHING`.
   - cursor `captured_through_message_id` = committed high-water mark; paginate **oldest→newest**, resume via `after_message_id=cursor`; batch insert + cursor advance in **one transaction**.

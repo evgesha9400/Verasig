@@ -2,6 +2,8 @@ import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
+import pytest
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
 from verasig.domain.protocols import TelegramSource
@@ -9,7 +11,10 @@ from verasig.domain.telegram import (
     TelegramDeletionEvent,
     TelegramDeliveryEvent,
 )
-from verasig.foundation.telethon_source import TelethonSource
+from verasig.foundation.telethon_source import (
+    ChannelReferenceResolutionError,
+    TelethonSource,
+)
 
 
 def _instant() -> datetime:
@@ -111,10 +116,19 @@ def test_telethon_source_satisfies_protocol():
 
 
 class FakeTelethonClient:
-    def __init__(self, messages_by_channel: dict[int, list] | None = None) -> None:
+    def __init__(
+        self,
+        messages_by_channel: dict[int, list] | None = None,
+        entities_by_reference: dict | None = None,
+        dialogs: list | None = None,
+    ) -> None:
         self.handlers = []
         self.messages_by_channel = messages_by_channel or {}
+        self.entities_by_reference = entities_by_reference or {}
+        self.dialogs = dialogs or []
+        self.get_entity_calls = []
         self.iter_calls = []
+        self.iter_dialog_calls = 0
 
     def add_event_handler(self, callback, event) -> None:
         self.handlers.append((callback, event))
@@ -122,6 +136,20 @@ class FakeTelethonClient:
     def remove_event_handler(self, callback, event) -> int:
         self.handlers = [item for item in self.handlers if item != (callback, event)]
         return 1
+
+    async def get_entity(self, reference):
+        self.get_entity_calls.append(reference)
+        if reference in self.entities_by_reference:
+            return self.entities_by_reference[reference]
+        raise ValueError(f"Cannot find any entity corresponding to {reference!r}")
+
+    async def __call__(self, request):
+        return type("FullChannelResult", (), {"full_chat": _full_chat(1234)})()
+
+    async def iter_dialogs(self):
+        self.iter_dialog_calls += 1
+        for dialog in self.dialogs:
+            yield dialog
 
     async def iter_messages(self, channel_id, **kwargs):
         self.iter_calls.append((channel_id, kwargs))
@@ -157,6 +185,75 @@ class FakeTelethonMessage:
 
     def to_dict(self):
         return {"id": self.id, "message": self.message}
+
+
+def _entity(entity_id: int = 7, title: str = "Pilot", username: str | None = "pilot"):
+    return type(
+        "FakeTelethonEntity",
+        (),
+        {"id": entity_id, "title": title, "username": username},
+    )()
+
+
+def _dialog(entity, name: str | None = None):
+    return type("FakeTelethonDialog", (), {"entity": entity, "name": name})()
+
+
+def _full_chat(participants_count: int):
+    return type("FakeFullChat", (), {"participants_count": participants_count})()
+
+
+async def test_resolve_channel_uses_canonical_handle_directly():
+    entity = _entity(entity_id=7, title="Pilot", username="pilot")
+    client = FakeTelethonClient(entities_by_reference={"@pilot": entity})
+
+    channel = await TelethonSource(client).resolve_channel("@pilot")
+
+    assert channel.channel_id == 7
+    assert channel.title == "Pilot"
+    assert channel.handle == "pilot"
+    assert channel.subscriber_count == 1234
+    assert client.get_entity_calls == ["@pilot"]
+    assert client.iter_dialog_calls == 0
+
+
+async def test_resolve_channel_uses_dialog_title_path_for_non_username_title():
+    entity = _entity(
+        entity_id=8,
+        title="Математик. Трейдинг и инвестиции.",
+        username=None,
+    )
+    client = FakeTelethonClient(dialogs=[_dialog(entity)])
+
+    channel = await TelethonSource(client).resolve_channel(
+        "Математик. Трейдинг и инвестиции."
+    )
+
+    assert channel.channel_id == 8
+    assert channel.title == "Математик. Трейдинг и инвестиции."
+    assert channel.handle is None
+    assert client.get_entity_calls == []
+    assert client.iter_dialog_calls == 1
+
+
+async def test_resolve_channel_rejects_ambiguous_dialog_title():
+    title = "Signals"
+    client = FakeTelethonClient(
+        dialogs=[
+            _dialog(_entity(entity_id=7, title=title, username="one")),
+            _dialog(_entity(entity_id=8, title=title, username="two")),
+        ]
+    )
+
+    with pytest.raises(ChannelReferenceResolutionError, match="multiple"):
+        await TelethonSource(client).resolve_channel(f"title:{title}")
+
+
+async def test_resolve_channel_rejects_unknown_dialog_title():
+    client = FakeTelethonClient(dialogs=[])
+
+    with pytest.raises(ChannelReferenceResolutionError, match="No joined dialog"):
+        await TelethonSource(client).resolve_channel("Unknown channel title")
 
 
 async def test_telethon_live_events_yields_push_delivery():

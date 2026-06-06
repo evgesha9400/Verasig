@@ -299,7 +299,8 @@ TelegramLiveEvent = TelegramDeliveryEvent | TelegramDeletionEvent
 
 # domain/protocols.py
 class TelegramSource(Protocol):
-    # resolve: @handle | t.me link | numeric id → channel identity + metadata (work item 2)
+    # resolve: @handle | bare handle | t.me link | numeric id | title:<exact joined dialog title>
+    #          | non-username title → channel identity + metadata (work item 2)
     async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
     # backfill: chunked + resumable — yields one committable batch at a time, never full history
     def backfill_batches(self, channel_id: int, after_message_id: int?,

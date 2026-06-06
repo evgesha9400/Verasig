@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 
 from verasig.cli import app, format_stats
 from verasig.domain.channel import TelegramChannel
+from verasig.foundation.telethon_source import ChannelReferenceResolutionError
 
 runner = CliRunner()
 
@@ -57,6 +58,20 @@ def test_backfill_without_credentials_exits_with_hint():
     result = runner.invoke(app, ["backfill", "@pilot"])
     assert result.exit_code == 1
     assert "VERASIG_TELEGRAM_API_ID" in result.stderr
+
+
+def test_backfill_reference_error_exits_without_traceback(monkeypatch):
+    async def fail_backfill(*args):
+        raise ChannelReferenceResolutionError("No joined dialog has title 'Missing'")
+
+    monkeypatch.setattr("verasig.cli.make_client", lambda settings: object())
+    monkeypatch.setattr("verasig.cli._connected_backfill", fail_backfill)
+
+    result = runner.invoke(app, ["backfill", "title:Missing"])
+
+    assert result.exit_code == 1
+    assert "No joined dialog has title 'Missing'" in result.stderr
+    assert "Traceback" not in result.stderr
 
 
 def test_format_stats_renders_handle_cursor_and_subs():

@@ -34,7 +34,10 @@ from verasig.foundation.telegram_session import (
     run_login,
     save_session_string,
 )
-from verasig.foundation.telethon_source import TelethonSource
+from verasig.foundation.telethon_source import (
+    ChannelReferenceResolutionError,
+    TelethonSource,
+)
 from verasig.services.deletion.rescan import RescanAborted
 from verasig.services.deletion.rescan import rescan as run_rescan
 from verasig.services.extraction.extract_service import ExtractOutcome, ExtractService
@@ -114,9 +117,12 @@ def backfill(reference: str) -> None:
     except (CredentialsMissingError, SessionMissingError) as error:
         raise _fail(error) from error
     session_factory = make_session_factory(settings.database_url)
-    result = asyncio.run(
-        _connected_backfill(client, reference, session_factory, settings)
-    )
+    try:
+        result = asyncio.run(
+            _connected_backfill(client, reference, session_factory, settings)
+        )
+    except ChannelReferenceResolutionError as error:
+        raise _fail(error) from error
     typer.echo(
         f"backfill complete: channel {result.channel_id} · +{result.inserted} new "
         f"· cursor={result.captured_through_message_id}"
@@ -144,7 +150,10 @@ def live(channels: list[str]) -> None:
     except (CredentialsMissingError, SessionMissingError) as error:
         raise _fail(error) from error
     session_factory = make_session_factory(settings.database_url)
-    result = asyncio.run(_connected_live(client, channels, session_factory))
+    try:
+        result = asyncio.run(_connected_live(client, channels, session_factory))
+    except ChannelReferenceResolutionError as error:
+        raise _fail(error) from error
     typer.echo(format_live_result(result))
 
 
