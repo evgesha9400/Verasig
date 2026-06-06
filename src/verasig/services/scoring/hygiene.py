@@ -1,6 +1,8 @@
 """Un-weighted hygiene measurements for ProviderScore (ADR 0009)."""
 
 from dataclasses import dataclass, field
+from statistics import median
+from typing import Protocol
 
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
@@ -11,7 +13,13 @@ from verasig.domain.event import RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import ExtractedSignal, ExtractionMethod, UnrecognizedSignal
 
+ACTIVE_USER_PROXY_ANCHOR = 10_000.0
 SIGNAL_FREQUENCY_ANCHOR_PER_DAY = 10.0
+
+
+class ChannelLike(Protocol):
+    channel_id: int
+    subscriber_count: int | None
 
 
 @dataclass(frozen=True)
@@ -46,6 +54,11 @@ def _channel_ref(channel_id: int) -> str:
 
 def _message_ref(message: RawTelegramMessage) -> str:
     return f"message:{message.channel_id}/{message.message_id}"
+
+
+def _append_unique(refs: list[str], ref: str) -> None:
+    if ref not in refs:
+        refs.append(ref)
 
 
 def _signal_ref(signal: ExtractedSignal) -> str:
@@ -253,4 +266,71 @@ def measure_signal_frequency(
         raw_value=raw_value,
         normalized=_normalize_signal_frequency(raw_value),
         evidence_refs=refs,
+    )
+
+
+def _saturate_proxy(value: float) -> float:
+    return min(1.0, value / ACTIVE_USER_PROXY_ANCHOR)
+
+
+def _message_values(
+    messages: list[RawTelegramMessage], field_name: str
+) -> list[tuple[RawTelegramMessage, int]]:
+    return [
+        (message, value)
+        for message in messages
+        if (value := getattr(message, field_name)) is not None
+    ]
+
+
+def _median_value(items: list[tuple[RawTelegramMessage, int]]) -> float:
+    return float(median(value for _, value in items))
+
+
+def _median_refs(items: list[tuple[RawTelegramMessage, int]]) -> list[str]:
+    ordered = sorted(items, key=lambda item: item[1])
+    count = len(ordered)
+    if count == 0:
+        return []
+    midpoint = count // 2
+    if count % 2 == 1:
+        return [_message_ref(ordered[midpoint][0])]
+    return [_message_ref(ordered[midpoint - 1][0]), _message_ref(ordered[midpoint][0])]
+
+
+def _proxy_inputs(
+    channel: ChannelLike,
+    messages: list[RawTelegramMessage],
+) -> tuple[list[float], list[str]]:
+    values: list[float] = []
+    refs = [_channel_ref(channel.channel_id)]
+    if channel.subscriber_count is not None:
+        values.append(float(channel.subscriber_count))
+    for field_name in ["views", "forwards"]:
+        items = _message_values(messages, field_name)
+        if not items:
+            continue
+        values.append(_median_value(items))
+        for ref in _median_refs(items):
+            _append_unique(refs, ref)
+    return values, refs
+
+
+def measure_active_user_proxy(
+    channel: ChannelLike,
+    messages: list[RawTelegramMessage],
+) -> Measurement:
+    values, refs = _proxy_inputs(channel, messages)
+    if not values:
+        return ExcludedMeasurement(
+            name="active_user_proxy",
+            note="active_user_proxy: not measured — no proxy inputs",
+        )
+    normalized = sum(_saturate_proxy(value) for value in values) / len(values)
+    return HygieneMeasurement(
+        name="active_user_proxy",
+        raw_value=float(channel.subscriber_count or 0),
+        normalized=normalized,
+        evidence_refs=refs,
+        notes=["active_user_proxy: proxy only, not a quality claim"],
     )

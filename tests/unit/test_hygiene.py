@@ -3,6 +3,7 @@ from uuid import UUID
 
 import pytest
 
+from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
     DeletionConfidence,
@@ -18,9 +19,11 @@ from verasig.domain.signal import (
     UnrecognizedSignal,
 )
 from verasig.services.scoring.hygiene import (
+    ACTIVE_USER_PROXY_ANCHOR,
     SIGNAL_FREQUENCY_ANCHOR_PER_DAY,
     ExcludedMeasurement,
     HygieneMeasurement,
+    measure_active_user_proxy,
     measure_completeness,
     measure_deletion_behaviour,
     measure_evidence_availability,
@@ -54,6 +57,29 @@ def _message(message_id: int, day: int) -> RawTelegramMessage:
         captured_at=_BASE.replace(day=_BASE.day + day),
         has_media=False,
         raw_payload={"id": message_id},
+    )
+
+
+def _message_with_proxy(
+    message_id: int,
+    *,
+    views: int | None = None,
+    forwards: int | None = None,
+) -> RawTelegramMessage:
+    message = _message(message_id, 0)
+    message.views = views
+    message.forwards = forwards
+    return message
+
+
+def _channel(subscriber_count: int | None) -> TelegramChannel:
+    return TelegramChannel(
+        channel_id=7,
+        handle="pilot",
+        title="Pilot",
+        is_private=False,
+        subscriber_count=subscriber_count,
+        first_seen_at=_BASE,
     )
 
 
@@ -277,3 +303,32 @@ def test_signal_frequency_excludes_empty_message_window():
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "signal_frequency"
     assert measurement.note == "signal_frequency: not measured — no captured messages"
+
+
+def test_active_user_proxy_means_available_subscribers_views_and_forwards():
+    measurement = measure_active_user_proxy(
+        channel=_channel(subscriber_count=5000),
+        messages=[
+            _message_with_proxy(50, views=1000, forwards=100),
+            _message_with_proxy(51, views=3000, forwards=300),
+        ],
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.name == "active_user_proxy"
+    assert measurement.raw_value == 5000
+    assert measurement.normalized == pytest.approx((0.5 + 0.2 + 0.02) / 3)
+    assert measurement.evidence_refs == ["channel:7", "message:7/50", "message:7/51"]
+    assert measurement.notes == ["active_user_proxy: proxy only, not a quality claim"]
+
+
+def test_active_user_proxy_means_over_available_inputs_when_views_missing():
+    measurement = measure_active_user_proxy(
+        channel=_channel(subscriber_count=2500),
+        messages=[_message_with_proxy(52), _message_with_proxy(53)],
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.raw_value == 2500
+    assert measurement.normalized == pytest.approx(2500 / ACTIVE_USER_PROXY_ANCHOR)
+    assert measurement.evidence_refs == ["channel:7"]
