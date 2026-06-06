@@ -12,6 +12,7 @@ from verasig.domain.deletion import (
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import ExtractedSignal, ExtractionMethod, UnrecognizedSignal
+from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 
 ACTIVE_USER_PROXY_ANCHOR = 10_000.0
 SIGNAL_FREQUENCY_ANCHOR_PER_DAY = 10.0
@@ -67,6 +68,66 @@ def _signal_ref(signal: ExtractedSignal) -> str:
 
 def _unrecognized_ref(item: UnrecognizedSignal) -> str:
     return f"unrecognized:{item.id}"
+
+
+def _outcome_ref(outcome: SimOutcome) -> str:
+    return f"signal:{outcome.folded_signal_id}"
+
+
+def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
+    return min(high, max(low, value))
+
+
+def _has_r_multiple(outcome: SimOutcome) -> bool:
+    return outcome.kind is SimOutcomeKind.R_MULTIPLE and outcome.r_multiple is not None
+
+
+def _r_multiple_outcomes(outcomes: list[SimOutcome]) -> list[SimOutcome]:
+    return [outcome for outcome in outcomes if _has_r_multiple(outcome)]
+
+
+def _outcome_refs(outcomes: list[SimOutcome]) -> list[str]:
+    return [_outcome_ref(outcome) for outcome in outcomes]
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
+def _normalize_expectancy(raw_value: float) -> float:
+    return _clamp((raw_value + 1.0) / 3.0)
+
+
+def measure_sim_expectancy(outcomes: list[SimOutcome]) -> Measurement:
+    measured = _r_multiple_outcomes(outcomes)
+    if not measured:
+        return ExcludedMeasurement(
+            name="sim_expectancy",
+            note="sim_expectancy: pending Slice 9 simulation",
+        )
+    raw_value = _mean([outcome.r_multiple for outcome in measured])
+    return HygieneMeasurement(
+        name="sim_expectancy",
+        raw_value=raw_value,
+        normalized=_normalize_expectancy(raw_value),
+        evidence_refs=_outcome_refs(measured),
+    )
+
+
+def measure_drawdown(outcomes: list[SimOutcome]) -> Measurement:
+    measured = _r_multiple_outcomes(outcomes)
+    if not measured:
+        return ExcludedMeasurement(
+            name="drawdown",
+            note="drawdown: pending Slice 9 simulation",
+        )
+    raw_value = max(outcome.mae for outcome in measured)
+    return HygieneMeasurement(
+        name="drawdown",
+        raw_value=raw_value,
+        normalized=_clamp(1.0 - raw_value),
+        evidence_refs=_outcome_refs(measured),
+    )
 
 
 def _is_confirmed_signal_deletion(evidence: DeletedSignalEvidence) -> bool:

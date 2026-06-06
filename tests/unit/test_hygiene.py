@@ -18,6 +18,7 @@ from verasig.domain.signal import (
     Side,
     UnrecognizedSignal,
 )
+from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.services.scoring.hygiene import (
     ACTIVE_USER_PROXY_ANCHOR,
     SIGNAL_FREQUENCY_ANCHOR_PER_DAY,
@@ -26,9 +27,11 @@ from verasig.services.scoring.hygiene import (
     measure_active_user_proxy,
     measure_completeness,
     measure_deletion_behaviour,
+    measure_drawdown,
     measure_evidence_availability,
     measure_parser_confidence,
     measure_signal_frequency,
+    measure_sim_expectancy,
 )
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
@@ -139,6 +142,21 @@ def _unrecognized(suffix: int) -> UnrecognizedSignal:
     )
 
 
+def _sim_outcome(suffix: int, *, r_multiple: float, mae: float) -> SimOutcome:
+    return SimOutcome(
+        folded_signal_id=_uuid(suffix),
+        kind=SimOutcomeKind.R_MULTIPLE,
+        r_multiple=r_multiple,
+        mfe=max(0.0, r_multiple),
+        mae=mae,
+        entry_fill_at=_BASE,
+        exit_at=_BASE,
+        exit_reason="tp" if r_multiple > 0 else "stop",
+        policy="ProviderStatedPolicy",
+        tie_break="stop_first",
+    )
+
+
 def test_deletion_behaviour_scores_zero_deletions_as_one_with_event_refs():
     measurement = measure_deletion_behaviour(events=[_event(1, 10)], deletions=[])
 
@@ -230,6 +248,30 @@ def test_parser_confidence_excludes_empty_candidate_denominator():
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "parser_confidence"
     assert measurement.note == "parser_confidence: not measured — no candidates"
+
+
+def test_sim_measurements_apply_v0_expectancy_and_drawdown_normalization():
+    outcomes = [
+        _sim_outcome(25, r_multiple=-1.0, mae=1.2),
+        _sim_outcome(26, r_multiple=2.0, mae=0.4),
+    ]
+
+    expectancy = measure_sim_expectancy(outcomes)
+    drawdown = measure_drawdown(outcomes)
+
+    assert isinstance(expectancy, HygieneMeasurement)
+    assert expectancy.name == "sim_expectancy"
+    assert expectancy.raw_value == pytest.approx(0.5)
+    assert expectancy.normalized == pytest.approx(0.5)
+    assert expectancy.evidence_refs == [
+        "signal:00000000-0000-0000-0000-000000000025",
+        "signal:00000000-0000-0000-0000-000000000026",
+    ]
+    assert isinstance(drawdown, HygieneMeasurement)
+    assert drawdown.name == "drawdown"
+    assert drawdown.raw_value == pytest.approx(1.2)
+    assert drawdown.normalized == 0.0
+    assert drawdown.evidence_refs == expectancy.evidence_refs
 
 
 def test_evidence_availability_excludes_without_rescan_proof():
