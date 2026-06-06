@@ -654,12 +654,13 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 - **Input:** running Telethon session + pilot `channel_ids`.
 - **Output:** continuous `RawTelegramMessage` capture via **hybrid push+poll** (passive `events.NewMessage` + bounded short-poll closing `pts` gaps, deduped on `(channel_id, message_id)`) + real-time `DeletedSignalEvidence` (LIVE_EVENT, precise timing). Capture is **queue-first**: persist the row immediately, parse/score async — never block the update loop.
-- **Contract:** `TelegramSource.live_events(channel_ids)` → `TelegramDeliveryEvent` (`mode`, `captured_at`, `pts`); see [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md).
+- **Contract:** `TelegramSource.live_events(channel_ids)` → `TelegramLiveEvent` (`TelegramDeliveryEvent` for message `mode`/`captured_at`/`pts`; `TelegramDeletionEvent` for live deletes); see [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md).
 - **Decisive tests (unit/integration, fake event stream):**
   - push event ⇒ row tagged `mode=PUSH`; delayed/absent push then poll ⇒ same message arrives **once** (`mode=POLL`/`CATCH_UP`), deduped vs push and vs backfill.
   - delete event ⇒ CONFIRMED evidence with timestamp.
   - **latency:** with a fake clock, median `captured_at − posted_at` ≤ the configured poll interval.
 - **Acceptance:** run `app live <channels>`, post + delete a test message ⇒ captured (within the poll interval) then CONFIRMED-deleted with timestamps.
+- **Manual acceptance notes:** use a throwaway account/session and migrated DB; run `uv run verasig live <channel>`; post a unique text message; verify `verasig stats <channel>` count increments within the poll interval; delete it; verify a `deleted_signal_evidence` row with `method=LIVE_EVENT`, `confidence=CONFIRMED`, `original_text`, `first_seen_at`, and `detected_at`. If verifying through `verasig deletions`, materialize the message as a `RawSignalEvent` before deletion so the reader does not hide chatter.
 
 ---
 

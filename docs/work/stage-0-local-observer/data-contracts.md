@@ -292,6 +292,14 @@ class TelegramDeliveryEvent(BaseModel):  # live message + its latency provenance
     source_pts: int?                 # channel pts at delivery, when known
     gap_closed: bool                 # this delivery resolved a detected pts gap
 
+class TelegramDeletionEvent(BaseModel):  # live deletion notice for one message id
+    channel_id: int
+    message_id: int
+    detected_at: datetime
+    source_pts: int?                 # channel pts at deletion, when known
+
+TelegramLiveEvent = TelegramDeliveryEvent | TelegramDeletionEvent
+
 class TelegramSource(Protocol):
     # resolve: @handle | t.me link | numeric id → channel identity + metadata (Slice 2)
     async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
@@ -301,7 +309,7 @@ class TelegramSource(Protocol):
     # deletion rescan: the channel's CURRENT live message-id set, for snapshot-diff (Slice 7, ADR 0008)
     async def live_message_ids(self, channel_id: int) -> set[int]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
-    def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramDeliveryEvent]: ...
+    def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramLiveEvent]: ...
 # adapter: TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
 ```
 
