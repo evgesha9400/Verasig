@@ -90,3 +90,23 @@ def test_market_entry_fills_at_next_kline_open_before_exit_checks():
     assert outcome.entry_fill_at == bar.open_time
     assert outcome.exit_reason == "tp"
     assert outcome.r_multiple == pytest.approx(2.0)
+
+
+def test_limit_entry_stays_unfilled_when_price_never_reaches_entry():
+    folded = _folded()
+    bars = [
+        _bar(high=Decimal("112"), low=Decimal("101")),
+        _bar(
+            open_time=_BASE + timedelta(minutes=1),
+            high=Decimal("115"),
+            low=Decimal("102"),
+        ),
+    ]
+
+    outcome = ProviderStatedPolicy().simulate(folded, bars)
+
+    assert outcome.kind is SimOutcomeKind.UNFILLED
+    assert outcome.entry_fill_at is None
+    assert outcome.exit_at is None
+    assert outcome.exit_reason == "unfilled"
+    assert outcome.r_multiple is None

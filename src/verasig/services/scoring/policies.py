@@ -1,5 +1,7 @@
 """ExecutionPolicy implementations for conservative simulated outcomes."""
 
+from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Protocol, runtime_checkable
 
@@ -8,6 +10,13 @@ from verasig.domain.signal import Side
 from verasig.domain.simulation import Kline, SimOutcome, SimOutcomeKind
 
 TIE_BREAK = "stop_first"
+
+
+@dataclass(frozen=True)
+class _EntryFill:
+    price: Decimal
+    at: datetime
+    bars: list[Kline]
 
 
 @runtime_checkable
@@ -21,18 +30,6 @@ def _policy_name(policy: object) -> str:
 
 def _active_step(folded: FoldedSignal) -> FoldStep:
     return folded.timeline[-1]
-
-
-def _market_entry_price(klines: list[Kline]) -> Decimal | None:
-    if not klines:
-        return None
-    return klines[0].open
-
-
-def _simulation_entry_price(step: FoldStep, klines: list[Kline]) -> Decimal | None:
-    if step.effective_entry is not None:
-        return step.effective_entry
-    return _market_entry_price(klines)
 
 
 def _stop_price(step: FoldStep) -> Decimal | None:
@@ -77,6 +74,44 @@ def _touches_target(folded: FoldedSignal, bar: Kline, target: Decimal) -> bool:
     return _short_touches_target(bar, target)
 
 
+def _long_touches_entry(bar: Kline, entry: Decimal) -> bool:
+    return bar.low <= entry
+
+
+def _short_touches_entry(bar: Kline, entry: Decimal) -> bool:
+    return bar.high >= entry
+
+
+def _touches_entry(folded: FoldedSignal, bar: Kline, entry: Decimal) -> bool:
+    if folded.side is Side.LONG:
+        return _long_touches_entry(bar, entry)
+    return _short_touches_entry(bar, entry)
+
+
+def _market_entry_fill(klines: list[Kline]) -> _EntryFill | None:
+    if not klines:
+        return None
+    first_bar = klines[0]
+    return _EntryFill(price=first_bar.open, at=first_bar.open_time, bars=klines)
+
+
+def _limit_entry_fill(
+    folded: FoldedSignal, entry: Decimal, klines: list[Kline]
+) -> _EntryFill | None:
+    for index, bar in enumerate(klines):
+        if _touches_entry(folded, bar, entry):
+            return _EntryFill(price=entry, at=bar.open_time, bars=klines[index:])
+    return None
+
+
+def _entry_fill(
+    folded: FoldedSignal, step: FoldStep, klines: list[Kline]
+) -> _EntryFill | None:
+    if step.effective_entry is None:
+        return _market_entry_fill(klines)
+    return _limit_entry_fill(folded, step.effective_entry, klines)
+
+
 def _favorable_move(side: Side, entry: Decimal, bar: Kline) -> Decimal:
     if side is Side.LONG:
         return bar.high - entry
@@ -112,24 +147,20 @@ class ProviderStatedPolicy:
 
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome:
         step = _active_step(folded)
-        entry = _simulation_entry_price(step, klines)
+        fill = _entry_fill(folded, step, klines)
         stop = _stop_price(step)
         target = _first_take_profit(step)
-        if entry is None or stop is None or target is None:
+        if fill is None or stop is None or target is None:
             return _unfilled(self, folded)
-        risk = _risk(entry, stop)
-        for bar in klines:
+        risk = _risk(fill.price, stop)
+        for bar in fill.bars:
             touches_stop = _touches_stop(folded, bar, stop)
             touches_target = _touches_target(folded, bar, target)
             if touches_stop:
-                return _r_outcome(
-                    self, folded, klines, entry, risk, bar, "stop", Decimal(-1)
-                )
+                return _r_outcome(self, folded, fill, risk, bar, "stop", Decimal(-1))
             if touches_target:
-                multiple = abs(target - entry) / risk
-                return _r_outcome(
-                    self, folded, klines, entry, risk, bar, "tp", multiple
-                )
+                multiple = abs(target - fill.price) / risk
+                return _r_outcome(self, folded, fill, risk, bar, "tp", multiple)
         return _unfilled(self, folded)
 
 
@@ -148,8 +179,7 @@ def _unfilled(policy: object, folded: FoldedSignal) -> SimOutcome:
 def _r_outcome(
     policy: object,
     folded: FoldedSignal,
-    klines: list[Kline],
-    entry: Decimal,
+    fill: _EntryFill,
     risk: Decimal,
     bar: Kline,
     exit_reason: str,
@@ -159,9 +189,9 @@ def _r_outcome(
         folded_signal_id=folded.root_signal_id,
         kind=SimOutcomeKind.R_MULTIPLE,
         r_multiple=float(r_multiple),
-        mfe=_mfe(folded.side, entry, risk, klines),
-        mae=_mae(folded.side, entry, risk, klines),
-        entry_fill_at=bar.open_time,
+        mfe=_mfe(folded.side, fill.price, risk, fill.bars),
+        mae=_mae(folded.side, fill.price, risk, fill.bars),
+        entry_fill_at=fill.at,
         exit_at=bar.open_time,
         exit_reason=exit_reason,
         policy=_policy_name(policy),
