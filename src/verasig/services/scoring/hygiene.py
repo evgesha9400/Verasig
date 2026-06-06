@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from verasig.domain.deletion import DeletedSignalEvidence, DeletionConfidence
 from verasig.domain.event import RawSignalEvent
+from verasig.domain.signal import ExtractedSignal
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,10 @@ def _event_ref(event: RawSignalEvent) -> str:
 
 def _deletion_ref(evidence: DeletedSignalEvidence) -> str:
     return f"deletion:{evidence.id}"
+
+
+def _signal_ref(signal: ExtractedSignal) -> str:
+    return f"signal:{signal.id}"
 
 
 def _is_confirmed_signal_deletion(evidence: DeletedSignalEvidence) -> bool:
@@ -64,4 +69,42 @@ def measure_deletion_behaviour(
         raw_value=value,
         normalized=value,
         evidence_refs=refs,
+    )
+
+
+def _has_entry(signal: ExtractedSignal) -> bool:
+    return signal.entry_type is not None or signal.entry_low is not None
+
+
+def _has_stop(signal: ExtractedSignal) -> bool:
+    return signal.stop_loss is not None
+
+
+def _has_take_profit(signal: ExtractedSignal) -> bool:
+    return len(signal.take_profits) > 0
+
+
+def _completion_ratio(signal: ExtractedSignal) -> float:
+    present = sum(
+        [
+            _has_entry(signal),
+            _has_stop(signal),
+            _has_take_profit(signal),
+        ]
+    )
+    return present / 3
+
+
+def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
+    if not signals:
+        return ExcludedMeasurement(
+            name="completeness",
+            note="completeness: not measured — no extracted signals",
+        )
+    value = sum(_completion_ratio(signal) for signal in signals) / len(signals)
+    return HygieneMeasurement(
+        name="completeness",
+        raw_value=value,
+        normalized=value,
+        evidence_refs=[_signal_ref(signal) for signal in signals],
     )

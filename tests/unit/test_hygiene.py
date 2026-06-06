@@ -1,15 +1,19 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
     DeletionConfidence,
     DeletionMethod,
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
+from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.services.scoring.hygiene import (
     ExcludedMeasurement,
     HygieneMeasurement,
+    measure_completeness,
     measure_deletion_behaviour,
 )
 
@@ -43,6 +47,28 @@ def _deletion(suffix: int, message_id: int) -> DeletedSignalEvidence:
     )
 
 
+def _signal(
+    suffix: int,
+    *,
+    entry_type: EntryType | None = None,
+    entry_low: str | None = None,
+    stop_loss: str | None = None,
+    take_profits: list[str] | None = None,
+) -> ExtractedSignal:
+    return ExtractedSignal(
+        id=_uuid(suffix),
+        event_id=_uuid(suffix + 100),
+        channel_id=7,
+        symbol="BTC",
+        side=Side.LONG,
+        entry_type=entry_type,
+        entry_low=entry_low,
+        stop_loss=stop_loss,
+        take_profits=[] if take_profits is None else take_profits,
+        extracted_at=_BASE,
+    )
+
+
 def test_deletion_behaviour_scores_zero_deletions_as_one_with_event_refs():
     measurement = measure_deletion_behaviour(events=[_event(1, 10)], deletions=[])
 
@@ -59,3 +85,36 @@ def test_deletion_behaviour_excludes_empty_candidate_denominator():
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "deletion_behaviour"
     assert measurement.note == "deletion_behaviour: not measured — no signal candidates"
+
+
+def test_completeness_means_entry_stop_and_take_profit_presence():
+    measurement = measure_completeness(
+        [
+            _signal(
+                10,
+                entry_type=EntryType.MARKET,
+                stop_loss="64000",
+                take_profits=["67000"],
+            ),
+            _signal(11, entry_low="65000"),
+            _signal(12, stop_loss="64000", take_profits=["67000"]),
+        ]
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.name == "completeness"
+    assert measurement.raw_value == pytest.approx(2 / 3)
+    assert measurement.normalized == pytest.approx(2 / 3)
+    assert measurement.evidence_refs == [
+        "signal:00000000-0000-0000-0000-000000000010",
+        "signal:00000000-0000-0000-0000-000000000011",
+        "signal:00000000-0000-0000-0000-000000000012",
+    ]
+
+
+def test_completeness_excludes_empty_signal_denominator():
+    measurement = measure_completeness([])
+
+    assert isinstance(measurement, ExcludedMeasurement)
+    assert measurement.name == "completeness"
+    assert measurement.note == "completeness: not measured — no extracted signals"
