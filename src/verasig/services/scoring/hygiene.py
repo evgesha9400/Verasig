@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from verasig.domain.deletion import DeletedSignalEvidence, DeletionConfidence
 from verasig.domain.event import RawSignalEvent
-from verasig.domain.signal import ExtractedSignal
+from verasig.domain.signal import ExtractedSignal, ExtractionMethod, UnrecognizedSignal
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,10 @@ def _deletion_ref(evidence: DeletedSignalEvidence) -> str:
 
 def _signal_ref(signal: ExtractedSignal) -> str:
     return f"signal:{signal.id}"
+
+
+def _unrecognized_ref(item: UnrecognizedSignal) -> str:
+    return f"unrecognized:{item.id}"
 
 
 def _is_confirmed_signal_deletion(evidence: DeletedSignalEvidence) -> bool:
@@ -107,4 +111,30 @@ def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
         raw_value=value,
         normalized=value,
         evidence_refs=[_signal_ref(signal) for signal in signals],
+    )
+
+
+def _is_deterministic(signal: ExtractedSignal) -> bool:
+    return signal.extraction_method is ExtractionMethod.DETERMINISTIC
+
+
+def measure_parser_confidence(
+    signals: list[ExtractedSignal],
+    unrecognized: list[UnrecognizedSignal],
+) -> Measurement:
+    total = len(signals) + len(unrecognized)
+    if total == 0:
+        return ExcludedMeasurement(
+            name="parser_confidence",
+            note="parser_confidence: not measured — no candidates",
+        )
+    deterministic = sum(1 for signal in signals if _is_deterministic(signal))
+    value = deterministic / total
+    refs = [_signal_ref(signal) for signal in signals]
+    refs.extend(_unrecognized_ref(item) for item in unrecognized)
+    return HygieneMeasurement(
+        name="parser_confidence",
+        raw_value=value,
+        normalized=value,
+        evidence_refs=refs,
     )
