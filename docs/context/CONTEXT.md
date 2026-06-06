@@ -89,14 +89,15 @@ _Avoid_: re-backfill (that is capture, which never re-reads), refetch.
 ### Scoring
 
 **ProviderScore**:
-A re-weightable, normalized composite score per provider/channel. Components: simulated expectancy, drawdown, deletion behaviour, signal frequency, completeness, parser confidence, evidence availability, active-user proxy. v0 weights are a placeholder, not claimed optimal.
+A re-weightable, normalized composite quality score per provider/channel, **recomputed on demand from durable evidence and never stored** (like a `FoldedSignal`). Components: simulated expectancy, drawdown, deletion behaviour, signal frequency, completeness, parser confidence, evidence availability, active-user proxy. A plain weighted-normalized sum over only the components currently backed by evidence, so it is **honestly partial** until simulation supplies expectancy + drawdown. v0 weights are a placeholder, not claimed optimal.
 _Avoid_: rating, rank, grade.
 
 **ProviderScoreExplanation**:
-The stored breakdown tracing every `ProviderScore` component, weight, and input back to the evidence that produced it. Every score change must be reconstructable from it.
+The breakdown tracing every `ProviderScore` component, weight, and input back to the evidence that produced it — each measured component carries `evidence_refs` to the exact rows used to measure it (numerator and denominator). Every score change must be reconstructable from it. Recomputed alongside the score, not stored.
+_Avoid_: report, summary.
 
 **Active-user proxy**:
-The best available stand-in for provider audience size, since Telegram exposes no true active-user count: subscriber count + median post views + reactions/forwards. Always labelled a proxy.
+The best available stand-in for provider audience size, since Telegram exposes no true active-user count: subscriber count, median post views, and forwards (**reactions are not captured at Stage 0**). Always labelled a proxy, never a quality claim.
 _Avoid_: active users, audience (unqualified).
 
 ### Simulation

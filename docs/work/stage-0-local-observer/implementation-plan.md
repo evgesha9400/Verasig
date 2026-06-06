@@ -617,6 +617,23 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 - **Decisive tests (unit, pure):** each metric fn (frequency, completeness, parser-confidence, deletion rate, proxy); composite = Σ(normalized×weight); **every component has `evidence_refs`**; re-weighting changes the score deterministically; "0 simulable signals" noted.
 - **Acceptance:** scorecard renders per provider; 100% of components trace to stored evidence.
 
+**Resolved gaps (grill, 2026-06-06) — see [ADR 0009](../../adr/0009-provider-score-recomputable-scorecard.md):**
+
+- **Storage class:** in-memory recompute, NEVER stored (ADR 0007 fold precedent, not ADR 0006/0008) — no migration, no table, no `conftest` change. `computed_at` + `weights_version` reproduce a past score; `computed_at` injected for deterministic tests, model defaults `_now()`.
+- **Composite:** `score = Σ(normalized × weight)` plain sum (frozen §7 — no renormalization), over only evidence-backed components. `domain/score.py` holds `ScoreWeights(version, by_component)` + `DEFAULT_WEIGHTS` (v0); injected into the builder (re-weight = pass another `ScoreWeights`, deterministic).
+- **Components:** *scored* — `sim_expectancy` 0.30 + `drawdown` 0.20 (**pending Slice 9** — excluded + noted, `simulated_count=0`), `deletion_behaviour` 0.20, `completeness` 0.10, `parser_confidence` 0.10, `evidence_availability` 0.10; *context @ weight 0* — `signal_frequency`, `active_user_proxy`. Slice-8 active weights sum 0.50 → score honestly partial. No fabrication: pending-sim / empty-denominator (0/0) components are excluded + noted, never scored 0 or 0.5.
+- **Per-component math:** deletion = 1−(CONFIRMED∧signal ÷ `RawSignalEvent` count); completeness = mean(present-{entry,stop,≥1 TP} ÷ 3, MARKET counts as entry); parser_confidence = DETERMINISTIC ÷ total candidates; evidence_availability = captured ÷ (captured + `ID_GAP`) — emitted only when a rescan provably ran (≥1 row `method ∈ {SNAPSHOT_DIFF, ID_GAP}`; `LIVE_EVENT` excluded), else excluded + noted (a never-rescanned channel never reads 1.0); frequency = candidates ÷ window-days; proxy raw=`subscriber_count`, normalized=mean(saturate{subs, median views, median forwards}) over available, name `active_user_proxy` (never a quality claim).
+- **evidence_refs:** typed-prefix grammar (`channel:` / `message:<ch>/<msg>` / `event:` / `signal:` / `unrecognized:` / `deletion:` / `parser_drift:` / `filter_drift:`), naming every row used to **measure** the value (numerator + denominator) so a measured 0.0 still traces; bulk message-corpus denominators anchor on `channel:<id>` (deterministic `count_messages`), not thousands of `message:` refs.
+- **Placement:** pure `services/scoring/hygiene.py` (un-weighted metric measurements: raw / normalized / evidence_refs / notes, or excluded+note) + `services/scoring/scorecard.py` (apply `ScoreWeights` → `ScoreComponent.contribution = normalized×weight`, sum `score`, stamp `computed_at`/`weights_version`, gather `notes` → build `ProviderScore` + `ProviderScoreExplanation`). Repo reads stay in the CLI, mirroring `_fold_channel`. Slice 9 adds `simulator.py` + `policies.py` alongside.
+- **Surface:** offline `verasig score <ref>` (read repos → pure builder → `format_score` + `format_explanation`); unknown channel exits 1. Mirrors `stats`/`lifecycle`/`deletions`. No persistence, no Streamlit scorecard this slice.
+
+**Files (this pass):**
+- `domain/score.py` (`ScoreComponent`, `ProviderScore`, `ProviderScoreExplanation`, `ScoreWeights`, `DEFAULT_WEIGHTS`, `WEIGHTS_VERSION="v0"`, `_now`)
+- `services/scoring/__init__.py`, `services/scoring/hygiene.py` (pure per-component measurements), `services/scoring/scorecard.py` (weighted assembly → `ProviderScore` + `ProviderScoreExplanation`)
+- `cli.py` (+`score`, +`format_score`, +`format_explanation`, +`_score_channel`)
+- `tests/unit/test_hygiene.py` (each metric fn, table-driven; exclude+note paths), `tests/unit/test_scorecard.py` (composite = Σ(normalized×weight); re-weight changes score; pending-sim note; partial score), `tests/integration/test_score_traceability.py` (seed rows → score → 100% of `evidence_refs` resolve to stored rows incl. `channel:` aggregate), `tests/integration/test_cli_score.py` (CliRunner: scorecard + explanation print; unknown channel exits 1)
+- No migration; no `tests/conftest.py` change.
+
 ---
 
 ## Slice 9: Simulation (FINAL scoring slice)
