@@ -10,6 +10,12 @@ from sqlalchemy import text
 from verasig.config import Settings
 from verasig.domain.deletion import DeletedSignalEvidence, DeletionConfidence
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
+from verasig.domain.score import (
+    ProviderScore,
+    ProviderScoreExplanation,
+    ScoreComponent,
+)
+from verasig.domain.score import _now as _score_now
 from verasig.domain.signal import ExtractionMethod, SignalEventType
 from verasig.foundation.db import make_engine, make_session_factory
 from verasig.foundation.exchange import StaticExchange
@@ -33,6 +39,7 @@ from verasig.services.ingestion.candidate_derivation import (
     sweep_advisory,
 )
 from verasig.services.lifecycle.fold import fold
+from verasig.services.scoring.scorecard import build_provider_score
 from verasig.storage import repositories as repo
 
 app = typer.Typer(help="Verasig — local observer CLI.")
@@ -223,6 +230,36 @@ def format_deletions(channel, evidence: list[DeletedSignalEvidence]) -> str:
     return "\n".join([_deletion_header(channel), *rows, footer])
 
 
+def _score_header(channel, score: ProviderScore) -> str:
+    parts = [f"ProviderScore {channel.title}"]
+    if channel.handle:
+        parts.append(f"@{channel.handle}")
+    parts.append(f"id={channel.channel_id}")
+    parts.append(f"score={score.score:.4f}")
+    parts.append(f"weights={score.weights_version}")
+    parts.append(f"signals={score.signal_count}")
+    parts.append(f"simulated={score.simulated_count}")
+    return " ".join(parts)
+
+
+def _format_component(component: ScoreComponent) -> str:
+    return (
+        f"  {component.name} raw={component.raw_value:.4f} "
+        f"normalized={component.normalized:.4f} weight={component.weight:.4f} "
+        f"contribution={component.contribution:.4f}"
+    )
+
+
+def format_score(channel, score: ProviderScore) -> str:
+    rows = [_format_component(component) for component in score.components]
+    return "\n".join([_score_header(channel, score), "Components:", *rows])
+
+
+def format_explanation(explanation: ProviderScoreExplanation) -> str:
+    rows = [f"  {note}" for note in explanation.notes]
+    return "\n".join(["Notes:", *rows])
+
+
 def _resolve_channel_id(session_factory, reference: str) -> int:
     with session_factory() as session:
         channel = repo.find_channel(session, reference)
@@ -255,6 +292,40 @@ def _fold_channel(session_factory, channel_id: int) -> list[FoldedSignal]:
         events = repo.read_signal_events(session, channel_id)
         messages = repo.read_messages(session, channel_id)
     return fold(signals, events, messages)
+
+
+def _score_channel(
+    session_factory, channel_id: int
+) -> tuple[object, ProviderScore, ProviderScoreExplanation]:
+    with session_factory() as session:
+        channel = repo.find_channel(session, channel_id)
+        messages = repo.read_messages(session, channel_id)
+        events = repo.read_signal_events(session, channel_id)
+        signals = repo.read_extracted_signals(session, channel_id)
+        unrecognized = repo.read_unrecognized_signals(session, channel_id)
+        deletions = repo.read_deletion_evidence(session, channel_id)
+        message_count = repo.count_messages(session, channel_id)
+    score, explanation = build_provider_score(
+        channel=channel,
+        messages=messages,
+        message_count=message_count,
+        events=events,
+        signals=signals,
+        unrecognized=unrecognized,
+        deletions=deletions,
+        computed_at=_score_now(),
+    )
+    return channel, score, explanation
+
+
+@app.command("score")
+def score_provider(reference: str) -> None:
+    """Print the recomputed ProviderScore + explanation (offline, read-only)."""
+    session_factory = make_session_factory(Settings().database_url)
+    channel_id = _resolve_channel_id(session_factory, reference)
+    channel, score, explanation = _score_channel(session_factory, channel_id)
+    typer.echo(format_score(channel, score))
+    typer.echo(format_explanation(explanation))
 
 
 @app.command()
