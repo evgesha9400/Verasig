@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from typer.testing import CliRunner
@@ -13,6 +14,7 @@ from verasig.domain.deletion import (
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.simulation import Kline
 from verasig.storage import repositories as repo
 
 runner = CliRunner()
@@ -29,7 +31,11 @@ def _message(message_id: int):
     return RawTelegramMessage(
         channel_id=_CHANNEL_ID,
         message_id=message_id,
-        text=f"message {message_id}",
+        text=(
+            "BTC long market sl 64000 tp 67000"
+            if message_id == 1
+            else f"message {message_id}"
+        ),
         posted_at=_BASE,
         captured_at=_BASE,
         has_media=False,
@@ -69,7 +75,7 @@ def _seed_score(session_factory) -> None:
                     id=_uuid(2),
                     event_id=event.id,
                     channel_id=_CHANNEL_ID,
-                    symbol="BTC",
+                    symbol="BTCUSDT",
                     side=Side.LONG,
                     entry_type=EntryType.MARKET,
                     stop_loss="64000",
@@ -93,6 +99,27 @@ def _seed_score(session_factory) -> None:
             ],
         )
         session.commit()
+
+
+class FakeMarketData:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, datetime, datetime, str]] = []
+
+    def klines(
+        self, symbol: str, start: datetime, end: datetime, interval: str = "1"
+    ) -> list[Kline]:
+        self.calls.append((symbol, start, end, interval))
+        return [
+            Kline(
+                symbol=symbol,
+                open_time=start,
+                open=Decimal("65000"),
+                high=Decimal("67000"),
+                low=Decimal("65000"),
+                close=Decimal("67000"),
+                volume=Decimal("1"),
+            )
+        ]
 
 
 def test_score_cli_prints_scorecard_and_explanation(
@@ -127,3 +154,39 @@ def test_score_cli_unknown_channel_exits_nonzero(monkeypatch, pg_url):
     result = runner.invoke(app, ["score", "@ghost"])
 
     assert result.exit_code == 1
+
+
+def test_score_cli_can_include_simulation_from_market_data(
+    session_factory, monkeypatch, pg_url
+):
+    _seed_score(session_factory)
+    market_data = FakeMarketData()
+    monkeypatch.setenv("VERASIG_DATABASE_URL", pg_url)
+    monkeypatch.setattr("verasig.cli._make_market_data", lambda: market_data)
+
+    result = runner.invoke(
+        app,
+        ["score", "@pilot", "--simulate", "--until", "2026-06-06T12:01:00+00:00"],
+    )
+
+    assert result.exit_code == 0
+    output = result.output
+    assert market_data.calls == [
+        (
+            "BTCUSDT",
+            _BASE,
+            datetime(2026, 6, 6, 12, 1, tzinfo=timezone.utc),
+            "1",
+        )
+    ]
+    assert "simulated=1" in output
+    assert (
+        "sim_expectancy raw=2.0000 normalized=1.0000 "
+        "weight=0.3000 contribution=0.3000" in output
+    )
+    assert (
+        "drawdown raw=0.0000 normalized=1.0000 "
+        "weight=0.2000 contribution=0.2000" in output
+    )
+    assert "sim_expectancy: pending Slice 9 simulation" not in output
+    assert "drawdown: pending Slice 9 simulation" not in output

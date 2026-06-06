@@ -2,6 +2,7 @@ import asyncio
 import os
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -9,16 +10,20 @@ from sqlalchemy import text
 
 from verasig.config import Settings
 from verasig.domain.deletion import DeletedSignalEvidence, DeletionConfidence
+from verasig.domain.event import RawSignalEvent
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
+from verasig.domain.message import RawTelegramMessage
 from verasig.domain.score import (
     ProviderScore,
     ProviderScoreExplanation,
     ScoreComponent,
 )
 from verasig.domain.score import _now as _score_now
-from verasig.domain.signal import ExtractionMethod, SignalEventType
+from verasig.domain.signal import ExtractedSignal, ExtractionMethod, SignalEventType
+from verasig.domain.simulation import SimOutcome
 from verasig.foundation.db import make_engine, make_session_factory
 from verasig.foundation.exchange import StaticExchange
+from verasig.foundation.market_data import BybitKlineClient, MarketData
 from verasig.foundation.telegram_session import (
     CredentialsMissingError,
     SessionMissingError,
@@ -40,6 +45,7 @@ from verasig.services.ingestion.candidate_derivation import (
 )
 from verasig.services.lifecycle.fold import fold
 from verasig.services.scoring.scorecard import build_provider_score
+from verasig.services.scoring.simulator import simulate_outcomes_from_market_data
 from verasig.storage import repositories as repo
 
 app = typer.Typer(help="Verasig — local observer CLI.")
@@ -294,8 +300,46 @@ def _fold_channel(session_factory, channel_id: int) -> list[FoldedSignal]:
     return fold(signals, events, messages)
 
 
+def _make_market_data() -> MarketData:
+    return BybitKlineClient()
+
+
+def _parse_until(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _require_simulation_until(until: datetime | None) -> datetime:
+    if until is None:
+        raise _fail(ValueError("pass --until <iso-datetime> when using --simulate"))
+    return until
+
+
+def _simulate_channel(
+    messages: list[RawTelegramMessage],
+    events: list[RawSignalEvent],
+    signals: list[ExtractedSignal],
+    market_data: MarketData,
+    until: datetime,
+) -> list[SimOutcome]:
+    folded_signals = fold(signals, events, messages)
+    return simulate_outcomes_from_market_data(
+        folded_signals=folded_signals,
+        market_data=market_data,
+        end=until,
+    )
+
+
 def _score_channel(
-    session_factory, channel_id: int
+    session_factory,
+    channel_id: int,
+    *,
+    market_data: MarketData | None = None,
+    simulation_until: datetime | None = None,
 ) -> tuple[object, ProviderScore, ProviderScoreExplanation]:
     with session_factory() as session:
         channel = repo.find_channel(session, channel_id)
@@ -305,6 +349,11 @@ def _score_channel(
         unrecognized = repo.read_unrecognized_signals(session, channel_id)
         deletions = repo.read_deletion_evidence(session, channel_id)
         message_count = repo.count_messages(session, channel_id)
+    sim_outcomes = (
+        []
+        if market_data is None or simulation_until is None
+        else _simulate_channel(messages, events, signals, market_data, simulation_until)
+    )
     score, explanation = build_provider_score(
         channel=channel,
         messages=messages,
@@ -313,17 +362,30 @@ def _score_channel(
         signals=signals,
         unrecognized=unrecognized,
         deletions=deletions,
+        sim_outcomes=sim_outcomes,
         computed_at=_score_now(),
     )
     return channel, score, explanation
 
 
 @app.command("score")
-def score_provider(reference: str) -> None:
+def score_provider(
+    reference: str,
+    simulate: bool = typer.Option(False, "--simulate"),
+    until: str | None = typer.Option(None, "--until"),
+) -> None:
     """Print the recomputed ProviderScore + explanation (offline, read-only)."""
     session_factory = make_session_factory(Settings().database_url)
     channel_id = _resolve_channel_id(session_factory, reference)
-    channel, score, explanation = _score_channel(session_factory, channel_id)
+    parsed_until = _parse_until(until)
+    market_data = _make_market_data() if simulate else None
+    simulation_until = _require_simulation_until(parsed_until) if simulate else None
+    channel, score, explanation = _score_channel(
+        session_factory,
+        channel_id,
+        market_data=market_data,
+        simulation_until=simulation_until,
+    )
     typer.echo(format_score(channel, score))
     typer.echo(format_explanation(explanation))
 

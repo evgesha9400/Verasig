@@ -644,6 +644,10 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 - **Decisive tests (unit, canned klines):** market fill=next-candle open; limit never reached ⇒ `UNFILLED`; **same-candle stop+tp ⇒ stop-first (-1R)**; MFE/MAE; policy **injectable** (dummy `CustomRiskPolicy` proves the seam).
 - **Acceptance:** known signal + known klines ⇒ expected conservative R; scorecard shows simulated expectancy + drawdown with full explanation.
 
+**Resolved gap (2026-06-06):**
+
+- **Operator path:** `verasig score <ref>` remains offline and partial by default. `verasig score <ref> --simulate --until <iso-datetime>` fetches public Bybit klines through `MarketData`, simulates folded signals in memory, and includes `sim_expectancy` + `drawdown` in the recomputed scorecard. Tests monkeypatch the market-data seam and never call the real Bybit network.
+
 ---
 
 ## Slice 10: Live listener daemon (FINAL slice overall)
