@@ -143,8 +143,8 @@ def test_score_cli_prints_scorecard_and_explanation(
     )
     assert "active_user_proxy raw=5000.0000" in output
     assert "Notes:" in output
-    assert "sim_expectancy: pending Slice 9 simulation" in output
-    assert "drawdown: pending Slice 9 simulation" in output
+    assert "sim_expectancy: simulation not supplied" in output
+    assert "drawdown: simulation not supplied" in output
     assert "active_user_proxy: proxy only, not a quality claim" in output
 
 
@@ -188,5 +188,5 @@ def test_score_cli_can_include_simulation_from_market_data(
         "drawdown raw=0.0000 normalized=1.0000 "
         "weight=0.2000 contribution=0.2000" in output
     )
-    assert "sim_expectancy: pending Slice 9 simulation" not in output
-    assert "drawdown: pending Slice 9 simulation" not in output
+    assert "sim_expectancy: simulation not supplied" not in output
+    assert "drawdown: simulation not supplied" not in output

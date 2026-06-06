@@ -66,7 +66,7 @@ class RawMessageRow(Base):
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
-# --- Slice 3/4: candidate events, extraction outputs, distilled rules, drift ---
+# --- Candidate events, extraction outputs, distilled rules, drift --------------
 # JSONB holds list/map fields + GoldenLabel.expected; enums stored as their value.
 
 
@@ -231,7 +231,7 @@ class ParserDriftWarningRow(Base):
     )
 
 
-# --- Slice 7: durable, NON-recomputable deletion evidence (ADR 0008) ----------
+# --- Durable, NON-recomputable deletion evidence (ADR 0008) -------------------
 # UNIQUE(channel_id, message_id) makes rescans idempotent; the upsert upgrades
 # SUSPECTED→CONFIRMED only and preserves the first-noticed detected_at.
 

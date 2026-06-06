@@ -1,7 +1,7 @@
 [project]
 name = "verasig"
 version = "0.1.0"
-description = "Proof-first Telegram signal-provider verification (Stage 0, local observer)"
+description = "Proof-first Telegram signal-provider verification"
 readme = "README.md"
 authors = [
     { name = "Evgeny", email = "aleshiner@mail.ru" }

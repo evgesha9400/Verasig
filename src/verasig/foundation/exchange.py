@@ -3,9 +3,9 @@
 `Exchange` is the Protocol the recall-first seed heuristic codes against to ask
 "is this token a listed base coin?" (the `SYMBOL_TOKEN` reason). `StaticExchange`
 ships a bundled cold-start seed of major base coins; the real `BybitExchange`
-(httpx over the public instruments-info endpoint) arrives with market data in
-Slice 9. Tests inject a `FakeExchange`. A distilled `FilterRule` supersedes the
-seed once the operator has labeled a channel.
+(httpx over the public instruments-info endpoint) lives behind a separate market
+data seam. Tests inject a `FakeExchange`. A distilled `FilterRule` supersedes
+the seed once the operator has labeled a channel.
 """
 
 from typing import Protocol, runtime_checkable

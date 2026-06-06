@@ -1,4 +1,4 @@
-"""Queue-first live ingestion (Slice 10; ADR 0004).
+"""Queue-first live ingestion (ADR 0004).
 
 Each delivered message is committed immediately. The raw-message composite key
 dedupes push, poll, catch-up, and any rows captured by earlier backfill.

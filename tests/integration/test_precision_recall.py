@@ -32,16 +32,16 @@ def test_corpus_has_a_meaningful_signal_denominator():
     assert len(labels) >= 30  # signals + chatter
 
 
-def test_filter_recall_meets_stage0_gate():
+def test_filter_recall_meets_quality_gate():
     report, _ = _report()
     assert report.filter_recall >= 0.95  # ADR 0005 candidate gate (vs GoldenLabel)
 
 
-def test_parser_precision_meets_stage0_gate():
+def test_parser_precision_meets_quality_gate():
     report, _ = _report()
-    assert report.parser_precision >= 0.95  # Stage 0 extraction gate
+    assert report.parser_precision >= 0.95
 
 
 def test_parser_recall_is_reported_not_gated():
     report, _ = _report()
-    assert 0.0 <= report.parser_recall <= 1.0  # measured + reported (Stage 1 gate)
+    assert 0.0 <= report.parser_recall <= 1.0  # measured + reported

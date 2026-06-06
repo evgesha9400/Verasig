@@ -1,4 +1,4 @@
-"""Insert-only repositories for raw capture (Slice 2).
+"""Insert-only repositories for raw capture.
 
 Messages are appended with `ON CONFLICT DO NOTHING` (idempotent on the
 `(channel_id, message_id)` PK). The channel row is upserted for metadata, but
@@ -98,7 +98,7 @@ def _reference_to_handle(reference: str | int) -> str | None:
     return text.removeprefix("https://t.me/").removeprefix("t.me/").lstrip("@")
 
 
-# --- Slice 3/4: events, extraction outputs, rules, golden corpus, drift ---------
+# --- Events, extraction outputs, rules, golden corpus, drift -------------------
 # JSONB columns hold list/map fields as JSON-safe values (UUID/Decimal -> str);
 # Pydantic coerces them back on read, so ORM rows mirror the §2-§4 contracts 1:1.
 
@@ -604,7 +604,7 @@ def record_outcome(session: Session, outcome: ExtractOutcome) -> None:
         _record_unrecognized(session, outcome.unrecognized)
 
 
-# --- Slice 7: durable, non-recomputable deletion evidence (ADR 0008) ----------
+# --- Durable, non-recomputable deletion evidence (ADR 0008) -------------------
 # One row per (channel_id, message_id). The guarded upsert upgrades
 # SUSPECTED->CONFIRMED only and never writes detected_at, so a same-state rescan
 # is a true +0 and the first-noticed timestamp is preserved.

@@ -144,5 +144,5 @@ def test_market_data_backed_simulation_feeds_scorecard_components():
     ]
     assert score.components[0].raw_value == pytest.approx(2.0)
     assert score.components[1].raw_value == pytest.approx(0.2)
-    assert "sim_expectancy: pending Slice 9 simulation" not in explanation.notes
-    assert "drawdown: pending Slice 9 simulation" not in explanation.notes
+    assert "sim_expectancy: simulation not supplied" not in explanation.notes
+    assert "drawdown: simulation not supplied" not in explanation.notes

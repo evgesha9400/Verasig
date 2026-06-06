@@ -1,12 +1,12 @@
-"""Gated deletion rescan (spec Slice 7; ADR 0008).
+"""Gated deletion rescan (ADR 0008).
 
 Re-fetch the channel's CURRENT live message-id set, diff it against the durable
 stored set, and persist the evidence. The channel must already be backfilled
 (stored messages are the left side of the diff), so it is resolved from the DB,
 never from the source. An empty/failed live re-fetch ABORTS — an inaccessible
 channel must never be read as a mass deletion. Mirrors `backfill.py`: a pure
-core (`detect_deletions`) wrapped in repo-driven orchestration; manual
-acceptance only (`live_message_ids` never runs against real Telegram in tests).
+core (`detect_deletions`) wrapped in repo-driven orchestration; `live_message_ids`
+never runs against real Telegram in tests.
 """
 
 from dataclasses import dataclass

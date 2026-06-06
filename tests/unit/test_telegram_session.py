@@ -18,7 +18,7 @@ from verasig.foundation.telegram_session import (
 def _user(**overrides):
     base = {
         "id": 12345,
-        "username": "throwaway_acct",
+        "username": "signal_operator",
         "first_name": "Jane",
         "last_name": "Doe",
         "phone": "15551234567",
@@ -78,7 +78,7 @@ def test_make_client_checks_credentials_before_session(tmp_path):
 def test_format_account_renders_all_fields_with_phone():
     assert (
         format_account(_user())
-        == "logged in as @throwaway_acct · Jane Doe · id=12345 · +15551234567"
+        == "logged in as @signal_operator · Jane Doe · id=12345 · +15551234567"
     )
 
 
@@ -92,14 +92,14 @@ def test_format_account_omits_missing_username():
 def test_format_account_omits_missing_last_name():
     assert (
         format_account(_user(last_name=None))
-        == "logged in as @throwaway_acct · Jane · id=12345 · +15551234567"
+        == "logged in as @signal_operator · Jane · id=12345 · +15551234567"
     )
 
 
 def test_format_account_omits_missing_phone():
     assert (
         format_account(_user(phone=None))
-        == "logged in as @throwaway_acct · Jane Doe · id=12345"
+        == "logged in as @signal_operator · Jane Doe · id=12345"
     )
 
 

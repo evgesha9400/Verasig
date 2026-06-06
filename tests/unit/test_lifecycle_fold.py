@@ -125,7 +125,7 @@ def test_market_average_in_leaves_entry_and_leg_price_pending():
     folded = fold([signal], [event], [entry_msg, reply])
     step = folded[0].timeline[1]
     assert step.effective_size == Decimal(2)
-    assert step.effective_entry is None  # market leg pending (Slice 9 fills)
+    assert step.effective_entry is None  # market leg waits for market data
     assert step.leg_size == Decimal(1)
     assert step.leg_price is None
 

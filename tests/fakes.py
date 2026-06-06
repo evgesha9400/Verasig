@@ -61,7 +61,7 @@ class FakeSource:
         return set(self.live_ids)  # canned live snapshot for rescan tests
 
     async def live_events(self, channel_ids: list[int]):
-        yield None  # unused in Slice 2
+        yield None  # unused by backfill tests
 
 
 class FakeExchange:

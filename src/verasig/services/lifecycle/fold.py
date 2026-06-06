@@ -124,7 +124,7 @@ def _averaged_entry(
     position: _Position, multiplier: Decimal, price: Decimal | None, new_size: Decimal
 ) -> Decimal | None:
     if position.entry is None or price is None:
-        return None  # a market leg leaves the average entry pending (Slice 9 fills)
+        return None  # a market leg leaves the average entry unresolved
     return (position.entry * position.size + price * multiplier) / new_size
 
 

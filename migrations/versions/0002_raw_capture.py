@@ -1,4 +1,4 @@
-"""telegram_channel + raw_telegram_message tables (Slice 2).
+"""telegram_channel + raw_telegram_message tables.
 
 Revision ID: 0002_raw_capture
 Revises: 0001_baseline

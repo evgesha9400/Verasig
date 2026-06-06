@@ -1,8 +1,8 @@
 """candidate events, extraction outputs, distilled rules, golden corpus, drift.
 
-Slice 3/4: raw_signal_event, extracted_signal, unrecognized_signal, filter_rule,
-parser_rule, golden_label, filter_drift_warning. Append-only; JSONB mirrors the
-list/map contract fields + GoldenLabel.expected.
+Adds raw_signal_event, extracted_signal, unrecognized_signal, filter_rule,
+parser_rule, golden_label, and filter_drift_warning. Append-only; JSONB mirrors
+the list/map contract fields + GoldenLabel.expected.
 
 Revision ID: 0003_distillation
 Revises: 0002_raw_capture

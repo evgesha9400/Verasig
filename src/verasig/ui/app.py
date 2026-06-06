@@ -4,7 +4,7 @@ The 4-view loop (Candidates | Unflagged | ⚠ Drift | 🎲 Audit), the recall/pr
 meters, and the Distil button all delegate to `ui.workbench.view_model` +
 `services.distillation` (unit-tested). Tests inject a `bootstrap` into
 `st.session_state` (offline, FakeDistiller); production loads it from the DB for
-the channel the `workbench` CLI launched. The real-LLM Distil is go-ahead-gated.
+the channel the `workbench` CLI launched.
 """
 
 import os

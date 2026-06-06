@@ -8,4 +8,4 @@ We chose conservatism because Verasig is a *proof* product: a slightly pessimist
 
 - Reported outcomes may slightly under-rate providers on ambiguous candles — stated openly in the explanation.
 - Klines are public REST data: no exchange credentials, fully local, no order placement.
-- "Score by realized demo outcome" (value-proposition.md) is reinterpreted as "score by simulated outcome" for Stage 0.
+- "Score by realized demo outcome" (value-proposition.md) is reinterpreted as "score by simulated outcome".

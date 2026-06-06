@@ -88,7 +88,7 @@ def _subprocess_runner(command: str) -> Callable[[str], str]:
 
 
 class ClaudeCliExtractor:
-    """Real LLM-CLI fallback extractor (manual acceptance / go-ahead-gated).
+    """LLM-CLI fallback extractor.
 
     The subprocess runner is injectable so tests drive it with canned stdout and
     never touch the real CLI. Pass `command="codex"` to drive Codex instead.

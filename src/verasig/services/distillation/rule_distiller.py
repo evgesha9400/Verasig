@@ -116,7 +116,7 @@ def _subprocess_runner(command: str) -> Callable[[str], str]:
 
 
 class ClaudeCliDistiller:
-    """Real LLM-CLI distiller (manual acceptance / go-ahead-gated).
+    """LLM-CLI rule distiller.
 
     The subprocess runner is injectable so tests drive it with canned stdout and
     never touch the real CLI. Distinct recall-first vs precision-first prompts.

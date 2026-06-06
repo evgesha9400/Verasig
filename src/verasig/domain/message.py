@@ -2,7 +2,7 @@
 
 `RawTelegramMessage` is the immutable, append-only 100%-capture record.
 `DeliveryMode` tags how a live message reached us (latency provenance; ADR 0004).
-The matching ORM row + Alembic table arrive in Slice 2.
+The ORM row and Alembic table mirror the capture contract.
 """
 
 from datetime import datetime

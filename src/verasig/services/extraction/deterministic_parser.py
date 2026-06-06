@@ -1,4 +1,4 @@
-"""Deterministic ParserRule application (data-contracts.md §3; plan Slice 4).
+"""Deterministic ParserRule application (data-contracts.md §3).
 
 `parse` applies a `ParserRule`'s ordered regexes to a message's candidate text
 and maps the named groups (via `field_map`) onto a provenance-free `TradeIntent`.

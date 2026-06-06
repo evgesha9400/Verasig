@@ -1,1 +1,1 @@
-"""Verasig: proof-first Telegram signal-provider verification (Stage 0)."""
+"""Verasig: proof-first Telegram signal-provider verification."""

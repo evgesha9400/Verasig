@@ -1,4 +1,4 @@
-# Stage 0 — TDD Test Plan
+# Observer TDD Test Plan
 
 Tests are the spec made executable. **Red → green → commit** for every step. Underlying implementation must be swappable without breaking tests (test behaviour through contracts, not internals).
 
@@ -28,9 +28,9 @@ tests/fixtures/
 - The labeled `messages/` + `labels/` pair is the **precision/recall oracle**.
 - Fixtures are committed (anonymized); secrets never are.
 
-## 3. Per-slice test matrix
+## 3. Per-Work-Item Test Matrix
 
-| Slice | Key tests (behaviour) | Oracle / fixture | Acceptance metric |
+| work item | Key tests (behaviour) | Oracle / fixture | Acceptance metric |
 |---|---|---|---|
 | 0 Foundation | config loads from env; `health` connects DB; migrations apply | testcontainers PG | `health` OK; pytest green; ruff clean |
 | 1 Session/login | session-string round-trip; missing session → fail-fast msg | fake session | `whoami` works after one `login` |
@@ -46,7 +46,7 @@ tests/fixtures/
 
 ## 4. Representative test specs (write these first, watch them fail)
 
-**Slice 4 — required fields + normalization (unit, pure):**
+**work item 4 — required fields + normalization (unit, pure):**
 ```python
 @pytest.mark.parametrize("text,expected", [
     ("BTC long entry 65000 sl 64000 tp 67000",
@@ -62,7 +62,7 @@ def test_deterministic_parse(rule, text, expected):
     assert _matches(result, expected)
 ```
 
-**Slice 5 — drift coverage invariant (unit, fake fallback):**
+**work item 5 — drift coverage invariant (unit, fake fallback):**
 ```python
 def test_fallback_success_emits_exactly_one_drift():
     svc = ExtractService(rules=[], fallback=FakeExtractor(returns=SOME_SIGNAL))
@@ -77,7 +77,7 @@ def test_fallback_not_called_when_deterministic_matches():
     assert fb.calls == 0                        # cost guard
 ```
 
-**Slice 9 — conservative tie-break (unit, canned klines):**
+**work item 9 — conservative tie-break (unit, canned klines):**
 ```python
 def test_same_candle_stop_and_tp_resolves_stop_first():
     signal = folded(side="LONG", entry=100, stop=95, tps=[110])
@@ -87,7 +87,7 @@ def test_same_candle_stop_and_tp_resolves_stop_first():
     assert out.r_multiple == pytest.approx(-1.0)
 ```
 
-**Slice 2 — append-only / idempotent (integration, PG):**
+**work item 2 — append-only / idempotent (integration, PG):**
 ```python
 def test_backfill_is_idempotent(pg_session, fake_source):
     backfill(fake_source, channel_id=1, session=pg_session)
@@ -99,15 +99,15 @@ def test_backfill_is_idempotent(pg_session, fake_source):
 ## 5. Precision / recall harness (cross-cutting)
 
 - A single `evaluate(channel)` test loads `labels/<channel>.jsonl`, runs the full extract pipeline over `messages/<channel>.jsonl`, and asserts:
-  - `precision >= 0.95` (Stage 0 gate; MVP metric).
-  - `recall` is **computed and reported** (not gated below target; reported for the Stage 1 "1,000 messages" gate).
+  - `precision >= 0.95` (quality gate).
+  - `recall` is **computed and reported** (not gated below target; reported for larger-corpus validation).
   - **filter recall `>= 0.95`** measured on `GoldenLabel.is_signal` — the candidate gate is advisory, so the denominator is `GoldenLabel`, **not** the candidate subset ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)).
 - Output: a small table (TP/FP/FN per field) written to test logs — feeds the scorecard's parser-confidence component.
 
-## 6. Definition of done (every slice)
+## 6. Definition of Done
 
 - [ ] Failing test written first, observed failing.
 - [ ] Minimal implementation; test green.
 - [ ] `ruff format` + `ruff check` clean; imports sorted.
 - [ ] No real network/CLI/Telegram in tests.
-- [ ] Conventional-commit per slice.
+- [ ] Conventional commit per work item.

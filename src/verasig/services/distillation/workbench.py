@@ -1,4 +1,4 @@
-"""Pure distillation-workbench presenter (plan Slice 3 UI mock; ADR 0005).
+"""Pure distillation-workbench presenter (ADR 0005).
 
 The 4-view workbench logic lives here so it is unit-tested independently of
 Streamlit (spec §4: UI is a thin adapter). `partition` splits the corpus into

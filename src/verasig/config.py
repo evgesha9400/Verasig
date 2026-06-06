@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     telegram_phone: str | None = None
     session_path: str = "/session/telegram.session"
     backfill_batch_size: int = 200
-    distiller_command: str = "claude"  # LLM CLI for rule distillation (go-ahead-gated)
+    distiller_command: str = "claude"  # LLM CLI for rule distillation
     extractor_fallback_enabled: bool = True  # LLM fallback on deterministic miss
     extractor_command: str = "claude"  # LLM CLI for fallback extraction (gated)
 

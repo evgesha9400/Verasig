@@ -2,7 +2,7 @@
 
 The message table is append-only; the channel row is mutable metadata
 (subscriber_count refresh, advancing `captured_through_message_id` cursor).
-The matching ORM row + Alembic table arrive with the backfill slice.
+The ORM row and Alembic table mirror this contract.
 """
 
 from datetime import datetime

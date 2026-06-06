@@ -1,4 +1,4 @@
-# Stage 0 — Local Observer Implementation Plan
+# Observer Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -12,8 +12,8 @@
 
 ## How to read this plan
 
-- Slices are **vertical and dependency-ordered**: each ends green, committed, and demonstrable.
-- Slice 0 and Slice 4 are fully fleshed to TDD micro-steps as the pattern; remaining slices give the frozen contract (input/output/test/acceptance + the decisive test) and are expanded just-in-time at execution per `subagent-driven-development`.
+- work items are **vertical and dependency-ordered**: each ends green, committed, and demonstrable.
+- work item 0 and work item 4 are fully fleshed to TDD micro-steps as the pattern; remaining work items give the frozen contract (input/output/test/acceptance + the decisive test) and are expanded just-in-time at execution per `subagent-driven-development`.
 - Contracts referenced here are frozen in `data-contracts.md`; metrics in `test-plan.md`.
 - **Commit after every passing step** (conventional commits). **Never skip a test.**
 
@@ -31,13 +31,13 @@
         ├─6 Lifecycle fold
         └─7 Deletion evidence (snapshot-diff + id-gap)
           └─8 Hygiene scorecard + ProviderScore/Explanation
-            └─9 Simulation (Bybit klines, conservative)   ← FINAL scoring slice
-              └─10 Live listener daemon                     ← FINAL slice overall
+            └─9 Simulation (Bybit klines, conservative)   ← scoring path
+              └─10 Live listener daemon                     ← live capture path
 ```
 
 ---
 
-## Slice 0: Foundation & skeleton
+## work item 0: Foundation & skeleton
 
 **Outcome:** `docker compose up` brings up Postgres + app; `app health` connects to the DB. pytest + ruff wired.
 
@@ -50,7 +50,7 @@
 **Resolved gaps (grill, 2026-06-03):**
 - **A — DB driver:** psycopg3. Add `psycopg[binary]`; config default URL `postgresql+psycopg://…`; conftest replace `psycopg2→psycopg` unchanged.
 - **B — secrets/session:** split paths — `./secrets:/secrets:ro` (read-only inputs) + `tgsession:/session` (writable session); `session_path="/session/telegram.session"`.
-- **C — Alembic:** full scaffold in Slice 0 — `migrations/env.py` (Base + Settings URL) + empty `0001_baseline.py` + an `alembic upgrade head` test on the testcontainer (satisfies test-plan "migrations apply").
+- **C — Alembic:** full scaffold in work item 0 — `migrations/env.py` (Base + Settings URL) + empty `0001_baseline.py` + an `alembic upgrade head` test on the testcontainer (satisfies test-plan "migrations apply").
 
 - [ ] **Step 1: Init uv project + dev deps**
 
@@ -233,7 +233,7 @@ secrets/
 __pycache__/
 ```
 
-- [ ] **Step 12: Manual acceptance + commit**
+- [ ] **Step 12: Verify health + commit**
 
 Run: `docker compose up -d db && docker compose run --rm app health`
 Expected: `OK: db connected`.
@@ -243,21 +243,21 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 ---
 
-## Slice 1: Telegram session & login
+## work item 1: Telegram session & login
 
 - **Input:** `telegram_api_id`/`hash`/`phone` (env), interactive code/2FA (once).
 - **Output:** persisted `StringSession` (bare UTF-8 string at `session_path`); non-interactive client for all other commands.
 - **Decisive test (unit):** session-string round-trips (`save`→`load`); missing/empty session raises `SessionMissingError("run `login` first")`; absent creds raise `CredentialsMissingError`.
-- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9) — Protocol-only stub this slice; `backfill_batches`/`live_events` are implemented in Slices 2/10. Slice 1's own seam is the session store + guarded client factory in `telegram_session.py`.
+- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9) — Protocol-only stub here; `backfill_batches`/`live_events` are implemented in work items 2/10. work item 1's own seam is the session store + guarded client factory in `telegram_session.py`.
 - **Acceptance:** `docker compose run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
-- **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are exercised manually; only load/persist/guard + the pure `format_account` formatter are unit-tested.
+- **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are verified outside automated tests; only load/persist/guard + the pure `format_account` formatter are unit-tested.
 
 **Resolved gaps (grill, 2026-06-03):**
-- **Seam (Q1):** ship **both** `foundation/telegram_source.py` (full async `TelegramSource` Protocol, Protocol-only) **and** `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — Slice 1 stubs the Protocol, does not implement its methods.
-- **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `telegram_source.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in Slice 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
+- **Seam (Q1):** ship **both** `foundation/telegram_source.py` (full async `TelegramSource` Protocol, Protocol-only) **and** `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
+- **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `telegram_source.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in work item 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
 - **login UX (Q3):** add `telegram_phone: str | None` to `Settings` + `.env(.example)`; `client.start(phone=settings.telegram_phone)` prompts for code + 2FA interactively. api_id/hash stay env-sourced.
-- **Creds absent (Q4):** `make_client` raises `CredentialsMissingError("set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH")` (creds-check **before** session-load) so Slice-0 `health` keeps working with creds Optional.
-- **whoami (Q5):** one line incl. phone — `logged in as @handle · First Last · id=N · +phone`; missing username/last_name omitted gracefully. Pure `format_account(user) -> str` is table-tested with a stub; live `get_me()` is manual.
+- **Creds absent (Q4):** `make_client` raises `CredentialsMissingError("set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH")` (creds-check **before** session-load) so work item-0 `health` keeps working with creds Optional.
+- **whoami (Q5):** one line incl. phone — `logged in as @handle · First Last · id=N · +phone`; missing username/last_name omitted gracefully. Pure `format_account(user) -> str` is table-tested with a stub; live `get_me()` is verified outside automated tests.
 
 **Files:**
 - Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/foundation/telegram_source.py`, `src/verasig/foundation/telegram_session.py`
@@ -266,7 +266,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 ---
 
-## Slice 2: History backfill → RawTelegramMessage (resumable + chunked)
+## work item 2: History backfill → RawTelegramMessage (resumable + chunked)
 
 - **Input:** `channel_id`.
 - **Output:** append-only `RawTelegramMessage` rows + a `TelegramChannel` row (with `subscriber_count`), and an advancing `captured_through_message_id` cursor.
@@ -288,19 +288,19 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
   - cursor `captured_through_message_id` = committed high-water mark; paginate **oldest→newest**, resume via `after_message_id=cursor`; batch insert + cursor advance in **one transaction**.
   - `backfill_batch_size: int = 200` added to `Settings`.
   - `stats <ref>` prints `@handle id=N · title · captured=X · cursor=Y · subs=Z`.
-  - Test fixtures: synthetic anonymized `fixtures/messages/*.jsonl` driven by `FakeSource`; real `TelethonSource` (resolve + `iter_messages(reverse=True, min_id=cursor)` + flood-wait backoff) is **manual-acceptance only**, never in tests.
+  - Test fixtures: synthetic anonymized `fixtures/messages/*.jsonl` driven by `FakeSource`; real `TelethonSource` (resolve + `iter_messages(reverse=True, min_id=cursor)` + flood-wait backoff) is verified outside automated tests.
 
 **Files:**
 - Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/storage/repositories.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
 - Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telegram_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
-- Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the Slice-2 tables before `backfill` (`docker compose run --rm app migrate`).
+- Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the work item-2 tables before `backfill` (`docker compose run --rm app migrate`).
 - Test: `tests/fixtures/messages/*.jsonl`, `tests/integration/test_backfill.py`, `tests/unit/test_fake_source.py` (+ Protocol conformance)
 
 ---
 
-## Slice 3: Candidate seed filter + unified distillation → FilterRule + ParserRule + golden corpus
+## work item 3: Candidate seed filter + unified distillation → FilterRule + ParserRule + golden corpus
 
-> Merges the former candidate-filter and distillation-loop slices ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)). The candidate filter is **advisory** (priority/triage, not a hard gate); its rules are **distilled** from the same `GoldenLabel` pass that produces parser rules.
+> Merges candidate filtering and the distillation loop ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)). The candidate filter is **advisory** (priority/triage, not a hard gate); its rules are **distilled** from the same `GoldenLabel` pass that produces parser rules.
 
 - **Input:** a channel's `RawTelegramMessage` corpus.
 - **Output:**
@@ -345,15 +345,13 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
   - integration: labels + rules persist; **re-applying distilled rules reproduces the labels** (filter recall ≥ target on `is_signal`; parser ≥ target precision on `expected`); a planted filter miss emits exactly one `FilterDriftWarning`.
   - smoke (optional): Streamlit `AppTest` drives label → distil(filter+parser) → filter → iterate; residue + unflagged sample shrink.
 - **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); operator labels a pilot channel via the UI; both rule kinds produced; residue shrinks each pass; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on `is_signal`; parser precision/recall on `expected`), not the candidate subset.
-- **Note:** real external-LLM distillation is gated behind operator go-ahead (selected examples → real LLM; see Start verdict). The seed filter + rule application are pure/offline and fixture-testable now. A local `FilterGemma`/`ParserGemma` is deferred to a later stage (ADR 0005).
+- **Note:** real external-LLM distillation sends only operator-selected examples to the real LLM. The seed filter + rule application are pure/offline and fixture-testable. A local `FilterGemma`/`ParserGemma` is outside current scope until a later product version (ADR 0005).
 
-**Resolved gaps (grill, 2026-06-04) — Slices 3 + 4 execute as ONE pass:**
+**Resolved gaps (grill, 2026-06-04) — work items 3 + 4 execute as one pass:**
 
-> **Status (2026-06-04): IMPLEMENTED — green + committed** on `feature/stage-0-foundation`. 161 tests pass, ruff clean. Filter recall + parser precision = **1.00** on the golden corpus (gate 0.95); planted filter-miss → exactly one `FilterDriftWarning`; Streamlit workbench `AppTest` smoke (label→distil→filter→iterate) green. Real-LLM `ClaudeCliDistiller` Distil + UI-over-real-content remain **go-ahead-gated manual acceptance** (no test touches the real CLI). Next: Slice 5 (LLM fallback).
-
-- **Scope:** build the entire merged slice now — seed filter + distillation (incl. Streamlit workbench + real `ClaudeCliDistiller`) **and** all of Slice 4 (deterministic extraction). The real-LLM Distil + UI-over-real-content stay **go-ahead-gated manual acceptance**; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
-- **3/4 boundary:** Slice 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until Slice 5), precision ≥ 0.95 harness.
-- **Exchange seam:** `foundation/exchange.py` = `Exchange` Protocol (`is_listed`/`base_symbols`) + bundled `StaticExchange` seed + `FakeExchange` (tests); real `BybitExchange(httpx)` deferred to Slice 9.
+- **Scope:** build seed filter + distillation (including Streamlit workbench + real `ClaudeCliDistiller`) **and** all of work item 4 (deterministic extraction). Real-LLM interactions use operator-selected examples only; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
+- **3/4 boundary:** work item 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until work item 5), precision ≥ 0.95 harness.
+- **Exchange seam:** `foundation/exchange.py` = `Exchange` Protocol (`is_listed`/`base_symbols`) + bundled `StaticExchange` seed + `FakeExchange` (tests); real `BybitExchange(httpx)` outside current scope until work item 9.
 - **Distiller output:** LLM emits JSON `{filter_rule, parser_rules}` (pattern content only); shared `parse_distiller_output` tolerantly extracts (bare or ```json-fenced) + Pydantic-validates; the adapter stamps `rule_id`/`version`/`created_at`/`distilled_from_label_ids` (provenance never hallucinated).
 - **MatchReason:** frozen 3-value enum kept — `DIRECTIONAL_KEYWORD` (long/short/buy/sell + RU), `SYMBOL_TOKEN` (Exchange-listed), `PRICE_SHAPED` (subsumes trade-structure keywords/emoji + price patterns).
 - **Persistence:** migration `0003` adds all 7 tables — `raw_signal_event`, `extracted_signal`, `unrecognized_signal`, `filter_rule`, `parser_rule`, `golden_label`, `filter_drift_warning`; list/map fields + `GoldenLabel.expected` as JSONB; conftest TRUNCATE extended.
@@ -372,9 +370,9 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 ---
 
-## Slice 4: Deterministic extraction → ExtractedSignal | UnrecognizedSignal
+## work item 4: Deterministic extraction → ExtractedSignal | UnrecognizedSignal
 
-> **Absorbed into the Slice 3 pass (grill 2026-06-04).** The contracts + parser + `ExtractService` + precision harness below are built together with Slice 3; the steps remain as the TDD micro-pattern. Slice 5 (LLM fallback) stays the next slice.
+> **Absorbed into the work item 3 pass (grill 2026-06-04).** The contracts + parser + `ExtractService` + precision harness below are built together with work item 3; the steps remain as the TDD micro-pattern. work item 5 adds LLM fallback.
 
 **Outcome:** apply `ParserRule`s to a `RawSignalEvent`, producing exactly one of `{ExtractedSignal, UnrecognizedSignal}`, enforcing `symbol`+`side` required and side normalization.
 
@@ -522,7 +520,7 @@ class ExtractService:
         for rule in self.rules:
             s = parse(rule, event.candidate_text)
             if s: return ExtractOutcome(signal=s, drift_warnings=[])
-        # fallback wired in Slice 5
+        # fallback wired in work item 5
         return ExtractOutcome(unrecognized=_unrecognized(event, "no_match"), drift_warnings=[])
 ```
 
@@ -536,27 +534,25 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 5: LLM fallback + ParserDriftWarning
+## work item 5: LLM fallback + ParserDriftWarning
 
 - **Input:** `RawSignalEvent` that missed deterministic parsing.
 - **Output:** `ExtractedSignal` (method=`LLM_FALLBACK`) or `UnrecognizedSignal`; **one `ParserDriftWarning` per fallback success**.
 - **Contracts:** `LlmExtractor` Protocol; adapter `ClaudeCliExtractor` (subprocess parse; Codex via `command="codex"` — a named subclass is trivial later, YAGNI) + `FakeExtractor`.
 - **Decisive tests (unit):** fallback called **only** on deterministic miss; success ⇒ exactly one drift warning (100% coverage metric); CLI-output parser tested against `fixtures/cli/extract_*.txt`; **real CLI never invoked**.
-- **Acceptance:** replay corpus → unmatched events route to fallback → drift warnings 1:1 with fallback successes; gated behind operator go-ahead (real content → real LLM; see Start verdict).
+- **Acceptance:** replay corpus → unmatched events route to fallback → drift warnings 1:1 with fallback successes; real content reaches the real LLM only through the configured extractor command.
 
 **Resolved gaps (grill, 2026-06-04) — see [ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md):**
 
-> **Status (2026-06-04): IMPLEMENTED — green + committed** on `feature/stage-0-foundation`. **193 tests pass**, ruff clean. Deterministic miss → LLM fallback → exactly one `ParserDriftWarning` per fallback success (1:1 coverage); `record_outcome` upserts the winning outcome as a recomputable per-event projection (idempotent re-extract = +0; clean `unrecognized ↔ extracted` transitions, stale sibling + drift cleared). `extract --no-llm` flag + `extractor_fallback_enabled` off-switch; CLI seam `_make_fallback_extractor` monkeypatched in tests (FakeExtractor), CLI-output parsing pinned to `cli/extract_*.txt` — **no test touches the real CLI**. Real-LLM extraction stays go-ahead-gated manual acceptance. Next: Slice 6 (lifecycle fold).
-
-- **Shape/linkage split (root fix of the §3-vs-§9 collision):** new `TradeIntent` (provenance-free trade levels) + `ExtractedSignal(TradeIntent)` (linkage). Both extractors symmetric `text -> TradeIntent | None` (`parse(rule, candidate_text)`, `extract(candidate_text)`); `ExtractService._link(intent, event, method, rule_id)` is the single linkage site. Refactors the (absorbed) Slice-4 deterministic parser + simplifies `evaluation.py` (drops its dummy event). The linkage assertion moves from the parser test to the service test.
+- **Shape/linkage split (root fix of the §3-vs-§9 collision):** new `TradeIntent` (provenance-free trade levels) + `ExtractedSignal(TradeIntent)` (linkage). Both extractors symmetric `text -> TradeIntent | None` (`parse(rule, candidate_text)`, `extract(candidate_text)`); `ExtractService._link(intent, event, method, rule_id)` is the single linkage site. Refactors the (absorbed) work item-4 deterministic parser + simplifies `evaluation.py` (drops its dummy event). The linkage assertion moves from the parser test to the service test.
 - **LLM output = exactly `TradeIntent`** (one task; no self-grading, no lifecycle classification). Shared tolerant `find_json_object` (new `services/json_extract.py`, shared with `rule_distiller`); `parse_extractor_output(stdout) -> TradeIntent | None` returns `None` on unparseable/missing symbol+side (a fallback miss, not a crash — unlike the distiller which raises). Fixtures: `cli/extract_pilot.txt` (success) + `cli/extract_miss.txt` (→ None).
-- **`parser_confidence` dropped** from the contract — redundant with `extraction_method`; Slice 8 derives its parse-reliability component from the `extraction_method` distribution + unrecognized rate.
-- **Fallback ON by default**, disableable: `Settings.extractor_fallback_enabled: bool = True` (+ `.env`) and a per-run `extract --no-llm` flag; `Settings.extractor_command: str = "claude"`. The operator authorised the real LLM for Stage 0 (Start verdict); the off-switch is for offline/free runs. CLI seam `_make_fallback_extractor` is monkeypatched in tests (FakeExtractor) — **no test touches the real CLI**.
+- **`parser_confidence` dropped** from the contract — redundant with `extraction_method`; work item 8 derives its parse-reliability component from the `extraction_method` distribution + unrecognized rate.
+- **Fallback ON by default**, disableable: `Settings.extractor_fallback_enabled: bool = True` (+ `.env`) and a per-run `extract --no-llm` flag; `Settings.extractor_command: str = "claude"`. The off-switch is for offline/free runs. CLI seam `_make_fallback_extractor` is monkeypatched in tests (FakeExtractor) — **no test touches the real CLI**.
 - **`ExtractService.extract(event)` wiring:** deterministic match → `_link(…, DETERMINISTIC, rule.rule_id)`, fallback not called; miss + no fallback → `UnrecognizedSignal(reason="no_match", attempted=[DETERMINISTIC])`; miss + fallback success → `_link(…, LLM_FALLBACK, None)` + one `ParserDriftWarning(deterministic_result="no_match", fallback_result="extracted", fallback_signal_id=…)`; miss + fallback fail (None) → `UnrecognizedSignal(reason="fallback_failed", attempted=[DETERMINISTIC, LLM_FALLBACK])`.
 - **Persistence — recomputable projection (ADR 0006):** `record_outcome(session, outcome)` (drift travels inside `ExtractOutcome.drift_warnings`, not a separate arg) upserts the winning outcome `ON CONFLICT(event_id) DO UPDATE`, deletes the losing sibling, and upserts/clears the `parser_drift_warning`. `UNIQUE(event_id)` on `extracted_signal`, `unrecognized_signal`, `parser_drift_warning`. Re-extract is `+0` and transitions `unrecognized -> extracted` cleanly. Raw tables stay append-only.
 - **Adapter:** one `ClaudeCliExtractor(command=…, runner=…)` mirroring `ClaudeCliDistiller` (Codex via `command="codex"`; a named subclass is trivial later — YAGNI). `FakeExtractor(returns=…, calls)` in `tests/fakes.py`.
 - **Migrations:** edit `0003` to drop the now-dead `parser_confidence` column; add `0004` (`parser_drift_warning` table + `UNIQUE(event_id)` on `extracted_signal`/`unrecognized_signal`). conftest TRUNCATE list extended.
-- **Out of scope:** the workbench ⚠ Drift view stays filter-drift only (no parser-drift UI this slice).
+- **Out of scope:** the workbench ⚠ Drift view stays filter-drift only (no parser-drift UI here).
 
 **Files:**
 - `domain/signal.py` (+`TradeIntent`, `ExtractedSignal(TradeIntent)`, −`parser_confidence`), `domain/drift.py` (+`ParserDriftWarning`)
@@ -567,11 +563,11 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 6: Signal lifecycle fold
+## work item 6: Signal lifecycle fold
 
 - **Input:** a channel's `ExtractedSignal` entries + their `RawTelegramMessage`s (`reply_to_message_id` for links, `posted_at` for the true timeline).
 - **Output:** in-memory `FoldedSignal` (entry + applied modifications + optional close) — recomputable, never stored.
-- **Decisive tests (unit, pure):** entry then "move SL to BE" reply ⇒ effective SL updated at modification time (= effective entry); average-in ⇒ effective size + size-weighted entry (priced legs); market-price add ⇒ `leg_price`/`effective_entry` pending (None, Slice-9 fill); reduce lowers size without moving entry; CLOSE (keyword or `size → 0`) terminates with `closed_at`; **standalone complete signal stays single-step (no phantom lifecycle)**; out-of-order updates handled (sort by `posted_at`); different-symbol reply starts its own root.
+- **Decisive tests (unit, pure):** entry then "move SL to BE" reply ⇒ effective SL updated at modification time (= effective entry); average-in ⇒ effective size + size-weighted entry (priced legs); market-price add ⇒ `leg_price`/`effective_entry` unresolved until market-data simulation; reduce lowers size without moving entry; CLOSE (keyword or `size → 0`) terminates with `closed_at`; **standalone complete signal stays single-step (no phantom lifecycle)**; out-of-order updates handled (sort by `posted_at`); different-symbol reply starts its own root.
 - **Acceptance:** a crafted entry→modify→close thread folds to the expected effective-parameter timeline; `verasig lifecycle <ref>` prints it.
 
 **Resolved gaps (grill, 2026-06-05) — see [ADR 0007](../../adr/0007-lifecycle-fold-pure-recomputable.md):**
@@ -580,9 +576,9 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 - **Modifications are not signals:** a reply ("move SL to BE") carries no `side`, so it is never an `ExtractedSignal`; it is recognized from the `reply_to` chain. `event_type`/`references_message_id` live in the folded view, never written back to `extracted_signal`.
 - **Storage = recompute:** `FoldedSignal` is in-memory + `fold_version`-stamped; auditable by recompute over append-only messages + recomputable signals (the fold adds no new information; its sources never vanish — unlike `DeletedSignalEvidence`). `SimOutcome.folded_signal_id := root_signal_id`.
 - **Contract growth ([data-contracts §5](data-contracts.md)):** `FoldStep` += `source_message_id`, `event_type`, `effective_size`, `effective_entry?`, `leg_size?`, `leg_price?`; `source_signal_id` pinned to `root_signal_id`; `FoldedSignal` += `fold_version`.
-- **Modify semantics:** SL (incl. BE := current `effective_entry`), TP (stated set replaces), average-in (+leg, stated multiplier, price or market), reduce (size↓, entry unchanged), full close. Effective state carries forward cumulatively. Position size = equal-weight legs × stated multipliers (no `size` field on `TradeIntent`). Market legs (`leg_price=None`) → `effective_entry=None`, resolved by Slice 9.
+- **Modify semantics:** SL (incl. BE := current `effective_entry`), TP (stated set replaces), average-in (+leg, stated multiplier, price or market), reduce (size↓, entry unchanged), full close. Effective state carries forward cumulatively. Position size = equal-weight legs × stated multipliers (no `size` field on `TradeIntent`). Market legs (`leg_price=None`) → `effective_entry=None`, resolved by work item 9.
 - **Threading:** transitive `reply_to` walk to the nearest entry root; symbol-guarded membership (same/no symbol joins; different symbol starts its own root); CLOSE by full-close keyword (EN+RU) or `effective_size → 0`.
-- **Surface:** read-only `verasig lifecycle <ref>` (reads DB, folds, prints; no writes, offline). Out of scope: scoring/sim/deletion/live (Slices 7–10), market-price fills (Slice 9).
+- **Surface:** read-only `verasig lifecycle <ref>` (reads DB, folds, prints; no writes, offline). Out of scope: scoring/sim/deletion/live (work items 7–10), market-price fills (work item 9).
 
 **Files (this pass):**
 - `domain/lifecycle.py` (`FoldStep`, `FoldedSignal`, `FOLD_VERSION`)
@@ -592,9 +588,9 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 7: Deletion evidence
+## work item 7: Deletion evidence
 
-- **Input:** the channel's **stored** `RawTelegramMessage`s + a **fresh live message-id re-fetch** (`TelegramSource.live_message_ids`); `LIVE_EVENT` deletions arrive in Slice 10.
+- **Input:** the channel's **stored** `RawTelegramMessage`s + a **fresh live message-id re-fetch** (`TelegramSource.live_message_ids`); `LIVE_EVENT` deletions arrive in work item 10.
 - **Output:** persisted `DeletedSignalEvidence` — `CONFIRMED`/`SNAPSHOT_DIFF` (`stored − live`, content retained) + `SUSPECTED`/`ID_GAP` (`range − stored − live`, absent from both, no content).
 - **Decisive tests (unit, pure):** present-then-absent ⇒ CONFIRMED with original text + correct `was_signal_candidate`; id-gap absent from both ⇒ SUSPECTED (no content); contiguous / all-still-live ⇒ nothing.
 - **Acceptance:** delete a captured message, then `rescan` ⇒ CONFIRMED evidence retaining the original content; `deletions <ref>` prints it.
@@ -602,8 +598,8 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 **Resolved gaps (grill, 2026-06-05) — see [ADR 0008](../../adr/0008-deletion-evidence-durable-projection.md):**
 
 - **Diff model (Q1):** raw capture is insert-only, so detection is **stored set vs a fresh live re-fetch** (full history), never two stored backfills. `CONFIRMED = stored − live` (original text + `first_seen_at` retained from the stored row).
-- **SUSPECTED (Q2):** `range − stored − live` over `range = [min..max]` of `stored ∪ live` — a slot **absent from both** snapshots. The live set rescues still-present content/service ids, so the Slice-8 deletion rate is not flooded; contiguous/all-live ⇒ nothing.
-- **Seam (Q3):** new `async live_message_ids(channel_id) -> set[int]` on `TelegramSource` (amends §9); `TelethonSource` projects ids from `iter_messages` (manual acceptance); `FakeSource` returns a canned set (offline tests).
+- **SUSPECTED (Q2):** `range − stored − live` over `range = [min..max]` of `stored ∪ live` — a slot **absent from both** snapshots. The live set rescues still-present content/service ids, so the work item-8 deletion rate is not flooded; contiguous/all-live ⇒ nothing.
+- **Seam (Q3):** new `async live_message_ids(channel_id) -> set[int]` on `TelegramSource` (amends §9); `TelethonSource` projects ids from `iter_messages`; `FakeSource` returns a canned set (offline tests).
 - **What is evidence (Q4):** **store all** confirmed deletions (chatter incl., for audit); **score + display only** `was_signal_candidate` ones (chatter affects nothing — enforced at score/display, detector stays complete); `SUSPECTED` shown per channel.
 - **Idempotency (Q5):** durable projection (NOT recomputable — the live snapshot is ephemeral). One row per `(channel_id, message_id)` (`UNIQUE`); rescan `+0`; `SUSPECTED→CONFIRMED` upgrades only (guarded); first-noticed `detected_at` preserved.
 - **Surface (Q6):** gated `rescan <ref>` (re-fetch + detect + store; aborts on empty/failed re-fetch) + offline `deletions <ref>` (read stored: signal-confirmed with text + per-channel suspected count). Mirrors `backfill` vs `stats`/`lifecycle`.
@@ -620,9 +616,9 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 8: Hygiene scorecard + ProviderScore/Explanation
+## work item 8: Hygiene scorecard + ProviderScore/Explanation
 
-- **Input:** events, signals, drift, deletions, active-user proxy (sim components null/pending).
+- **Input:** events, signals, drift, deletions, active-user proxy, and optional simulation components.
 - **Output:** `ProviderScore` + `ProviderScoreExplanation`.
 - **Decisive tests (unit, pure):** each metric fn (frequency, completeness, parser-confidence, deletion rate, proxy); composite = Σ(normalized×weight); **every component has `evidence_refs`**; re-weighting changes the score deterministically; "0 simulable signals" noted.
 - **Acceptance:** scorecard renders per provider; 100% of components trace to stored evidence.
@@ -631,22 +627,22 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 - **Storage class:** in-memory recompute, NEVER stored (ADR 0007 fold precedent, not ADR 0006/0008) — no migration, no table, no `conftest` change. `computed_at` + `weights_version` reproduce a past score; `computed_at` injected for deterministic tests, model defaults `_now()`.
 - **Composite:** `score = Σ(normalized × weight)` plain sum (frozen §7 — no renormalization), over only evidence-backed components. `domain/score.py` holds `ScoreWeights(version, by_component)` + `DEFAULT_WEIGHTS` (v0); injected into the builder (re-weight = pass another `ScoreWeights`, deterministic).
-- **Components:** *scored* — `sim_expectancy` 0.30 + `drawdown` 0.20 (**pending Slice 9** — excluded + noted, `simulated_count=0`), `deletion_behaviour` 0.20, `completeness` 0.10, `parser_confidence` 0.10, `evidence_availability` 0.10; *context @ weight 0* — `signal_frequency`, `active_user_proxy`. Slice-8 active weights sum 0.50 → score honestly partial. No fabrication: pending-sim / empty-denominator (0/0) components are excluded + noted, never scored 0 or 0.5.
+- **Components:** *scored* — `sim_expectancy` 0.30 + `drawdown` 0.20 (excluded + noted when simulation evidence is absent), `deletion_behaviour` 0.20, `completeness` 0.10, `parser_confidence` 0.10, `evidence_availability` 0.10; *context @ weight 0* — `signal_frequency`, `active_user_proxy`. Without simulation evidence, active weights sum 0.50 → score honestly partial. No fabrication: absent-simulation / empty-denominator (0/0) components are excluded + noted, never scored 0 or 0.5.
 - **Per-component math:** deletion = 1−(CONFIRMED∧signal ÷ `RawSignalEvent` count); completeness = mean(present-{entry,stop,≥1 TP} ÷ 3, MARKET counts as entry); parser_confidence = DETERMINISTIC ÷ total candidates; evidence_availability = captured ÷ (captured + `ID_GAP`) — emitted only when a rescan provably ran (≥1 row `method ∈ {SNAPSHOT_DIFF, ID_GAP}`; `LIVE_EVENT` excluded), else excluded + noted (a never-rescanned channel never reads 1.0); frequency = candidates ÷ window-days; proxy raw=`subscriber_count`, normalized=mean(saturate{subs, median views, median forwards}) over available, name `active_user_proxy` (never a quality claim).
 - **evidence_refs:** typed-prefix grammar (`channel:` / `message:<ch>/<msg>` / `event:` / `signal:` / `unrecognized:` / `deletion:` / `parser_drift:` / `filter_drift:`), naming every row used to **measure** the value (numerator + denominator) so a measured 0.0 still traces; bulk message-corpus denominators anchor on `channel:<id>` (deterministic `count_messages`), not thousands of `message:` refs.
-- **Placement:** pure `services/scoring/hygiene.py` (un-weighted metric measurements: raw / normalized / evidence_refs / notes, or excluded+note) + `services/scoring/scorecard.py` (apply `ScoreWeights` → `ScoreComponent.contribution = normalized×weight`, sum `score`, stamp `computed_at`/`weights_version`, gather `notes` → build `ProviderScore` + `ProviderScoreExplanation`). Repo reads stay in the CLI, mirroring `_fold_channel`. Slice 9 adds `simulator.py` + `policies.py` alongside.
-- **Surface:** offline `verasig score <ref>` (read repos → pure builder → `format_score` + `format_explanation`); unknown channel exits 1. Mirrors `stats`/`lifecycle`/`deletions`. No persistence, no Streamlit scorecard this slice.
+- **Placement:** pure `services/scoring/hygiene.py` (un-weighted metric measurements: raw / normalized / evidence_refs / notes, or excluded+note) + `services/scoring/scorecard.py` (apply `ScoreWeights` → `ScoreComponent.contribution = normalized×weight`, sum `score`, stamp `computed_at`/`weights_version`, gather `notes` → build `ProviderScore` + `ProviderScoreExplanation`). Repo reads stay in the CLI, mirroring `_fold_channel`. work item 9 adds `simulator.py` + `policies.py` alongside.
+- **Surface:** offline `verasig score <ref>` (read repos → pure builder → `format_score` + `format_explanation`); unknown channel exits 1. Mirrors `stats`/`lifecycle`/`deletions`. No persistence and no Streamlit scorecard here.
 
 **Files (this pass):**
 - `domain/score.py` (`ScoreComponent`, `ProviderScore`, `ProviderScoreExplanation`, `ScoreWeights`, `DEFAULT_WEIGHTS`, `WEIGHTS_VERSION="v0"`, `_now`)
 - `services/scoring/__init__.py`, `services/scoring/hygiene.py` (pure per-component measurements), `services/scoring/scorecard.py` (weighted assembly → `ProviderScore` + `ProviderScoreExplanation`)
 - `cli.py` (+`score`, +`format_score`, +`format_explanation`, +`_score_channel`)
-- `tests/unit/test_hygiene.py` (each metric fn, table-driven; exclude+note paths), `tests/unit/test_scorecard.py` (composite = Σ(normalized×weight); re-weight changes score; pending-sim note; partial score), `tests/integration/test_score_traceability.py` (seed rows → score → 100% of `evidence_refs` resolve to stored rows incl. `channel:` aggregate), `tests/integration/test_cli_score.py` (CliRunner: scorecard + explanation print; unknown channel exits 1)
+- `tests/unit/test_hygiene.py` (each metric fn, table-driven; exclude+note paths), `tests/unit/test_scorecard.py` (composite = Σ(normalized×weight); re-weight changes score; absent-simulation note; partial score), `tests/integration/test_score_traceability.py` (seed rows → score → 100% of `evidence_refs` resolve to stored rows incl. `channel:` aggregate), `tests/integration/test_cli_score.py` (CliRunner: scorecard + explanation print; unknown channel exits 1)
 - No migration; no `tests/conftest.py` change.
 
 ---
 
-## Slice 9: Simulation (FINAL scoring slice)
+## work item 9: Simulation
 
 - **Input:** `FoldedSignal`s + Bybit klines + `ExecutionPolicy`.
 - **Output:** `SimOutcome` per signal (R-multiple/MTM, MFE/MAE) → fills sim components of `ProviderScore`.
@@ -660,7 +656,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 ---
 
-## Slice 10: Live listener daemon (FINAL slice overall)
+## work item 10: Live listener daemon
 
 - **Input:** running Telethon session + pilot `channel_ids`.
 - **Output:** continuous `RawTelegramMessage` capture via **hybrid push+poll** (passive `events.NewMessage` + bounded short-poll closing `pts` gaps, deduped on `(channel_id, message_id)`) + real-time `DeletedSignalEvidence` (LIVE_EVENT, precise timing). Capture is **queue-first**: persist the row immediately, parse/score async — never block the update loop.
@@ -670,22 +666,18 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
   - delete event ⇒ CONFIRMED evidence with timestamp.
   - **latency:** with a fake clock, median `captured_at − posted_at` ≤ the configured poll interval.
 - **Acceptance:** run `app live <channels>`, post + delete a test message ⇒ captured (within the poll interval) then CONFIRMED-deleted with timestamps.
-- **Manual acceptance notes:** use a throwaway account/session and migrated DB; run `uv run verasig live <channel>`; post a unique text message; verify `verasig stats <channel>` count increments within the poll interval; delete it; verify a `deleted_signal_evidence` row with `method=LIVE_EVENT`, `confidence=CONFIRMED`, `original_text`, `first_seen_at`, and `detected_at`. If verifying through `verasig deletions`, materialize the message as a `RawSignalEvent` before deletion so the reader does not hide chatter.
+- **Live verification notes:** use a dedicated account/session and migrated DB; run `uv run verasig live <channel>`; post a unique text message; verify `verasig stats <channel>` count increments within the poll interval; delete it; verify a `deleted_signal_evidence` row with `method=LIVE_EVENT`, `confidence=CONFIRMED`, `original_text`, `first_seen_at`, and `detected_at`. If verifying through `verasig deletions`, materialize the message as a `RawSignalEvent` before deletion so the reader does not hide chatter.
 
 ---
 
-## Start verdict
+## Execution Order
 
-**Start now — partially.** The plan and contracts are clear and frozen. Two preconditions and one gate:
-
-1. **Precondition — git (CLAUDE.md mandates it):** `git init`, create `main` (+ `develop`), commit the docs, then branch `feature/stage-0-foundation`. The repo currently has no VCS.
-2. **Start immediately (no external/legal exposure):** Slices **0, 4, 6, 7, 8, 9** — plus the **seed filter + rule-application** of Slice 3 — are pure-logic / fixture-driven — build them TDD against committed fixtures with **zero** Telegram, LLM, or network calls. This is the bulk of the engine and proves the thesis on recorded data.
-3. **Reality slices — operator has given go-ahead (accepted risk).** Slices **1, 2, 5, 10** — plus **Slice 3's distillation sub-step** (external LLM over operator-selected examples only) — touch a real Telegram account and/or a real LLM. The operator **accepted the legal risk for Stage 0** on a **dedicated throwaway Telegram account** (Telegram content-licensing + AI-scraping terms remain unresolved; revisit before paid launch). Per ADR 0005, bulk channel text is never sent to the external LLM. Constraints: resumable + chunked (spec §4.1) — **no rescrape on restart**, process in batches, never load full history into RAM.
-
-> Recommended first move: git init → Slice 0 → Slice 3's seed filter + Slices 4/6/7 against fixtures, then bring real Telegram online (Slices 1→2) and run Slice 3's distillation on the throwaway account.
+1. Build pure, fixture-driven logic first: foundation, seed filtering, deterministic extraction, lifecycle folding, deletion evidence, scoring, and simulation.
+2. Enable real Telegram and real LLM paths only with configured credentials/session; automated tests stay offline.
+3. Process Telegram in bounded batches with resumable cursors; never load full history into RAM.
 
 ## Self-review notes
 
-- **Spec coverage:** every entity in `data-contracts.md` maps to a slice (channel/message→2; event + FilterRule/ParserRule + GoldenLabel + FilterDriftWarning→3; signal/unrecognized→4; parser-drift→5; folded→6; deletion→7; score/explanation→8; sim→9; live→10). ✓
-- **Type consistency:** `ExtractedSignal` fields, `Side`/`EntryType`/`MatchReason`/`MaterializationPath` enums, `ExtractOutcome`, `FilterRule`/`ParserRule`, and Protocol names match across slices and `data-contracts.md`. ✓
-- **No placeholders:** Slices 0 and 4 carry full code; later slices carry frozen contracts + decisive tests, expanded JIT at execution per the chosen execution skill. ✓
+- **Spec coverage:** every entity in `data-contracts.md` maps to a work item (channel/message→2; event + FilterRule/ParserRule + GoldenLabel + FilterDriftWarning→3; signal/unrecognized→4; parser-drift→5; folded→6; deletion→7; score/explanation→8; sim→9; live→10). ✓
+- **Type consistency:** `ExtractedSignal` fields, `Side`/`EntryType`/`MatchReason`/`MaterializationPath` enums, `ExtractOutcome`, `FilterRule`/`ParserRule`, and Protocol names match across work items and `data-contracts.md`. ✓
+- **No placeholders:** work items 0 and 4 carry full code; remaining work items carry frozen contracts + decisive tests, expanded JIT at execution per the chosen execution skill. ✓

@@ -103,7 +103,7 @@ def measure_sim_expectancy(outcomes: list[SimOutcome]) -> Measurement:
     if not measured:
         return ExcludedMeasurement(
             name="sim_expectancy",
-            note="sim_expectancy: pending Slice 9 simulation",
+            note="sim_expectancy: simulation not supplied",
         )
     raw_value = _mean([outcome.r_multiple for outcome in measured])
     return HygieneMeasurement(
@@ -119,7 +119,7 @@ def measure_drawdown(outcomes: list[SimOutcome]) -> Measurement:
     if not measured:
         return ExcludedMeasurement(
             name="drawdown",
-            note="drawdown: pending Slice 9 simulation",
+            note="drawdown: simulation not supplied",
         )
     raw_value = max(outcome.mae for outcome in measured)
     return HygieneMeasurement(

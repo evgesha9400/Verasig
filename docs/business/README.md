@@ -38,7 +38,7 @@
 - [business-decomposition.md](business-decomposition.md) - separate products and sequencing.
 - [value-proposition.md](value-proposition.md) - core buyer, pain, promise, and pricing hypotheses.
 - [requirements.md](requirements.md) - user stories and open questions.
-- [core-features.md](core-features.md) - MVP scope and deferred scope.
-- [validation-stages.md](validation-stages.md) - MVP to scale evaluation path.
+- [core-features.md](core-features.md) - MVP scope and out-of-scope work.
+- [validation-roadmap.md](validation-roadmap.md) - MVP to scale evaluation path.
 - [architecture-decisions.md](architecture-decisions.md) - business-facing architecture decisions.
 - [project-structure.md](project-structure.md) - folder and document protocol.

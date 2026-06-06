@@ -30,8 +30,8 @@ from verasig.services.scoring.hygiene import (
 )
 
 _SIM_NOTES_BY_COMPONENT = {
-    "sim_expectancy": "sim_expectancy: pending Slice 9 simulation",
-    "drawdown": "drawdown: pending Slice 9 simulation",
+    "sim_expectancy": "sim_expectancy: simulation not supplied",
+    "drawdown": "drawdown: simulation not supplied",
 }
 
 
@@ -156,7 +156,7 @@ def build_provider_score(
     sim_outcomes: list[SimOutcome] | None = None,
     weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> tuple[ProviderScore, ProviderScoreExplanation]:
-    """Build the Slice-8 scorecard from durable channel inputs."""
+    """Build a scorecard from durable channel inputs."""
     outcomes = [] if sim_outcomes is None else sim_outcomes
     return build_scorecard(
         channel_id=channel.channel_id,

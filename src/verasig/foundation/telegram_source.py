@@ -1,9 +1,7 @@
 """Telegram ingestion seam (data-contracts.md §9; ADR 0004).
 
 `TelegramSource` is the Protocol every consumer codes against; tests inject a
-fake. `TelethonSource` is the real adapter — its `resolve_channel`/
-`backfill_batches` are exercised by manual acceptance against a real account
-(never in tests); `live_events` is exercised by manual Slice 10 acceptance.
+fake. `TelethonSource` is the real Telegram adapter behind the same seam.
 """
 
 import asyncio
@@ -63,7 +61,7 @@ class TelegramSource(Protocol):
         self, channel_id: int, after_message_id: int | None, batch_size: int
     ) -> AsyncIterator[list[RawTelegramMessage]]: ...
 
-    # deletion rescan: the channel's CURRENT live message-id set (Slice 7, ADR 0008).
+    # deletion rescan: the channel's CURRENT live message-id set (ADR 0008).
     async def live_message_ids(self, channel_id: int) -> set[int]: ...
 
     # live: one global socket, many channels; hybrid push + short-poll inside.
@@ -78,7 +76,7 @@ def _json_safe(payload: dict) -> dict:
 
 
 class TelethonSource:
-    """Real Telegram adapter over one Telethon client (manual acceptance)."""
+    """Telegram adapter over one Telethon client."""
 
     def __init__(
         self, client: TelegramClient, poll_interval_seconds: float = 4.0
@@ -133,7 +131,7 @@ class TelethonSource:
         )
 
     async def live_message_ids(self, channel_id: int) -> set[int]:
-        # full live id set for snapshot-diff (manual acceptance, never in tests)
+        # full live id set for snapshot-diff
         return {message.id async for message in self._client.iter_messages(channel_id)}
 
     async def live_events(

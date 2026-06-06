@@ -2,8 +2,8 @@
 
 The StringSession is persisted as a bare UTF-8 string at `settings.session_path`
 (the writable `/session` volume). Load/persist/guard logic is pure and unit-tested;
-the interactive `login` and live `whoami` calls are exercised manually — no test
-ever authenticates against real Telegram.
+the interactive `login` and live `whoami` calls are verified outside automated
+tests. No test authenticates against real Telegram.
 """
 
 from pathlib import Path
@@ -54,7 +54,7 @@ def make_client(settings: Settings) -> TelegramClient:
 
 
 async def run_login(settings: Settings) -> str:
-    """Interactive one-time auth; returns the session string (run manually).
+    """Interactive one-time auth; returns the session string.
 
     The credential guard fires before any Telegram contact. Telethon prompts
     for the login code and the 2FA password; the phone comes from config or,
@@ -70,7 +70,7 @@ async def run_login(settings: Settings) -> str:
 
 
 async def fetch_account(client: TelegramClient):
-    """Connect, read the logged-in account, disconnect (run manually)."""
+    """Connect, read the logged-in account, disconnect."""
     async with client:
         return await client.get_me()
 

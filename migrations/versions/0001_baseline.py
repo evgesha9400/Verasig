@@ -1,7 +1,5 @@
 """Empty baseline: establishes the Alembic revision chain.
 
-Real tables arrive in Slice 2 (TelegramChannel, RawTelegramMessage).
-
 Revision ID: 0001_baseline
 Revises:
 """

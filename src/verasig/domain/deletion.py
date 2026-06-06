@@ -4,8 +4,8 @@
 observed against an ephemeral live re-fetch that nothing retains, so the
 observation itself is the only honest record. Coupling: `SNAPSHOT_DIFF→CONFIRMED`
 (content retained), `ID_GAP→SUSPECTED` (no content), `LIVE_EVENT→CONFIRMED`
-(Slice 10). `detected_at` defaults to `_now()` but the detector injects it for
-deterministic tests.
+for realtime delete notices. `detected_at` defaults to `_now()` but the detector
+injects it for deterministic tests.
 """
 
 from datetime import datetime, timezone

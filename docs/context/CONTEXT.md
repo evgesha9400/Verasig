@@ -19,7 +19,7 @@ A `RawTelegramMessage` the candidate filter flagged as a signal candidate, plus 
 _Avoid_: signal, raw message. Note: this **supersedes** the old definition where `RawSignalEvent` meant "original source content" — that role now belongs to `RawTelegramMessage`.
 
 **Candidate filter**:
-The recall-first, **advisory** stage that flags a `RawTelegramMessage` as a `RawSignalEvent`. Over-includes on purpose; precision is recovered downstream. It runs a cheap hand-coded **seed heuristic** for cold start, then provider-specific `FilterRule`s distilled from the golden corpus. Not a hard gate ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
+The recall-first, **advisory** step that flags a `RawTelegramMessage` as a `RawSignalEvent`. Over-includes on purpose; precision is recovered downstream. It runs a cheap hand-coded **seed heuristic** for cold start, then provider-specific `FilterRule`s distilled from the golden corpus. Not a hard gate ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
 
 ### Extraction
 
@@ -97,7 +97,7 @@ The breakdown tracing every `ProviderScore` component, weight, and input back to
 _Avoid_: report, summary.
 
 **Active-user proxy**:
-The best available stand-in for provider audience size, since Telegram exposes no true active-user count: subscriber count, median post views, and forwards (**reactions are not captured at Stage 0**). Always labelled a proxy, never a quality claim.
+The best available stand-in for provider audience size, since Telegram exposes no true active-user count: subscriber count, median post views, and forwards (**reactions are not captured**). Always labelled a proxy, never a quality claim.
 _Avoid_: active users, audience (unqualified).
 
 ### Simulation
@@ -117,8 +117,8 @@ Maximum favorable / adverse excursion over a signal's simulated life. MAE drives
 ## Flagged ambiguities
 
 - **Signal**: ambiguous in older docs (raw vs parsed). Resolved: the canonical parsed object is `ExtractedSignal`; raw capture is `RawTelegramMessage`. The bare word "Signal" is retired.
-- **`signals` vs `failure_signal`**: `signals` always means trade signals; `failure_signal` (operational failure indication) is out of Verasig's Stage 0 scope entirely.
-- **"Demo outcome" (value-proposition.md)**: there is no demo execution at Stage 0. "Outcome" means `Simulated outcome` from historical klines.
+- **`signals` vs `failure_signal`**: `signals` always means trade signals; `failure_signal` (operational failure indication) is out of Verasig's scope.
+- **"Demo outcome" (value-proposition.md)**: there is no demo execution. "Outcome" means `Simulated outcome` from historical klines.
 - **"Local-only"**: means everything runs in Docker via `docker compose` on any machine with Docker — not "no servers." A Postgres container is in scope.
 
 ## Example dialogue

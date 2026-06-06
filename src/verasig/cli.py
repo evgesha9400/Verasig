@@ -50,12 +50,12 @@ from verasig.services.scoring.scorecard import build_provider_score
 from verasig.services.scoring.simulator import simulate_outcomes_from_market_data
 from verasig.storage import repositories as repo
 
-app = typer.Typer(help="Verasig — local observer CLI.")
+app = typer.Typer(help="Verasig CLI.")
 
 
 @app.callback()
 def main() -> None:
-    """Verasig — local observer CLI (one subcommand per pipeline stage)."""
+    """Verasig CLI."""
 
 
 def _fail(error: Exception) -> typer.Exit:
@@ -554,7 +554,7 @@ def sweep(reference: str) -> None:
 
 @app.command()
 def workbench(reference: str) -> None:
-    """Launch the Streamlit distillation workbench (real-LLM Distil gated)."""
+    """Launch the Streamlit distillation workbench."""
     session_factory = make_session_factory(Settings().database_url)
     channel_id = _resolve_channel_id(session_factory, reference)
     _launch_workbench(channel_id)

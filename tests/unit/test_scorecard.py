@@ -168,8 +168,8 @@ def test_scorecard_applies_weights_without_renormalizing():
     assert explanation.channel_id == score.channel_id
     assert explanation.score == score.score
     assert explanation.breakdown == score.components
-    assert "sim_expectancy: pending Slice 9 simulation" in explanation.notes
-    assert "drawdown: pending Slice 9 simulation" in explanation.notes
+    assert "sim_expectancy: simulation not supplied" in explanation.notes
+    assert "drawdown: simulation not supplied" in explanation.notes
 
 
 def test_scorecard_excludes_empty_denominator_measurements_with_note():
@@ -225,7 +225,7 @@ def test_scorecard_reweights_measurements_deterministically():
     assert custom_score.weights_version == "test"
 
 
-def test_provider_score_builder_measures_all_present_slice8_components():
+def test_provider_score_builder_measures_all_present_components():
     event = _event(1, 10)
     score, explanation = build_provider_score(
         channel=_channel(),
@@ -277,5 +277,5 @@ def test_provider_score_builder_adds_simulation_components_when_outcomes_exist()
     assert score.components[1].normalized == 0.75
     assert score.components[1].contribution == pytest.approx(0.15)
     assert score.score == pytest.approx(0.95)
-    assert "sim_expectancy: pending Slice 9 simulation" not in explanation.notes
-    assert "drawdown: pending Slice 9 simulation" not in explanation.notes
+    assert "sim_expectancy: simulation not supplied" not in explanation.notes
+    assert "drawdown: simulation not supplied" not in explanation.notes

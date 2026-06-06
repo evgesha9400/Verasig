@@ -1,6 +1,6 @@
-# Stage 0 — Local Observer: Design Spec
+# Observer Design Spec
 
-**Status:** draft, pending sign-off · **Date:** 2026-06-02 · **Supersedes:** nothing (first work doc)
+**Date:** 2026-06-02
 
 ## 1. Purpose
 
@@ -9,7 +9,7 @@
 - **Local-only** = the whole stack runs via `docker compose` on any machine with Docker.
 - Disposable: easy to delete (`docker compose down -v`) or change.
 
-## 2. Stage 0 pass gate (from validation-stages.md)
+## 2. Success Criterion (from validation-roadmap.md)
 
 > The operator can classify a signal source as **good / bad / untradeable** purely from stored evidence.
 
@@ -21,7 +21,7 @@
 
 ### In
 - Telegram **user-account** session ingestion (Telethon).
-- Public + private channel **history backfill** (first) and a **live listener** (last slice).
+- Public + private channel **history backfill** and **live listener**.
 - Append-only `RawTelegramMessage` capture.
 - Candidate filter (**advisory**, seed + distilled) → `RawSignalEvent` ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)).
 - Human-assisted **distillation loop** → `FilterRule` + `ParserRule`s + golden corpus (Streamlit).
@@ -38,7 +38,7 @@
 - Cloud deployment · billing · multi-user tenancy · public launch.
 - Discord · image/multimodal extraction · marketplace · portfolio management.
 - Autonomous auto-research / autonomous parser-rule mining.
-- Final/optimal score formula (explicit open research question — deferred).
+- Final/optimal score formula (explicit open research question — outside current scope).
 
 ## 4. Architecture (2-layer, per CLAUDE.md)
 
@@ -54,7 +54,7 @@
 ```
 
 - **Foundation** = storage + comms config: Postgres, Telethon session, Bybit market-data client.
-- **Service** = one uv-built Python image; each pipeline stage is a CLI subcommand; UI stages launch Streamlit. The live daemon is the same image run long-lived.
+- **Service** = one uv-built Python image; each pipeline step is a CLI subcommand; UI commands launch Streamlit. The live daemon is the same image run long-lived.
 - **Dependency rule:** `domain/` (pure contracts) ← `services/` (logic) ← `storage/`+`foundation/` (IO). UI and CLI are thin adapters over services. Logic never imports IO frameworks directly.
 
 ### Data flow
@@ -80,7 +80,7 @@ Telegram ──backfill──▶ RawTelegramMessage ──candidate filter──
 
 - **Resumable, no needless refetch.** Backfill persists a per-channel cursor (`TelegramChannel.captured_through_message_id`). On restart it resumes from the cursor; already-captured messages are **never refetched**. A separate explicit `rescan` (for deletion-diffing) is the only path that re-reads old ranges.
 - **Idempotent.** All writes keyed on `(channel_id, message_id)` (raw) / deterministic ids; a crash mid-batch then restart produces zero duplicates.
-- **Chunked / streaming — never load everything into RAM.** Every stage iterates in bounded batches and dumps to Postgres per batch: backfill paginates Telegram and commits every N messages; extraction/lifecycle/scoring stream rows via server-side cursors / `yield_per`; klines are fetched per-signal-window, not bulk-cached. Peak memory stays ~flat regardless of channel size.
+- **Chunked / streaming — never load everything into RAM.** Every processing path iterates in bounded batches and dumps to Postgres per batch: backfill paginates Telegram and commits every N messages; extraction/lifecycle/scoring stream rows via server-side cursors / `yield_per`; klines are fetched per-signal-window, not bulk-cached. Peak memory stays ~flat regardless of channel size.
 - **Checkpoint granularity.** Commit per batch (not per run) so a kill at message 9,000 of 10,000 loses at most one batch and resumes cleanly.
 - **Backpressure.** Respect Telegram flood-wait; exponential backoff on rate limits; resume after backoff.
 
@@ -147,7 +147,7 @@ verasig/
 - `.env` + `secrets/` are **gitignored**; compose mounts `secrets/` read-only, injects env from `.env`.
 - Telethon **first login is interactive** → dedicated `login` subcommand run once via `docker compose run --rm -it app login`; persists a `StringSession` into the mounted volume.
 - All other commands load the session **non-interactively**; missing/invalid → fail fast ("run `login` first").
-- The `.session` is **password-equivalent** (full account access); a **throwaway Telegram account** is advised given ban risk.
+- The `.session` is **password-equivalent** (full account access); a **dedicated Telegram account** is advised given ban risk.
 
 ## 8. Scoring model (v0)
 
@@ -167,7 +167,7 @@ verasig/
 - Every component value + weight + input is written to `ProviderScoreExplanation` → 100% of score changes trace to evidence.
 - Re-weighting is a config change; the score recomputes deterministically.
 
-## 9. Stage 0 acceptance criteria
+## 9. Acceptance Criteria
 
 - [ ] Fresh clone → `cp .env.example .env` → `docker compose up` brings up `db` + app on **any** Docker host.
 - [ ] `docker compose run --rm -it app login` completes interactive auth; session persists across restarts.
@@ -187,15 +187,15 @@ verasig/
 
 ## 10. Risks & open items (carry forward)
 
-| Risk | Stance for Stage 0 |
+| Risk | Stance |
 |---|---|
-| Telegram content-licensing / AI-scraping terms (history + LLM over content) | **Unresolved — operator accepted the risk for Stage 0** on a dedicated throwaway account. Practice/test on real signal chats; revisit before any paid launch. Mitigated by [ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md): only operator-selected examples reach the external LLM (rule distillation); bulk channel text is scanned only by local deterministic rules. |
-| Telegram API rate/behaviour limits on user sessions | Resumable cursor + chunked pagination + flood-wait backoff; **no needless rescrape**; throwaway account. |
+| Telegram content-licensing / AI-scraping terms (history + LLM over content) | **Unresolved.** Use a dedicated Telegram account. Practice/test on real signal chats; revisit before any paid launch. Mitigated by [ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md): only operator-selected examples reach the external LLM (rule distillation); bulk channel text is scanned only by local deterministic rules. |
+| Telegram API rate/behaviour limits on user sessions | Resumable cursor + chunked pagination + flood-wait backoff; **no needless rescrape**; dedicated account. |
 | Telegram channel-push latency on user accounts (~30s batching) | Hybrid push + bounded short-poll closes `pts` gaps inside the adapter; latency is measured (`posted_at → captured_at`) and gated; TDLib/Pytdbot is the documented escape hatch. See [ADR 0004](../../adr/0004-hybrid-push-poll-live-ingestion.md). |
-| User-account ban / ToS | Accepted, documented; **throwaway account required**. |
+| User-account ban / ToS | Accepted, documented; **dedicated account required**. |
 | Provider scoring → regulatory risk before paid launch | Out of scope (no paid launch); conservative, evidence-only copy. |
-| Optimal score formula | Deferred; re-weightable design is the hedge. |
+| Optimal score formula | Open research question; re-weightable design is the hedge. |
 
-## 11. Start verdict
+## 11. Rollout
 
-See `implementation-plan.md` §"Start verdict". Short version: **start now on foundation + all pure-logic, fixture-driven slices (TDD)**; gate the real-Telegram-capture and real-LLM-over-real-content slices behind git setup + explicit operator go-ahead on the documented legal risk.
+Build pure, fixture-driven logic first. Enable real Telegram capture and real-LLM paths only with configured credentials, a migrated database, and the risk controls above.

@@ -12,7 +12,7 @@
 - The first symbol scope is every Bybit-supported trading pair for scoring.
 - The first global market stance is tooling-only.
 - The tooling-only stance requires jurisdiction research before paid launch.
-- Demo and live execution are deferred until observe-only scoring proves value.
+- Demo and live execution stay outside scope until observe-only scoring proves value.
 - Future execution promotion and demotion must be programmatic.
 - Signed-up users should get a provider performance dashboard.
 
@@ -37,7 +37,7 @@
 - As a trader, I want any Bybit-supported pair recognized so provider scoring is not limited to BTC or ETH.
 - As a signal seller, I want an evidence-backed performance page so subscribers can inspect results.
 - As an operator, I want raw and canonical signal storage so future research can reuse the dataset.
-- As an operator, I want a human-assisted distillation loop to mine historical messages so I can confirm provider-specific signal formats. [Stage 0: see docs/adr/0002]
+- As an operator, I want a human-assisted distillation loop to mine historical messages so I can confirm provider-specific signal formats. [see docs/adr/0002]
 - As an operator, I want the distillation loop to turn my labeled examples into deterministic parser rules.
 - As an operator, I want deterministic parser rules used before LLM extraction so normal processing is cheap and reproducible and fast.
 - As an operator, I want parser drift warnings so agentic parser updates can be queued.
@@ -59,10 +59,10 @@
 - First buyer: trader paying for proof.
 - Geography: global crypto users.
 - Compliance stance: tooling-only until research disproves it.
-- Execution lifecycle: deferred until observe-only scoring proves value.
-- Promotion control: deferred.
-- Promotion UI: deferred.
-- Promotion agents: deferred.
+- Execution lifecycle: outside scope until observe-only scoring proves value.
+- Promotion control: outside scope.
+- Promotion UI: outside scope.
+- Promotion agents: outside scope.
 - Signed-up user dashboard: included.
 
 ## Open Research Questions

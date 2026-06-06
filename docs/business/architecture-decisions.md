@@ -4,7 +4,7 @@
 
 - Decision: build `Verasig` first.
 - Reason: the full platform is too broad to validate.
-- Consequence: every other wedge is deferred or internal.
+- Consequence: every other wedge is internal until observe-only scoring proves value.
 
 ## ADR-BIZ-002 - Signal Is A First-Class Dataset
 
@@ -12,7 +12,7 @@
 - Reason: performance truth depends on reconstructable evidence.
 - Consequence: auto-research can later use Signals like market data.
 
-## ADR-BIZ-003 - Execution Is Deferred At MVP
+## ADR-BIZ-003 - Execution Stays Outside The MVP
 
 - Decision: first validation uses observe-only provider scoring.
 - Reason: business value is proof before any execution.
@@ -38,7 +38,7 @@
 
 ## ADR-BIZ-007 - PortfolioOps Requires Multiple Proven Strategies
 
-- Decision: portfolio allocation is deferred.
+- Decision: portfolio allocation stays outside the MVP.
 - Reason: allocation has no value until multiple strategies have real performance history.
 - Consequence: portfolio agent starts as analysis-only.
 

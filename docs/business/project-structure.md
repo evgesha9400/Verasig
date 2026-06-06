@@ -10,7 +10,7 @@ docs/business/
 |-- value-proposition.md
 |-- requirements.md
 |-- core-features.md
-|-- validation-stages.md
+|-- validation-roadmap.md
 |-- architecture-decisions.md
 `-- project-structure.md
 ```
@@ -23,7 +23,7 @@ Verasig/
 |   |-- business/                 # product thesis and validation records
 |   |-- context/                  # domain glossary
 |   |-- adr/                      # architecture decisions
-|   `-- work/                     # implementation plans and slices
+|   `-- work/                     # implementation plans
 |-- backend/
 |   |-- app/foundation/           # config, database, auth, Telegram session, Bybit metadata
 |   `-- app/services/             # ingestion, extraction, scoring, promotion, dashboard APIs
