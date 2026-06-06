@@ -5,6 +5,8 @@ dedupes push, poll, catch-up, and any rows captured by earlier backfill.
 """
 
 from dataclasses import dataclass, field
+from datetime import timedelta
+from statistics import median
 
 from sqlalchemy.orm import sessionmaker
 
@@ -29,6 +31,7 @@ class LiveIngestionResult:
     inserted: int
     duplicates: int
     deleted: int
+    median_latency: timedelta | None
     captured_by_mode: dict[DeliveryMode, int]
 
 
@@ -37,6 +40,7 @@ class _LiveIngestionTally:
     inserted: int = 0
     duplicates: int = 0
     deleted: int = 0
+    latencies: list[timedelta] = field(default_factory=list)
     captured_by_mode: dict[DeliveryMode, int] = field(default_factory=dict)
 
 
@@ -53,6 +57,7 @@ async def ingest_live(
         inserted=tally.inserted,
         duplicates=tally.duplicates,
         deleted=tally.deleted,
+        median_latency=_median_latency(tally.latencies),
         captured_by_mode=tally.captured_by_mode,
     )
 
@@ -64,7 +69,7 @@ def _persist_event(
 ) -> None:
     if isinstance(event, TelegramDeliveryEvent):
         inserted = _persist_delivery(session_factory, event)
-        _record_delivery(tally, event.mode, inserted)
+        _record_delivery(tally, event, inserted)
         return
     written = _persist_deletion(session_factory, event)
     tally.deleted += written
@@ -80,13 +85,22 @@ def _persist_delivery(
 
 
 def _record_delivery(
-    tally: _LiveIngestionTally, mode: DeliveryMode, inserted: bool
+    tally: _LiveIngestionTally, event: TelegramDeliveryEvent, inserted: bool
 ) -> None:
     if not inserted:
         tally.duplicates += 1
         return
     tally.inserted += 1
+    tally.latencies.append(event.captured_at - event.message.posted_at)
+    mode = event.mode
     tally.captured_by_mode[mode] = tally.captured_by_mode.get(mode, 0) + 1
+
+
+def _median_latency(latencies: list[timedelta]) -> timedelta | None:
+    if not latencies:
+        return None
+    seconds = median(latency.total_seconds() for latency in latencies)
+    return timedelta(seconds=seconds)
 
 
 def _persist_deletion(

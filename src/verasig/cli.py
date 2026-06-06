@@ -43,6 +43,8 @@ from verasig.services.ingestion.candidate_derivation import (
     derive_candidates,
     sweep_advisory,
 )
+from verasig.services.ingestion.live import LiveIngestionResult
+from verasig.services.ingestion.live import ingest_live as run_live
 from verasig.services.lifecycle.fold import fold
 from verasig.services.scoring.scorecard import build_provider_score
 from verasig.services.scoring.simulator import simulate_outcomes_from_market_data
@@ -126,6 +128,54 @@ async def _connected_backfill(client, reference, session_factory, settings):
         return await run_backfill(
             source, reference, session_factory, settings.backfill_batch_size
         )
+
+
+def _make_live_source(client) -> TelethonSource:
+    return TelethonSource(client)
+
+
+@app.command()
+def live(channels: list[str]) -> None:
+    """Run queue-first live capture for one or more Telegram channels."""
+    settings = Settings()
+    try:
+        client = make_client(settings)
+    except (CredentialsMissingError, SessionMissingError) as error:
+        raise _fail(error) from error
+    session_factory = make_session_factory(settings.database_url)
+    result = asyncio.run(_connected_live(client, channels, session_factory))
+    typer.echo(format_live_result(result))
+
+
+async def _connected_live(client, references: list[str], session_factory):
+    async with client:
+        source = _make_live_source(client)
+        channel_ids = await _register_live_channels(source, references, session_factory)
+        return await run_live(source, channel_ids, session_factory)
+
+
+async def _register_live_channels(source, references: list[str], session_factory):
+    channels = [await source.resolve_channel(reference) for reference in references]
+    with session_factory() as session:
+        for channel in channels:
+            repo.upsert_channel(session, channel)
+        session.commit()
+    return [channel.channel_id for channel in channels]
+
+
+def _format_latency(result: LiveIngestionResult) -> str:
+    if result.median_latency is None:
+        return "n/a"
+    return f"{result.median_latency.total_seconds():.1f}s"
+
+
+def format_live_result(result: LiveIngestionResult) -> str:
+    channel_ids = ",".join(str(channel_id) for channel_id in result.channel_ids)
+    return (
+        f"live: channels={channel_ids} · +{result.inserted} captured "
+        f"· duplicates={result.duplicates} · deleted={result.deleted} "
+        f"· median_latency={_format_latency(result)}"
+    )
 
 
 @app.command()

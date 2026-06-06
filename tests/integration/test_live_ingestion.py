@@ -162,3 +162,19 @@ async def test_live_ingestion_persists_confirmed_delete_event_with_stored_text(
     assert evidence[0].first_seen_at == captured_at
     assert evidence[0].detected_at == detected_at
     assert evidence[0].was_signal_candidate is True
+
+
+async def test_live_ingestion_reports_median_capture_latency(session_factory):
+    _seed_channel(session_factory)
+    source = FakeLiveSource(
+        [
+            _delivery(10, DeliveryMode.POLL, _POSTED + timedelta(seconds=2)),
+            _delivery(11, DeliveryMode.POLL, _POSTED + timedelta(seconds=4)),
+            _delivery(12, DeliveryMode.POLL, _POSTED + timedelta(seconds=6)),
+        ]
+    )
+
+    result = await ingest_live(source, [_CHANNEL_ID], session_factory)
+
+    assert result.median_latency == timedelta(seconds=4)
+    assert result.median_latency <= timedelta(seconds=4)
