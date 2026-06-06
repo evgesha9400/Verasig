@@ -1,1 +1,1 @@
-"""Ingestion services: history backfill (Slice 2) and the live listener (Slice 11)."""
+"""Ingestion services: history backfill (Slice 2) and live listener (Slice 10)."""
