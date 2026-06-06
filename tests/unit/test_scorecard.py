@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from verasig.domain.score import DEFAULT_WEIGHTS, WEIGHTS_VERSION, ScoreWeights
-from verasig.services.scoring.hygiene import HygieneMeasurement
+from verasig.services.scoring.hygiene import ExcludedMeasurement, HygieneMeasurement
 from verasig.services.scoring.scorecard import build_scorecard
 
 
@@ -79,3 +79,22 @@ def test_scorecard_applies_weights_without_renormalizing():
     assert explanation.breakdown == score.components
     assert "sim_expectancy: pending Slice 9 simulation" in explanation.notes
     assert "drawdown: pending Slice 9 simulation" in explanation.notes
+
+
+def test_scorecard_excludes_empty_denominator_measurements_with_note():
+    score, explanation = build_scorecard(
+        channel_id=7,
+        signal_count=0,
+        computed_at=_computed_at(),
+        measurements=[
+            ExcludedMeasurement(
+                name="completeness",
+                note="completeness: not measured — no extracted signals",
+            )
+        ],
+    )
+
+    assert score.components == []
+    assert score.score == 0
+    assert explanation.breakdown == []
+    assert "completeness: not measured — no extracted signals" in explanation.notes

@@ -9,7 +9,11 @@ from verasig.domain.score import (
     ScoreComponent,
     ScoreWeights,
 )
-from verasig.services.scoring.hygiene import HygieneMeasurement
+from verasig.services.scoring.hygiene import (
+    ExcludedMeasurement,
+    HygieneMeasurement,
+    Measurement,
+)
 
 _PENDING_SIM_NOTES = [
     "sim_expectancy: pending Slice 9 simulation",
@@ -36,19 +40,29 @@ def _score_component(
 
 
 def _score_components(
-    measurements: list[HygieneMeasurement], weights: ScoreWeights
+    measurements: list[Measurement], weights: ScoreWeights
 ) -> list[ScoreComponent]:
-    return [_score_component(measurement, weights) for measurement in measurements]
+    return [
+        _score_component(measurement, weights)
+        for measurement in measurements
+        if isinstance(measurement, HygieneMeasurement)
+    ]
 
 
 def _score_value(components: list[ScoreComponent]) -> float:
     return sum(component.contribution for component in components)
 
 
-def _notes(measurements: list[HygieneMeasurement]) -> list[str]:
+def _measurement_notes(measurement: Measurement) -> list[str]:
+    if isinstance(measurement, ExcludedMeasurement):
+        return [measurement.note]
+    return measurement.notes
+
+
+def _notes(measurements: list[Measurement]) -> list[str]:
     notes = list(_PENDING_SIM_NOTES)
     for measurement in measurements:
-        notes.extend(measurement.notes)
+        notes.extend(_measurement_notes(measurement))
     return notes
 
 
@@ -56,7 +70,7 @@ def build_scorecard(
     channel_id: int,
     signal_count: int,
     computed_at: datetime,
-    measurements: list[HygieneMeasurement],
+    measurements: list[Measurement],
     weights: ScoreWeights = DEFAULT_WEIGHTS,
 ) -> tuple[ProviderScore, ProviderScoreExplanation]:
     """Build ProviderScore + ProviderScoreExplanation from un-weighted metrics."""
