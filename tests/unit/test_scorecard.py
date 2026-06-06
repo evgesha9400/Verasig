@@ -1,8 +1,18 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
+from verasig.domain.channel import TelegramChannel
+from verasig.domain.deletion import (
+    DeletedSignalEvidence,
+    DeletionConfidence,
+    DeletionMethod,
+)
+from verasig.domain.event import MaterializationPath, RawSignalEvent
+from verasig.domain.message import RawTelegramMessage
 from verasig.domain.score import DEFAULT_WEIGHTS, WEIGHTS_VERSION, ScoreWeights
+from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.services.scoring.hygiene import ExcludedMeasurement, HygieneMeasurement
-from verasig.services.scoring.scorecard import build_scorecard
+from verasig.services.scoring.scorecard import build_provider_score, build_scorecard
 
 
 def test_default_weights_match_frozen_v0_contract():
@@ -24,6 +34,69 @@ def test_default_weights_match_frozen_v0_contract():
 
 def _computed_at() -> datetime:
     return datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+
+
+def _uuid(suffix: int) -> UUID:
+    return UUID(f"10000000-0000-0000-0000-{suffix:012d}")
+
+
+def _channel() -> TelegramChannel:
+    return TelegramChannel(
+        channel_id=7,
+        handle="pilot",
+        title="Pilot",
+        is_private=False,
+        subscriber_count=1000,
+        first_seen_at=_computed_at(),
+    )
+
+
+def _message(message_id: int) -> RawTelegramMessage:
+    return RawTelegramMessage(
+        channel_id=7,
+        message_id=message_id,
+        posted_at=_computed_at(),
+        captured_at=_computed_at(),
+        has_media=False,
+        raw_payload={"id": message_id},
+    )
+
+
+def _event(suffix: int, message_id: int) -> RawSignalEvent:
+    return RawSignalEvent(
+        id=_uuid(suffix),
+        channel_id=7,
+        message_id=message_id,
+        candidate_text="BTC long",
+        materialized_by=MaterializationPath.SEED_HEURISTIC,
+        created_at=_computed_at(),
+    )
+
+
+def _signal(suffix: int, event_id: UUID) -> ExtractedSignal:
+    return ExtractedSignal(
+        id=_uuid(suffix),
+        event_id=event_id,
+        channel_id=7,
+        symbol="BTC",
+        side=Side.LONG,
+        entry_type=EntryType.MARKET,
+        stop_loss="64000",
+        take_profits=["67000"],
+        extracted_at=_computed_at(),
+    )
+
+
+def _snapshot_rescan_proof(suffix: int) -> DeletedSignalEvidence:
+    return DeletedSignalEvidence(
+        id=_uuid(suffix),
+        channel_id=7,
+        message_id=99,
+        confidence=DeletionConfidence.CONFIRMED,
+        method=DeletionMethod.SNAPSHOT_DIFF,
+        detected_at=_computed_at(),
+        was_signal_candidate=False,
+    )
 
 
 def test_scorecard_applies_weights_without_renormalizing():
@@ -98,3 +171,30 @@ def test_scorecard_excludes_empty_denominator_measurements_with_note():
     assert score.score == 0
     assert explanation.breakdown == []
     assert "completeness: not measured — no extracted signals" in explanation.notes
+
+
+def test_provider_score_builder_measures_all_present_slice8_components():
+    event = _event(1, 10)
+    score, explanation = build_provider_score(
+        channel=_channel(),
+        messages=[_message(10), _message(11)],
+        message_count=2,
+        events=[event],
+        signals=[_signal(2, event.id)],
+        unrecognized=[],
+        deletions=[_snapshot_rescan_proof(3)],
+        computed_at=_computed_at(),
+    )
+
+    assert score.signal_count == 1
+    assert score.simulated_count == 0
+    assert [component.name for component in score.components] == [
+        "deletion_behaviour",
+        "completeness",
+        "parser_confidence",
+        "evidence_availability",
+        "signal_frequency",
+        "active_user_proxy",
+    ]
+    assert score.score == 0.5
+    assert explanation.breakdown == score.components
