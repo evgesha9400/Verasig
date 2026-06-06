@@ -573,7 +573,13 @@ def workbench(reference: str) -> None:
 def _launch_workbench(channel_id: int) -> None:
     app_path = Path(__file__).parent / "ui" / "app.py"
     environment = {**os.environ, "VERASIG_WORKBENCH_CHANNEL": str(channel_id)}
-    subprocess.run(["streamlit", "run", str(app_path)], env=environment, check=False)
+    command = [
+        "streamlit",
+        "run",
+        str(app_path),
+        "--server.address=0.0.0.0",
+    ]
+    subprocess.run(command, env=environment, check=False)
 
 
 if __name__ == "__main__":
