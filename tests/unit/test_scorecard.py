@@ -173,6 +173,40 @@ def test_scorecard_excludes_empty_denominator_measurements_with_note():
     assert "completeness: not measured — no extracted signals" in explanation.notes
 
 
+def test_scorecard_reweights_measurements_deterministically():
+    base_score, _ = build_scorecard(
+        channel_id=7,
+        signal_count=1,
+        computed_at=_computed_at(),
+        measurements=[
+            HygieneMeasurement(
+                name="deletion_behaviour",
+                raw_value=0.5,
+                normalized=0.5,
+                evidence_refs=["event:aaaaaaaa-0000-0000-0000-000000000000"],
+            )
+        ],
+    )
+    custom_score, _ = build_scorecard(
+        channel_id=7,
+        signal_count=1,
+        computed_at=_computed_at(),
+        measurements=[
+            HygieneMeasurement(
+                name="deletion_behaviour",
+                raw_value=0.5,
+                normalized=0.5,
+                evidence_refs=["event:aaaaaaaa-0000-0000-0000-000000000000"],
+            )
+        ],
+        weights=ScoreWeights(version="test", by_component={"deletion_behaviour": 0.8}),
+    )
+
+    assert base_score.score == 0.1
+    assert custom_score.score == 0.4
+    assert custom_score.weights_version == "test"
+
+
 def test_provider_score_builder_measures_all_present_slice8_components():
     event = _event(1, 10)
     score, explanation = build_provider_score(
