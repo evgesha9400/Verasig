@@ -23,8 +23,16 @@ def _active_step(folded: FoldedSignal) -> FoldStep:
     return folded.timeline[-1]
 
 
-def _entry_price(step: FoldStep) -> Decimal | None:
-    return step.effective_entry
+def _market_entry_price(klines: list[Kline]) -> Decimal | None:
+    if not klines:
+        return None
+    return klines[0].open
+
+
+def _simulation_entry_price(step: FoldStep, klines: list[Kline]) -> Decimal | None:
+    if step.effective_entry is not None:
+        return step.effective_entry
+    return _market_entry_price(klines)
 
 
 def _stop_price(step: FoldStep) -> Decimal | None:
@@ -104,7 +112,7 @@ class ProviderStatedPolicy:
 
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome:
         step = _active_step(folded)
-        entry = _entry_price(step)
+        entry = _simulation_entry_price(step, klines)
         stop = _stop_price(step)
         target = _first_take_profit(step)
         if entry is None or stop is None or target is None:
