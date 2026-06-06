@@ -1,14 +1,10 @@
-"""Exchange-listing seam for the seed candidate filter (spec §6; ADR 0005).
+"""Static exchange listing adapter for the seed candidate filter.
 
-`Exchange` is the Protocol the recall-first seed heuristic codes against to ask
-"is this token a listed base coin?" (the `SYMBOL_TOKEN` reason). `StaticExchange`
-ships a bundled cold-start seed of major base coins; the real `BybitExchange`
-(httpx over the public instruments-info endpoint) lives behind a separate market
-data seam. Tests inject a `FakeExchange`. A distilled `FilterRule` supersedes
-the seed once the operator has labeled a channel.
+`StaticExchange` ships a bundled cold-start seed of major base coins and
+implements the pure `Exchange` seam from `domain.protocols`.
 """
 
-from typing import Protocol, runtime_checkable
+from verasig.domain.protocols import Exchange
 
 _QUOTE_SUFFIXES = ("USDT", "USDC", "USD", "PERP")
 
@@ -109,13 +105,7 @@ def normalize_base_symbol(token: str) -> str:
     return base
 
 
-@runtime_checkable
-class Exchange(Protocol):
-    def is_listed(self, token: str) -> bool: ...
-    def base_symbols(self) -> set[str]: ...
-
-
-class StaticExchange:
+class StaticExchange(Exchange):
     """Cold-start seed exchange backed by a bundled base-symbol set."""
 
     def base_symbols(self) -> set[str]:

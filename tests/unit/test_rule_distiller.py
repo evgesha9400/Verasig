@@ -7,10 +7,10 @@ from fakes import FakeDistiller
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.parser_rule import ParserRule
+from verasig.domain.protocols import RuleDistiller
 from verasig.domain.signal import Side
 from verasig.services.distillation.rule_distiller import (
     ClaudeCliDistiller,
-    RuleDistiller,
     parse_distiller_output,
 )
 

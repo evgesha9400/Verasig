@@ -5,7 +5,7 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import DeletionConfidence, DeletionMethod
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
-from verasig.foundation.telegram_source import (
+from verasig.domain.telegram import (
     TelegramDeletionEvent,
     TelegramDeliveryEvent,
     TelegramLiveEvent,

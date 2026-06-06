@@ -13,7 +13,7 @@ import re
 from verasig.domain.event import MatchReason, MaterializationPath, RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
-from verasig.foundation.exchange import Exchange
+from verasig.domain.protocols import Exchange
 
 _DIRECTIONAL = re.compile(
     r"\b(long|short|buy|bought|sell|sold"

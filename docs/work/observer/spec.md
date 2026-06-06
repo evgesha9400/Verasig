@@ -115,10 +115,11 @@ verasig/
 │   ├── foundation/
 │   │   ├── db.py               # engine, session, Base
 │   │   ├── telegram_session.py # Telethon factory + login flow
-│   │   ├── exchange.py         # Exchange Protocol + Bybit adapter (supported_symbols)
-│   │   └── market_data.py      # BybitKlineClient (httpx) + MarketData interface
+│   │   ├── exchange.py         # StaticExchange cold-start adapter
+│   │   └── market_data.py      # BybitKlineClient (httpx) adapter
 │   ├── domain/             # PURE contracts (no IO)
-│   │   ├── channel.py  message.py  event.py  signal.py  lifecycle.py
+│   │   ├── channel.py  message.py  telegram.py  protocols.py
+│   │   ├── event.py  signal.py  lifecycle.py
 │   │   ├── filter_rule.py  parser_rule.py  drift.py  deletion.py  score.py
 │   ├── storage/
 │   │   ├── models.py       # SQLAlchemy ORM (append-only tables)

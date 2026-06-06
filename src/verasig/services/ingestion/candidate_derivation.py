@@ -16,7 +16,7 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
-from verasig.foundation.exchange import Exchange
+from verasig.domain.protocols import Exchange
 from verasig.services.extraction.deterministic_parser import parse
 from verasig.services.ingestion.candidate_filter import (
     apply_filter_rule,

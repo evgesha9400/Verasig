@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.message import RawTelegramMessage
-from verasig.foundation.telegram_source import TelegramSource
+from verasig.domain.protocols import TelegramSource
 from verasig.storage import repositories as repo
 
 

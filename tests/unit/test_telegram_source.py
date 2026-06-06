@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
-from verasig.foundation.telegram_source import (
+from verasig.domain.protocols import TelegramSource
+from verasig.domain.telegram import (
     TelegramDeletionEvent,
     TelegramDeliveryEvent,
-    TelegramSource,
-    TelethonSource,
 )
+from verasig.foundation.telegram_source import TelethonSource
 
 
 def _instant() -> datetime:

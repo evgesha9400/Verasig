@@ -1,11 +1,11 @@
-"""Market-data seam for historical kline replay (data-contracts.md §9)."""
+"""Bybit market-data adapter for historical kline replay."""
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Protocol, runtime_checkable
 
 import httpx
 
+from verasig.domain.protocols import MarketData
 from verasig.domain.simulation import Kline
 
 BYBIT_PUBLIC_BASE_URL = "https://api.bybit.com"
@@ -14,18 +14,7 @@ BYBIT_DEFAULT_CATEGORY = "linear"
 BYBIT_KLINE_LIMIT = 1000
 
 
-@runtime_checkable
-class MarketData(Protocol):
-    def klines(
-        self,
-        symbol: str,
-        start: datetime,
-        end: datetime,
-        interval: str = "1",
-    ) -> list[Kline]: ...
-
-
-class BybitKlineClient:
+class BybitKlineClient(MarketData):
     """Bybit public kline adapter; tests inject an httpx mock transport."""
 
     def __init__(

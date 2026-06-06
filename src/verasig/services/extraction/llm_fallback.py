@@ -13,10 +13,10 @@ injectable subprocess runner so no test touches the real CLI; pass
 import json
 import subprocess
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
 
 from pydantic import ValidationError
 
+from verasig.domain.protocols import LlmExtractor
 from verasig.domain.signal import TradeIntent
 from verasig.services.json_extract import find_json_object
 
@@ -31,11 +31,6 @@ _TRADE_INTENT_KEYS = {
     "leverage",
     "confidence",
 }
-
-
-@runtime_checkable
-class LlmExtractor(Protocol):
-    def extract(self, candidate_text: str) -> TradeIntent | None: ...
 
 
 def _content(payload: dict) -> dict:
@@ -87,7 +82,7 @@ def _subprocess_runner(command: str) -> Callable[[str], str]:
     return run
 
 
-class ClaudeCliExtractor:
+class ClaudeCliExtractor(LlmExtractor):
     """LLM-CLI fallback extractor.
 
     The subprocess runner is injectable so tests drive it with canned stdout and

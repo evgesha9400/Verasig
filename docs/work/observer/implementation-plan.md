@@ -248,19 +248,19 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Input:** `telegram_api_id`/`hash`/`phone` (env), interactive code/2FA (once).
 - **Output:** persisted `StringSession` (bare UTF-8 string at `session_path`); non-interactive client for all other commands.
 - **Decisive test (unit):** session-string round-trips (`save`→`load`); missing/empty session raises `SessionMissingError("run `login` first")`; absent creds raise `CredentialsMissingError`.
-- **Contract:** `TelegramSource` Protocol (`data-contracts.md` §9) — Protocol-only stub here; `backfill_batches`/`live_events` are implemented in work items 2/10. work item 1's own seam is the session store + guarded client factory in `telegram_session.py`.
+- **Contract:** `TelegramSource` Protocol (`domain/protocols.py`, `data-contracts.md` §9) — Protocol-only stub here; `backfill_batches`/`live_events` are implemented in work items 2/10. work item 1's own seam is the session store + guarded client factory in `telegram_session.py`.
 - **Acceptance:** `docker compose run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
 - **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are verified outside automated tests; only load/persist/guard + the pure `format_account` formatter are unit-tested.
 
 **Resolved gaps (grill, 2026-06-03):**
-- **Seam (Q1):** ship **both** `foundation/telegram_source.py` (full async `TelegramSource` Protocol, Protocol-only) **and** `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
-- **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `telegram_source.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in work item 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
+- **Seam (Q1):** ship `domain/protocols.py` (full async `TelegramSource` Protocol), `domain/telegram.py` (live event contracts), `foundation/telegram_source.py` (`TelethonSource` adapter), and `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
+- **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `domain/telegram.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in work item 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
 - **login UX (Q3):** add `telegram_phone: str | None` to `Settings` + `.env(.example)`; `client.start(phone=settings.telegram_phone)` prompts for code + 2FA interactively. api_id/hash stay env-sourced.
 - **Creds absent (Q4):** `make_client` raises `CredentialsMissingError("set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH")` (creds-check **before** session-load) so work item-0 `health` keeps working with creds Optional.
 - **whoami (Q5):** one line incl. phone — `logged in as @handle · First Last · id=N · +phone`; missing username/last_name omitted gracefully. Pure `format_account(user) -> str` is table-tested with a stub; live `get_me()` is verified outside automated tests.
 
 **Files:**
-- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/foundation/telegram_source.py`, `src/verasig/foundation/telegram_session.py`
+- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/domain/telegram.py`, `src/verasig/domain/protocols.py`, `src/verasig/foundation/telegram_source.py`, `src/verasig/foundation/telegram_session.py`
 - Edit: `src/verasig/config.py` (+`telegram_phone`), `src/verasig/cli.py` (+`login`, +`whoami`), `.env`, `.env.example`
 - Test: `tests/unit/test_domain_message.py`, `tests/unit/test_telegram_source.py`, `tests/unit/test_telegram_session.py`
 
@@ -556,7 +556,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 **Files:**
 - `domain/signal.py` (+`TradeIntent`, `ExtractedSignal(TradeIntent)`, −`parser_confidence`), `domain/drift.py` (+`ParserDriftWarning`)
-- `services/extraction/llm_fallback.py` (new: `LlmExtractor` Protocol + `parse_extractor_output` + `ClaudeCliExtractor`) + `services/json_extract.py` (new: shared `find_json_object`), `services/extraction/deterministic_parser.py` (→ `TradeIntent`), `services/extraction/extract_service.py` (wire fallback + `_link` + drift), `services/distillation/evaluation.py` (→ `TradeIntent`, drop dummy event), `services/ingestion/candidate_derivation.py` (`parse(rule, text)`)
+- `services/extraction/llm_fallback.py` (new: `parse_extractor_output` + `ClaudeCliExtractor`; `LlmExtractor` Protocol lives in `domain/protocols.py`) + `services/json_extract.py` (new: shared `find_json_object`), `services/extraction/deterministic_parser.py` (→ `TradeIntent`), `services/extraction/extract_service.py` (wire fallback + `_link` + drift), `services/distillation/evaluation.py` (→ `TradeIntent`, drop dummy event), `services/ingestion/candidate_derivation.py` (`parse(rule, text)`)
 - `storage/models.py` (−`parser_confidence`, +`ParserDriftWarningRow`, +`UNIQUE`), `storage/repositories.py` (+`record_outcome`, +`read_parser_drift_warnings`), `migrations/versions/0003_*.py` (edit), `migrations/versions/0004_*.py` (new)
 - `config.py` (+`extractor_fallback_enabled`, +`extractor_command`), `cli.py` (`extract --no-llm` + `_make_fallback_extractor` + `record_outcome` + drift count in output)
 - `tests/fakes.py` (+`FakeExtractor`), `tests/fixtures/cli/extract_pilot.txt` + `extract_miss.txt`, unit + integration tests; `tests/conftest.py` (TRUNCATE +`parser_drift_warning`)
@@ -609,7 +609,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 **Files (this pass):**
 - `domain/deletion.py` (`DeletionConfidence`, `DeletionMethod`, `DeletedSignalEvidence`)
 - `services/deletion/__init__.py`, `services/deletion/diff.py` (pure `detect_deletions`), `services/deletion/rescan.py` (gated re-fetch → detect → persist)
-- `foundation/telegram_source.py` (+`live_message_ids` on the Protocol + `TelethonSource`)
+- `domain/protocols.py` (+`live_message_ids` on `TelegramSource`), `foundation/telegram_source.py` (+`TelethonSource`)
 - `storage/models.py` (+`DeletedSignalEvidenceRow`), `storage/repositories.py` (+`upsert_deletion_evidence`, +`read_deletion_evidence`), `migrations/versions/0005_deletion_evidence.py`
 - `cli.py` (+`rescan`, +`deletions`, +formatters)
 - `tests/fakes.py` (+`FakeSource.live_message_ids`), `tests/unit/test_deletion_diff.py`, `tests/integration/test_deletion_evidence.py`, `tests/integration/test_cli_deletions.py`, `tests/conftest.py` (TRUNCATE +`deleted_signal_evidence`)
@@ -646,7 +646,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 - **Input:** `FoldedSignal`s + Bybit klines + `ExecutionPolicy`.
 - **Output:** `SimOutcome` per signal (R-multiple/MTM, MFE/MAE) → fills sim components of `ProviderScore`.
-- **Contracts:** `MarketData` Protocol (`BybitKlineClient` httpx + Fake); `ExecutionPolicy` (`ProviderStatedPolicy`).
+- **Contracts:** `MarketData` + `ExecutionPolicy` Protocols in `domain/protocols.py`; adapters/policies: `BybitKlineClient` httpx + Fake, `ProviderStatedPolicy`.
 - **Decisive tests (unit, canned klines):** market fill=next-candle open; limit never reached ⇒ `UNFILLED`; **same-candle stop+tp ⇒ stop-first (-1R)**; MFE/MAE; policy **injectable** (dummy `CustomRiskPolicy` proves the seam).
 - **Acceptance:** known signal + known klines ⇒ expected conservative R; scorecard shows simulated expectancy + drawdown with full explanation.
 

@@ -12,11 +12,11 @@ invokes the real CLI (the subprocess runner is injectable).
 import json
 import subprocess
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
 
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.parser_rule import ParserRule
+from verasig.domain.protocols import RuleDistiller
 from verasig.services.json_extract import find_json_object
 
 _FILTER_KEYS = {
@@ -26,12 +26,6 @@ _FILTER_KEYS = {
     "recall_target",
 }
 _PARSER_KEYS = {"patterns", "field_map", "side_aliases"}
-
-
-@runtime_checkable
-class RuleDistiller(Protocol):
-    def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule: ...
-    def distill_parsers(self, labels: list[GoldenLabel]) -> list[ParserRule]: ...
 
 
 def _extract_json(stdout: str) -> dict:
@@ -115,7 +109,7 @@ def _subprocess_runner(command: str) -> Callable[[str], str]:
     return run
 
 
-class ClaudeCliDistiller:
+class ClaudeCliDistiller(RuleDistiller):
     """LLM-CLI rule distiller.
 
     The subprocess runner is injectable so tests drive it with canned stdout and

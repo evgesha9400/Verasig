@@ -13,6 +13,7 @@ from verasig.domain.deletion import DeletedSignalEvidence, DeletionConfidence
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
+from verasig.domain.protocols import LlmExtractor, MarketData
 from verasig.domain.score import (
     ProviderScore,
     ProviderScoreExplanation,
@@ -23,7 +24,7 @@ from verasig.domain.signal import ExtractedSignal, ExtractionMethod, SignalEvent
 from verasig.domain.simulation import SimOutcome
 from verasig.foundation.db import make_engine, make_session_factory
 from verasig.foundation.exchange import StaticExchange
-from verasig.foundation.market_data import BybitKlineClient, MarketData
+from verasig.foundation.market_data import BybitKlineClient
 from verasig.foundation.telegram_session import (
     CredentialsMissingError,
     SessionMissingError,
@@ -37,7 +38,7 @@ from verasig.foundation.telegram_source import TelethonSource
 from verasig.services.deletion.rescan import RescanAborted
 from verasig.services.deletion.rescan import rescan as run_rescan
 from verasig.services.extraction.extract_service import ExtractOutcome, ExtractService
-from verasig.services.extraction.llm_fallback import ClaudeCliExtractor, LlmExtractor
+from verasig.services.extraction.llm_fallback import ClaudeCliExtractor
 from verasig.services.ingestion.backfill import backfill as run_backfill
 from verasig.services.ingestion.candidate_derivation import (
     derive_candidates,

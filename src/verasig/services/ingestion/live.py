@@ -16,11 +16,11 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.message import DeliveryMode
-from verasig.foundation.telegram_source import (
+from verasig.domain.protocols import TelegramSource
+from verasig.domain.telegram import (
     TelegramDeletionEvent,
     TelegramDeliveryEvent,
     TelegramLiveEvent,
-    TelegramSource,
 )
 from verasig.storage import repositories as repo
 

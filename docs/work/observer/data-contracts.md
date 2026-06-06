@@ -261,30 +261,27 @@ Kline:
 ## 9. Service interfaces (the seams TDD tests inject fakes at)
 
 ```python
-# foundation/market_data.py
+# domain/protocols.py
 class MarketData(Protocol):
     def klines(self, symbol: str, start: datetime, end: datetime,
                interval: str = "1") -> list[Kline]: ...   # "1" = 1m
 
-# services/extraction/llm_fallback.py
 class LlmExtractor(Protocol):
     def extract(self, candidate_text: str) -> TradeIntent | None: ...   # text in, trade-shape out; service links
 # adapter: ClaudeCliExtractor(command="claude"|"codex", runner=...) (subprocess, runner-injectable); FakeExtractor (tests)
 # the deterministic parser is SYMMETRIC: parse(rule, candidate_text) -> TradeIntent | None
 # both feed ExtractService._link, which stamps event_id/channel_id/extraction_method/rule_id
 
-# services/distillation/rule_distiller.py  (one labeling pass → both rule kinds; ADR 0005)
 class RuleDistiller(Protocol):
     def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule: ...        # recall-first, from is_signal
     def distill_parsers(self, labels: list[GoldenLabel]) -> list[ParserRule]: ...  # precision-first, from expected fields
 # adapter: ClaudeCliDistiller (distinct recall-first vs precision-first prompts); FakeDistiller (tests)
 
-# services/scoring/policies.py
 class ExecutionPolicy(Protocol):
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome: ...
 # v0: ProviderStatedPolicy; future: CustomRiskPolicy
 
-# foundation/telegram_source.py   (async seam — supersedes the old sync backfill()/stream(); see ADR 0004)
+# domain/telegram.py
 class TelegramDeliveryEvent(BaseModel):  # live message + its latency provenance
     message: RawTelegramMessage
     mode: DeliveryMode               # PUSH | POLL | CATCH_UP
@@ -300,6 +297,7 @@ class TelegramDeletionEvent(BaseModel):  # live deletion notice for one message 
 
 TelegramLiveEvent = TelegramDeliveryEvent | TelegramDeletionEvent
 
+# domain/protocols.py
 class TelegramSource(Protocol):
     # resolve: @handle | t.me link | numeric id → channel identity + metadata (work item 2)
     async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
@@ -310,7 +308,7 @@ class TelegramSource(Protocol):
     async def live_message_ids(self, channel_id: int) -> set[int]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
     def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramLiveEvent]: ...
-# adapter: TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
+# adapter: foundation/telegram_source.py TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
 ```
 
 **Every external dependency (Telegram, LLM CLI, market data, Postgres) sits behind one of these Protocols** so unit tests run pure and offline; integration tests use ephemeral Postgres + recorded fixtures. No test ever calls the real CLI or real Telegram.

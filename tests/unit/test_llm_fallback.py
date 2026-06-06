@@ -3,10 +3,10 @@ from pathlib import Path
 
 from fakes import FakeExtractor
 
+from verasig.domain.protocols import LlmExtractor
 from verasig.domain.signal import Side, TradeIntent
 from verasig.services.extraction.llm_fallback import (
     ClaudeCliExtractor,
-    LlmExtractor,
     parse_extractor_output,
 )
 

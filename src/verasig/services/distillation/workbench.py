@@ -13,8 +13,8 @@ from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
+from verasig.domain.protocols import RuleDistiller
 from verasig.services.distillation.evaluation import filter_recall
-from verasig.services.distillation.rule_distiller import RuleDistiller
 
 
 @dataclass(frozen=True)

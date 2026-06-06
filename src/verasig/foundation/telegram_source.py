@@ -1,7 +1,7 @@
-"""Telegram ingestion seam (data-contracts.md §9; ADR 0004).
+"""Telethon Telegram adapter (data-contracts.md §9; ADR 0004).
 
-`TelegramSource` is the Protocol every consumer codes against; tests inject a
-fake. `TelethonSource` is the real Telegram adapter behind the same seam.
+`TelethonSource` is the real Telegram adapter behind the pure `TelegramSource`
+seam in `domain.protocols`.
 """
 
 import asyncio
@@ -9,36 +9,18 @@ import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Protocol, runtime_checkable
 
-from pydantic import BaseModel
 from telethon import TelegramClient, events
 from telethon.tl.functions.channels import GetFullChannelRequest
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
-
-
-class TelegramDeliveryEvent(BaseModel):
-    """A live message plus its latency provenance (which path delivered it)."""
-
-    message: RawTelegramMessage
-    mode: DeliveryMode
-    captured_at: datetime
-    source_pts: int | None = None
-    gap_closed: bool
-
-
-class TelegramDeletionEvent(BaseModel):
-    """A live deletion notice for one message id."""
-
-    channel_id: int
-    message_id: int
-    detected_at: datetime
-    source_pts: int | None = None
-
-
-TelegramLiveEvent = TelegramDeliveryEvent | TelegramDeletionEvent
+from verasig.domain.protocols import TelegramSource
+from verasig.domain.telegram import (
+    TelegramDeletionEvent,
+    TelegramDeliveryEvent,
+    TelegramLiveEvent,
+)
 
 
 @dataclass
@@ -51,31 +33,12 @@ class _LiveEventState:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-@runtime_checkable
-class TelegramSource(Protocol):
-    # resolve: @handle | t.me link | numeric id -> channel identity + metadata.
-    async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
-
-    # backfill: chunked + resumable — one committable batch at a time.
-    def backfill_batches(
-        self, channel_id: int, after_message_id: int | None, batch_size: int
-    ) -> AsyncIterator[list[RawTelegramMessage]]: ...
-
-    # deletion rescan: the channel's CURRENT live message-id set (ADR 0008).
-    async def live_message_ids(self, channel_id: int) -> set[int]: ...
-
-    # live: one global socket, many channels; hybrid push + short-poll inside.
-    def live_events(
-        self, channel_ids: list[int]
-    ) -> AsyncIterator[TelegramLiveEvent]: ...
-
-
 def _json_safe(payload: dict) -> dict:
     # verbatim-ish provenance: stringify datetimes/bytes Telethon embeds
     return json.loads(json.dumps(payload, default=str))
 
 
-class TelethonSource:
+class TelethonSource(TelegramSource):
     """Telegram adapter over one Telethon client."""
 
     def __init__(

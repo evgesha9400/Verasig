@@ -3,9 +3,9 @@
 from datetime import datetime
 
 from verasig.domain.lifecycle import FoldedSignal
+from verasig.domain.protocols import ExecutionPolicy, MarketData
 from verasig.domain.simulation import Kline, SimOutcome
-from verasig.foundation.market_data import MarketData
-from verasig.services.scoring.policies import ExecutionPolicy, ProviderStatedPolicy
+from verasig.services.scoring.policies import ProviderStatedPolicy
 
 
 def _klines_for_symbol(

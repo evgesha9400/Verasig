@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol, runtime_checkable
 
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
+from verasig.domain.protocols import ExecutionPolicy
 from verasig.domain.signal import Side
 from verasig.domain.simulation import Kline, SimOutcome, SimOutcomeKind
 
@@ -17,11 +17,6 @@ class _EntryFill:
     price: Decimal
     at: datetime
     bars: list[Kline]
-
-
-@runtime_checkable
-class ExecutionPolicy(Protocol):
-    def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome: ...
 
 
 def _policy_name(policy: object) -> str:
@@ -142,7 +137,7 @@ def _mae(side: Side, entry: Decimal, risk: Decimal, klines: list[Kline]) -> floa
     )
 
 
-class ProviderStatedPolicy:
+class ProviderStatedPolicy(ExecutionPolicy):
     """Simulate using the provider-stated entry, stop, and first take-profit."""
 
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome:

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from verasig.domain.drift import ParserDriftWarning
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.parser_rule import ParserRule
+from verasig.domain.protocols import LlmExtractor
 from verasig.domain.signal import (
     ExtractedSignal,
     ExtractionMethod,
@@ -21,7 +22,6 @@ from verasig.domain.signal import (
     UnrecognizedSignal,
 )
 from verasig.services.extraction.deterministic_parser import parse
-from verasig.services.extraction.llm_fallback import LlmExtractor
 
 
 @dataclass

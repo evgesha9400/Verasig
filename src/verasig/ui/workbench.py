@@ -9,7 +9,7 @@ thin Streamlit adapter that renders this and wires the label/distil widgets.
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
-from verasig.foundation.exchange import Exchange
+from verasig.domain.protocols import Exchange
 from verasig.services.distillation.evaluation import evaluate
 from verasig.services.distillation.workbench import partition, residue
 from verasig.services.ingestion.candidate_filter import (

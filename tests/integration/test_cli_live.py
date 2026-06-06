@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 from verasig.cli import app
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
-from verasig.foundation.telegram_source import TelegramDeliveryEvent, TelegramLiveEvent
+from verasig.domain.telegram import TelegramDeliveryEvent, TelegramLiveEvent
 from verasig.storage import repositories as repo
 
 runner = CliRunner()

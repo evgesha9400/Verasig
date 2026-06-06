@@ -18,7 +18,7 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     _now,
 )
-from verasig.foundation.telegram_source import TelegramSource
+from verasig.domain.protocols import TelegramSource
 from verasig.services.deletion.diff import detect_deletions
 from verasig.storage import repositories as repo
 
