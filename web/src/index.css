@@ -1,22 +1,23 @@
 :root {
-  --bg: oklch(1 0 0);
-  --surface: oklch(0.972 0.006 250);
-  --surface-raised: oklch(0.985 0.004 250);
-  --sidebar: oklch(0.15 0.01 250);
-  --sidebar-muted: oklch(0.62 0.03 250);
-  --border: oklch(0.875 0.01 250);
-  --border-strong: oklch(0.72 0.018 250);
-  --ink: oklch(0.18 0.018 250);
-  --muted: oklch(0.43 0.02 250);
-  --primary: oklch(0.54 0.145 330);
-  --primary-deep: oklch(0.43 0.13 330);
-  --success: oklch(0.56 0.125 150);
-  --success-soft: oklch(0.94 0.04 150);
-  --warning: oklch(0.82 0.13 82);
-  --warning-soft: oklch(0.955 0.04 82);
-  --danger: oklch(0.56 0.16 28);
-  --info: oklch(0.57 0.12 245);
-  --info-soft: oklch(0.945 0.035 245);
+  --bg: oklch(0.105 0.018 252);
+  --surface: oklch(0.135 0.018 252);
+  --surface-raised: oklch(0.17 0.02 252);
+  --surface-active: oklch(0.205 0.026 252);
+  --sidebar: oklch(0.082 0.016 252);
+  --sidebar-muted: oklch(0.68 0.026 252);
+  --border: oklch(0.255 0.02 252);
+  --border-strong: oklch(0.39 0.034 252);
+  --ink: oklch(0.925 0.014 252);
+  --muted: oklch(0.69 0.026 252);
+  --primary: oklch(0.7 0.185 332);
+  --primary-deep: oklch(0.62 0.18 332);
+  --success: oklch(0.76 0.15 150);
+  --success-soft: oklch(0.24 0.045 150);
+  --warning: oklch(0.79 0.13 78);
+  --warning-soft: oklch(0.245 0.052 78);
+  --danger: oklch(0.74 0.155 32);
+  --info: oklch(0.76 0.13 236);
+  --info-soft: oklch(0.24 0.045 236);
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -30,8 +31,8 @@
     "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  background: var(--bg);
   color: var(--ink);
-  background: var(--surface);
   font-family: var(--font-sans);
   font-size: 16px;
   font-synthesis: none;
@@ -47,6 +48,7 @@
 }
 
 body {
+  background: var(--bg);
   margin: 0;
   min-width: 320px;
 }

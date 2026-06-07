@@ -62,7 +62,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-theme="dark-primary">
       <header className="app-bar">
         <a className="brand" href="/" aria-label="Verasig home">
           <span className="brand-mark" aria-hidden="true">
@@ -370,18 +370,7 @@ function Pagination({
 }
 
 function makeSourceMessages(): SourceMessage[] {
-  const samples = [
-    "$BTC breaking above 69.5k with strong volume. Next targets: 71k / 72.5k / 75k",
-    "Chart update, liquidity sweep completed before NY open.",
-    "Replying to @TraderMax. Agree, risk management first.",
-    "Reminder: do not overleverage into news.",
-    "ETH short setup forming, wait for retest before entry.",
-    "SOL long entry 140 sl 135 tp 160",
-    "BTC long entry 65000 sl 64000 tp 67000",
-    "Morning notes, macro calendar is heavy today.",
-    "AVAX buy now market order, stop under local low.",
-    "LINK long entry 18 tp 22",
-  ]
+  const samples = makeTelegramSignalSamples()
 
   return Array.from({ length: 240 }, (_, index) => {
     const sequence = index + 1
@@ -401,6 +390,79 @@ function makeSourceMessages(): SourceMessage[] {
       ...(initialLabel ? { label: initialLabel } : {}),
     }
   })
+}
+
+function makeTelegramSignalSamples(): string[] {
+  return [
+    `Image
+🪙 МОНЕТА: #ENA/USDT
+
+📉📈ПОКУПКА: SHORT
+ПЛЕЧО: 16x
+
+· Вход: 0.09109$
+
+· Фиксируем прибыль на: 0.08994$ 0.08844$ 0.08680$ 0.08509$ 0.08330$ 0.08191$
+
+· Стоп: 0.09925$
+Вы самостоятельно решаете когда фиксировать прибыль❗️
+➿➿➿➿➿➿➿➿➿➿➿
+• Даю бесплатные прибыльные сигналы - МатематикТорговля
+• Отзывы совместной работы от подписчиков - МатематикОтзывы
+• Моё закрытое трейдинг сообщество - МатематикВип`,
+    `Image
+🪙 МОНЕТА: #BTC/USDT
+
+📉📈ПОКУПКА: LONG
+ПЛЕЧО: 10x
+
+· Вход: 67,180$
+
+· Фиксируем прибыль на: 67,920$ 68,450$ 69,100$ 70,000$
+
+· Стоп: 66,420$
+Переносим стоп после первой фиксации прибыли.`,
+    `#ETH/USDT SHORT
+
+Entry: 3,514-3,529
+Leverage: 12x
+
+Targets: 3,482 / 3,448 / 3,401 / 3,360
+Stop: 3,612
+
+Wait for confirmation candle before entering.`,
+    `Quick update
+
+#SOL/USDT remains a candidate.
+No entry yet.
+
+Breakout level: 164.80
+Invalidation: close below 158.20`,
+    `Replying to @TraderMax
+
+The setup is still valid.
+I would not add size before the retest.
+Risk stays 1 percent maximum.`,
+    `Image
+#AVAX/USDT LONG
+
+Entry: 29.40
+Targets: 30.10 / 30.80 / 31.90
+Stop: 28.30
+
+Volume confirmation is required.`,
+    `Market note
+
+BTC dominance is rising.
+Avoid weak alt entries until liquidity rotates back.`,
+    `#LINK/USDT LONG
+
+Entry: 18.20-18.35
+Targets: 18.90 / 19.45 / 20.10
+Stop: 17.74
+
+Do not enter after target 1.`,
+  ]
 }
 
 function initialMessageLabel(sequence: number): LabelValue | undefined {

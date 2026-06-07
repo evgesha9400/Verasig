@@ -4,6 +4,15 @@ import { describe, expect, it } from "vitest"
 import App from "./App"
 
 describe("source labeling reader", () => {
+  it("uses a dark-primary review surface", () => {
+    const { container } = render(<App />)
+
+    expect(container.querySelector(".app-shell")).toHaveAttribute(
+      "data-theme",
+      "dark-primary",
+    )
+  })
+
   it("shows only Telegram as the V1 source and no future source menu", () => {
     render(<App />)
 
@@ -25,6 +34,16 @@ describe("source labeling reader", () => {
       within(firstMessage).getByRole("button", { name: "Mark as Non-signal" }),
     ).toBeVisible()
     expect(screen.queryByRole("button", { name: /noise/i })).not.toBeInTheDocument()
+  })
+
+  it("renders realistic multiline Telegram signal messages", () => {
+    render(<App />)
+
+    expect(screen.getAllByText(/МОНЕТА: #ENA\/USDT/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/ПОКУПКА: SHORT/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/ПЛЕЧО: 16x/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Вход: 0\.09109\$/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Стоп: 0\.09925\$/i).length).toBeGreaterThan(0)
   })
 
   it("updates stats when a message is labeled", async () => {

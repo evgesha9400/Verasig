@@ -2,26 +2,26 @@
 name: Verasig
 description: Proof-first signal provider intelligence.
 colors:
-  bg: "oklch(1.000 0.000 0)"
-  surface: "oklch(0.972 0.006 250)"
-  surface-raised: "oklch(0.985 0.004 250)"
-  sidebar: "oklch(0.150 0.010 250)"
-  sidebar-muted: "oklch(0.620 0.030 250)"
-  border: "oklch(0.875 0.010 250)"
-  border-strong: "oklch(0.720 0.018 250)"
-  ink: "oklch(0.180 0.018 250)"
-  muted: "oklch(0.430 0.020 250)"
-  primary: "oklch(0.540 0.145 330)"
-  primary-deep: "oklch(0.430 0.130 330)"
-  accent: "oklch(0.880 0.105 86)"
-  success: "oklch(0.560 0.125 150)"
-  success-soft: "oklch(0.940 0.040 150)"
-  warning: "oklch(0.820 0.130 82)"
-  warning-soft: "oklch(0.955 0.040 82)"
-  danger: "oklch(0.560 0.160 28)"
-  danger-soft: "oklch(0.950 0.040 28)"
-  info: "oklch(0.570 0.120 245)"
-  info-soft: "oklch(0.945 0.035 245)"
+  bg: "oklch(0.105 0.018 252)"
+  surface: "oklch(0.135 0.018 252)"
+  surface-raised: "oklch(0.170 0.020 252)"
+  surface-active: "oklch(0.205 0.026 252)"
+  sidebar: "oklch(0.082 0.016 252)"
+  sidebar-muted: "oklch(0.680 0.026 252)"
+  border: "oklch(0.255 0.020 252)"
+  border-strong: "oklch(0.390 0.034 252)"
+  ink: "oklch(0.925 0.014 252)"
+  muted: "oklch(0.690 0.026 252)"
+  primary: "oklch(0.700 0.185 332)"
+  primary-deep: "oklch(0.620 0.180 332)"
+  accent: "oklch(0.790 0.130 78)"
+  success: "oklch(0.760 0.150 150)"
+  success-soft: "oklch(0.240 0.045 150)"
+  warning: "oklch(0.790 0.130 78)"
+  warning-soft: "oklch(0.245 0.052 78)"
+  danger: "oklch(0.740 0.155 32)"
+  info: "oklch(0.760 0.130 236)"
+  info-soft: "oklch(0.240 0.045 236)"
 typography:
   display:
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
@@ -109,17 +109,17 @@ components:
 
 ## 1. Overview
 
-**Creative North Star: "Ledger Console"**
+**Creative North Star: "Dark Ledger Console"**
 
-Ledger Console is a restrained product interface for reviewing evidence. It should feel like a clean audit ledger with enough density for scorecards, parser traces, raw messages, deleted-signal evidence, and simulated outcomes to sit on one screen without visual noise.
+Dark Ledger Console is a restrained product interface for reviewing evidence. It should feel like a compact audit terminal with enough density for raw messages, labeling actions, parser traces, deleted-signal evidence, and simulated outcomes to sit on one screen without visual noise.
 
-The default surface is light because users compare rows, read explanations, and inspect provenance. A dark sidebar can anchor navigation, but the content area stays bright, quiet, and legible. The rose primary color comes from the brand seed and is used sparingly for focus, selection, and primary action. Green, amber, red, and blue are reserved for measured states.
+The default surface is dark because source labeling is a scanning workflow over long raw messages. The interface must reduce chrome, preserve line structure, and keep label actions close to the message being judged. The rose primary color comes from the brand seed and is used sparingly for focus, selection, and primary action. Green, amber, red, and blue are reserved for measured states.
 
 This system rejects hype-driven trading bot visuals, exchange casino energy, black-box score cards, and decorative chrome that competes with evidence.
 
 **Key Characteristics:**
 
-- Dense information without cramped text.
+- Dense information with compact chrome.
 - Restrained color with state-rich semantics.
 - Flat surfaces with structural borders.
 - Clear provenance markers.
@@ -127,33 +127,34 @@ This system rejects hype-driven trading bot visuals, exchange casino energy, bla
 
 ## 2. Colors
 
-The palette is pure white and cool neutral by default, with rose identity used rarely and evidence colors used only when they encode state.
+The palette is dark cool neutral by default, with rose identity used rarely and evidence colors used only when they encode state.
 
 ### Primary
 
-- **Ledger Rose** (`oklch(0.540 0.145 330)`): Primary action, selected navigation, focused controls, and one active chart series. Use on less than 8 percent of any screen.
-- **Deep Ledger Rose** (`oklch(0.430 0.130 330)`): Pressed primary state, focused text links on light surfaces, and compact active markers.
+- **Ledger Rose** (`oklch(0.700 0.185 332)`): Primary action, selected navigation, focused controls, and one active chart series. Use on less than 8 percent of any screen.
+- **Deep Ledger Rose** (`oklch(0.620 0.180 332)`): Pressed primary state, focused text links, and compact active markers.
 
 ### Secondary
 
-- **Evidence Amber** (`oklch(0.880 0.105 86)`): Pending, caution, incomplete evidence, and review-needed states. Prefer the soft token for backgrounds.
-- **Signal Green** (`oklch(0.560 0.125 150)`): Positive simulated outcome, passed checks, and parser coverage success.
+- **Evidence Amber** (`oklch(0.790 0.130 78)`): Pending, caution, incomplete evidence, and review-needed states. Prefer the soft token for backgrounds.
+- **Signal Green** (`oklch(0.760 0.150 150)`): Positive simulated outcome, passed checks, and parser coverage success.
 
 ### Tertiary
 
-- **Risk Red** (`oklch(0.560 0.160 28)`): Deletion evidence, failed checks, broken parser output, and high-risk warnings.
-- **Trace Blue** (`oklch(0.570 0.120 245)`): Links, informational notices, trace references, and neutral drill-down actions.
+- **Risk Red** (`oklch(0.740 0.155 32)`): Deletion evidence, failed checks, broken parser output, and high-risk warnings.
+- **Trace Blue** (`oklch(0.760 0.130 236)`): Links, informational notices, trace references, and neutral drill-down actions.
 
 ### Neutral
 
-- **White Ledger** (`oklch(1.000 0.000 0)`): Main content background.
-- **Cool Panel** (`oklch(0.972 0.006 250)`): Page bands, table headers, and secondary panels.
-- **Raised White** (`oklch(0.985 0.004 250)`): Cards and grouped evidence surfaces.
-- **Ink** (`oklch(0.180 0.018 250)`): Body text and data values.
-- **Muted Ink** (`oklch(0.430 0.020 250)`): Secondary metadata, timestamps, and helper text.
-- **Rule Gray** (`oklch(0.875 0.010 250)`): Dividers, table row boundaries, input borders.
-- **Strong Rule Gray** (`oklch(0.720 0.018 250)`): Active borders, resizable panel handles, and selected row outlines.
-- **Night Sidebar** (`oklch(0.150 0.010 250)`): Primary app navigation and operator context.
+- **Dark Ledger** (`oklch(0.105 0.018 252)`): Main content background.
+- **Dark Panel** (`oklch(0.135 0.018 252)`): Page bands, table bodies, and secondary panels.
+- **Raised Dark** (`oklch(0.170 0.020 252)`): Grouped evidence surfaces and controls.
+- **Active Dark** (`oklch(0.205 0.026 252)`): Selected controls and pressed states.
+- **Ink** (`oklch(0.925 0.014 252)`): Body text and data values.
+- **Muted Ink** (`oklch(0.690 0.026 252)`): Secondary metadata, timestamps, and helper text.
+- **Rule Gray** (`oklch(0.255 0.020 252)`): Dividers, table row boundaries, input borders.
+- **Strong Rule Gray** (`oklch(0.390 0.034 252)`): Active borders, resizable panel handles, and selected row outlines.
+- **Night Sidebar** (`oklch(0.082 0.016 252)`): Primary app navigation and operator context.
 
 ### Named Rules
 
@@ -204,10 +205,10 @@ Verasig is flat by default. Depth is conveyed with tonal layers, borders, and st
 ### Buttons
 
 - **Shape:** Compact rectangle with a 6px radius.
-- **Primary:** Ledger Rose fill, white text, 8px 12px padding, label typography.
+- **Primary:** Ledger Rose fill, Dark Ledger text, 8px 12px padding, label typography.
 - **Hover / Focus:** Deep Rose hover, visible 2px focus ring, 180ms state transition.
-- **Secondary:** Raised White background, Rule Gray border, Ink text.
-- **Ghost:** Transparent background, Ink text, subtle Cool Panel hover.
+- **Secondary:** Raised Dark background, Rule Gray border, Ink text.
+- **Ghost:** Transparent background, Ink text, subtle Dark Panel hover.
 
 ### Chips
 
@@ -218,16 +219,16 @@ Verasig is flat by default. Depth is conveyed with tonal layers, borders, and st
 ### Cards / Containers
 
 - **Corner Style:** 8px for evidence cards, 12px only for large empty states.
-- **Background:** Raised White on White Ledger or Cool Panel.
+- **Background:** Raised Dark on Dark Ledger or Dark Panel.
 - **Shadow Strategy:** No static card shadows.
 - **Border:** Rule Gray at rest; Strong Rule Gray for selected or focused containers.
 - **Internal Padding:** 16px default, 24px for large summary panels.
 
 ### Inputs / Fields
 
-- **Style:** White background, Rule Gray border, 6px radius, 8px 10px padding.
+- **Style:** Dark Panel background, Rule Gray border, 6px radius, 8px 10px padding.
 - **Focus:** Ledger Rose border plus a 2px outside focus ring.
-- **Error / Disabled:** Risk Red for errors; Cool Panel background and Muted Ink for disabled.
+- **Error / Disabled:** Risk Red for errors; Dark Panel background and Muted Ink for disabled.
 
 ### Navigation
 
@@ -247,7 +248,7 @@ Verasig is flat by default. Depth is conveyed with tonal layers, borders, and st
 
 ### Do:
 
-- **Do** use White Ledger as the default content background.
+- **Do** use Dark Ledger as the default content background.
 - **Do** reserve Ledger Rose for primary action, selection, and focus.
 - **Do** use Signal Green, Evidence Amber, Risk Red, and Trace Blue only for measured states.
 - **Do** keep score inputs traceable to raw evidence, parser output, simulation, or deletion records.
