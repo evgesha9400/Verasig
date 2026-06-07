@@ -498,49 +498,47 @@ function MessageEntry({
       role="article"
       tabIndex={isActive ? 0 : -1}
     >
-      <header className="entry-head">
-        <div className="entry-meta">
-          <span className={`entry-dot dot-${labelClass}`} aria-hidden="true" />
-          <span className="entry-id">{message.sourceMessageId}</span>
-          <span className="entry-sep" aria-hidden="true">
-            ·
-          </span>
-          <time className="entry-time" dateTime={message.postedAt}>
-            {formatDateTime(message.postedAt)}
-          </time>
-          {message.isCandidate && <span className="candidate-chip">Candidate</span>}
-          <MessageTypeTag message={message} />
-        </div>
-        <div className="label-actions" aria-label="Label actions">
-          <span className={`label-state ${labelClass}`}>{labelText(message.label)}</span>
-          <button
-            className="label-button label-button-signal"
-            type="button"
-            aria-pressed={message.label === "signal"}
-            aria-label="Mark as Signal"
-            onClick={(event) => {
-              event.stopPropagation()
-              onLabelMessage(message.id, "signal")
-            }}
-          >
-            <TrendingUp size={14} aria-hidden="true" />
-            Signal
-          </button>
-          <button
-            className="label-button label-button-non-signal"
-            type="button"
-            aria-pressed={message.label === "non_signal"}
-            aria-label="Mark as Non-signal"
-            onClick={(event) => {
-              event.stopPropagation()
-              onLabelMessage(message.id, "non_signal")
-            }}
-          >
-            Non-signal
-          </button>
-        </div>
-      </header>
+      <div className="entry-meta">
+        <span className={`entry-dot dot-${labelClass}`} aria-hidden="true" />
+        <span className="entry-id">{message.sourceMessageId}</span>
+        <span className="entry-sep" aria-hidden="true">
+          ·
+        </span>
+        <time className="entry-time" dateTime={message.postedAt}>
+          {formatDateTime(message.postedAt)}
+        </time>
+        {message.isCandidate && <span className="candidate-chip">Candidate</span>}
+        <MessageTypeTag message={message} />
+      </div>
       <p className="raw">{renderMessageBody(message.text)}</p>
+      <div className="label-actions" aria-label="Label actions">
+        <span className={`label-state ${labelClass}`}>{labelText(message.label)}</span>
+        <button
+          className="label-button label-button-signal"
+          type="button"
+          aria-pressed={message.label === "signal"}
+          aria-label="Mark as Signal"
+          onClick={(event) => {
+            event.stopPropagation()
+            onLabelMessage(message.id, "signal")
+          }}
+        >
+          <TrendingUp size={14} aria-hidden="true" />
+          Signal
+        </button>
+        <button
+          className="label-button label-button-non-signal"
+          type="button"
+          aria-pressed={message.label === "non_signal"}
+          aria-label="Mark as Non-signal"
+          onClick={(event) => {
+            event.stopPropagation()
+            onLabelMessage(message.id, "non_signal")
+          }}
+        >
+          Non-signal
+        </button>
+      </div>
     </article>
   )
 }
