@@ -1206,6 +1206,36 @@
 
 .start-backfill {
   align-items: center;
+  background: color-mix(in oklch, var(--surface-raised) 82%, var(--surface));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  display: inline-flex;
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  gap: var(--space-xs);
+  height: 34px;
+  justify-content: center;
+  line-height: var(--line-label);
+  padding: 0 var(--space-md);
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+  white-space: nowrap;
+}
+
+.start-backfill:hover:not(:disabled) {
+  background: var(--surface-active);
+}
+
+.start-backfill:disabled {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.open-reader {
+  align-items: center;
   background: var(--primary);
   border: 0;
   border-radius: var(--radius-sm);
@@ -1215,43 +1245,13 @@
   font-weight: var(--weight-bold);
   gap: var(--space-xs);
   height: 34px;
-  justify-content: center;
-  line-height: var(--line-label);
-  padding: 0 var(--space-md);
-  transition: background-color 160ms ease-out;
-  white-space: nowrap;
-}
-
-.start-backfill:hover:not(:disabled) {
-  background: var(--primary-deep);
-}
-
-.start-backfill:disabled {
-  background: var(--surface-active);
-  color: var(--muted);
-}
-
-.open-reader {
-  align-items: center;
-  background: transparent;
-  border: 1px solid color-mix(in oklch, var(--primary) 40%, var(--border));
-  border-radius: var(--radius-sm);
-  color: var(--primary);
-  display: inline-flex;
-  font-size: var(--text-label);
-  font-weight: var(--weight-bold);
-  gap: var(--space-xs);
-  height: 34px;
   padding: 0 var(--space-md);
   text-decoration: none;
-  transition:
-    background-color 160ms ease-out,
-    border-color 160ms ease-out;
+  transition: background-color 160ms ease-out;
 }
 
 .open-reader:hover {
-  background: color-mix(in oklch, var(--primary) 14%, var(--surface));
-  border-color: var(--primary);
+  background: var(--primary-deep);
 }
 
 .row-progress {

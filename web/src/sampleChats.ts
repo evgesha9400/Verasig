@@ -56,7 +56,7 @@ const chatSeeds: ChatSeed[] = [
   {
     id: "chat_scalp_room",
     channelId: "1399201774",
-    title: "Scalp Room — Inner Circle",
+    title: "Scalp Room · Inner Circle",
     handle: null,
     subscriberCount: 3_280,
     estimatedMessageCount: 48_300,
