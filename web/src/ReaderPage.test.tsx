@@ -23,13 +23,15 @@ function renderReader(onBack = vi.fn()) {
   return onBack
 }
 
+function entries() {
+  return screen.getAllByRole("article", { name: /source message/i })
+}
+
 describe("source labeling reader", () => {
-  it("shows only Telegram as the V1 source and no future source menu", () => {
+  it("shows Telegram as the only V1 source with no future source menu", () => {
     renderReader()
 
-    expect(screen.getByRole("combobox", { name: "Source type" })).toHaveValue(
-      "telegram",
-    )
+    expect(screen.getByText("Telegram")).toBeVisible()
     expect(screen.queryByText("Discord")).not.toBeInTheDocument()
     expect(screen.queryByText("X.com")).not.toBeInTheDocument()
     expect(screen.queryByText("API / Webhook")).not.toBeInTheDocument()
@@ -38,9 +40,9 @@ describe("source labeling reader", () => {
   it("opens the labeling reader for the chat it was given", () => {
     renderReader()
 
-    expect(screen.getByRole("combobox", { name: "Chat" })).toHaveValue(
-      "chat_crypto_alpha",
-    )
+    expect(
+      screen.getByRole("heading", { name: /crypto alpha signals/i }),
+    ).toBeVisible()
     expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toHaveTextContent(
       "Crypto Alpha Signals",
     )
@@ -58,90 +60,49 @@ describe("source labeling reader", () => {
   it("offers only Signal and Non-signal label actions", () => {
     renderReader()
 
-    const firstMessage = screen.getAllByRole("row", { name: /source message/i })[0]
+    const firstEntry = entries()[0]
 
-    expect(within(firstMessage).getByRole("button", { name: "Mark as Signal" })).toBeVisible()
+    expect(within(firstEntry).getByRole("button", { name: "Mark as Signal" })).toBeVisible()
     expect(
-      within(firstMessage).getByRole("button", { name: "Mark as Non-signal" }),
+      within(firstEntry).getByRole("button", { name: "Mark as Non-signal" }),
     ).toBeVisible()
     expect(screen.queryByRole("button", { name: /noise/i })).not.toBeInTheDocument()
+  })
+
+  it("keeps each entry's Signal action before its Non-signal action", () => {
+    renderReader()
+
+    const actions = within(entries()[0]).getByLabelText("Label actions")
+    const buttons = within(actions).getAllByRole("button")
+
+    expect(buttons[0]).toHaveAccessibleName("Mark as Signal")
+    expect(buttons[1]).toHaveAccessibleName("Mark as Non-signal")
   })
 
   it("renders realistic multiline Telegram signal messages", () => {
     renderReader()
 
-    expect(screen.getAllByText(/МОНЕТА: #ENA\/USDT/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/ПОКУПКА: SHORT/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/ПЛЕЧО: 16x/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Вход: 0\.09109\$/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Стоп: 0\.09925\$/i).length).toBeGreaterThan(0)
+    const stream = screen.getByLabelText("Messages")
+
+    expect(stream).toHaveTextContent("МОНЕТА: #ENA/USDT")
+    expect(stream).toHaveTextContent("ПОКУПКА: SHORT")
+    expect(stream).toHaveTextContent("ПЛЕЧО: 16x")
+    expect(stream).toHaveTextContent("Вход: 0.09109$")
+    expect(stream).toHaveTextContent("Стоп: 0.09925$")
+  })
+
+  it("accents trade symbols as their own mono tokens", () => {
+    renderReader()
+
+    const symbol = screen.getAllByText("#ENA/USDT")[0]
+
+    expect(symbol).toHaveClass("tok-symbol")
   })
 
   it("highlights the first visible message by default", () => {
     renderReader()
 
-    expect(screen.getAllByRole("row", { name: /source message/i })[0]).toHaveAttribute(
-      "aria-current",
-      "true",
-    )
-  })
-
-  it("orders scan columns for fast labeling", () => {
-    renderReader()
-
-    const header = screen.getByRole("row", {
-      name: /source msg id posted captured type message buttons/i,
-    })
-
-    expect(header).toHaveTextContent(
-      "Source msg idPostedCapturedTypeMessageButtons",
-    )
-  })
-
-  it("keeps label buttons immediately after the message column", () => {
-    renderReader()
-
-    const firstMessage = screen.getAllByRole("row", { name: /source message/i })[0]
-    const rowCells = Array.from(firstMessage.children)
-    const messageCell = rowCells.at(4)
-    const buttonCell = rowCells.at(5)
-
-    expect(messageCell).toHaveAccessibleName("Message")
-    expect(buttonCell).toHaveAccessibleName("Label actions")
-    expect(within(buttonCell as HTMLElement).getByRole("button", { name: "Mark as Signal" })).toBeVisible()
-    expect(
-      within(buttonCell as HTMLElement).getByRole("button", { name: "Mark as Non-signal" }),
-    ).toBeVisible()
-  })
-
-  it("colors a labeled signal row with the signal row state", async () => {
-    const user = userEvent.setup()
-    renderReader()
-
-    await selectMessageFilter("All")
-
-    const firstMessage = screen.getAllByRole("row", { name: /source message/i })[0]
-
-    await user.click(
-      within(firstMessage).getByRole("button", { name: "Mark as Signal" }),
-    )
-
-    expect(firstMessage).toHaveClass("message-row-signal")
-  })
-
-  it("colors a labeled non-signal row with the non-signal row state", async () => {
-    const user = userEvent.setup()
-    renderReader()
-
-    await selectMessageFilter("All")
-
-    const firstMessage = screen.getAllByRole("row", { name: /source message/i })[0]
-
-    await user.click(
-      within(firstMessage).getByRole("button", { name: "Mark as Non-signal" }),
-    )
-
-    expect(firstMessage).toHaveClass("message-row-non_signal")
+    expect(entries()[0]).toHaveAttribute("aria-current", "true")
   })
 
   it("keeps search as the first message control", () => {
@@ -151,6 +112,34 @@ describe("source labeling reader", () => {
     const firstControl = controls.firstElementChild
 
     expect(firstControl).toHaveAccessibleName("Search messages")
+  })
+
+  it("marks a labeled signal entry with the signal state", async () => {
+    const user = userEvent.setup()
+    renderReader()
+
+    await selectMessageFilter("All")
+
+    const firstEntry = entries()[0]
+    await user.click(
+      within(firstEntry).getByRole("button", { name: "Mark as Signal" }),
+    )
+
+    expect(firstEntry).toHaveClass("entry-signal")
+  })
+
+  it("marks a labeled non-signal entry with the non-signal state", async () => {
+    const user = userEvent.setup()
+    renderReader()
+
+    await selectMessageFilter("All")
+
+    const firstEntry = entries()[0]
+    await user.click(
+      within(firstEntry).getByRole("button", { name: "Mark as Non-signal" }),
+    )
+
+    expect(firstEntry).toHaveClass("entry-non_signal")
   })
 
   it("keeps the filter options open long enough to select one", async () => {
@@ -166,16 +155,12 @@ describe("source labeling reader", () => {
     const user = userEvent.setup()
     renderReader()
 
-    const firstMessageId = screen
-      .getAllByRole("row", { name: /source message/i })[0]
-      .textContent
+    const firstMessageId = entries()[0].textContent
 
     await user.keyboard("s")
 
     expect(within(screen.getByLabelText("Label stats")).getByText("25")).toBeVisible()
-    expect(screen.getAllByRole("row", { name: /source message/i })[0].textContent).not.toBe(
-      firstMessageId,
-    )
+    expect(entries()[0].textContent).not.toBe(firstMessageId)
 
     await user.keyboard("n")
 
@@ -186,7 +171,7 @@ describe("source labeling reader", () => {
     const user = userEvent.setup()
     renderReader()
 
-    const rows = screen.getAllByRole("row", { name: /source message/i })
+    const rows = entries()
 
     await user.keyboard("{ArrowDown}")
 
@@ -209,26 +194,25 @@ describe("source labeling reader", () => {
     expect(within(screen.getByLabelText("Label stats")).getByText("24")).toBeVisible()
   })
 
-  it("updates stats when a message is labeled", async () => {
+  it("counts labeled messages in the stats header", async () => {
     const user = userEvent.setup()
     renderReader()
 
-    expect(screen.getByText("Labeled")).toBeVisible()
-    expect(within(screen.getByLabelText("Label stats")).getByText("24")).toBeVisible()
+    const stats = screen.getByLabelText("Label stats")
+    expect(within(stats).getByText("24")).toBeVisible()
 
-    const firstUnlabeledRow = screen
-      .getAllByRole("row", { name: /source message/i })
-      .find((row) => within(row).queryByText("Unlabeled"))
-
-    expect(firstUnlabeledRow).toBeDefined()
+    const firstUnlabeled = entries().find((entry) =>
+      within(entry).queryByText("Unlabeled"),
+    )
+    expect(firstUnlabeled).toBeDefined()
 
     await user.click(
-      within(firstUnlabeledRow as HTMLElement).getByRole("button", {
+      within(firstUnlabeled as HTMLElement).getByRole("button", {
         name: "Mark as Signal",
       }),
     )
 
-    expect(within(screen.getByLabelText("Label stats")).getByText("25")).toBeVisible()
+    expect(within(stats).getByText("25")).toBeVisible()
   })
 
   it("filters to unlabeled messages and keeps pagination compact", async () => {

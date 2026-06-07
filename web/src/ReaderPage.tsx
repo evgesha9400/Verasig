@@ -1,15 +1,13 @@
 import {
-  ChevronLeft,
-  CheckCircle2,
-  ChevronRight,
-  FlaskConical,
-  Image as ImageIcon,
-  MessageSquare,
-  Search,
-  SlidersHorizontal,
-  TrendingUp,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FlaskConical,
+  Search,
+  Send,
+  SlidersHorizontal,
+  TrendingUp,
 } from "lucide-react"
 import {
   useEffect,
@@ -18,7 +16,9 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react"
+import { tokenizeMessage, type MessageToken } from "./messageMarkup"
 import type { SourceChat } from "./sourceChats"
 import {
   DEFAULT_PAGE_SIZE,
@@ -158,15 +158,15 @@ function ReaderPage({ chat, onBack }: { chat: SourceChat; onBack: () => void }) 
   return (
     <section className="reader-frame" aria-label="Source labeling reader">
       <ReaderBreadcrumb chat={chat} onBack={onBack} />
-      <SourceToolbar chat={chat} />
-      <StatsStrip stats={stats} />
-      <ReaderControls
-        filter={filter}
-        onFilterChange={selectMessageFilter}
-        searchQuery={searchQuery}
-        onSearchChange={updateSearchQuery}
-      />
-      <MessageTable
+      <ReaderHeader chat={chat} stats={stats}>
+        <ReaderControls
+          filter={filter}
+          onFilterChange={selectMessageFilter}
+          searchQuery={searchQuery}
+          onSearchChange={updateSearchQuery}
+        />
+      </ReaderHeader>
+      <MessageStream
         activeMessageId={activePageMessageId}
         messages={pageSlice.items}
         onActivateMessage={selectActiveMessage}
@@ -209,73 +209,115 @@ function ReaderBreadcrumb({
   )
 }
 
-function SourceToolbar({ chat }: { chat: SourceChat }) {
+function ReaderHeader({
+  chat,
+  stats,
+  children,
+}: {
+  chat: SourceChat
+  stats: ReturnType<typeof summarizeLabels>
+  children: ReactNode
+}) {
   return (
-    <section className="source-toolbar" aria-label="Selected source">
-      <label className="field field-compact">
-        <span>Source type</span>
-        <select aria-label="Source type" value={chat.sourceType} disabled>
-          <option value="telegram">Telegram</option>
-        </select>
-      </label>
+    <header className="reader-head">
+      <div className="reader-head-top">
+        <div className="reader-source">
+          <span className="reader-source-mark" aria-hidden="true">
+            <Send size={18} strokeWidth={2.2} />
+          </span>
+          <div className="reader-source-text">
+            <h2 className="reader-source-title">
+              {chat.title}
+              <span className="reader-platform">Telegram</span>
+            </h2>
+            <p className="reader-source-sub">
+              <span className="reader-handle">
+                {chat.handle ?? "Private channel"}
+              </span>
+              <span className="reader-dot" aria-hidden="true">
+                ·
+              </span>
+              <span className="reader-complete">
+                <Check size={14} aria-hidden="true" />
+                backfill complete
+              </span>
+              <span className="reader-dot" aria-hidden="true">
+                ·
+              </span>
+              <span>{formatNumber(chat.capturedCount)} captured</span>
+            </p>
+          </div>
+        </div>
 
-      <label className="field field-feed">
-        <span>Chat</span>
-        <select aria-label="Chat" value={chat.id} disabled>
-          <option value={chat.id}>{chat.title}</option>
-        </select>
-        <small>{chat.handle ?? "Private channel"}</small>
-      </label>
-
-      <div className="status-block" aria-label="Backfill status">
-        <span>Status</span>
-        <strong>
-          <CheckCircle2 size={16} aria-hidden="true" />
-          Backfill complete
-        </strong>
-        <small>{formatNumber(chat.capturedCount)} messages</small>
+        <div className="reader-stats" aria-label="Label stats">
+          <div className="reader-stats-head">
+            <span className="reader-stats-count">
+              <b>{formatNumber(stats.labeled)}</b> labeled{" "}
+              <span>of {formatNumber(stats.total)}</span>
+            </span>
+            <button className="reader-distill" type="button">
+              <FlaskConical size={14} aria-hidden="true" />
+              Start distillation
+            </button>
+          </div>
+          <LabelMeter
+            nonSignals={stats.nonSignals}
+            signals={stats.signals}
+            total={stats.total}
+          />
+          <ul className="reader-legend">
+            <LegendItem tone="signal" value={stats.signals} label="signals" />
+            <LegendItem tone="nonsignal" value={stats.nonSignals} label="non-signals" />
+            <LegendItem tone="unlabeled" value={stats.unlabeled} label="unlabeled" />
+          </ul>
+        </div>
       </div>
 
-      <label className="field field-compact">
-        <span>Page size</span>
-        <select aria-label="Page size" value={DEFAULT_PAGE_SIZE} disabled>
-          <option value={DEFAULT_PAGE_SIZE}>100</option>
-        </select>
-      </label>
-
-      <button className="primary-action" type="button">
-        <FlaskConical size={16} aria-hidden="true" />
-        Start distillation
-      </button>
-    </section>
+      {children}
+    </header>
   )
 }
 
-function StatsStrip({ stats }: { stats: ReturnType<typeof summarizeLabels> }) {
+function LabelMeter({
+  nonSignals,
+  signals,
+  total,
+}: {
+  nonSignals: number
+  signals: number
+  total: number
+}) {
+  const unlabeled = total - signals - nonSignals
+
   return (
-    <section className="stats-strip" aria-label="Label stats">
-      <StatItem label="Labeled" value={stats.labeled} />
-      <StatItem label="Signals" value={stats.signals} tone="success" />
-      <StatItem label="Non-signals" value={stats.nonSignals} tone="warning" />
-      <StatItem label="Unlabeled" value={stats.unlabeled} />
-    </section>
+    <div
+      className="label-meter"
+      role="img"
+      aria-label={`${signals} signal, ${nonSignals} non-signal, ${unlabeled} unlabeled of ${total}`}
+    >
+      <span className="seg-signal" style={{ width: percentOf(signals, total) }} />
+      <span
+        className="seg-nonsignal"
+        style={{ width: percentOf(nonSignals, total) }}
+      />
+    </div>
   )
 }
 
-function StatItem({
+function LegendItem({
   label,
-  tone = "neutral",
+  tone,
   value,
 }: {
   label: string
-  tone?: "neutral" | "success" | "warning"
+  tone: "signal" | "nonsignal" | "unlabeled"
   value: number
 }) {
   return (
-    <div className={`stat-item stat-item-${tone}`}>
-      <span>{label}</span>
-      <strong>{formatNumber(value)}</strong>
-    </div>
+    <li>
+      <span className={`legend-dot legend-${tone}`} aria-hidden="true" />
+      <b>{formatNumber(value)}</b> {label}
+    </li>
   )
 }
 
@@ -408,7 +450,7 @@ function ReaderControls({
   )
 }
 
-function MessageTable({
+function MessageStream({
   activeMessageId,
   messages,
   onActivateMessage,
@@ -420,21 +462,9 @@ function MessageTable({
   onLabelMessage: (messageId: string, label: LabelValue) => void
 }) {
   return (
-    <section className="message-table" aria-label="Messages">
-      <div
-        aria-label="Source msg id Posted Captured Type Message Buttons"
-        className="message-header"
-        role="row"
-      >
-        <span>Source msg id</span>
-        <span>Posted</span>
-        <span>Captured</span>
-        <span>Type</span>
-        <span>Message</span>
-        <span>Buttons</span>
-      </div>
+    <section className="stream" aria-label="Messages">
       {messages.map((message) => (
-        <MessageRow
+        <MessageEntry
           isActive={message.id === activeMessageId}
           key={message.id}
           message={message}
@@ -446,7 +476,7 @@ function MessageTable({
   )
 }
 
-function MessageRow({
+function MessageEntry({
   isActive,
   message,
   onActivateMessage,
@@ -457,78 +487,74 @@ function MessageRow({
   onActivateMessage: (messageId: string) => void
   onLabelMessage: (messageId: string, label: LabelValue) => void
 }) {
+  const labelClass = message.label ?? "unlabeled"
+
   return (
     <article
       aria-current={isActive ? "true" : "false"}
       aria-label={`Source message ${message.sourceMessageId}`}
-      className={`message-row message-row-${message.label ?? "unlabeled"}`}
+      className={`entry entry-${labelClass}`}
       onClick={() => onActivateMessage(message.id)}
-      role="row"
+      role="article"
       tabIndex={isActive ? 0 : -1}
     >
-      <div className="mono-cell message-id">
-        <strong>{message.sourceMessageId}</strong>
-        <span>{message.id}</span>
-      </div>
-      <time className="mono-cell" dateTime={message.postedAt}>
-        {formatDateTime(message.postedAt)}
-      </time>
-      <time className="mono-cell" dateTime={message.capturedAt}>
-        {formatDateTime(message.capturedAt)}
-      </time>
-      <MessageTypeIcon message={message} />
-      <div className="message-body" aria-label="Message">
-        <p>{message.text}</p>
-        {message.isCandidate && <span className="candidate-chip">Candidate</span>}
-      </div>
-      <div className="label-actions" aria-label="Label actions">
-        <span className={`label-state ${message.label ?? "unlabeled"}`}>
-          {labelText(message.label)}
-        </span>
-        <button
-          className="label-button label-button-signal"
-          type="button"
-          aria-pressed={message.label === "signal"}
-          aria-label="Mark as Signal"
-          onClick={(event) => {
-            event.stopPropagation()
-            onLabelMessage(message.id, "signal")
-          }}
-        >
-          <TrendingUp size={14} aria-hidden="true" />
-          Signal
-        </button>
-        <button
-          className="label-button label-button-non-signal"
-          type="button"
-          aria-pressed={message.label === "non_signal"}
-          aria-label="Mark as Non-signal"
-          onClick={(event) => {
-            event.stopPropagation()
-            onLabelMessage(message.id, "non_signal")
-          }}
-        >
-          Non-signal
-        </button>
-      </div>
+      <header className="entry-head">
+        <div className="entry-meta">
+          <span className={`entry-dot dot-${labelClass}`} aria-hidden="true" />
+          <span className="entry-id">{message.sourceMessageId}</span>
+          <span className="entry-sep" aria-hidden="true">
+            ·
+          </span>
+          <time className="entry-time" dateTime={message.postedAt}>
+            {formatDateTime(message.postedAt)}
+          </time>
+          {message.isCandidate && <span className="candidate-chip">Candidate</span>}
+          <MessageTypeTag message={message} />
+        </div>
+        <div className="label-actions" aria-label="Label actions">
+          <span className={`label-state ${labelClass}`}>{labelText(message.label)}</span>
+          <button
+            className="label-button label-button-signal"
+            type="button"
+            aria-pressed={message.label === "signal"}
+            aria-label="Mark as Signal"
+            onClick={(event) => {
+              event.stopPropagation()
+              onLabelMessage(message.id, "signal")
+            }}
+          >
+            <TrendingUp size={14} aria-hidden="true" />
+            Signal
+          </button>
+          <button
+            className="label-button label-button-non-signal"
+            type="button"
+            aria-pressed={message.label === "non_signal"}
+            aria-label="Mark as Non-signal"
+            onClick={(event) => {
+              event.stopPropagation()
+              onLabelMessage(message.id, "non_signal")
+            }}
+          >
+            Non-signal
+          </button>
+        </div>
+      </header>
+      <p className="raw">{renderMessageBody(message.text)}</p>
     </article>
   )
 }
 
-function MessageTypeIcon({ message }: { message: SourceMessage }) {
+function MessageTypeTag({ message }: { message: SourceMessage }) {
   if (message.hasMedia) {
-    return (
-      <span className="type-icon" title="Media message">
-        <ImageIcon size={15} aria-hidden="true" />
-      </span>
-    )
+    return <span className="entry-tag">Media</span>
   }
 
-  return (
-    <span className="type-icon" title={message.isReply ? "Reply message" : "Text message"}>
-      <MessageSquare size={15} aria-hidden="true" />
-    </span>
-  )
+  if (message.isReply) {
+    return <span className="entry-tag">Reply</span>
+  }
+
+  return null
 }
 
 function Pagination({
@@ -567,6 +593,22 @@ function Pagination({
         <ChevronRight size={16} aria-hidden="true" />
       </button>
     </nav>
+  )
+}
+
+function renderMessageBody(text: string): ReactNode[] {
+  return tokenizeMessage(text).map((token, index) => renderToken(token, index))
+}
+
+function renderToken(token: MessageToken, index: number): ReactNode {
+  if (token.type === "text") {
+    return token.value
+  }
+
+  return (
+    <span className={`tok-${token.type}`} key={index}>
+      {token.value}
+    </span>
   )
 }
 
@@ -768,6 +810,14 @@ function targetConsumesReaderShortcut(target: EventTarget | null): boolean {
   }
 
   return ["BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)
+}
+
+function percentOf(value: number, total: number): string {
+  if (total <= 0) {
+    return "0%"
+  }
+
+  return `${(value / total) * 100}%`
 }
 
 function formatDateTime(value: string): string {
