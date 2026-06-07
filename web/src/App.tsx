@@ -9,7 +9,7 @@ import {
   SlidersHorizontal,
   TrendingUp,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import "./App.css"
 import {
   DEFAULT_PAGE_SIZE,
@@ -40,6 +40,7 @@ function App() {
   const [filter, setFilter] = useState<MessageFilter>("unlabeled")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
+  const [activeMessageId, setActiveMessageId] = useState<string | undefined>()
 
   const sortedMessages = useMemo(
     () => sortMessagesNewestFirst(messages),
@@ -49,16 +50,91 @@ function App() {
     () => filterMessages(sortedMessages, filter, searchQuery),
     [filter, searchQuery, sortedMessages],
   )
-  const pageSlice = paginateMessages(visibleMessages, page, DEFAULT_PAGE_SIZE)
+  const pageSlice = useMemo(
+    () => paginateMessages(visibleMessages, page, DEFAULT_PAGE_SIZE),
+    [page, visibleMessages],
+  )
   const stats = summarizeLabels(messages)
+  const activePageMessageId = selectActivePageMessageId(
+    activeMessageId,
+    pageSlice.items,
+  )
+
+  useEffect(() => {
+    function handleWindowKeyDown(event: KeyboardEvent) {
+      if (targetConsumesReaderShortcut(event.target)) {
+        return
+      }
+
+      if (event.altKey || event.ctrlKey || event.metaKey) {
+        return
+      }
+
+      if (event.key === "ArrowDown" || event.key.toLowerCase() === "j") {
+        event.preventDefault()
+        setActiveMessageId(
+          adjacentMessageId(pageSlice.items, activePageMessageId, 1),
+        )
+        return
+      }
+
+      if (event.key === "ArrowUp" || event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        setActiveMessageId(
+          adjacentMessageId(pageSlice.items, activePageMessageId, -1),
+        )
+        return
+      }
+
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault()
+        labelMessageWithShortcut("signal")
+        return
+      }
+
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault()
+        labelMessageWithShortcut("non_signal")
+      }
+    }
+
+    function labelMessageWithShortcut(label: LabelValue) {
+      if (!activePageMessageId) {
+        return
+      }
+
+      setMessages((currentMessages) =>
+        labelMessage(currentMessages, activePageMessageId, label),
+      )
+      setActiveMessageId(nextMessageIdAfter(pageSlice.items, activePageMessageId))
+    }
+
+    window.addEventListener("keydown", handleWindowKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown)
+    }
+  }, [activePageMessageId, pageSlice.items])
 
   function saveMessageLabel(messageId: string, label: LabelValue) {
     setMessages((currentMessages) => labelMessage(currentMessages, messageId, label))
+    setActiveMessageId(nextMessageIdAfter(pageSlice.items, messageId))
   }
 
   function selectMessageFilter(value: MessageFilter) {
     setFilter(value)
     setPage(1)
+    setActiveMessageId(undefined)
+  }
+
+  function updateSearchQuery(value: string) {
+    setSearchQuery(value)
+    setPage(1)
+    setActiveMessageId(undefined)
+  }
+
+  function selectActiveMessage(messageId: string) {
+    setActiveMessageId(messageId)
   }
 
   return (
@@ -88,10 +164,12 @@ function App() {
           filter={filter}
           onFilterChange={selectMessageFilter}
           searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          onSearchChange={updateSearchQuery}
         />
         <MessageTable
+          activeMessageId={activePageMessageId}
           messages={pageSlice.items}
+          onActivateMessage={selectActiveMessage}
           onLabelMessage={saveMessageLabel}
         />
         <Pagination
@@ -192,6 +270,17 @@ function ReaderControls({
 }) {
   return (
     <section className="reader-controls" aria-label="Message controls">
+      <label className="search-field" aria-label="Search messages">
+        <Search size={16} aria-hidden="true" />
+        <input
+          aria-label="Search messages"
+          placeholder="Search messages..."
+          type="search"
+          value={searchQuery}
+          onChange={(event) => onSearchChange(event.target.value)}
+        />
+      </label>
+
       <label className="filter-field">
         <span>
           <SlidersHorizontal size={15} aria-hidden="true" />
@@ -212,47 +301,41 @@ function ReaderControls({
           <option value="replies">Replies</option>
         </select>
       </label>
-
-      <div className="active-chip" aria-label="Active filter">
-        {filterLabel(filter)}
-      </div>
-
-      <label className="search-field">
-        <Search size={16} aria-hidden="true" />
-        <input
-          aria-label="Search messages"
-          placeholder="Search messages..."
-          type="search"
-          value={searchQuery}
-          onChange={(event) => onSearchChange(event.target.value)}
-        />
-        <kbd>⌘K</kbd>
-      </label>
     </section>
   )
 }
 
 function MessageTable({
+  activeMessageId,
   messages,
+  onActivateMessage,
   onLabelMessage,
 }: {
+  activeMessageId: string | undefined
   messages: SourceMessage[]
+  onActivateMessage: (messageId: string) => void
   onLabelMessage: (messageId: string, label: LabelValue) => void
 }) {
   return (
     <section className="message-table" aria-label="Messages">
-      <div className="message-header" role="row">
+      <div
+        aria-label="Source msg id Posted Captured Type Message Buttons"
+        className="message-header"
+        role="row"
+      >
         <span>Source msg id</span>
-        <span>Captured</span>
         <span>Posted</span>
+        <span>Captured</span>
         <span>Type</span>
         <span>Message</span>
-        <span>Label</span>
+        <span>Buttons</span>
       </div>
       {messages.map((message) => (
         <MessageRow
+          isActive={message.id === activeMessageId}
           key={message.id}
           message={message}
+          onActivateMessage={onActivateMessage}
           onLabelMessage={onLabelMessage}
         />
       ))}
@@ -261,54 +344,69 @@ function MessageTable({
 }
 
 function MessageRow({
+  isActive,
   message,
+  onActivateMessage,
   onLabelMessage,
 }: {
+  isActive: boolean
   message: SourceMessage
+  onActivateMessage: (messageId: string) => void
   onLabelMessage: (messageId: string, label: LabelValue) => void
 }) {
   return (
-    <article className="message-row" role="row" aria-label={`Source message ${message.sourceMessageId}`}>
+    <article
+      aria-current={isActive ? "true" : "false"}
+      aria-label={`Source message ${message.sourceMessageId}`}
+      className={`message-row message-row-${message.label ?? "unlabeled"}`}
+      onClick={() => onActivateMessage(message.id)}
+      role="row"
+      tabIndex={isActive ? 0 : -1}
+    >
       <div className="mono-cell message-id">
         <strong>{message.sourceMessageId}</strong>
         <span>{message.id}</span>
       </div>
-      <time className="mono-cell" dateTime={message.capturedAt}>
-        {formatDateTime(message.capturedAt)}
-      </time>
       <time className="mono-cell" dateTime={message.postedAt}>
         {formatDateTime(message.postedAt)}
       </time>
+      <time className="mono-cell" dateTime={message.capturedAt}>
+        {formatDateTime(message.capturedAt)}
+      </time>
       <MessageTypeIcon message={message} />
-      <div className="message-body">
+      <div className="message-body" aria-label="Message">
         <p>{message.text}</p>
         {message.isCandidate && <span className="candidate-chip">Candidate</span>}
       </div>
-      <div className="label-cell">
+      <div className="label-actions" aria-label="Label actions">
         <span className={`label-state ${message.label ?? "unlabeled"}`}>
           {labelText(message.label)}
         </span>
-        <div className="label-actions" aria-label="Label actions">
-          <button
-            className="label-button label-button-signal"
-            type="button"
-            aria-pressed={message.label === "signal"}
-            aria-label="Mark as Signal"
-            onClick={() => onLabelMessage(message.id, "signal")}
-          >
-            <TrendingUp size={14} aria-hidden="true" />
-            Signal
-          </button>
-          <button
-            className="label-button label-button-non-signal"
-            type="button"
-            aria-pressed={message.label === "non_signal"}
-            aria-label="Mark as Non-signal"
-            onClick={() => onLabelMessage(message.id, "non_signal")}
-          >
-            Non-signal
-          </button>
-        </div>
+        <button
+          className="label-button label-button-signal"
+          type="button"
+          aria-pressed={message.label === "signal"}
+          aria-label="Mark as Signal"
+          onClick={(event) => {
+            event.stopPropagation()
+            onLabelMessage(message.id, "signal")
+          }}
+        >
+          <TrendingUp size={14} aria-hidden="true" />
+          Signal
+        </button>
+        <button
+          className="label-button label-button-non-signal"
+          type="button"
+          aria-pressed={message.label === "non_signal"}
+          aria-label="Mark as Non-signal"
+          onClick={(event) => {
+            event.stopPropagation()
+            onLabelMessage(message.id, "non_signal")
+          }}
+        >
+          Non-signal
+        </button>
       </div>
     </article>
   )
@@ -477,21 +575,6 @@ function initialMessageLabel(sequence: number): LabelValue | undefined {
   return undefined
 }
 
-function filterLabel(filter: MessageFilter): string {
-  const labels: Record<MessageFilter, string> = {
-    all: "All",
-    candidates: "Candidates",
-    non_candidates: "Non-candidates",
-    unlabeled: "Unlabeled",
-    signal: "Signal",
-    non_signal: "Non-signal",
-    media: "Has media",
-    replies: "Replies",
-  }
-
-  return labels[filter]
-}
-
 function labelText(label: LabelValue | undefined): string {
   if (label === "signal") {
     return "Signal"
@@ -502,6 +585,72 @@ function labelText(label: LabelValue | undefined): string {
   }
 
   return "Unlabeled"
+}
+
+function selectActivePageMessageId(
+  activeMessageId: string | undefined,
+  messages: SourceMessage[],
+): string | undefined {
+  if (messages.length === 0) {
+    return undefined
+  }
+
+  if (activeMessageId && messages.some((message) => message.id === activeMessageId)) {
+    return activeMessageId
+  }
+
+  return messages[0].id
+}
+
+function adjacentMessageId(
+  messages: SourceMessage[],
+  activeMessageId: string | undefined,
+  offset: number,
+): string | undefined {
+  if (messages.length === 0) {
+    return undefined
+  }
+
+  const activeIndex = Math.max(
+    0,
+    messages.findIndex((message) => message.id === activeMessageId),
+  )
+  const nextIndex = clampIndex(activeIndex + offset, messages.length)
+
+  return messages[nextIndex].id
+}
+
+function nextMessageIdAfter(
+  messages: SourceMessage[],
+  messageId: string,
+): string | undefined {
+  if (messages.length === 0) {
+    return undefined
+  }
+
+  const currentIndex = messages.findIndex((message) => message.id === messageId)
+  if (currentIndex < 0) {
+    return messages[0].id
+  }
+
+  const nextIndex = Math.min(currentIndex + 1, messages.length - 1)
+  return messages[nextIndex]?.id
+}
+
+function clampIndex(index: number, length: number): number {
+  return Math.min(Math.max(index, 0), length - 1)
+}
+
+function targetConsumesReaderShortcut(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  if (target.isContentEditable) {
+    return true
+  }
+
+  return ["BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)
 }
 
 function formatDateTime(value: string): string {
