@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verasig · Labeling — C · Reading Stream</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: oklch(0.105 0.018 252);
+        --surface: oklch(0.135 0.018 252);
+        --surface-raised: oklch(0.17 0.02 252);
+        --surface-active: oklch(0.205 0.026 252);
+        --sidebar: oklch(0.082 0.016 252);
+        --border: oklch(0.255 0.02 252);
+        --border-strong: oklch(0.39 0.034 252);
+        --ink: oklch(0.95 0.012 252);
+        --muted: oklch(0.7 0.026 252);
+        --faint: oklch(0.58 0.024 252);
+        --primary: oklch(0.7 0.185 332);
+        --success: oklch(0.78 0.15 150);
+        --success-soft: oklch(0.26 0.05 150);
+        --warning: oklch(0.82 0.13 78);
+        --warning-soft: oklch(0.255 0.055 78);
+        --info: oklch(0.78 0.12 236);
+        --info-soft: oklch(0.25 0.045 236);
+        --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-sans);
+        font-size: 15px;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      .app-bar {
+        align-items: center;
+        background: var(--sidebar);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        gap: 32px;
+        height: 52px;
+        padding: 0 24px;
+      }
+      .brand {
+        align-items: center;
+        display: inline-flex;
+        font-size: 17px;
+        font-weight: 700;
+        gap: 8px;
+        letter-spacing: -0.01em;
+      }
+      .brand-mark {
+        align-items: center;
+        border: 2px solid var(--primary);
+        border-radius: 5px;
+        color: var(--primary);
+        display: inline-flex;
+        height: 22px;
+        justify-content: center;
+        width: 22px;
+      }
+      .app-nav {
+        display: flex;
+        gap: 18px;
+      }
+      .app-nav a {
+        color: var(--faint);
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .app-nav a[data-current] {
+        color: var(--ink);
+      }
+      .account {
+        align-items: center;
+        background: var(--surface-active);
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 700;
+        height: 28px;
+        justify-content: center;
+        margin-left: auto;
+        width: 28px;
+      }
+
+      .reader-head {
+        background: color-mix(in oklch, var(--bg) 88%, var(--sidebar));
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+      .head-inner {
+        margin: 0 auto;
+        max-width: 760px;
+        padding: 16px 24px;
+      }
+      .head-top {
+        align-items: center;
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+      }
+      .ctx-title {
+        align-items: center;
+        display: flex;
+        font-size: 16px;
+        font-weight: 650;
+        gap: 9px;
+      }
+      .ctx-title span {
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        font-weight: 400;
+      }
+      .progress {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+      }
+      .progress-text {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .progress-text b {
+        font-weight: 600;
+      }
+      .progress-text span {
+        color: var(--faint);
+      }
+      .meter {
+        display: flex;
+        gap: 2px;
+        height: 7px;
+        width: 180px;
+      }
+      .meter span {
+        height: 100%;
+      }
+      .meter .s {
+        background: var(--success);
+        border-radius: 99px 0 0 99px;
+      }
+      .meter .n {
+        background: var(--warning);
+      }
+      .meter .u {
+        background: var(--surface-active);
+        border-radius: 0 99px 99px 0;
+      }
+      .head-tools {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .search {
+        align-items: center;
+        background: color-mix(in oklch, var(--surface-raised) 70%, var(--surface));
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--muted);
+        display: flex;
+        gap: 8px;
+        height: 32px;
+        padding: 0 10px;
+        width: 240px;
+      }
+      .search input {
+        background: none;
+        border: 0;
+        color: var(--ink);
+        flex: 1;
+        font: inherit;
+        font-size: 13px;
+        outline: none;
+      }
+      .search input::placeholder {
+        color: var(--faint);
+      }
+      .pills {
+        display: flex;
+        gap: 6px;
+        margin-left: auto;
+      }
+      .pill {
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        height: 30px;
+        padding: 0 11px;
+      }
+      .pill[data-active] {
+        background: color-mix(in oklch, var(--primary) 16%, var(--surface-active));
+        border-color: color-mix(in oklch, var(--primary) 50%, var(--border));
+        color: var(--ink);
+      }
+
+      .stream {
+        margin: 0 auto;
+        max-width: 760px;
+        padding: 8px 24px 64px;
+      }
+      .entry {
+        border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+        padding: 22px 18px;
+        border-radius: 10px;
+      }
+      .entry-signal {
+        background: color-mix(in oklch, var(--success) 6%, transparent);
+      }
+      .entry-nonsignal {
+        background: color-mix(in oklch, var(--warning) 6%, transparent);
+      }
+      .entry[data-active] {
+        background: color-mix(in oklch, var(--primary) 8%, var(--surface));
+        box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 50%, transparent);
+      }
+      .entry-head {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+      }
+      .e-meta {
+        align-items: center;
+        color: var(--faint);
+        display: flex;
+        flex-wrap: wrap;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        gap: 10px;
+      }
+      .e-dot {
+        border-radius: 999px;
+        height: 8px;
+        width: 8px;
+      }
+      .dot-s {
+        background: var(--success);
+      }
+      .dot-n {
+        background: var(--warning);
+      }
+      .dot-u {
+        background: var(--border-strong);
+      }
+      .e-id {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .chip {
+        border-radius: 4px;
+        font-family: var(--font-sans);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 2px 6px;
+      }
+      .chip-cand {
+        background: var(--info-soft);
+        color: var(--info);
+      }
+      .e-actions {
+        align-items: center;
+        display: flex;
+        gap: 7px;
+      }
+      .lbtn {
+        align-items: center;
+        background: color-mix(in oklch, var(--surface-raised) 78%, var(--surface));
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--ink);
+        cursor: pointer;
+        display: inline-flex;
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 650;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+      }
+      .lbtn .kbd {
+        background: var(--bg);
+        border: 1px solid var(--border-strong);
+        border-radius: 4px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        padding: 1px 5px;
+      }
+      .lbtn.s {
+        border-color: color-mix(in oklch, var(--success) 34%, var(--border));
+        color: var(--success);
+      }
+      .lbtn.n {
+        border-color: color-mix(in oklch, var(--warning) 34%, var(--border));
+        color: var(--warning);
+      }
+      .state {
+        align-items: center;
+        border-radius: 6px;
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 600;
+        gap: 6px;
+        padding: 5px 10px;
+      }
+      .state-s {
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      .state-n {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+      .raw {
+        color: var(--ink);
+        font-size: 15px;
+        line-height: 1.72;
+        margin: 14px 0 0;
+        max-width: 64ch;
+        white-space: pre-wrap;
+      }
+      .raw .sym {
+        color: var(--info);
+        font-family: var(--font-mono);
+        font-weight: 600;
+      }
+      .raw .num {
+        color: oklch(0.9 0.02 252);
+        font-family: var(--font-mono);
+      }
+      .raw .side-short {
+        color: var(--danger, oklch(0.74 0.155 32));
+        font-weight: 600;
+      }
+      .raw.dim {
+        color: var(--muted);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-bar">
+      <span class="brand"><span class="brand-mark">◉</span>Verasig</span>
+      <nav class="app-nav">
+        <a href="#" data-current>Sources</a>
+        <a href="#">Distillation</a>
+      </nav>
+      <span class="account">EV</span>
+    </header>
+
+    <div class="reader-head">
+      <div class="head-inner">
+        <div class="head-top">
+          <div class="ctx-title">Crypto Alpha Signals <span>@cryptoalphasignals</span></div>
+          <div class="progress">
+            <div class="meter" title="58 signal · 38 non-signal · 144 unlabeled">
+              <span class="s" style="width: 24%"></span>
+              <span class="n" style="width: 16%"></span>
+              <span class="u" style="width: 60%"></span>
+            </div>
+            <div class="progress-text"><b>96</b> <span>of 240</span></div>
+          </div>
+        </div>
+        <div class="head-tools">
+          <label class="search">🔍<input placeholder="Search messages…" /></label>
+          <div class="pills">
+            <button class="pill" data-active>Unlabeled</button>
+            <button class="pill">Candidates</button>
+            <button class="pill">Signal</button>
+            <button class="pill">Non-signal</button>
+            <button class="pill">All</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stream">
+      <article class="entry" data-active>
+        <div class="entry-head">
+          <div class="e-meta">
+            <span class="e-dot dot-u"></span>
+            <span class="e-id">13485290297</span>
+            <span>04 Jun · 10:42</span>
+            <span class="chip chip-cand">● CANDIDATE</span>
+          </div>
+          <div class="e-actions">
+            <button class="lbtn s">↗ Signal <span class="kbd">S</span></button>
+            <button class="lbtn n">Non-signal <span class="kbd">N</span></button>
+          </div>
+        </div>
+        <p class="raw"><span class="sym">#ETH/USDT</span> <span class="side-short">SHORT</span>
+
+Entry: <span class="num">3,514-3,529</span>
+Leverage: <span class="num">12x</span>
+
+Targets: <span class="num">3,482</span> / <span class="num">3,448</span> / <span class="num">3,401</span> / <span class="num">3,360</span>
+Stop: <span class="num">3,612</span>
+
+Wait for confirmation candle before entering.</p>
+      </article>
+
+      <article class="entry entry-signal">
+        <div class="entry-head">
+          <div class="e-meta">
+            <span class="e-dot dot-s"></span>
+            <span class="e-id">13485290312</span>
+            <span>04 Jun · 10:51</span>
+            <span class="chip chip-cand">● CANDIDATE</span>
+          </div>
+          <div class="e-actions"><span class="state state-s">↗ Signal</span></div>
+        </div>
+        <p class="raw">🪙 МОНЕТА: <span class="sym">#ENA/USDT</span>
+
+📉 ПОКУПКА: <span class="side-short">SHORT</span> · ПЛЕЧО: <span class="num">16x</span>
+Вход: <span class="num">0.09109$</span>
+Фиксируем прибыль: <span class="num">0.08994</span> <span class="num">0.08844</span> <span class="num">0.08680</span>
+Стоп: <span class="num">0.09925$</span></p>
+      </article>
+
+      <article class="entry entry-nonsignal">
+        <div class="entry-head">
+          <div class="e-meta">
+            <span class="e-dot dot-n"></span>
+            <span class="e-id">13485290274</span>
+            <span>04 Jun · 10:33</span>
+            <span class="chip chip-cand" style="background: var(--surface-active); color: var(--faint)">↩ REPLY</span>
+          </div>
+          <div class="e-actions"><span class="state state-n">Non-signal</span></div>
+        </div>
+        <p class="raw dim">Replying to @TraderMax
+
+The setup is still valid. I would not add size before the retest. Risk stays 1 percent maximum.</p>
+      </article>
+
+      <article class="entry">
+        <div class="entry-head">
+          <div class="e-meta">
+            <span class="e-dot dot-u"></span>
+            <span class="e-id">13485290288</span>
+            <span>04 Jun · 10:39</span>
+            <span class="chip chip-cand">● CANDIDATE</span>
+          </div>
+          <div class="e-actions">
+            <button class="lbtn s">↗ Signal</button>
+            <button class="lbtn n">Non-signal</button>
+          </div>
+        </div>
+        <p class="raw">Quick update
+
+<span class="sym">#SOL/USDT</span> remains a candidate. No entry yet.
+
+Breakout level: <span class="num">164.80</span>
+Invalidation: close below <span class="num">158.20</span></p>
+      </article>
+
+      <article class="entry entry-signal">
+        <div class="entry-head">
+          <div class="e-meta">
+            <span class="e-dot dot-s"></span>
+            <span class="e-id">13485290260</span>
+            <span>04 Jun · 10:21</span>
+            <span class="chip chip-cand">● CANDIDATE</span>
+          </div>
+          <div class="e-actions"><span class="state state-s">↗ Signal</span></div>
+        </div>
+        <p class="raw"><span class="sym">#AVAX/USDT</span> LONG
+
+Entry: <span class="num">29.40</span>
+Targets: <span class="num">30.10</span> / <span class="num">30.80</span> / <span class="num">31.90</span>
+Stop: <span class="num">28.30</span>
+Volume confirmation is required.</p>
+      </article>
+    </div>
+  </body>
+</html>
