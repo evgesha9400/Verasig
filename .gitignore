@@ -22,3 +22,8 @@ build/
 *.db
 data/
 .DS_Store
+
+# Local tool state
+.impeccable/live/
+.playwright-mcp/
+graphify-out/.graphify_python
