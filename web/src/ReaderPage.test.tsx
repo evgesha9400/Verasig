@@ -142,13 +142,17 @@ describe("source labeling reader", () => {
     expect(firstEntry).toHaveClass("entry-non_signal")
   })
 
-  it("keeps the filter options open long enough to select one", async () => {
+  it("applies an extra filter from the More menu", async () => {
+    const user = userEvent.setup()
     renderReader()
 
-    await selectMessageFilter("All")
+    await user.click(screen.getByRole("button", { name: "More" }))
+    await user.click(screen.getByRole("option", { name: "Replies" }))
 
-    expect(screen.getByRole("button", { name: "Message filter: All" })).toBeVisible()
-    expect(screen.queryByRole("listbox", { name: "Message filter options" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Replies" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
   })
 
   it("labels the highlighted message with cross-platform keyboard shortcuts", async () => {
@@ -201,15 +205,8 @@ describe("source labeling reader", () => {
     const stats = screen.getByLabelText("Label stats")
     expect(within(stats).getByText("24")).toBeVisible()
 
-    const firstUnlabeled = entries().find((entry) =>
-      within(entry).queryByText("Unlabeled"),
-    )
-    expect(firstUnlabeled).toBeDefined()
-
     await user.click(
-      within(firstUnlabeled as HTMLElement).getByRole("button", {
-        name: "Mark as Signal",
-      }),
+      within(entries()[0]).getByRole("button", { name: "Mark as Signal" }),
     )
 
     expect(within(stats).getByText("25")).toBeVisible()
@@ -221,14 +218,15 @@ describe("source labeling reader", () => {
     await selectMessageFilter("Unlabeled")
 
     expect(screen.getByText(/100 per page/i)).toBeVisible()
-    expect(screen.getAllByText("Unlabeled").length).toBeGreaterThan(1)
+    expect(screen.getByRole("button", { name: "Unlabeled" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
   })
 })
 
 async function selectMessageFilter(label: string) {
   const user = userEvent.setup()
 
-  await user.click(screen.getByRole("button", { name: /message filter:/i }))
-  expect(screen.getByRole("listbox", { name: "Message filter options" })).toBeVisible()
-  await user.click(screen.getByRole("option", { name: label }))
+  await user.click(screen.getByRole("button", { name: label }))
 }

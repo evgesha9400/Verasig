@@ -5,8 +5,6 @@ import {
   ChevronRight,
   FlaskConical,
   Search,
-  Send,
-  SlidersHorizontal,
   TrendingUp,
 } from "lucide-react"
 import {
@@ -37,18 +35,16 @@ type MessageFilterOption = {
   value: MessageFilter
 }
 
-const defaultMessageFilterOption: MessageFilterOption = {
-  label: "All",
-  value: "all",
-}
-
-const messageFilterOptions: MessageFilterOption[] = [
-  defaultMessageFilterOption,
-  { label: "Candidates", value: "candidates" },
-  { label: "Non-candidates", value: "non_candidates" },
+const primaryFilterOptions: MessageFilterOption[] = [
   { label: "Unlabeled", value: "unlabeled" },
+  { label: "Candidates", value: "candidates" },
   { label: "Signal", value: "signal" },
   { label: "Non-signal", value: "non_signal" },
+  { label: "All", value: "all" },
+]
+
+const moreFilterOptions: MessageFilterOption[] = [
+  { label: "Non-candidates", value: "non_candidates" },
   { label: "Has media", value: "media" },
   { label: "Replies", value: "replies" },
 ]
@@ -222,54 +218,44 @@ function ReaderHeader({
     <header className="reader-head">
       <div className="reader-head-top">
         <div className="reader-source">
-          <span className="reader-source-mark" aria-hidden="true">
-            <Send size={18} strokeWidth={2.2} />
-          </span>
-          <div className="reader-source-text">
-            <h2 className="reader-source-title">
-              {chat.title}
-              <span className="reader-platform">Telegram</span>
-            </h2>
-            <p className="reader-source-sub">
-              <span className="reader-handle">
-                {chat.handle ?? "Private channel"}
-              </span>
-              <span className="reader-dot" aria-hidden="true">
-                ·
-              </span>
-              <span className="reader-complete">
-                <Check size={14} aria-hidden="true" />
-                backfill complete
-              </span>
-              <span className="reader-dot" aria-hidden="true">
-                ·
-              </span>
-              <span>{formatNumber(chat.capturedCount)} captured</span>
-            </p>
-          </div>
+          <h2 className="reader-source-title">
+            {chat.title}
+            <span className="reader-handle">
+              {chat.handle ?? "private channel"}
+            </span>
+          </h2>
+          <p className="reader-source-sub">
+            <span className="reader-platform">Telegram</span>
+            <span className="reader-dot" aria-hidden="true">
+              ·
+            </span>
+            <span className="reader-complete">
+              <Check size={14} aria-hidden="true" />
+              backfill complete
+            </span>
+            <span className="reader-dot" aria-hidden="true">
+              ·
+            </span>
+            <span>{formatNumber(chat.capturedCount)} captured</span>
+          </p>
         </div>
 
-        <div className="reader-stats" aria-label="Label stats">
-          <div className="reader-stats-head">
-            <span className="reader-stats-count">
-              <b>{formatNumber(stats.labeled)}</b> labeled{" "}
-              <span>of {formatNumber(stats.total)}</span>
+        <div className="reader-progress">
+          <div className="reader-progress-meter" aria-label="Label stats">
+            <LabelMeter
+              nonSignals={stats.nonSignals}
+              signals={stats.signals}
+              total={stats.total}
+            />
+            <span className="reader-progress-count">
+              <b>{formatNumber(stats.labeled)}</b>
+              <span> of {formatNumber(stats.total)} labeled</span>
             </span>
-            <button className="reader-distill" type="button">
-              <FlaskConical size={14} aria-hidden="true" />
-              Start distillation
-            </button>
           </div>
-          <LabelMeter
-            nonSignals={stats.nonSignals}
-            signals={stats.signals}
-            total={stats.total}
-          />
-          <ul className="reader-legend">
-            <LegendItem tone="signal" value={stats.signals} label="signals" />
-            <LegendItem tone="nonsignal" value={stats.nonSignals} label="non-signals" />
-            <LegendItem tone="unlabeled" value={stats.unlabeled} label="unlabeled" />
-          </ul>
+          <button className="reader-distill" type="button">
+            <FlaskConical size={14} aria-hidden="true" />
+            Start distillation
+          </button>
         </div>
       </div>
 
@@ -304,23 +290,6 @@ function LabelMeter({
   )
 }
 
-function LegendItem({
-  label,
-  tone,
-  value,
-}: {
-  label: string
-  tone: "signal" | "nonsignal" | "unlabeled"
-  value: number
-}) {
-  return (
-    <li>
-      <span className={`legend-dot legend-${tone}`} aria-hidden="true" />
-      <b>{formatNumber(value)}</b> {label}
-    </li>
-  )
-}
-
 function ReaderControls({
   filter,
   onFilterChange,
@@ -332,58 +301,6 @@ function ReaderControls({
   onSearchChange: (value: string) => void
   searchQuery: string
 }) {
-  const filterMenuId = useId()
-  const filterMenuRef = useRef<HTMLDivElement>(null)
-  const [isFilterMenuOpen, setFilterMenuOpen] = useState(false)
-  const selectedFilterOption = selectMessageFilterOption(filter)
-
-  useEffect(() => {
-    if (!isFilterMenuOpen) {
-      return
-    }
-
-    function closeFilterMenuWhenPointerStartsOutside(event: PointerEvent) {
-      if (targetIsInsideElement(filterMenuRef.current, event.target)) {
-        return
-      }
-
-      setFilterMenuOpen(false)
-    }
-
-    document.addEventListener("pointerdown", closeFilterMenuWhenPointerStartsOutside)
-
-    return () => {
-      document.removeEventListener(
-        "pointerdown",
-        closeFilterMenuWhenPointerStartsOutside,
-      )
-    }
-  }, [isFilterMenuOpen])
-
-  function toggleFilterMenu() {
-    setFilterMenuOpen((currentValue) => !currentValue)
-  }
-
-  function closeFilterMenu() {
-    setFilterMenuOpen(false)
-  }
-
-  function closeFilterMenuWhenEscapeIsPressed(
-    event: ReactKeyboardEvent<HTMLDivElement>,
-  ) {
-    if (event.key !== "Escape") {
-      return
-    }
-
-    event.preventDefault()
-    closeFilterMenu()
-  }
-
-  function selectFilterOption(value: MessageFilter) {
-    onFilterChange(value)
-    closeFilterMenu()
-  }
-
   return (
     <section className="reader-controls" aria-label="Message controls">
       <label className="search-field" aria-label="Search messages">
@@ -397,56 +314,112 @@ function ReaderControls({
         />
       </label>
 
-      <div
-        className="filter-menu-wrapper"
-        onKeyDown={closeFilterMenuWhenEscapeIsPressed}
-        ref={filterMenuRef}
-      >
-        <button
-          aria-controls={filterMenuId}
-          aria-expanded={isFilterMenuOpen}
-          aria-haspopup="listbox"
-          aria-label={`Message filter: ${selectedFilterOption.label}`}
-          className="filter-trigger"
-          type="button"
-          onClick={toggleFilterMenu}
-        >
-          <span className="filter-trigger-label">
-            <SlidersHorizontal size={15} aria-hidden="true" />
-            Filter
-          </span>
-          <span className="filter-trigger-value">{selectedFilterOption.label}</span>
-          <ChevronDown
-            className="filter-trigger-chevron"
-            size={15}
-            aria-hidden="true"
-          />
-        </button>
-
-        {isFilterMenuOpen && (
-          <div
-            aria-label="Message filter options"
-            className="filter-popover"
-            id={filterMenuId}
-            role="listbox"
+      <div className="filter-pills" role="group" aria-label="Message filter">
+        {primaryFilterOptions.map((option) => (
+          <button
+            aria-pressed={option.value === filter}
+            className="filter-pill"
+            key={option.value}
+            type="button"
+            onClick={() => onFilterChange(option.value)}
           >
-            {messageFilterOptions.map((option) => (
-              <button
-                aria-selected={option.value === filter}
-                className="filter-option"
-                key={option.value}
-                role="option"
-                type="button"
-                onClick={() => selectFilterOption(option.value)}
-              >
-                <span>{option.label}</span>
-                {option.value === filter && <Check size={14} aria-hidden="true" />}
-              </button>
-            ))}
-          </div>
-        )}
+            {option.label}
+          </button>
+        ))}
+        <MoreFilter filter={filter} onFilterChange={onFilterChange} />
       </div>
     </section>
+  )
+}
+
+function MoreFilter({
+  filter,
+  onFilterChange,
+}: {
+  filter: MessageFilter
+  onFilterChange: (value: MessageFilter) => void
+}) {
+  const menuId = useId()
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setOpen] = useState(false)
+  const activeOption = moreFilterOptions.find((option) => option.value === filter)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    function closeWhenPointerStartsOutside(event: PointerEvent) {
+      if (targetIsInsideElement(menuRef.current, event.target)) {
+        return
+      }
+
+      setOpen(false)
+    }
+
+    document.addEventListener("pointerdown", closeWhenPointerStartsOutside)
+
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenPointerStartsOutside)
+    }
+  }, [isOpen])
+
+  function closeWhenEscapePressed(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape") {
+      return
+    }
+
+    event.preventDefault()
+    setOpen(false)
+  }
+
+  function selectOption(value: MessageFilter) {
+    onFilterChange(value)
+    setOpen(false)
+  }
+
+  return (
+    <div
+      className="more-filter"
+      onKeyDown={closeWhenEscapePressed}
+      ref={menuRef}
+    >
+      <button
+        aria-controls={menuId}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-pressed={activeOption !== undefined}
+        className="filter-pill more-trigger"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {activeOption ? activeOption.label : "More"}
+        <ChevronDown size={14} aria-hidden="true" />
+      </button>
+
+      {isOpen && (
+        <div
+          aria-label="More filters"
+          className="filter-popover"
+          id={menuId}
+          role="listbox"
+        >
+          {moreFilterOptions.map((option) => (
+            <button
+              aria-selected={option.value === filter}
+              className="filter-option"
+              key={option.value}
+              role="option"
+              type="button"
+              onClick={() => selectOption(option.value)}
+            >
+              <span>{option.label}</span>
+              {option.value === filter && <Check size={14} aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -511,35 +484,75 @@ function MessageEntry({
         <MessageTypeTag message={message} />
       </div>
       <p className="raw">{renderMessageBody(message.text)}</p>
-      <div className="label-actions" aria-label="Label actions">
-        <span className={`label-state ${labelClass}`}>{labelText(message.label)}</span>
-        <button
-          className="label-button label-button-signal"
-          type="button"
-          aria-pressed={message.label === "signal"}
-          aria-label="Mark as Signal"
-          onClick={(event) => {
-            event.stopPropagation()
-            onLabelMessage(message.id, "signal")
-          }}
-        >
-          <TrendingUp size={14} aria-hidden="true" />
-          Signal
-        </button>
-        <button
-          className="label-button label-button-non-signal"
-          type="button"
-          aria-pressed={message.label === "non_signal"}
-          aria-label="Mark as Non-signal"
-          onClick={(event) => {
-            event.stopPropagation()
-            onLabelMessage(message.id, "non_signal")
-          }}
-        >
-          Non-signal
-        </button>
-      </div>
+      <EntryActions
+        isActive={isActive}
+        message={message}
+        onLabelMessage={onLabelMessage}
+      />
     </article>
+  )
+}
+
+function EntryActions({
+  isActive,
+  message,
+  onLabelMessage,
+}: {
+  isActive: boolean
+  message: SourceMessage
+  onLabelMessage: (messageId: string, label: LabelValue) => void
+}) {
+  if (message.label && !isActive) {
+    return (
+      <div className="entry-state">
+        <span className={`label-chip label-chip-${message.label}`}>
+          {message.label === "signal" && (
+            <TrendingUp size={13} aria-hidden="true" />
+          )}
+          {labelText(message.label)}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="label-actions" aria-label="Label actions">
+      <button
+        className="label-button label-button-signal"
+        type="button"
+        aria-pressed={message.label === "signal"}
+        aria-label="Mark as Signal"
+        onClick={(event) => {
+          event.stopPropagation()
+          onLabelMessage(message.id, "signal")
+        }}
+      >
+        <TrendingUp size={14} aria-hidden="true" />
+        Signal
+        {isActive && (
+          <span className="kbd" aria-hidden="true">
+            S
+          </span>
+        )}
+      </button>
+      <button
+        className="label-button label-button-non-signal"
+        type="button"
+        aria-pressed={message.label === "non_signal"}
+        aria-label="Mark as Non-signal"
+        onClick={(event) => {
+          event.stopPropagation()
+          onLabelMessage(message.id, "non_signal")
+        }}
+      >
+        Non-signal
+        {isActive && (
+          <span className="kbd" aria-hidden="true">
+            N
+          </span>
+        )}
+      </button>
+    </div>
   )
 }
 
@@ -728,13 +741,6 @@ function labelText(label: LabelValue | undefined): string {
   }
 
   return "Unlabeled"
-}
-
-function selectMessageFilterOption(filter: MessageFilter): MessageFilterOption {
-  return (
-    messageFilterOptions.find((option) => option.value === filter) ??
-    defaultMessageFilterOption
-  )
 }
 
 function targetIsInsideElement(
