@@ -58,6 +58,23 @@ export function findChatById(
   return chats.find((chat) => chat.id === chatId)
 }
 
+export function filterChats(chats: SourceChat[], query: string): SourceChat[] {
+  const needle = query.trim().toLowerCase()
+  if (!needle) {
+    return chats
+  }
+
+  return chats.filter((chat) => chatMatchesQuery(chat, needle))
+}
+
+function chatMatchesQuery(chat: SourceChat, needle: string): boolean {
+  if (chat.title.toLowerCase().includes(needle)) {
+    return true
+  }
+
+  return chat.handle?.toLowerCase().includes(needle) ?? false
+}
+
 export function startBackfill(chats: SourceChat[], chatId: string): SourceChat[] {
   if (isBackfillActive(chats)) {
     return chats

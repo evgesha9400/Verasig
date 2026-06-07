@@ -4,6 +4,7 @@ import {
   canStartBackfill,
   cancelBackfill,
   estimateSecondsRemaining,
+  filterChats,
   findRunningChat,
   isBackfillActive,
   isBackfilled,
@@ -107,6 +108,19 @@ describe("source chats state", () => {
 
   it("reports an idle chat with zero captured as a fresh, non-resumable start", () => {
     expect(isResumable(makeChat({ status: "idle", capturedCount: 0 }))).toBe(false)
+  })
+
+  it("filters chats by title or handle and ignores empty queries", () => {
+    const chats = [
+      makeChat({ id: "a", title: "Whale Pump Alerts", handle: "@whalepump" }),
+      makeChat({ id: "b", title: "Математик Торговля", handle: null }),
+      makeChat({ id: "c", title: "Macro Desk", handle: "@macrodesk" }),
+    ]
+
+    expect(filterChats(chats, "  ").map((chat) => chat.id)).toEqual(["a", "b", "c"])
+    expect(filterChats(chats, "whale").map((chat) => chat.id)).toEqual(["a"])
+    expect(filterChats(chats, "@macro").map((chat) => chat.id)).toEqual(["c"])
+    expect(filterChats(chats, "Математик").map((chat) => chat.id)).toEqual(["b"])
   })
 
   it("estimates remaining seconds from the capture rate", () => {
