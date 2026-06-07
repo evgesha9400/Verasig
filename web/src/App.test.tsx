@@ -87,9 +87,7 @@ describe("source labeling reader", () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Message filter" }), [
-      "all",
-    ])
+    await selectMessageFilter("All")
 
     const firstMessage = screen.getAllByRole("row", { name: /source message/i })[0]
 
@@ -104,9 +102,7 @@ describe("source labeling reader", () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Message filter" }), [
-      "all",
-    ])
+    await selectMessageFilter("All")
 
     const firstMessage = screen.getAllByRole("row", { name: /source message/i })[0]
 
@@ -124,6 +120,15 @@ describe("source labeling reader", () => {
     const firstControl = controls.firstElementChild
 
     expect(firstControl).toHaveAccessibleName("Search messages")
+  })
+
+  it("keeps the filter options open long enough to select one", async () => {
+    render(<App />)
+
+    await selectMessageFilter("All")
+
+    expect(screen.getByRole("button", { name: "Message filter: All" })).toBeVisible()
+    expect(screen.queryByRole("listbox", { name: "Message filter options" })).not.toBeInTheDocument()
   })
 
   it("labels the highlighted message with cross-platform keyboard shortcuts", async () => {
@@ -196,14 +201,19 @@ describe("source labeling reader", () => {
   })
 
   it("filters to unlabeled messages and keeps pagination compact", async () => {
-    const user = userEvent.setup()
     render(<App />)
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Message filter" }), [
-      "unlabeled",
-    ])
+    await selectMessageFilter("Unlabeled")
 
     expect(screen.getByText(/100 per page/i)).toBeVisible()
     expect(screen.getAllByText("Unlabeled").length).toBeGreaterThan(1)
   })
 })
+
+async function selectMessageFilter(label: string) {
+  const user = userEvent.setup()
+
+  await user.click(screen.getByRole("button", { name: /message filter:/i }))
+  expect(screen.getByRole("listbox", { name: "Message filter options" })).toBeVisible()
+  await user.click(screen.getByRole("option", { name: label }))
+}

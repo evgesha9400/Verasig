@@ -1,5 +1,7 @@
 import {
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   FlaskConical,
@@ -9,7 +11,14 @@ import {
   SlidersHorizontal,
   TrendingUp,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react"
 import "./App.css"
 import {
   DEFAULT_PAGE_SIZE,
@@ -34,6 +43,27 @@ const selectedFeed: SourceFeed = {
 }
 
 const initialMessages = makeSourceMessages()
+
+type MessageFilterOption = {
+  label: string
+  value: MessageFilter
+}
+
+const defaultMessageFilterOption: MessageFilterOption = {
+  label: "All",
+  value: "all",
+}
+
+const messageFilterOptions: MessageFilterOption[] = [
+  defaultMessageFilterOption,
+  { label: "Candidates", value: "candidates" },
+  { label: "Non-candidates", value: "non_candidates" },
+  { label: "Unlabeled", value: "unlabeled" },
+  { label: "Signal", value: "signal" },
+  { label: "Non-signal", value: "non_signal" },
+  { label: "Has media", value: "media" },
+  { label: "Replies", value: "replies" },
+]
 
 function App() {
   const [messages, setMessages] = useState(initialMessages)
@@ -268,6 +298,58 @@ function ReaderControls({
   onSearchChange: (value: string) => void
   searchQuery: string
 }) {
+  const filterMenuId = useId()
+  const filterMenuRef = useRef<HTMLDivElement>(null)
+  const [isFilterMenuOpen, setFilterMenuOpen] = useState(false)
+  const selectedFilterOption = selectMessageFilterOption(filter)
+
+  useEffect(() => {
+    if (!isFilterMenuOpen) {
+      return
+    }
+
+    function closeFilterMenuWhenPointerStartsOutside(event: PointerEvent) {
+      if (targetIsInsideElement(filterMenuRef.current, event.target)) {
+        return
+      }
+
+      setFilterMenuOpen(false)
+    }
+
+    document.addEventListener("pointerdown", closeFilterMenuWhenPointerStartsOutside)
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        closeFilterMenuWhenPointerStartsOutside,
+      )
+    }
+  }, [isFilterMenuOpen])
+
+  function toggleFilterMenu() {
+    setFilterMenuOpen((currentValue) => !currentValue)
+  }
+
+  function closeFilterMenu() {
+    setFilterMenuOpen(false)
+  }
+
+  function closeFilterMenuWhenEscapeIsPressed(
+    event: ReactKeyboardEvent<HTMLDivElement>,
+  ) {
+    if (event.key !== "Escape") {
+      return
+    }
+
+    event.preventDefault()
+    closeFilterMenu()
+  }
+
+  function selectFilterOption(value: MessageFilter) {
+    onFilterChange(value)
+    closeFilterMenu()
+  }
+
   return (
     <section className="reader-controls" aria-label="Message controls">
       <label className="search-field" aria-label="Search messages">
@@ -281,26 +363,55 @@ function ReaderControls({
         />
       </label>
 
-      <label className="filter-field">
-        <span>
-          <SlidersHorizontal size={15} aria-hidden="true" />
-          Filter
-        </span>
-        <select
-          aria-label="Message filter"
-          value={filter}
-          onChange={(event) => onFilterChange(event.target.value as MessageFilter)}
+      <div
+        className="filter-menu-wrapper"
+        onKeyDown={closeFilterMenuWhenEscapeIsPressed}
+        ref={filterMenuRef}
+      >
+        <button
+          aria-controls={filterMenuId}
+          aria-expanded={isFilterMenuOpen}
+          aria-haspopup="listbox"
+          aria-label={`Message filter: ${selectedFilterOption.label}`}
+          className="filter-trigger"
+          type="button"
+          onClick={toggleFilterMenu}
         >
-          <option value="all">All</option>
-          <option value="candidates">Candidates</option>
-          <option value="non_candidates">Non-candidates</option>
-          <option value="unlabeled">Unlabeled</option>
-          <option value="signal">Signal</option>
-          <option value="non_signal">Non-signal</option>
-          <option value="media">Has media</option>
-          <option value="replies">Replies</option>
-        </select>
-      </label>
+          <span className="filter-trigger-label">
+            <SlidersHorizontal size={15} aria-hidden="true" />
+            Filter
+          </span>
+          <span className="filter-trigger-value">{selectedFilterOption.label}</span>
+          <ChevronDown
+            className="filter-trigger-chevron"
+            size={15}
+            aria-hidden="true"
+          />
+        </button>
+
+        {isFilterMenuOpen && (
+          <div
+            aria-label="Message filter options"
+            className="filter-popover"
+            id={filterMenuId}
+            role="listbox"
+          >
+            {messageFilterOptions.map((option) => (
+              <button
+                aria-selected={option.value === filter}
+                className="filter-option"
+                key={option.value}
+                role="option"
+                type="button"
+                onClick={() => selectFilterOption(option.value)}
+              >
+                <span>{option.label}</span>
+                {option.value === filter && <Check size={14} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }
@@ -585,6 +696,20 @@ function labelText(label: LabelValue | undefined): string {
   }
 
   return "Unlabeled"
+}
+
+function selectMessageFilterOption(filter: MessageFilter): MessageFilterOption {
+  return (
+    messageFilterOptions.find((option) => option.value === filter) ??
+    defaultMessageFilterOption
+  )
+}
+
+function targetIsInsideElement(
+  element: HTMLElement | null,
+  target: EventTarget | null,
+): boolean {
+  return element !== null && target instanceof Node && element.contains(target)
 }
 
 function selectActivePageMessageId(
