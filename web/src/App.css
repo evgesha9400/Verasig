@@ -235,12 +235,13 @@
 
 .reader-controls {
   align-items: center;
+  background: color-mix(in oklch, var(--surface) 84%, var(--sidebar));
   border-top: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm) var(--space-md);
   min-height: 52px;
-  padding: var(--space-sm) var(--space-lg);
+  padding: var(--space-md) var(--space-xl);
 }
 
 .filter-pills {
@@ -701,6 +702,7 @@
   .reader-controls {
     align-items: stretch;
     flex-direction: column;
+    padding: var(--space-md) var(--space-lg);
   }
 
   .search-field {

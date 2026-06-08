@@ -154,14 +154,13 @@ function ReaderPage({ chat, onBack }: { chat: SourceChat; onBack: () => void }) 
   return (
     <section className="reader-frame" aria-label="Source labeling reader">
       <ReaderBreadcrumb chat={chat} onBack={onBack} />
-      <ReaderHeader chat={chat} stats={stats}>
-        <ReaderControls
-          filter={filter}
-          onFilterChange={selectMessageFilter}
-          searchQuery={searchQuery}
-          onSearchChange={updateSearchQuery}
-        />
-      </ReaderHeader>
+      <ReaderHeader chat={chat} stats={stats} />
+      <ReaderControls
+        filter={filter}
+        onFilterChange={selectMessageFilter}
+        searchQuery={searchQuery}
+        onSearchChange={updateSearchQuery}
+      />
       <MessageStream
         activeMessageId={activePageMessageId}
         messages={pageSlice.items}
@@ -208,11 +207,9 @@ function ReaderBreadcrumb({
 function ReaderHeader({
   chat,
   stats,
-  children,
 }: {
   chat: SourceChat
   stats: ReturnType<typeof summarizeLabels>
-  children: ReactNode
 }) {
   return (
     <header className="reader-head">
@@ -258,8 +255,6 @@ function ReaderHeader({
           </button>
         </div>
       </div>
-
-      {children}
     </header>
   )
 }
