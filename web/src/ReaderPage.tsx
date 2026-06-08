@@ -38,12 +38,12 @@ type MessageFilterOption = {
 const primaryFilterOptions: MessageFilterOption[] = [
   { label: "Unlabeled", value: "unlabeled" },
   { label: "Candidates", value: "candidates" },
-  { label: "Signal", value: "signal" },
-  { label: "Non-signal", value: "non_signal" },
   { label: "All", value: "all" },
 ]
 
 const moreFilterOptions: MessageFilterOption[] = [
+  { label: "Signal", value: "signal" },
+  { label: "Non-signal", value: "non_signal" },
   { label: "Non-candidates", value: "non_candidates" },
   { label: "Has media", value: "media" },
   { label: "Replies", value: "replies" },
