@@ -31,3 +31,7 @@ data/
 .impeccable/live/
 .playwright-mcp/
 graphify-out/.graphify_python
+graphify-out/.graphify_*.json
+graphify-out/cache/
+graphify-out/cost.json
+graphify-out/manifest.json

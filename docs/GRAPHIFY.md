@@ -7,6 +7,19 @@
 - Treat `graphify-out/graph.json` as the canonical graph output.
 - Treat `graphify-out/GRAPH_REPORT.md` as the audit report.
 - Treat `graphify-out/graph.html` as the browser view.
+- Treat Graphify cache/state files as local generated artifacts.
+
+## Git Tracking
+
+| Path | Rule |
+|---|---|
+| `graphify-out/graph.json` | Track when intentionally refreshed. |
+| `graphify-out/GRAPH_REPORT.md` | Track when intentionally refreshed. |
+| `graphify-out/graph.html` | Track when intentionally refreshed. |
+| `graphify-out/cache/` | Ignore. |
+| `graphify-out/.graphify_*.json` | Ignore. |
+| `graphify-out/cost.json` | Ignore. |
+| `graphify-out/manifest.json` | Ignore. |
 
 ## Default Rule
 
