@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Button } from '../../../design-system/index.js'
-import { Icon } from '../../../design-system/index.js'
+import { Button } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 
 /* Verasig prototype — Label step: Tinder-style signal / non-signal classification.
    Labeling is BINARY on purpose: a reply that is a signal is, by definition, an

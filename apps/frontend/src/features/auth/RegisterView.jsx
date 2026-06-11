@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Button, Input } from '../../design-system/index.js'
-import { Icon } from '../../design-system/index.js'
+import { Button, Input } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Button } from '../../../design-system/index.js'
-import { Icon } from '../../../design-system/index.js'
+import { Button } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import { DISTILLED_RULES } from '../../../data/seed.js'
 
 /* Verasig prototype — Distill step: AI generates filtering rules */

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Select, Tabs, Badge, Button, Icon } from '../../design-system/index.js'
+import { Select, Tabs, Badge, Button, Icon } from '@verasig/design-system'
 import { SIGNALS, SOURCES, MOD_KINDS, ORPHAN_MODS, ORPHAN_LINKED_MOD } from '../../data/seed.js'
 
 /* Verasig prototype — Signals page: extracted output of analyzed feeds, filterable by source & feed.

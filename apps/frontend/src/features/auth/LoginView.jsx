@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Button, Input, Checkbox } from '../../design-system/index.js'
-import { Icon } from '../../design-system/index.js'
+import { Button, Input, Checkbox } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
 

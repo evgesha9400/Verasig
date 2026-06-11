@@ -1,6 +1,6 @@
 /* Verasig prototype — Sources page */
-import { Badge, Button } from '../../design-system/index.js';
-import { Icon } from '../../design-system/index.js';
+import { Badge, Button } from '@verasig/design-system';
+import { Icon } from '@verasig/design-system';
 
 export function SourcesView({ telegramConnected, chats, onConnectTelegram, onOpenTelegram }) {
   const analyzed = chats.filter((c) => c.status === 'analyzed').length;

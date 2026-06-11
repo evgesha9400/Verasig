@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Button, Input, Select, Tabs, Switch } from '../../../design-system/index.js'
-import { Icon } from '../../../design-system/index.js'
+import { Button, Input, Select, Tabs, Switch } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import './execution.css'
 
 /* Verasig prototype — Execution step (reorganised risk step) exploration.

@@ -1,7 +1,7 @@
 /* Verasig prototype — Telegram connect flow: credentials -> verification code */
 import { useState, useRef } from 'react';
-import { Input, Button, Banner } from '../../design-system/index.js';
-import { Icon } from '../../design-system/index.js';
+import { Input, Button, Banner } from '@verasig/design-system';
+import { Icon } from '@verasig/design-system';
 
 export function TelegramSetup({ onConnected, onCancel }) {
   const [phase, setPhase] = useState('creds'); // creds | sending | code | verifying

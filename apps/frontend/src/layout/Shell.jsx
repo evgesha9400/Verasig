@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Avatar } from '../design-system/index.js'
-import { Icon } from '../design-system/index.js'
+import { Avatar } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 
 /* Verasig prototype — user account popover (Vercel-style) */
 export function UserMenu({ user, theme, onThemeChange, onLogout, onOpenSettings }) {

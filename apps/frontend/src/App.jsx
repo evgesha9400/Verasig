@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
-import { Button, IconButton, ToastStack, Toast, Dialog } from './design-system/index.js'
-import { Icon } from './design-system/index.js'
+import { Button, IconButton, ToastStack, Toast, Dialog } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import { Shell } from './layout/Shell.jsx'
 import { Pipeline, PIPELINE_STEPS } from './features/pipeline/Pipeline.jsx'
 import { SourcesView } from './features/sources/SourcesView.jsx'

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Card, Input, Button, Badge, Banner, Dialog } from '../../design-system/index.js'
-import { Icon } from '../../design-system/index.js'
+import { Card, Input, Button, Badge, Banner, Dialog } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 
 export function SettingsView({ user, onUpdateUser, onToast }) {
   /* ---- profile ---- */

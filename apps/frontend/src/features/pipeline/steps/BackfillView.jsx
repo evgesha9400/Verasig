@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button } from '../../../design-system/index.js'
-import { Icon } from '../../../design-system/index.js'
+import { Button } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 
 /* Verasig prototype — backfill infinite loader */
 export function BackfillView({ chat, onCancel, onComplete }) {

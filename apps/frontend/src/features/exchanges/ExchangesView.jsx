@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Badge, Button, Dialog, Input, Banner, Switch } from '../../design-system/index.js'
-import { Icon } from '../../design-system/index.js'
+import { Badge, Button, Dialog, Input, Banner, Switch } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import { EXCHANGES } from '../../data/seed.js'
 
 export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
