@@ -40,6 +40,14 @@ function loadUser() {
   try { return { ...USER_DEFAULTS, ...(JSON.parse(localStorage.getItem(USER_KEY)) || {}) } } catch { return { ...USER_DEFAULTS } }
 }
 
+// The marketing site (root domain) links here with ?signup=1 for "Get started".
+const MARKETING_URL = import.meta.env.VITE_MARKETING_URL || 'http://localhost:5174'
+function initialAuthScreen() {
+  try {
+    return new URLSearchParams(window.location.search).get('signup') === '1' ? 'register' : 'login'
+  } catch { return 'login' }
+}
+
 function mergeChatFlags(savedChats) {
   if (!Array.isArray(savedChats)) return CHATS
   const seed = Object.fromEntries(CHATS.map((c) => [c.id, c]))
@@ -70,7 +78,7 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [backTarget, setBackTarget] = useState(null)
   const [signalsPreset, setSignalsPreset] = useState(null)
-  const [authScreen, setAuthScreen] = useState('login') // 'login' | 'register' | null
+  const [authScreen, setAuthScreen] = useState(initialAuthScreen) // 'login' | 'register' | null
 
   function goToDeletedSignals(c) {
     setSignalsPreset({ source: 'all', feed: c.id, tab: 'deleted', _t: Date.now() })
@@ -261,7 +269,7 @@ export default function App() {
   return (
     <>
       <Shell nav={nav} onNavigate={handleNav} title={title} subtitle={subtitle} breadcrumb={breadcrumb} onExit={onExit} actions={actions} pipeline={pipeline}
-        theme={theme} onThemeChange={changeTheme} onLogout={() => setAuthScreen('login')}
+        theme={theme} onThemeChange={changeTheme} onLogout={() => { window.location.href = MARKETING_URL }}
         user={user} onOpenSettings={openSettings}>
         {body}
       </Shell>
