@@ -25,7 +25,7 @@ Replace the placeholder `apps/frontend/src/App.jsx` with the full Verasig protot
 | `claude_design/Verasig/App.jsx` | `window.App = App` | `src/App.jsx` (default export) |
 | `claude_design/Verasig/data.jsx` | `window.VRS_DATA = {...}` | `src/data/seed.js` (named exports) |
 | `claude_design/Verasig/Pipeline.jsx` | `window.PIPELINE_STEPS`, `window.Pipeline` | `src/features/pipeline/Pipeline.jsx` (named exports) |
-| `claude_design/Verasig/*View.jsx` (10 files) | `window.XView = XView` | `src/features/{feature}/` (named exports) |
+| `claude_design/Verasig/*View.jsx` (12 files) | `window.XView = XView` | `src/features/{feature}/` (named exports) |
 | `claude_design/Verasig/app.css` | Global layout styles | `src/app.css` |
 | `claude_design/Verasig/execution.css` | ExecutionView-specific styles | `src/features/pipeline/steps/execution.css` |
 | `claude_design/Verasig/auth.css` | Auth-specific styles | `src/features/auth/auth.css` |
@@ -38,6 +38,11 @@ Replace the placeholder `apps/frontend/src/App.jsx` with the full Verasig protot
 - `claude_design/Verasig/marketing.jsx` + `marketing.css` — separate product, not part of app
 - `claude_design/Verasig/_ds/` — the IIFE bundle; replaced by direct DS source
 - `claude_design/Verasig/docs/` — design documentation, not production code
+- `claude_design/Verasig/RiskView.jsx` — superseded; `App.jsx` routes the `risk` screen to `ExecutionView` instead
+
+### Extracted from App.jsx (not a standalone file in prototype)
+
+- `ExchangesView` — the nav-level exchanges view is defined inline in `App.jsx:295`; extract to `features/exchanges/ExchangesView.jsx`
 
 ---
 
@@ -126,11 +131,13 @@ export const DISTILLED_RULES = [...]
 
 ### 4c. auth.jsx split
 
-The prototype has one `AuthPage` component that takes `mode` prop. Split into:
+The prototype has one `AuthPage` component that takes a `mode` prop. Split into three files:
 
-- `LoginView.jsx` — renders `<AuthPage mode="login" />` or inlines the login form directly
-- `RegisterView.jsx` — renders `<AuthPage mode="register" />` or inlines the register form directly
-- `BrandPanel.jsx` — the shared left panel, used by both
+- `LoginView.jsx` — inlines the login form directly (email + password + remember me + forgot password)
+- `RegisterView.jsx` — inlines the register form directly (name + email + password + terms)
+- `BrandPanel.jsx` — the shared left panel; imported by both LoginView and RegisterView
+
+Do NOT keep a shared `AuthPage` wrapper — the split eliminates the need for it and the forms are simple enough to inline independently.
 
 Auth routing: `App.jsx` gets a new `authScreen` state: `'login' | 'register' | null`. When null, the user is "authenticated" and the main shell renders. Auth views render full-screen (no Shell wrapper).
 
@@ -151,14 +158,16 @@ Adjust:
 ```jsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import '../src/design-system/styles.css'
-import '../src/app.css'
+import './design-system/styles.css'
+import './app.css'
 import App from './App.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />)
 ```
 
 And `index.html` needs `data-theme="dark"` on `<html>`.
+
+> **Import path note:** Files in `src/` use `./` prefix. Files in `src/features/*/` use `../../` to reach `design-system/` or `data/`.
 
 ### 4f. design-system/index.js barrel
 
