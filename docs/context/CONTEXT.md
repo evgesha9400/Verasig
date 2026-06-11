@@ -121,6 +121,12 @@ Maximum favorable / adverse excursion over a signal's simulated life. MAE drives
 - **"Demo outcome" (value-proposition.md)**: there is no demo execution. "Outcome" means `Simulated outcome` from historical klines.
 - **"Local-only"**: means everything runs in Docker via `docker compose` on any machine with Docker — not "no servers." A Postgres container is in scope.
 
+## Design references
+
+Frontend and execution-engine design specs live in [`docs/design/`](../design/):
+
+- [execution-adaptivity.md](../design/execution-adaptivity.md) — how the Execution step adapts its controls to what a feed actually posts: corpus-driven display gates plus the per-signal engine matrix. Visual companion: `execution-adaptivity-decision-tree.html`.
+
 ## Example dialogue
 
 > **Operator:** This channel posted "BTC long, 65k" with no stop. Is that a bad signal?
