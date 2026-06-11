@@ -2,8 +2,36 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
 import App from './App.jsx'
 
+function createTestStorage() {
+  const entries = new Map()
+
+  return {
+    getItem: (key) => {
+      const storageKey = String(key)
+      return entries.has(storageKey) ? entries.get(storageKey) : null
+    },
+    setItem: (key, value) => {
+      entries.set(String(key), String(value))
+    },
+    removeItem: (key) => {
+      entries.delete(String(key))
+    },
+    clear: () => {
+      entries.clear()
+    },
+  }
+}
+
 beforeEach(() => {
-  localStorage.clear()
+  const storage = createTestStorage()
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: storage,
+    configurable: true,
+  })
+  Object.defineProperty(window, 'localStorage', {
+    value: storage,
+    configurable: true,
+  })
 })
 
 describe('App auth flow', () => {
