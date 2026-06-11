@@ -1,0 +1,330 @@
+/* Verasig — marketing landing page. Grounded entirely in the product:
+   connect Telegram signal channels, backfill, label signal/noise, distill
+   rules, verify on fresh messages, route to an exchange, set risk, backtest.
+   No fabricated metrics. Log in / Sign up cross over to the app subdomain. */
+import { useState, useEffect, Fragment } from 'react'
+import { Button, Icon } from '@verasig/design-system'
+
+// The app lives on its own subdomain; CTAs link there. Configured per env.
+const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5173'
+const appHref = (mode) => (mode === 'signup' ? `${APP_URL}/?signup=1` : `${APP_URL}/`)
+
+// Theme drives the brand signal color: dark = lime trace, light = azure.
+// Shared with the app via the same localStorage key.
+const THEME_ACCENTS = {
+  dark:  ['#B9EE2E', '#CBF457', '#8FB81E', 'rgba(185,238,46,0.28)'],
+  light: ['#5197FF', '#82B6FF', '#2F6FE0', 'rgba(81,151,255,0.30)'],
+}
+const THEME_KEY = 'vrs-theme-1'
+function loadTheme() {
+  try { return localStorage.getItem(THEME_KEY) || 'dark' } catch { return 'dark' }
+}
+function useTheme() {
+  const [theme, setTheme] = useState(loadTheme())
+  useEffect(() => {
+    const root = document.documentElement
+    const [a, hover, press, quiet] = THEME_ACCENTS[theme] || THEME_ACCENTS.dark
+    root.style.setProperty('--accent', a)
+    root.style.setProperty('--accent-hover', hover)
+    root.style.setProperty('--accent-press', press)
+    root.style.setProperty('--accent-text', hover)
+    root.style.setProperty('--accent-quiet', quiet)
+    root.style.setProperty('--signal-500', a)
+    root.style.setProperty('--signal-400', hover)
+    root.style.setProperty('--signal-glow', quiet)
+    root.style.setProperty('--verified-500', a)
+    root.setAttribute('data-theme', theme)
+    try { localStorage.setItem(THEME_KEY, theme) } catch { /* ignore */ }
+  }, [theme])
+  return [theme, setTheme]
+}
+
+function ThemeToggle({ theme, onChange }) {
+  const themes = [
+    { id: 'light', icon: 'sun', label: 'Light' },
+    { id: 'dark', icon: 'moon', label: 'Dark' },
+  ]
+  return (
+    <div className="mk-theme" role="radiogroup" aria-label="Theme">
+      {themes.map((th) => (
+        <button key={th.id} type="button" role="radio" aria-checked={theme === th.id}
+          className={`mk-theme__btn ${theme === th.id ? 'is-on' : ''}`}
+          title={th.label} aria-label={th.label}
+          onClick={() => onChange(th.id)}>
+          <Icon name={th.icon} size={15} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* ---------- brand mark ---------- */
+function Mark({ size = 26 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" style={{ color: 'var(--signal-500)' }}>
+      <path d="M4 22 L11 22 L17 30 L24 9 L30 18" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="30" cy="18" r="3.4" fill="currentColor" />
+    </svg>
+  )
+}
+
+/* ========================================================== NAV ===== */
+function Nav({ theme, onThemeChange }) {
+  return (
+    <header className="mk-nav">
+      <div className="mk-nav__inner">
+        <a className="mk-nav__brand" href="#top">
+          <Mark size={26} />
+          <span>Verasig<span style={{ color: 'var(--signal-500)' }}>.</span></span>
+        </a>
+        <nav className="mk-nav__links">
+          <a href="#how">How it works</a>
+          <a href="#integrations">Integrations</a>
+          <a href="#principles">Principles</a>
+        </nav>
+        <div className="mk-nav__actions">
+          <ThemeToggle theme={theme} onChange={onThemeChange} />
+          <span className="mk-nav__divider" aria-hidden="true" />
+          <a className="mk-nav__signin" href={appHref('login')}>Log in</a>
+          <Button as="a" href={appHref('signup')} variant="primary" size="sm">Sign up</Button>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+/* ========================================================== HERO ===== */
+function HeroTrace() {
+  return (
+    <svg className="mk-hero__trace" viewBox="0 0 520 120" fill="none" preserveAspectRatio="none">
+      <path d="M0 78 L60 78 L92 78 L120 96 L150 34 L182 64 L212 64 L260 64 L300 50 L340 70 L380 26 L430 56 L470 44 L520 44"
+        stroke="var(--signal-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="520" cy="44" r="4" fill="var(--signal-500)" />
+    </svg>
+  )
+}
+
+function Hero() {
+  const pipe = ['Backfill', 'Label', 'Distill', 'Verify', 'Backtest']
+  return (
+    <section className="mk-hero v-lattice" id="top">
+      <div className="mk-hero__glow" />
+      <div className="mk-hero__inner">
+        <div className="mk-hero__copy">
+          <span className="v-eyebrow mk-hero__eyebrow"><span className="mk-dot" />Signal verification for traders</span>
+          <h1 className="mk-hero__title">Verify the signal<br />before you trade it.</h1>
+          <p className="mk-hero__sub">Verasig connects to your Telegram signal channels, learns what a real call looks like from your own labels, backtests it across full history, and routes only verified signals to your exchange.</p>
+          <div className="mk-hero__cta">
+            <Button as="a" href={appHref('signup')} variant="primary" size="lg" iconRight={<Icon name="arrowRight" size={16} />}>Sign up</Button>
+            <Button as="a" href={appHref('login')} variant="secondary" size="lg">Log in</Button>
+          </div>
+          <div className="mk-caps">
+            <span className="mk-cap"><Icon name="telegram" size={14} fill />Telegram today · Discord soon</span>
+            <span className="mk-cap"><Icon name="chart" size={14} />Backtest before live</span>
+            <span className="mk-cap"><Icon name="lock" size={14} />Trade-only API keys</span>
+          </div>
+        </div>
+
+        <div className="mk-preview">
+          <div className="mk-pv-card">
+            <div className="mk-pv-card__bar">
+              <span className="mk-pv-card__dot" />
+              <span className="mk-pv-card__name">Delta Futures Signals</span>
+              <span className="mk-pv-card__tag">@deltafutures</span>
+              <span className="mk-pv-card__ex">Example</span>
+            </div>
+            <div className="mk-pv-body">
+              <HeroTrace />
+              <div className="mk-pv-metrics">
+                <div className="mk-pv-metric"><span className="mk-pv-metric__v is-good">86</span><span className="mk-pv-metric__l">Quality / 100</span></div>
+                <div className="mk-pv-metric"><span className="mk-pv-metric__v">64.2%</span><span className="mk-pv-metric__l">Win rate</span></div>
+                <div className="mk-pv-metric"><span className="mk-pv-metric__v">18,420</span><span className="mk-pv-metric__l">Msgs tested</span></div>
+              </div>
+            </div>
+          </div>
+          <div className="mk-pv-card">
+            <div className="mk-pv-card__bar">
+              <span className="mk-pv-card__name" style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xs)', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-faint)', fontWeight: 400 }}>Verification pipeline</span>
+            </div>
+            <div className="mk-pv-body" style={{ paddingTop: 20, paddingBottom: 20 }}>
+              <div className="mk-pv-pipe">
+                {pipe.map((s, i) => (
+                  <Fragment key={s}>
+                    {i > 0 && <span className="mk-pv-pipe__line" />}
+                    <div className="mk-pv-pipe__step">
+                      <span className="mk-pv-pipe__dot"><Icon name="check" size={11} /></span>
+                      <span className="mk-pv-pipe__lbl">{s}</span>
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ==================================================== HOW IT WORKS ===== */
+const FLOW = [
+  { n: '01', ic: 'sources', t: 'Connect', b: 'Link a Telegram channel or group you belong to over MTProto. Read-only — Verasig never posts.' },
+  { n: '02', ic: 'download', t: 'Backfill', b: 'Pull the full message history so verification runs on everything the channel has ever called.' },
+  { n: '03', ic: 'check', t: 'Label', b: 'Mark a handful of messages as signal or noise. You define what a tradeable call looks like.' },
+  { n: '04', ic: 'sparkles', t: 'Distill', b: 'Verasig turns your labels into a small ruleset and classifies the rest of the history.' },
+  { n: '05', ic: 'shield', t: 'Verify', b: 'Confirm a fresh sample of auto-classified signals. Wrong ones send the rules back to refine.' },
+  { n: '06', ic: 'exchanges', t: 'Route', b: 'Send verified signals to a connected exchange — or just watch them stream, your call.' },
+  { n: '07', ic: 'settings', t: 'Risk', b: 'Set position sizing and stops so a verified signal becomes an order you actually want.' },
+  { n: '08', ic: 'chart', t: 'Backtest', b: 'Simulate the source over its history for a quality score and win rate before going live.' },
+]
+function HowItWorks() {
+  return (
+    <section className="mk-sec" id="how">
+      <div className="mk-sec__head">
+        <span className="v-eyebrow"><span className="mk-dot" />How it works</span>
+        <h2 className="mk-sec__title">From a noisy channel<br />to a verified source.</h2>
+        <p className="mk-sec__lead">Every source moves through the same pipeline. Nothing reaches your exchange until it has been labelled, distilled, verified, and backtested.</p>
+      </div>
+      <div className="mk-flow">
+        {FLOW.map((s) => (
+          <div className="mk-flow__step" key={s.n}>
+            <span className="mk-flow__ic"><Icon name={s.ic} size={20} /></span>
+            <span className="mk-flow__n">{s.n}</span>
+            <div className="mk-flow__t">{s.t}</div>
+            <p className="mk-flow__b">{s.b}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* ==================================================== INTEGRATIONS ===== */
+function IntRow({ logoBg, logoColor, icon, name, kind, live }) {
+  return (
+    <div className={`mk-int ${live ? '' : 'is-soon'}`}>
+      <span className="mk-int__logo" style={{ background: logoBg, color: logoColor }}><Icon name={icon} size={24} fill /></span>
+      <div className="mk-int__main">
+        <div className="mk-int__name">{name}</div>
+        <div className="mk-int__kind">{kind}</div>
+      </div>
+      <span className={`mk-int__state ${live ? 'is-live' : 'is-soon'}`}>{live ? 'Live' : 'Soon'}</span>
+    </div>
+  )
+}
+function Integrations() {
+  return (
+    <section className="mk-sec" id="integrations" style={{ paddingTop: 0 }}>
+      <div className="mk-sec__head">
+        <span className="v-eyebrow"><span className="mk-dot" />Integrations</span>
+        <h2 className="mk-sec__title">Where signals come<br />from, and where they go.</h2>
+      </div>
+      <div className="mk-int-cols">
+        <div className="mk-int-col">
+          <div className="mk-int-col__h"><span className="mk-int-col__t">Sources</span><span className="mk-int-col__s">where signals come from</span></div>
+          <div className="mk-int-list">
+            <IntRow icon="telegram" logoBg="color-mix(in srgb, #2AABEE 22%, transparent)" logoColor="#3CB4F0" name="Telegram" kind="Channels & groups · MTProto" live />
+            <IntRow icon="discord" logoBg="color-mix(in srgb, #5865F2 22%, transparent)" logoColor="#7B85F7" name="Discord" kind="Servers & channels · bot gateway" />
+          </div>
+        </div>
+        <div className="mk-int-col">
+          <div className="mk-int-col__h"><span className="mk-int-col__t">Exchanges</span><span className="mk-int-col__s">where verified signals route</span></div>
+          <div className="mk-int-list">
+            <IntRow icon="bybit" logoBg="color-mix(in srgb, #F7A600 18%, transparent)" logoColor="#F7A600" name="Bybit" kind="Derivatives & spot · trade-only key" live />
+            <IntRow icon="binance" logoBg="color-mix(in srgb, #F0B90B 18%, transparent)" logoColor="#F0B90B" name="Binance" kind="Derivatives & spot" />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ==================================================== PRINCIPLES ===== */
+const PRINCIPLES = [
+  { ic: 'check', t: 'You teach it', b: 'Label messages as signal or noise. Verasig learns your definition of a tradeable call from your own labels — not a generic model.' },
+  { ic: 'shield', t: 'Verified, then trusted', b: 'Distilled rules are re-checked on fresh messages. If the sample isn’t clean, the rules go back to be refined before anything routes.' },
+  { ic: 'chart', t: 'Backtested before live', b: 'Each source is simulated over its full history for a quality score and win rate, so you decide with evidence — not vibes.' },
+  { ic: 'lock', t: 'Trade-only keys', b: 'Exchanges connect with trade-only API keys. Verasig places orders; it can never withdraw your funds.' },
+]
+function Principles() {
+  return (
+    <section className="mk-sec" id="principles" style={{ paddingTop: 0 }}>
+      <div className="mk-sec__head">
+        <span className="v-eyebrow"><span className="mk-dot" />Principles</span>
+        <h2 className="mk-sec__title">Built to earn<br />your trust.</h2>
+      </div>
+      <div className="mk-why">
+        {PRINCIPLES.map((p) => (
+          <div className="mk-why__item" key={p.t}>
+            <span className="mk-why__ic"><Icon name={p.ic} size={22} /></span>
+            <div className="mk-why__t">{p.t}</div>
+            <p className="mk-why__b">{p.b}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* ==================================================== CTA + FOOTER ===== */
+function CTA() {
+  return (
+    <section className="mk-cta v-lattice">
+      <div className="mk-cta__glow" />
+      <div className="mk-cta__inner">
+        <h2 className="mk-cta__title">Connect your<br />first source.</h2>
+        <p className="mk-cta__sub">Bring a channel, label a handful of messages, and see whether it holds up on its own history — before a cent is at risk.</p>
+        <div className="mk-cta__btns">
+          <Button as="a" href={appHref('signup')} variant="primary" size="lg" iconRight={<Icon name="arrowRight" size={16} />}>Sign up</Button>
+          <Button as="a" href={appHref('login')} variant="secondary" size="lg">Log in</Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function Footer() {
+  const cols = [
+    { h: 'Product', links: ['How it works', 'Integrations', 'Principles'] },
+    { h: 'Resources', links: ['Docs', 'Changelog', 'Status'] },
+    { h: 'Company', links: ['About', 'Contact', 'Security'] },
+  ]
+  return (
+    <footer className="mk-foot">
+      <div className="mk-foot__inner">
+        <div className="mk-foot__brand">
+          <a className="mk-nav__brand" href="#top"><Mark size={24} /><span>Verasig<span style={{ color: 'var(--signal-500)' }}>.</span></span></a>
+          <p className="mk-foot__tag">Verify the signal before you trade it.</p>
+        </div>
+        <div className="mk-foot__cols">
+          {cols.map((c) => (
+            <div className="mk-foot__col" key={c.h}>
+              <div className="mk-foot__h">{c.h}</div>
+              {c.links.map((l) => <a key={l} href="#">{l}</a>)}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mk-foot__bar">
+        <span>© 2026 Verasig</span>
+        <span className="mk-foot__legal"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Security</a></span>
+      </div>
+    </footer>
+  )
+}
+
+/* ==================================================== ROOT ===== */
+export default function Marketing() {
+  const [theme, setTheme] = useTheme()
+  return (
+    <div className="mk-page">
+      <Nav theme={theme} onThemeChange={setTheme} />
+      <Hero />
+      <HowItWorks />
+      <Integrations />
+      <Principles />
+      <CTA />
+      <Footer />
+    </div>
+  )
+}
