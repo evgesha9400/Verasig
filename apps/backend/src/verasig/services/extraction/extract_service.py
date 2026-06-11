@@ -9,10 +9,9 @@ deterministic miss the optional `LlmExtractor` fallback runs: a hit is linked
 `reason="no_match"`. `_link` is the single linkage site for both paths.
 """
 
-from dataclasses import dataclass, field
-
 from verasig.domain.drift import ParserDriftWarning
 from verasig.domain.event import RawSignalEvent
+from verasig.domain.extraction_outcome import ExtractOutcome
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.protocols import LlmExtractor
 from verasig.domain.signal import (
@@ -22,13 +21,6 @@ from verasig.domain.signal import (
     UnrecognizedSignal,
 )
 from verasig.services.extraction.deterministic_parser import parse
-
-
-@dataclass
-class ExtractOutcome:
-    signal: ExtractedSignal | None = None
-    unrecognized: UnrecognizedSignal | None = None
-    drift_warnings: list = field(default_factory=list)
 
 
 def _link(
