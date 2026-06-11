@@ -1,0 +1,24 @@
+<!-- @dsCard group="Colors" viewport="700x140" name="Data-viz ramp" subtitle="Categorical palette for charts, channels & providers" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 20px; background: var(--bg-app); }
+  .row { display: flex; gap: 10px; align-items: flex-end; height: 84px; }
+  .bar { flex: 1; border-radius: var(--radius-sm) var(--radius-sm) 0 0; position: relative; }
+  .cap { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="bar" style="height:90%;background:var(--viz-1)"><span class="cap">viz-1</span></div>
+    <div class="bar" style="height:70%;background:var(--viz-2)"><span class="cap">viz-2</span></div>
+    <div class="bar" style="height:82%;background:var(--viz-3)"><span class="cap">viz-3</span></div>
+    <div class="bar" style="height:58%;background:var(--viz-4)"><span class="cap">viz-4</span></div>
+    <div class="bar" style="height:74%;background:var(--viz-5)"><span class="cap">viz-5</span></div>
+    <div class="bar" style="height:46%;background:var(--viz-6)"><span class="cap">viz-6</span></div>
+  </div>
+</body>
+</html>

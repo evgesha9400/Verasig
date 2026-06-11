@@ -1,0 +1,31 @@
+<!-- @dsCard group="Verasig App" viewport="1320x840" name="Console — verification dashboard" subtitle="Interactive: browse signals, open detail, reject" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verasig — Console</title>
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="app.css">
+<style> html, body { height: 100%; } body { margin: 0; overflow: hidden; } </style>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+<script src="../../_ds_bundle.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="app.data.jsx"></script>
+<script type="text/babel" src="Sidebar.jsx"></script>
+<script type="text/babel" src="Topbar.jsx"></script>
+<script type="text/babel" src="OverviewView.jsx"></script>
+<script type="text/babel" src="SignalsView.jsx"></script>
+<script type="text/babel" src="ProvidersView.jsx"></script>
+<script type="text/babel" src="SignalDrawer.jsx"></script>
+<script type="text/babel" src="App.jsx"></script>
+<script type="text/babel">
+  const Root = window.App;
+  ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>

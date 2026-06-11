@@ -1,0 +1,24 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Light theme surfaces" subtitle="Supported light mode — set data-theme=light" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 20px; background: var(--bg-void); }
+  .stack { display: flex; gap: 14px; align-items: stretch; }
+  .layer { flex: 1; border-radius: var(--radius-lg); border: 1px solid var(--border-default); padding: 16px 14px; display: flex; flex-direction: column; justify-content: space-between; min-height: 96px; }
+  .tag { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); letter-spacing: .06em; }
+  .nm { font-family: var(--font-sans); font-size: 12px; color: var(--text-body); font-weight: 500; }
+  .acc { width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="stack">
+    <div class="layer" style="background:var(--bg-app)"><span class="nm">App</span><span class="tag">--bg-app</span></div>
+    <div class="layer" style="background:var(--surface-sunken)"><span class="nm">Sunken</span><span class="tag">--surface-sunken</span></div>
+    <div class="layer" style="background:var(--surface-card)"><span class="nm">Card</span><span class="tag">--surface-card</span></div>
+    <div class="layer" style="background:var(--surface-card);align-items:flex-start;gap:8px"><div class="acc"></div><span class="tag">--accent (darkened)</span></div>
+  </div>
+</body>
+</html>
