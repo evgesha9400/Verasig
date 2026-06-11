@@ -17,7 +17,7 @@ function VerifyMedia({ kind }) {
   );
 }
 
-function VerifyCard({ item, verdict, dragX = 0, isTop, style }) {
+function VerifyCard({ item, dragX = 0, isTop, style }) {
   const rot = dragX / 22;
   const tStyle = isTop ? { transform: `translateX(${dragX}px) rotate(${rot}deg)`, ...style } : style;
   const isSignal = item.predicted === 'signal';
@@ -200,8 +200,8 @@ export function VerifyView({ attempt, onPass, onStop, onLoop }) {
             </div>
           ) : (
             <>
-              {next1 && <VerifyCard key={'bg' + next1.id} item={next1} verdict={marks[next1.id]} isTop={false} style={{ transform: 'scale(0.95) translateY(14px)', opacity: 0.6 }} />}
-              <VerifyCard key={current.id} item={current} verdict={marks[current.id]} isTop={true}
+              {next1 && <VerifyCard key={'bg' + next1.id} item={next1} isTop={false} style={{ transform: 'scale(0.95) translateY(14px)', opacity: 0.6 }} />}
+              <VerifyCard key={current.id} item={current} isTop={true}
                 dragX={flying ? flying.dir * 600 : dragX}
                 style={flying ? { transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)', transform: `translateX(${flying.dir * 600}px) rotate(${flying.dir * 18}deg)` } : (dragRef.current.active ? {} : { transition: 'transform 0.25s var(--ease-out)' })} />
             </>

@@ -93,7 +93,7 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
         title="Email"
         subtitle="Where alerts, invoices and security notices go"
         footer={<>
-          <span className="vrs-help">We'll send a verification link before the change takes effect.</span>
+          <span className="vrs-help">We&rsquo;ll send a verification link before the change takes effect.</span>
           <Button variant="primary" size="sm" style={{ marginLeft: 'auto' }} disabled={!emailDirty || !emailValid} onClick={saveEmail}>Save</Button>
         </>}
       >
@@ -107,7 +107,7 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
                 <Button variant="ghost" size="sm" onClick={cancelEmailChange}>Cancel change</Button>
               </>}
             >
-              We sent a confirmation link to <span className="vrs-mono">{user.pendingEmail}</span>. Your current address <span className="vrs-mono">{user.email}</span> stays active until it's confirmed.
+              We sent a confirmation link to <span className="vrs-mono">{user.pendingEmail}</span>. Your current address <span className="vrs-mono">{user.email}</span> stays active until it&rsquo;s confirmed.
             </Banner>
           )}
         </div>

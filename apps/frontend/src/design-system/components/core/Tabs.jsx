@@ -1,4 +1,3 @@
-import React from 'react';
 
 const CSS = `
 .vrs-tabs { display: flex; align-items: center; gap: 2px; position: relative; }

@@ -1,4 +1,3 @@
-import React from 'react';
 
 /* Inject component styles once (self-contained, token-driven). */
 const CSS = `

@@ -1,4 +1,3 @@
-import React from 'react';
 
 const CSS = `
 .vrs-field { display: flex; flex-direction: column; gap: 6px; }

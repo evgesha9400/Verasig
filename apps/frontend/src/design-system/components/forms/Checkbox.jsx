@@ -1,4 +1,3 @@
-import React from 'react';
 
 const CSS = `
 .vrs-check { display: inline-flex; align-items: flex-start; gap: 10px; cursor: pointer; user-select: none; }

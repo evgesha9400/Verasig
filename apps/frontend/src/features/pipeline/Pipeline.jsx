@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react'
+import { Fragment } from 'react'
 import { Icon } from '../../design-system/index.js'
 
 /* Verasig prototype — pipeline stepper shown across the verification workflow */

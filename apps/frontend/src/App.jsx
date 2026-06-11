@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useLayoutEffect, Fragment } from 'react'
-import { Button, IconButton, ToastStack, Toast, Badge, Dialog } from './design-system/index.js'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { Button, IconButton, ToastStack, Toast, Dialog } from './design-system/index.js'
 import { Icon } from './design-system/index.js'
 import { Shell } from './layout/Shell.jsx'
 import { Pipeline, PIPELINE_STEPS } from './features/pipeline/Pipeline.jsx'
@@ -18,7 +18,7 @@ import { ExchangesView } from './features/exchanges/ExchangesView.jsx'
 import { SettingsView } from './features/settings/SettingsView.jsx'
 import { LoginView } from './features/auth/LoginView.jsx'
 import { RegisterView } from './features/auth/RegisterView.jsx'
-import { CHATS, MESSAGES, SIGNALS, SOURCES, MOD_KINDS, ORPHAN_MODS, ORPHAN_LINKED_MOD } from './data/seed.js'
+import { CHATS, MESSAGES } from './data/seed.js'
 
 const THEME_ACCENTS = {
   dark:  ['#B9EE2E', '#CBF457', '#8FB81E', 'rgba(185,238,46,0.28)'],
@@ -52,12 +52,12 @@ function mergeChatFlags(savedChats) {
 export default function App() {
   const saved = useRef(loadState()).current
   const [theme, setTheme] = useState(loadTheme())
-  function changeTheme(next) { setTheme(next); try { localStorage.setItem(THEME_KEY, next) } catch {} }
+  function changeTheme(next) { setTheme(next); try { localStorage.setItem(THEME_KEY, next) } catch { /* ignore */ } }
   const [nav, setNav] = useState('sources')
   const [user, setUser] = useState(loadUser())
   const prevNavRef = useRef('sources')
   function updateUser(patch) {
-    setUser((u) => { const n = { ...u, ...patch }; try { localStorage.setItem(USER_KEY, JSON.stringify(n)) } catch {} return n })
+    setUser((u) => { const n = { ...u, ...patch }; try { localStorage.setItem(USER_KEY, JSON.stringify(n)) } catch { /* ignore */ } return n })
   }
   function openSettings() { if (nav !== 'settings') prevNavRef.current = nav; setNav('settings') }
   const [screen, setScreen] = useState(saved ? saved.screen : 'sources')

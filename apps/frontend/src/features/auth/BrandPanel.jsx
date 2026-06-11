@@ -1,5 +1,3 @@
-import React from 'react'
-
 function AuthMark({ size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none" style={{ color: 'var(--signal-500)' }}>

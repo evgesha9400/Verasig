@@ -1,4 +1,3 @@
-import React from 'react';
 
 const CSS = `
 .vrs-select { position: relative; display: flex; flex-direction: column; gap: 6px; }

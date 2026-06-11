@@ -1,5 +1,3 @@
-import React from 'react'
-
 /* Verasig prototype — inline line icons (house style: 1.8px stroke, round caps) */
 export function Icon({ name, size = 18, fill = false, style }) {
   const P = {

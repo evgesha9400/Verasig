@@ -1,4 +1,3 @@
-import React from 'react';
 
 const CSS = `
 .vrs-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
