@@ -7,7 +7,8 @@ Proof-first signal provider intelligence.
 - `apps/backend/` — Python backend service (logic, migrations, CLI, tests).
 - `apps/frontend/` — React/Vite frontend shell for future production UI.
 - `libs/contracts/` — shared API contract definitions (reserved for phase 2+).
-- `docs/` — architecture docs and design references.
+- `docs/` — architecture docs, domain language, product docs, and design references.
+- `graphify-out/` — canonical project graph outputs; cache/state files are ignored.
 
 ## Backend (current behavior preserved)
 
@@ -37,4 +38,5 @@ Compose uses `apps/backend/Dockerfile` and `apps/backend/alembic.ini`.
 - [Product requirements](docs/business/requirements.md)
 - [Architecture decisions](docs/business/architecture-decisions.md)
 - [Design and domain language](docs/context/CONTEXT.md)
-- [Design artifacts](docs/design/prototypes/Verasig)
+- [Design system](docs/DESIGN.md)
+- [Current project structure](docs/business/project-structure.md)
