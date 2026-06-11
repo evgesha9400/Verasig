@@ -1,0 +1,1182 @@
+{
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/vite.config.js": {
+    "mtime": 1781206511.2416308,
+    "ast_hash": "5c1521dcb62c0d8013fbfe63d7f93aae",
+    "semantic_hash": "5c1521dcb62c0d8013fbfe63d7f93aae"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/package.json": {
+    "mtime": 1781207823.7890368,
+    "ast_hash": "2e88953b34e42d2e56ebdd859885a4e3",
+    "semantic_hash": "2e88953b34e42d2e56ebdd859885a4e3"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/eslint.config.js": {
+    "mtime": 1781207830.554381,
+    "ast_hash": "1e19862de4291d82fadea843649e8511",
+    "semantic_hash": "1e19862de4291d82fadea843649e8511"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/main.jsx": {
+    "mtime": 1781207894.3424656,
+    "ast_hash": "7522a3ec0587a5fbab170e143c531634",
+    "semantic_hash": "7522a3ec0587a5fbab170e143c531634"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/App.jsx": {
+    "mtime": 1781207894.344593,
+    "ast_hash": "9df37eed079e886c8433c11f6d658e5e",
+    "semantic_hash": "9df37eed079e886c8433c11f6d658e5e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/App.test.jsx": {
+    "mtime": 1781207894.346213,
+    "ast_hash": "609bf28b1908691688b538beab63c52f",
+    "semantic_hash": "609bf28b1908691688b538beab63c52f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/layout/Shell.jsx": {
+    "mtime": 1781207894.3479865,
+    "ast_hash": "4a4182e9421c8f9eb73e132a39989eba",
+    "semantic_hash": "4a4182e9421c8f9eb73e132a39989eba"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/settings/SettingsView.jsx": {
+    "mtime": 1781207894.3498516,
+    "ast_hash": "fa82e7974bc2d274b898a92adb9ea1f7",
+    "semantic_hash": "fa82e7974bc2d274b898a92adb9ea1f7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/Pipeline.jsx": {
+    "mtime": 1781207911.2215264,
+    "ast_hash": "f0bc91370eae5ece93f52af1448e9b0e",
+    "semantic_hash": "f0bc91370eae5ece93f52af1448e9b0e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/Pipeline.test.jsx": {
+    "mtime": 1781207894.3527932,
+    "ast_hash": "f8cf37f68d411ea0e52fd56d71c580e1",
+    "semantic_hash": "f8cf37f68d411ea0e52fd56d71c580e1"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/ExecutionView.jsx": {
+    "mtime": 1781207894.3684666,
+    "ast_hash": "1c97de7afade02fd406c2a4fa011b037",
+    "semantic_hash": "1c97de7afade02fd406c2a4fa011b037"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/VerifyView.jsx": {
+    "mtime": 1781207894.3697634,
+    "ast_hash": "cc81f47be489d5e2ab296bb483545897",
+    "semantic_hash": "cc81f47be489d5e2ab296bb483545897"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/ExchangeView.jsx": {
+    "mtime": 1781207894.371023,
+    "ast_hash": "97ee1a95f55918c364c1036414e334cc",
+    "semantic_hash": "97ee1a95f55918c364c1036414e334cc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/DistillView.jsx": {
+    "mtime": 1781207894.3723962,
+    "ast_hash": "670637730d6932fc3b88c05f5e30969f",
+    "semantic_hash": "670637730d6932fc3b88c05f5e30969f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/BacktestView.jsx": {
+    "mtime": 1781207894.373594,
+    "ast_hash": "2abdbe11a27d6655b06fef290f1aa624",
+    "semantic_hash": "2abdbe11a27d6655b06fef290f1aa624"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/BackfillView.jsx": {
+    "mtime": 1781207894.3748136,
+    "ast_hash": "4087bcc0eab17bd3c2e61b8b74a1473e",
+    "semantic_hash": "4087bcc0eab17bd3c2e61b8b74a1473e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/pipeline/steps/LabelView.jsx": {
+    "mtime": 1781207894.375953,
+    "ast_hash": "813ed4ab57be8a6c66625e7e39471e55",
+    "semantic_hash": "813ed4ab57be8a6c66625e7e39471e55"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/exchanges/ExchangesView.jsx": {
+    "mtime": 1781207894.3543026,
+    "ast_hash": "0c85eeda73f0e50c9b2ccf74f8336ac8",
+    "semantic_hash": "0c85eeda73f0e50c9b2ccf74f8336ac8"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/auth/BrandPanel.jsx": {
+    "mtime": 1781207905.0494225,
+    "ast_hash": "0153172a5a32e89e13daa7d6e875ca4a",
+    "semantic_hash": "0153172a5a32e89e13daa7d6e875ca4a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/auth/LoginView.test.jsx": {
+    "mtime": 1781207894.3577805,
+    "ast_hash": "f8db181697bedb6d240e75260cb532e3",
+    "semantic_hash": "f8db181697bedb6d240e75260cb532e3"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/auth/LoginView.jsx": {
+    "mtime": 1781207894.3591378,
+    "ast_hash": "7b7e2482880a78e4149b55843d7f2a60",
+    "semantic_hash": "7b7e2482880a78e4149b55843d7f2a60"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/auth/RegisterView.jsx": {
+    "mtime": 1781207894.3604767,
+    "ast_hash": "f0eabb68d2238d57742242af27e45c15",
+    "semantic_hash": "f0eabb68d2238d57742242af27e45c15"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/signals/SignalsView.jsx": {
+    "mtime": 1781207894.3619964,
+    "ast_hash": "2cbdf04af23596d29bc7dea99c8edb20",
+    "semantic_hash": "2cbdf04af23596d29bc7dea99c8edb20"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/sources/TelegramSetup.jsx": {
+    "mtime": 1781207894.3633194,
+    "ast_hash": "43f6cdbcca3bd1f286b7d0752ca2d680",
+    "semantic_hash": "43f6cdbcca3bd1f286b7d0752ca2d680"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/sources/ChatsView.jsx": {
+    "mtime": 1781207894.3646424,
+    "ast_hash": "a0401bcaa8b1d759185c7610f9b10e52",
+    "semantic_hash": "a0401bcaa8b1d759185c7610f9b10e52"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/features/sources/SourcesView.jsx": {
+    "mtime": 1781207894.3659413,
+    "ast_hash": "e0c8692bfa3044c0d4aa0c0f3e36b9b9",
+    "semantic_hash": "e0c8692bfa3044c0d4aa0c0f3e36b9b9"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/index.js": {
+    "mtime": 1781206497.156734,
+    "ast_hash": "c65fced563d77dde4812fd935a53f521",
+    "semantic_hash": "c65fced563d77dde4812fd935a53f521"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/index.test.js": {
+    "mtime": 1781206509.0302122,
+    "ast_hash": "8be05d08b03816f365bf3b66fafc5d0a",
+    "semantic_hash": "8be05d08b03816f365bf3b66fafc5d0a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Switch.d.ts": {
+    "mtime": 1781206396.579539,
+    "ast_hash": "15d9bfa592434234e0e0df9dcb771090",
+    "semantic_hash": "15d9bfa592434234e0e0df9dcb771090"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Switch.jsx": {
+    "mtime": 1781207894.377156,
+    "ast_hash": "cba228623200a5fb0cf9f41861f86618",
+    "semantic_hash": "cba228623200a5fb0cf9f41861f86618"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Input.d.ts": {
+    "mtime": 1781206396.5803843,
+    "ast_hash": "35464ad58102a18cf5e5108a2eb229c0",
+    "semantic_hash": "35464ad58102a18cf5e5108a2eb229c0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Input.jsx": {
+    "mtime": 1781207894.3782141,
+    "ast_hash": "5f76541c3a8d3463395187b13e466364",
+    "semantic_hash": "5f76541c3a8d3463395187b13e466364"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Select.jsx": {
+    "mtime": 1781207894.379262,
+    "ast_hash": "1ae24954a2fabfad901a940bb96da6d4",
+    "semantic_hash": "1ae24954a2fabfad901a940bb96da6d4"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Checkbox.jsx": {
+    "mtime": 1781207894.3804486,
+    "ast_hash": "d2299b7f0fb14305bec28304584dcb8b",
+    "semantic_hash": "d2299b7f0fb14305bec28304584dcb8b"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Checkbox.d.ts": {
+    "mtime": 1781206396.5814807,
+    "ast_hash": "56a4051333201ee1344dcc5c9efccf68",
+    "semantic_hash": "56a4051333201ee1344dcc5c9efccf68"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Select.d.ts": {
+    "mtime": 1781206396.5823762,
+    "ast_hash": "3284cbbec6fd7d9fc97b6c5694ebf305",
+    "semantic_hash": "3284cbbec6fd7d9fc97b6c5694ebf305"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Avatar.jsx": {
+    "mtime": 1781207894.381715,
+    "ast_hash": "3c408ec80616087fea11cad8a3e89f16",
+    "semantic_hash": "3c408ec80616087fea11cad8a3e89f16"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Button.jsx": {
+    "mtime": 1781207894.3828921,
+    "ast_hash": "1430f747bc1b3cc97d648a579e648a08",
+    "semantic_hash": "1430f747bc1b3cc97d648a579e648a08"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/IconButton.jsx": {
+    "mtime": 1781207894.3841255,
+    "ast_hash": "4067233946246d690cd1ce8a414d3841",
+    "semantic_hash": "4067233946246d690cd1ce8a414d3841"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Badge.jsx": {
+    "mtime": 1781207894.3851547,
+    "ast_hash": "fb8fe7e7fa3fcdf5e47d4af5381bc033",
+    "semantic_hash": "fb8fe7e7fa3fcdf5e47d4af5381bc033"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Button.d.ts": {
+    "mtime": 1781206396.5839345,
+    "ast_hash": "fe362e775c5d8c3334d1f079ac676bf2",
+    "semantic_hash": "fe362e775c5d8c3334d1f079ac676bf2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Tabs.jsx": {
+    "mtime": 1781207894.3862271,
+    "ast_hash": "e04dc16bf814f5e9810e9d8bb46809f0",
+    "semantic_hash": "e04dc16bf814f5e9810e9d8bb46809f0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Tabs.d.ts": {
+    "mtime": 1781206396.5852914,
+    "ast_hash": "4d201f2bea2733044531659fbeb85e7f",
+    "semantic_hash": "4d201f2bea2733044531659fbeb85e7f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Tag.d.ts": {
+    "mtime": 1781206396.5854695,
+    "ast_hash": "33712254ac5a761efde95265edc2c117",
+    "semantic_hash": "33712254ac5a761efde95265edc2c117"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Avatar.d.ts": {
+    "mtime": 1781206396.5856495,
+    "ast_hash": "414f09865ab63ae40003ea7d5614c5d4",
+    "semantic_hash": "414f09865ab63ae40003ea7d5614c5d4"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Tag.jsx": {
+    "mtime": 1781207894.3873842,
+    "ast_hash": "85355a78d74c68267a92380a1b335b99",
+    "semantic_hash": "85355a78d74c68267a92380a1b335b99"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/IconButton.d.ts": {
+    "mtime": 1781206396.5861747,
+    "ast_hash": "490682af373b8373d3eac2aaa3ebd1d0",
+    "semantic_hash": "490682af373b8373d3eac2aaa3ebd1d0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Badge.d.ts": {
+    "mtime": 1781206396.5863543,
+    "ast_hash": "45a36c538a932d037b1636514a030bcf",
+    "semantic_hash": "45a36c538a932d037b1636514a030bcf"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Dialog.jsx": {
+    "mtime": 1781207894.388825,
+    "ast_hash": "c14ca2bfe9381221c192aad6f4366848",
+    "semantic_hash": "c14ca2bfe9381221c192aad6f4366848"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Toast.d.ts": {
+    "mtime": 1781206396.5872571,
+    "ast_hash": "4fb776e5b0a9c2b5f42b617b80b44f09",
+    "semantic_hash": "4fb776e5b0a9c2b5f42b617b80b44f09"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Tooltip.d.ts": {
+    "mtime": 1781206396.587441,
+    "ast_hash": "a0db50df10739c565b580e80be29f727",
+    "semantic_hash": "a0db50df10739c565b580e80be29f727"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Banner.d.ts": {
+    "mtime": 1781206396.5876095,
+    "ast_hash": "6741476ffb232d1ab9ec578a778358bc",
+    "semantic_hash": "6741476ffb232d1ab9ec578a778358bc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Toast.jsx": {
+    "mtime": 1781207894.3900928,
+    "ast_hash": "3dc8aa011931d21f588efb1a0b223ad2",
+    "semantic_hash": "3dc8aa011931d21f588efb1a0b223ad2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Dialog.d.ts": {
+    "mtime": 1781206396.5881157,
+    "ast_hash": "ed98b7aa2ddc66ce1187fcebfb935d72",
+    "semantic_hash": "ed98b7aa2ddc66ce1187fcebfb935d72"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Banner.jsx": {
+    "mtime": 1781207894.3913236,
+    "ast_hash": "8b02e20e10444badbcf1c84befa0a5b8",
+    "semantic_hash": "8b02e20e10444badbcf1c84befa0a5b8"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Tooltip.jsx": {
+    "mtime": 1781207894.3924286,
+    "ast_hash": "8ab82d4fd062f4ad5dc4704aec7591eb",
+    "semantic_hash": "8ab82d4fd062f4ad5dc4704aec7591eb"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/icons/Icon.jsx": {
+    "mtime": 1781207901.5222902,
+    "ast_hash": "27c27a8c7ba96648c3db3829e10cf6c2",
+    "semantic_hash": "27c27a8c7ba96648c3db3829e10cf6c2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/migrations/env.py": {
+    "mtime": 1780762478.7273474,
+    "ast_hash": "02d993e52947be198cfa2ad9db802a9a",
+    "semantic_hash": "02d993e52947be198cfa2ad9db802a9a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/migrations/versions/0003_distillation.py": {
+    "mtime": 1780762478.733819,
+    "ast_hash": "9a70c4f224f261faae404460e4875520",
+    "semantic_hash": "9a70c4f224f261faae404460e4875520"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/migrations/versions/0005_deletion_evidence.py": {
+    "mtime": 1780762478.7345953,
+    "ast_hash": "f7063a79829fb4e9afa4a1404364eb23",
+    "semantic_hash": "f7063a79829fb4e9afa4a1404364eb23"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/migrations/versions/0002_raw_capture.py": {
+    "mtime": 1780762478.7336493,
+    "ast_hash": "9bf9325bd0a3d71531caf2c1d8d5aee6",
+    "semantic_hash": "9bf9325bd0a3d71531caf2c1d8d5aee6"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/migrations/versions/0001_baseline.py": {
+    "mtime": 1780762478.730613,
+    "ast_hash": "94d476490fcba6d212775efddcb16d31",
+    "semantic_hash": "94d476490fcba6d212775efddcb16d31"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/migrations/versions/0004_outcome_projection.py": {
+    "mtime": 1780762478.7342882,
+    "ast_hash": "866aaad70e0df07db482d4d1f8a5b175",
+    "semantic_hash": "866aaad70e0df07db482d4d1f8a5b175"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/conftest.py": {
+    "mtime": 1780762478.7451258,
+    "ast_hash": "ff4f868709a5c5c31ebf9cbc635b8cb7",
+    "semantic_hash": "ff4f868709a5c5c31ebf9cbc635b8cb7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/fakes.py": {
+    "mtime": 1780762478.7454033,
+    "ast_hash": "060b38a9bee7a9b7f6e58a2bc55983f0",
+    "semantic_hash": "060b38a9bee7a9b7f6e58a2bc55983f0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/corpus.py": {
+    "mtime": 1780762478.7452183,
+    "ast_hash": "3e749ade235ea3e34aaaaf5b047c36cc",
+    "semantic_hash": "3e749ade235ea3e34aaaaf5b047c36cc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_simulator.py": {
+    "mtime": 1780762478.7560198,
+    "ast_hash": "7ab8048cf3cd72a397f13744de7ce6ab",
+    "semantic_hash": "7ab8048cf3cd72a397f13744de7ce6ab"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_telegram_session.py": {
+    "mtime": 1780762478.7561612,
+    "ast_hash": "5862c70f044ac1b65585bb8b22b7d4bb",
+    "semantic_hash": "5862c70f044ac1b65585bb8b22b7d4bb"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_exchange.py": {
+    "mtime": 1780762478.753209,
+    "ast_hash": "4a464df02dcc08f37e7964b2fe7a36fb",
+    "semantic_hash": "4a464df02dcc08f37e7964b2fe7a36fb"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_domain_event.py": {
+    "mtime": 1780762478.7522237,
+    "ast_hash": "dc46aec3df42a6b2ac8c8e708bfd2972",
+    "semantic_hash": "dc46aec3df42a6b2ac8c8e708bfd2972"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_domain_signal.py": {
+    "mtime": 1780762478.7530549,
+    "ast_hash": "3db5ece77877f3b09f798be0faae6110",
+    "semantic_hash": "3db5ece77877f3b09f798be0faae6110"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_scorecard.py": {
+    "mtime": 1780762478.7556045,
+    "ast_hash": "7bfa6c4354115939ca66de5f3471cd32",
+    "semantic_hash": "7bfa6c4354115939ca66de5f3471cd32"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_numbers.py": {
+    "mtime": 1780762478.7553039,
+    "ast_hash": "b606dfc955518d6a3cd4a105ce666514",
+    "semantic_hash": "b606dfc955518d6a3cd4a105ce666514"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_extract_service.py": {
+    "mtime": 1780762478.7533932,
+    "ast_hash": "4d62ad47cb9ef7e60b2e5a39f290b28f",
+    "semantic_hash": "4d62ad47cb9ef7e60b2e5a39f290b28f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_domain_label_drift.py": {
+    "mtime": 1780762478.7524207,
+    "ast_hash": "cd13cda55b335518931a5f0ecf95ed55",
+    "semantic_hash": "cd13cda55b335518931a5f0ecf95ed55"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_domain_rules.py": {
+    "mtime": 1780762478.752801,
+    "ast_hash": "7d6955b975bccda92441af725e2e04d4",
+    "semantic_hash": "7d6955b975bccda92441af725e2e04d4"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_cli_telegram.py": {
+    "mtime": 1780762478.751055,
+    "ast_hash": "6c27908bfa4e6224a18a4c13ce119333",
+    "semantic_hash": "6c27908bfa4e6224a18a4c13ce119333"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_lifecycle_fold.py": {
+    "mtime": 1780762478.7541447,
+    "ast_hash": "e1327175a29cb08fb1732d062f1128d8",
+    "semantic_hash": "e1327175a29cb08fb1732d062f1128d8"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_hygiene.py": {
+    "mtime": 1780762478.7537477,
+    "ast_hash": "0e10a11980d2b78e9f73ce449fe87ecd",
+    "semantic_hash": "0e10a11980d2b78e9f73ce449fe87ecd"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_market_data_simulation.py": {
+    "mtime": 1780762478.7551126,
+    "ast_hash": "bacd4521a90fd913ad30f661ca2d1893",
+    "semantic_hash": "bacd4521a90fd913ad30f661ca2d1893"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_config.py": {
+    "mtime": 1780762478.7512233,
+    "ast_hash": "0ffab43717407d197bdede97c6b3d67c",
+    "semantic_hash": "0ffab43717407d197bdede97c6b3d67c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_lifecycle_domain.py": {
+    "mtime": 1780762478.7539608,
+    "ast_hash": "35fb4df28e18eddc52712e8da6ae673f",
+    "semantic_hash": "35fb4df28e18eddc52712e8da6ae673f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_deletions_format.py": {
+    "mtime": 1780762478.7517166,
+    "ast_hash": "bab69cec0420d042533dd9f2e5ee3898",
+    "semantic_hash": "bab69cec0420d042533dd9f2e5ee3898"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_llm_fallback.py": {
+    "mtime": 1780762478.7548664,
+    "ast_hash": "9e8d9f28c8c38576b06d60a00c4bfb4d",
+    "semantic_hash": "9e8d9f28c8c38576b06d60a00c4bfb4d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_domain_channel.py": {
+    "mtime": 1780762478.7520711,
+    "ast_hash": "65b973ea12f7ee8621c88ef70bd2e5c1",
+    "semantic_hash": "65b973ea12f7ee8621c88ef70bd2e5c1"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_rule_distiller.py": {
+    "mtime": 1780762478.755485,
+    "ast_hash": "838cec2b57860464cc7c22739a4ace1f",
+    "semantic_hash": "838cec2b57860464cc7c22739a4ace1f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_deterministic_parser.py": {
+    "mtime": 1780762478.7518933,
+    "ast_hash": "fe035e2774f0495a177a72ab9c0f1f3e",
+    "semantic_hash": "fe035e2774f0495a177a72ab9c0f1f3e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_lifecycle_patch.py": {
+    "mtime": 1780762478.754676,
+    "ast_hash": "8a48cdabc5deec8364b3f574c592c768",
+    "semantic_hash": "8a48cdabc5deec8364b3f574c592c768"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_telegram_source.py": {
+    "mtime": 1780762478.7563574,
+    "ast_hash": "ad71c20769282ef64ef082880821a07e",
+    "semantic_hash": "ad71c20769282ef64ef082880821a07e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_simulation_policy.py": {
+    "mtime": 1780762478.755866,
+    "ast_hash": "8207e2c9589b0056caae5976d40cd975",
+    "semantic_hash": "8207e2c9589b0056caae5976d40cd975"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_lifecycle_format.py": {
+    "mtime": 1780762478.7544227,
+    "ast_hash": "ca8bea950b9f66fc4cf003ed128e3460",
+    "semantic_hash": "ca8bea950b9f66fc4cf003ed128e3460"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_filter_rule_apply.py": {
+    "mtime": 1780762478.7535686,
+    "ast_hash": "4a66385694a660e96f314feb00e54e6b",
+    "semantic_hash": "4a66385694a660e96f314feb00e54e6b"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_channel_reference.py": {
+    "mtime": 1780762478.7508843,
+    "ast_hash": "ec4000e75d83a2d70d1aa50bef01c61a",
+    "semantic_hash": "ec4000e75d83a2d70d1aa50bef01c61a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_candidate_filter.py": {
+    "mtime": 1780762478.750741,
+    "ast_hash": "d048de817158a5c6e2665ed54a354600",
+    "semantic_hash": "d048de817158a5c6e2665ed54a354600"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_domain_message.py": {
+    "mtime": 1780762478.752582,
+    "ast_hash": "c46aa841c60b382dc819cb4a64c3f9a2",
+    "semantic_hash": "c46aa841c60b382dc819cb4a64c3f9a2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_market_data.py": {
+    "mtime": 1780762478.754981,
+    "ast_hash": "054f3d403cd975c168df831d69333628",
+    "semantic_hash": "054f3d403cd975c168df831d69333628"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/unit/test_deletion_diff.py": {
+    "mtime": 1780762478.7514331,
+    "ast_hash": "27245cf76f1921282bef7a035e33ae3d",
+    "semantic_hash": "27245cf76f1921282bef7a035e33ae3d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_deletion_evidence.py": {
+    "mtime": 1780762478.7488873,
+    "ast_hash": "7da4f8dcd047d7941ed81cd3855e1091",
+    "semantic_hash": "7da4f8dcd047d7941ed81cd3855e1091"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_distillation.py": {
+    "mtime": 1780762478.7474718,
+    "ast_hash": "fcbd00b3e1aa9e6a33b9c6528565ae5c",
+    "semantic_hash": "fcbd00b3e1aa9e6a33b9c6528565ae5c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_live.py": {
+    "mtime": 1780762478.748282,
+    "ast_hash": "352798629b0ae3594e30f23d47163424",
+    "semantic_hash": "352798629b0ae3594e30f23d47163424"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_repositories.py": {
+    "mtime": 1780762478.7503364,
+    "ast_hash": "2df8b141418eaa677043f90be0fdb136",
+    "semantic_hash": "2df8b141418eaa677043f90be0fdb136"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_migrations.py": {
+    "mtime": 1780762478.7497869,
+    "ast_hash": "6c39518d71cc10a8656c5da80d1a89a5",
+    "semantic_hash": "6c39518d71cc10a8656c5da80d1a89a5"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_score_traceability.py": {
+    "mtime": 1780762478.7505348,
+    "ast_hash": "1ec38cbed8dfa5570fc2f5bdbddfa481",
+    "semantic_hash": "1ec38cbed8dfa5570fc2f5bdbddfa481"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_deletions.py": {
+    "mtime": 1780762478.7473788,
+    "ast_hash": "6a04468af5e7acf06784d6ce5f848cdd",
+    "semantic_hash": "6a04468af5e7acf06784d6ce5f848cdd"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_lifecycle.py": {
+    "mtime": 1780762478.747836,
+    "ast_hash": "2e7f4b11b4a37ce3d04837fc9cb3260d",
+    "semantic_hash": "2e7f4b11b4a37ce3d04837fc9cb3260d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_stats.py": {
+    "mtime": 1780762478.7486188,
+    "ast_hash": "1e5c5d73aa646949dadfb97cf2fb1f84",
+    "semantic_hash": "1e5c5d73aa646949dadfb97cf2fb1f84"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_health.py": {
+    "mtime": 1780762478.7476447,
+    "ast_hash": "2da4908449c2fe70454e6c7255319b5c",
+    "semantic_hash": "2da4908449c2fe70454e6c7255319b5c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_foundation.py": {
+    "mtime": 1780762478.7493215,
+    "ast_hash": "1133027396bde5ae16b024cc69f5de6d",
+    "semantic_hash": "1133027396bde5ae16b024cc69f5de6d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_live_ingestion.py": {
+    "mtime": 1780762478.749611,
+    "ast_hash": "be634bae7f3ab10bb3182dad9fbfe978",
+    "semantic_hash": "be634bae7f3ab10bb3182dad9fbfe978"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_cli_score.py": {
+    "mtime": 1780762478.7484548,
+    "ast_hash": "af748f86f2aa45b5afd78f301b7f4efb",
+    "semantic_hash": "af748f86f2aa45b5afd78f301b7f4efb"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_distillation_storage.py": {
+    "mtime": 1780762478.749066,
+    "ast_hash": "9254808bf18d76274bb1ae5bd05566d8",
+    "semantic_hash": "9254808bf18d76274bb1ae5bd05566d8"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_backfill.py": {
+    "mtime": 1780762478.747085,
+    "ast_hash": "1bbd36fe93a48bdef4dc69ac92a729ac",
+    "semantic_hash": "1bbd36fe93a48bdef4dc69ac92a729ac"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_candidate_derivation.py": {
+    "mtime": 1780762478.7472136,
+    "ast_hash": "72877982e4e42dd34223064501c31c45",
+    "semantic_hash": "72877982e4e42dd34223064501c31c45"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_outcome_projection.py": {
+    "mtime": 1780762478.7499835,
+    "ast_hash": "37961a9a1eebf93a249f213ea624b7f6",
+    "semantic_hash": "37961a9a1eebf93a249f213ea624b7f6"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/integration/test_precision_recall.py": {
+    "mtime": 1780762478.750149,
+    "ast_hash": "adc3ddad3ab9a306774592fc953a8332",
+    "semantic_hash": "adc3ddad3ab9a306774592fc953a8332"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/fixtures/klines/bybit_linear_btcusdt_response.json": {
+    "mtime": 1780762478.7465527,
+    "ast_hash": "df6be36df82a50695959b5ba150a5585",
+    "semantic_hash": "df6be36df82a50695959b5ba150a5585"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/fixtures/klines/btcusdt_known_r.json": {
+    "mtime": 1780762478.7463655,
+    "ast_hash": "e4d611dbd615bbdc0c8d01c323b3dcf1",
+    "semantic_hash": "e4d611dbd615bbdc0c8d01c323b3dcf1"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/config.py": {
+    "mtime": 1780762478.7354848,
+    "ast_hash": "b219cfcd8156732d68e610af42971fec",
+    "semantic_hash": "b219cfcd8156732d68e610af42971fec"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/__init__.py": {
+    "mtime": 1780762478.7351513,
+    "ast_hash": "57f6fa8f00156fb4d3f489f73b641a66",
+    "semantic_hash": "57f6fa8f00156fb4d3f489f73b641a66"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/cli.py": {
+    "mtime": 1780762478.7353706,
+    "ast_hash": "2c6ccc3344ebc81c5190bfeb8bee17b3",
+    "semantic_hash": "2c6ccc3344ebc81c5190bfeb8bee17b3"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/foundation/db.py": {
+    "mtime": 1780762478.7389367,
+    "ast_hash": "341344ba778cf495bd3ddc636a0b9d3e",
+    "semantic_hash": "341344ba778cf495bd3ddc636a0b9d3e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/foundation/telethon_source.py": {
+    "mtime": 1780762478.7393684,
+    "ast_hash": "7658254ddd0c98e713e0bc4c494c4662",
+    "semantic_hash": "7658254ddd0c98e713e0bc4c494c4662"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/foundation/__init__.py": {
+    "mtime": 1780762478.7385643,
+    "ast_hash": "faddcdee2e62fbc39ca2cd7b471c5255",
+    "semantic_hash": "faddcdee2e62fbc39ca2cd7b471c5255"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/foundation/bybit_market_data.py": {
+    "mtime": 1780762478.7387776,
+    "ast_hash": "2b9363c164edc59c0debe6398fc71099",
+    "semantic_hash": "2b9363c164edc59c0debe6398fc71099"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/foundation/static_exchange.py": {
+    "mtime": 1780762478.7391188,
+    "ast_hash": "0027048a8a90795cf98848a5aad30dba",
+    "semantic_hash": "0027048a8a90795cf98848a5aad30dba"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/foundation/telegram_session.py": {
+    "mtime": 1780762478.739214,
+    "ast_hash": "0ccb2d9eccabebe162467adcf1758d26",
+    "semantic_hash": "0ccb2d9eccabebe162467adcf1758d26"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/drift_repository.py": {
+    "mtime": 1781210596.7349234,
+    "ast_hash": "a81af2578a0a083cd523874b1d921182",
+    "semantic_hash": "a81af2578a0a083cd523874b1d921182"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/outcome_repository.py": {
+    "mtime": 1781210596.734861,
+    "ast_hash": "5ac64ce58f3782bee2388b9bc10071f2",
+    "semantic_hash": "5ac64ce58f3782bee2388b9bc10071f2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/models.py": {
+    "mtime": 1780762478.7447145,
+    "ast_hash": "8d8eda51e65af22179a2d6145c22bbd0",
+    "semantic_hash": "8d8eda51e65af22179a2d6145c22bbd0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/__init__.py": {
+    "mtime": 1780762478.744588,
+    "ast_hash": "ce0fab8d7844149eed2eb3e3610b2440",
+    "semantic_hash": "ce0fab8d7844149eed2eb3e3610b2440"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/event_repository.py": {
+    "mtime": 1781210596.7345917,
+    "ast_hash": "060a9d50bd0df76ad38fa3d9a41ce460",
+    "semantic_hash": "060a9d50bd0df76ad38fa3d9a41ce460"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/deletion_repository.py": {
+    "mtime": 1781210596.73493,
+    "ast_hash": "33493372348c18e205fbee7483056385",
+    "semantic_hash": "33493372348c18e205fbee7483056385"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/repositories.py": {
+    "mtime": 1781210596.734666,
+    "ast_hash": "b353a74905af8f696689ac8e1eb44bd6",
+    "semantic_hash": "b353a74905af8f696689ac8e1eb44bd6"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/message_repository.py": {
+    "mtime": 1781210596.7345917,
+    "ast_hash": "c0405138d676116e0bdb020a5fa75cb7",
+    "semantic_hash": "c0405138d676116e0bdb020a5fa75cb7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/channel_repository.py": {
+    "mtime": 1781210596.7348604,
+    "ast_hash": "2e5c01746c2dbe286fd283d9879d1441",
+    "semantic_hash": "2e5c01746c2dbe286fd283d9879d1441"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/storage/rule_repository.py": {
+    "mtime": 1781210596.7348714,
+    "ast_hash": "32ff635aff062ca14da0db1d7577cfcd",
+    "semantic_hash": "32ff635aff062ca14da0db1d7577cfcd"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/simulation.py": {
+    "mtime": 1780762478.7382796,
+    "ast_hash": "e6fdc2c49e9c541e7a3cf8d2ebcb6ccd",
+    "semantic_hash": "e6fdc2c49e9c541e7a3cf8d2ebcb6ccd"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/event.py": {
+    "mtime": 1780762478.736506,
+    "ast_hash": "b6b01b005c9979deca3fce3f1733bdf0",
+    "semantic_hash": "b6b01b005c9979deca3fce3f1733bdf0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/signal.py": {
+    "mtime": 1780762478.73812,
+    "ast_hash": "473a89b27fd5c07bc94646e468e8efc2",
+    "semantic_hash": "473a89b27fd5c07bc94646e468e8efc2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/protocols.py": {
+    "mtime": 1780762478.7377741,
+    "ast_hash": "2c820335876eebceb0e2e5b7fe28be68",
+    "semantic_hash": "2c820335876eebceb0e2e5b7fe28be68"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/telegram.py": {
+    "mtime": 1780762478.7383986,
+    "ast_hash": "3bd62cdce3140396efdf2efbcf018e8b",
+    "semantic_hash": "3bd62cdce3140396efdf2efbcf018e8b"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/channel.py": {
+    "mtime": 1780762478.7357476,
+    "ast_hash": "f8c6b641b673ead8ec5f96e88b0825c4",
+    "semantic_hash": "f8c6b641b673ead8ec5f96e88b0825c4"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/channel_reference.py": {
+    "mtime": 1780762478.7360287,
+    "ast_hash": "558a656e79718fc256c36acfe6c10391",
+    "semantic_hash": "558a656e79718fc256c36acfe6c10391"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/drift.py": {
+    "mtime": 1780762478.736339,
+    "ast_hash": "5e9f8359038f367691d5a1db4719ae28",
+    "semantic_hash": "5e9f8359038f367691d5a1db4719ae28"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/__init__.py": {
+    "mtime": 1780762478.7356575,
+    "ast_hash": "4935b7224033b9faa45295d55ab0178b",
+    "semantic_hash": "4935b7224033b9faa45295d55ab0178b"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/message.py": {
+    "mtime": 1780762478.7372987,
+    "ast_hash": "10fc69d736190951549125dacb306ef0",
+    "semantic_hash": "10fc69d736190951549125dacb306ef0"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/extraction_outcome.py": {
+    "mtime": 1781210592.2323847,
+    "ast_hash": "7324f648a0d59e38c4e2d0a5f68ece18",
+    "semantic_hash": "7324f648a0d59e38c4e2d0a5f68ece18"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/parser_rule.py": {
+    "mtime": 1780762478.7375474,
+    "ast_hash": "c9ed5fe34cdb46fbae2b9d7a122cb1cc",
+    "semantic_hash": "c9ed5fe34cdb46fbae2b9d7a122cb1cc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/lifecycle.py": {
+    "mtime": 1780762478.7371964,
+    "ast_hash": "af4cb16ad491f6774dbc98102362f6ca",
+    "semantic_hash": "af4cb16ad491f6774dbc98102362f6ca"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/label.py": {
+    "mtime": 1780762478.7368724,
+    "ast_hash": "4664380790a689fa862257a49d09090b",
+    "semantic_hash": "4664380790a689fa862257a49d09090b"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/deletion.py": {
+    "mtime": 1780762478.7361264,
+    "ast_hash": "def7c36e05008decf9365c8ed9470799",
+    "semantic_hash": "def7c36e05008decf9365c8ed9470799"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/score.py": {
+    "mtime": 1780762478.7379453,
+    "ast_hash": "ba9d5e2b1b7989a53c5363a1b8d9f3cc",
+    "semantic_hash": "ba9d5e2b1b7989a53c5363a1b8d9f3cc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/domain/filter_rule.py": {
+    "mtime": 1780762478.7367115,
+    "ast_hash": "4f449e18dbd4565185941ffdd4e3c2db",
+    "semantic_hash": "4f449e18dbd4565185941ffdd4e3c2db"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/json_extract.py": {
+    "mtime": 1780762478.7426612,
+    "ast_hash": "80e0e80d4a9afae6111c345449acc152",
+    "semantic_hash": "80e0e80d4a9afae6111c345449acc152"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/__init__.py": {
+    "mtime": 1780762478.7395403,
+    "ast_hash": "47f92339beab1ca8a18043fe19477ad9",
+    "semantic_hash": "47f92339beab1ca8a18043fe19477ad9"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/numbers.py": {
+    "mtime": 1780762478.7433999,
+    "ast_hash": "005ed8fb14e144c49c833769ec8b53b3",
+    "semantic_hash": "005ed8fb14e144c49c833769ec8b53b3"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/ingestion/candidate_filter.py": {
+    "mtime": 1780762478.742327,
+    "ast_hash": "18063ef6258f58f4bca82031cee0f46c",
+    "semantic_hash": "18063ef6258f58f4bca82031cee0f46c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/ingestion/__init__.py": {
+    "mtime": 1780762478.7420084,
+    "ast_hash": "803413d3adb230778789776a119827df",
+    "semantic_hash": "803413d3adb230778789776a119827df"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/ingestion/candidate_derivation.py": {
+    "mtime": 1780762478.742224,
+    "ast_hash": "1b063e62004032725e1f725f3c7a72f8",
+    "semantic_hash": "1b063e62004032725e1f725f3c7a72f8"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/ingestion/backfill.py": {
+    "mtime": 1780762478.7421122,
+    "ast_hash": "de001cfd9be11dde1521a07b4684a666",
+    "semantic_hash": "de001cfd9be11dde1521a07b4684a666"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/ingestion/live.py": {
+    "mtime": 1780762478.7425165,
+    "ast_hash": "aba8843313e76d626a33560715f6d549",
+    "semantic_hash": "aba8843313e76d626a33560715f6d549"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/deletion/rescan.py": {
+    "mtime": 1780762478.740282,
+    "ast_hash": "500ec70a89b2b6c0b90200ef79fdd947",
+    "semantic_hash": "500ec70a89b2b6c0b90200ef79fdd947"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/deletion/__init__.py": {
+    "mtime": 1780762478.7398367,
+    "ast_hash": "a0fa6614b71cbc84c47d4a167efea573",
+    "semantic_hash": "a0fa6614b71cbc84c47d4a167efea573"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/deletion/diff.py": {
+    "mtime": 1780762478.7400572,
+    "ast_hash": "33d26cbd94a5c9e44742228dc88c747d",
+    "semantic_hash": "33d26cbd94a5c9e44742228dc88c747d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/distillation/rule_distiller.py": {
+    "mtime": 1780762478.7408142,
+    "ast_hash": "865a9298f7ed1a81c4fb98c7b1a38567",
+    "semantic_hash": "865a9298f7ed1a81c4fb98c7b1a38567"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/distillation/evaluation.py": {
+    "mtime": 1780762478.7406044,
+    "ast_hash": "3f34190e7ba8d54656925737eec41056",
+    "semantic_hash": "3f34190e7ba8d54656925737eec41056"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/distillation/__init__.py": {
+    "mtime": 1780762478.7404723,
+    "ast_hash": "25b2e5167029dc12854edb15b3ebb33a",
+    "semantic_hash": "25b2e5167029dc12854edb15b3ebb33a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/lifecycle/patch.py": {
+    "mtime": 1780762478.7432408,
+    "ast_hash": "9f30140da1907c9e7d712ecba9d51cf3",
+    "semantic_hash": "9f30140da1907c9e7d712ecba9d51cf3"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/lifecycle/__init__.py": {
+    "mtime": 1780762478.7428672,
+    "ast_hash": "86fe9124f706712672a6a9534d47b910",
+    "semantic_hash": "86fe9124f706712672a6a9534d47b910"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/lifecycle/fold.py": {
+    "mtime": 1780762478.743049,
+    "ast_hash": "6b215e59d018a438b971a871b0a80d4c",
+    "semantic_hash": "6b215e59d018a438b971a871b0a80d4c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/scoring/__init__.py": {
+    "mtime": 1780762478.7436597,
+    "ast_hash": "aedda29f2a5afc7be1ab48c91bb38daa",
+    "semantic_hash": "aedda29f2a5afc7be1ab48c91bb38daa"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/scoring/scorecard.py": {
+    "mtime": 1780762478.7442653,
+    "ast_hash": "827f3e7dda3d2d1c13433ca078701bda",
+    "semantic_hash": "827f3e7dda3d2d1c13433ca078701bda"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/scoring/hygiene.py": {
+    "mtime": 1780762478.743864,
+    "ast_hash": "97ac10a717eb1cb6087c3b76620c0d8c",
+    "semantic_hash": "97ac10a717eb1cb6087c3b76620c0d8c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/scoring/simulator.py": {
+    "mtime": 1780762478.744405,
+    "ast_hash": "43d3a111f91b23a492de60087596bcef",
+    "semantic_hash": "43d3a111f91b23a492de60087596bcef"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/scoring/policies.py": {
+    "mtime": 1780762478.744059,
+    "ast_hash": "90a3b4013da76de1be10ae087e5f4d77",
+    "semantic_hash": "90a3b4013da76de1be10ae087e5f4d77"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/extraction/llm_fallback.py": {
+    "mtime": 1780762478.741685,
+    "ast_hash": "18751778db30d2aebd23ed5ab15fb142",
+    "semantic_hash": "18751778db30d2aebd23ed5ab15fb142"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/extraction/__init__.py": {
+    "mtime": 1780762478.741184,
+    "ast_hash": "b435c96aafd6484675dffca6c4632542",
+    "semantic_hash": "b435c96aafd6484675dffca6c4632542"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/extraction/deterministic_parser.py": {
+    "mtime": 1780762478.7413678,
+    "ast_hash": "a4697cd833524349e271fb4c9f80f81f",
+    "semantic_hash": "a4697cd833524349e271fb4c9f80f81f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/src/verasig/services/extraction/extract_service.py": {
+    "mtime": 1781210596.734829,
+    "ast_hash": "8462e745b56bedb988498aa58be4c5db",
+    "semantic_hash": "8462e745b56bedb988498aa58be4c5db"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/README.md": {
+    "mtime": 1781191391.468524,
+    "ast_hash": "80811ae63089461cca875e7e402bc87a",
+    "semantic_hash": "80811ae63089461cca875e7e402bc87a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docker-compose.yml": {
+    "mtime": 1781191387.0128953,
+    "ast_hash": "0f12c21a4ede891e9199a4d69a375a36",
+    "semantic_hash": "0f12c21a4ede891e9199a4d69a375a36"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/PRODUCT.md": {
+    "mtime": 1780768304.4810534,
+    "ast_hash": "3dc3a4136d20750f6b430ef22e92048f",
+    "semantic_hash": "3dc3a4136d20750f6b430ef22e92048f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/DESIGN.md": {
+    "mtime": 1780851366.2878659,
+    "ast_hash": "871e1687556d266cbc6864df1c589035",
+    "semantic_hash": "871e1687556d266cbc6864df1c589035"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0004-hybrid-push-poll-live-ingestion.md": {
+    "mtime": 1780762478.6814322,
+    "ast_hash": "d81e9d024dcac6cd58d5b18975543de6",
+    "semantic_hash": "d81e9d024dcac6cd58d5b18975543de6"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0008-deletion-evidence-durable-projection.md": {
+    "mtime": 1780762478.6822574,
+    "ast_hash": "ef825d1637f484d95e7de6d2f6a6d1e7",
+    "semantic_hash": "ef825d1637f484d95e7de6d2f6a6d1e7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0010-refine-codebase-structure-without-new-application-layer.md": {
+    "mtime": 1780762478.6830702,
+    "ast_hash": "68ee12493b3346b613e6e81840a80967",
+    "semantic_hash": "68ee12493b3346b613e6e81840a80967"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0009-provider-score-recomputable-scorecard.md": {
+    "mtime": 1780762478.6827703,
+    "ast_hash": "c19d24b82d3c1de000366d7ab9763b46",
+    "semantic_hash": "c19d24b82d3c1de000366d7ab9763b46"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0006-extraction-outcomes-shape-and-lifecycle.md": {
+    "mtime": 1780762478.6819434,
+    "ast_hash": "a8ba542584cd05dc23a6fe0d18801189",
+    "semantic_hash": "a8ba542584cd05dc23a6fe0d18801189"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0005-distilled-filter-and-advisory-gate.md": {
+    "mtime": 1780762478.681815,
+    "ast_hash": "ebd5275886b790ae58ac8db89eb48cdb",
+    "semantic_hash": "ebd5275886b790ae58ac8db89eb48cdb"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0003-conservative-simulation-with-pluggable-policy.md": {
+    "mtime": 1780762478.681299,
+    "ast_hash": "8b0a4d9ebdcb28a168d71fe020726b95",
+    "semantic_hash": "8b0a4d9ebdcb28a168d71fe020726b95"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0002-human-assisted-rule-distillation.md": {
+    "mtime": 1780762478.6811006,
+    "ast_hash": "65aa010d7bdd13a50c01ad9f8241084c",
+    "semantic_hash": "65aa010d7bdd13a50c01ad9f8241084c"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0001-two-layer-raw-capture.md": {
+    "mtime": 1780762478.6807086,
+    "ast_hash": "34e721160755fd6bdcac4d2b7cb76523",
+    "semantic_hash": "34e721160755fd6bdcac4d2b7cb76523"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/adr/0007-lifecycle-fold-pure-recomputable.md": {
+    "mtime": 1780762478.6820912,
+    "ast_hash": "48ce2f30d916b2abfcd5e62ed1bdbeb3",
+    "semantic_hash": "48ce2f30d916b2abfcd5e62ed1bdbeb3"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/context/CONTEXT.md": {
+    "mtime": 1780762478.684405,
+    "ast_hash": "e42bf3ba7dd7f3976d76aae1427a32d1",
+    "semantic_hash": "e42bf3ba7dd7f3976d76aae1427a32d1"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/requirements.md": {
+    "mtime": 1780762478.6836438,
+    "ast_hash": "bd44987226256b989ba36ee8f1144b74",
+    "semantic_hash": "bd44987226256b989ba36ee8f1144b74"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/core-features.md": {
+    "mtime": 1780748374.057798,
+    "ast_hash": "e4f74e0e79afb2c026c34369c1e0d405",
+    "semantic_hash": "e4f74e0e79afb2c026c34369c1e0d405"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/business-decomposition.md": {
+    "mtime": 1780748374.0575705,
+    "ast_hash": "c9172fcd8736cc6a93d2ec3c7a8d0f2d",
+    "semantic_hash": "c9172fcd8736cc6a93d2ec3c7a8d0f2d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/validation-roadmap.md": {
+    "mtime": 1780762478.6837544,
+    "ast_hash": "bdb5561eb6116184a8392e0e69a50355",
+    "semantic_hash": "bdb5561eb6116184a8392e0e69a50355"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/README.md": {
+    "mtime": 1780762478.68323,
+    "ast_hash": "950e9d98f869d6ec0fd0a38de08df64b",
+    "semantic_hash": "950e9d98f869d6ec0fd0a38de08df64b"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/architecture-decisions.md": {
+    "mtime": 1780762478.6833713,
+    "ast_hash": "2cc7695847ff26b025e74cf82644e8b4",
+    "semantic_hash": "2cc7695847ff26b025e74cf82644e8b4"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/market-research.md": {
+    "mtime": 1780748374.0581098,
+    "ast_hash": "0e31b887991a129e22fe8685ee6c3acd",
+    "semantic_hash": "0e31b887991a129e22fe8685ee6c3acd"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/value-proposition.md": {
+    "mtime": 1780762478.6841106,
+    "ast_hash": "1e0066348a3cd48b52b153e24866788e",
+    "semantic_hash": "1e0066348a3cd48b52b153e24866788e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/business/project-structure.md": {
+    "mtime": 1780762478.6834986,
+    "ast_hash": "d90702f313a4223e92de85486861d95a",
+    "semantic_hash": "d90702f313a4223e92de85486861d95a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/observer/implementation-plan.md": {
+    "mtime": 1780762478.6852345,
+    "ast_hash": "0cd6c7f49a8ef5abff3c0809be941eab",
+    "semantic_hash": "0cd6c7f49a8ef5abff3c0809be941eab"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/observer/data-contracts.md": {
+    "mtime": 1780762478.6848006,
+    "ast_hash": "8227a657451250772b9ee5a2d4bc128f",
+    "semantic_hash": "8227a657451250772b9ee5a2d4bc128f"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/observer/spec.md": {
+    "mtime": 1780762478.6856806,
+    "ast_hash": "421e1ea09308f5cc8797c28333835b9a",
+    "semantic_hash": "421e1ea09308f5cc8797c28333835b9a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/observer/test-plan.md": {
+    "mtime": 1780762478.6859207,
+    "ast_hash": "d5910a4acbecb97e44e3d840ed9a43f7",
+    "semantic_hash": "d5910a4acbecb97e44e3d840ed9a43f7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/source-labeling-reader/requirements.md": {
+    "mtime": 1780937644.1811318,
+    "ast_hash": "b097b4298416131d29deb6c3b3eaea75",
+    "semantic_hash": "b097b4298416131d29deb6c3b3eaea75"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/source-labeling-reader/mockups/c-reading-stream.html": {
+    "mtime": 1780866489.1960063,
+    "ast_hash": "65df645dd90743e4b412d5aedecf6fcb",
+    "semantic_hash": "65df645dd90743e4b412d5aedecf6fcb"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/source-labeling-reader/mockups/a-focus-deck.html": {
+    "mtime": 1780866345.9607952,
+    "ast_hash": "95a3beca76702e7ef138eead43089f77",
+    "semantic_hash": "95a3beca76702e7ef138eead43089f77"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/docs/work/source-labeling-reader/mockups/b-refined-ledger.html": {
+    "mtime": 1780866423.0578303,
+    "ast_hash": "0e6d281ff11cbcc381071e309db52877",
+    "semantic_hash": "0e6d281ff11cbcc381071e309db52877"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/libs/contracts/README.md": {
+    "mtime": 1781191393.7118814,
+    "ast_hash": "2a6dbb66e067196723fb798941fdb90e",
+    "semantic_hash": "2a6dbb66e067196723fb798941fdb90e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/README.md": {
+    "mtime": 1781191393.6920755,
+    "ast_hash": "5fcc210c43621a8259d1e33c02f14294",
+    "semantic_hash": "5fcc210c43621a8259d1e33c02f14294"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/index.html": {
+    "mtime": 1781207743.910721,
+    "ast_hash": "43ed92adf722eabd5f9ace6dfefdf6fc",
+    "semantic_hash": "43ed92adf722eabd5f9ace6dfefdf6fc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/forms.card.html": {
+    "mtime": 1781206396.5797658,
+    "ast_hash": "d166c4ea69aa1e9507842413cce6b2ec",
+    "semantic_hash": "d166c4ea69aa1e9507842413cce6b2ec"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Select.prompt.md": {
+    "mtime": 1781206396.5801823,
+    "ast_hash": "1ba4df316d87f70b9ff12b1e4eea7ae6",
+    "semantic_hash": "1ba4df316d87f70b9ff12b1e4eea7ae6"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Checkbox.prompt.md": {
+    "mtime": 1781206396.5812936,
+    "ast_hash": "3de6da2067b27770d3a44d7e52f9b1a7",
+    "semantic_hash": "3de6da2067b27770d3a44d7e52f9b1a7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Switch.prompt.md": {
+    "mtime": 1781206396.581727,
+    "ast_hash": "bb157e518e1561191d046d51bd05f37a",
+    "semantic_hash": "bb157e518e1561191d046d51bd05f37a"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/forms/Input.prompt.md": {
+    "mtime": 1781206396.5819197,
+    "ast_hash": "0a4500296cb3b046db1c0cf3fd6604e7",
+    "semantic_hash": "0a4500296cb3b046db1c0cf3fd6604e7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Badge.prompt.md": {
+    "mtime": 1781206396.5830681,
+    "ast_hash": "3cd54d89adb87f6a7b26ab480719aed2",
+    "semantic_hash": "3cd54d89adb87f6a7b26ab480719aed2"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Tag.prompt.md": {
+    "mtime": 1781206396.5841315,
+    "ast_hash": "1872a5591bb35b3d7c290042f0b13725",
+    "semantic_hash": "1872a5591bb35b3d7c290042f0b13725"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/core.card.html": {
+    "mtime": 1781206396.584391,
+    "ast_hash": "a3c149bdd29c6423f596eb53088ee285",
+    "semantic_hash": "a3c149bdd29c6423f596eb53088ee285"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/IconButton.prompt.md": {
+    "mtime": 1781206396.584904,
+    "ast_hash": "11e22c57e39af1ed1b73ade6f78d6e46",
+    "semantic_hash": "11e22c57e39af1ed1b73ade6f78d6e46"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Avatar.prompt.md": {
+    "mtime": 1781206396.5850973,
+    "ast_hash": "2e8a397faab684f580564bfb2f80693e",
+    "semantic_hash": "2e8a397faab684f580564bfb2f80693e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Tabs.prompt.md": {
+    "mtime": 1781206396.5859978,
+    "ast_hash": "bd90c802c24513f7137d6410e34746c7",
+    "semantic_hash": "bd90c802c24513f7137d6410e34746c7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/core/Button.prompt.md": {
+    "mtime": 1781206396.5865307,
+    "ast_hash": "d41da625d5b5f87264530ad654ff9d26",
+    "semantic_hash": "d41da625d5b5f87264530ad654ff9d26"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Banner.prompt.md": {
+    "mtime": 1781206396.5870748,
+    "ast_hash": "566890e084737fcac08de5a5d192f888",
+    "semantic_hash": "566890e084737fcac08de5a5d192f888"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Toast.prompt.md": {
+    "mtime": 1781206396.5877783,
+    "ast_hash": "ab1ffdea11aa140ddddd25684be276af",
+    "semantic_hash": "ab1ffdea11aa140ddddd25684be276af"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Dialog.prompt.md": {
+    "mtime": 1781206396.5882835,
+    "ast_hash": "d85789248bc64a7746fc138008c43977",
+    "semantic_hash": "d85789248bc64a7746fc138008c43977"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/feedback.card.html": {
+    "mtime": 1781206396.5886495,
+    "ast_hash": "bf5431edd6dd52785acd99ea40f0141e",
+    "semantic_hash": "bf5431edd6dd52785acd99ea40f0141e"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/design-system/components/feedback/Tooltip.prompt.md": {
+    "mtime": 1781206396.5890002,
+    "ast_hash": "c42d075b623449c0a226e5e380b357cc",
+    "semantic_hash": "c42d075b623449c0a226e5e380b357cc"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/README.md": {
+    "mtime": 1781191393.6968617,
+    "ast_hash": "1134e0efacc007bdb7a43ffaa4079135",
+    "semantic_hash": "1134e0efacc007bdb7a43ffaa4079135"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/fixtures/cli/extract_miss.txt": {
+    "mtime": 1780762478.7458167,
+    "ast_hash": "b0a6153395c53cea34f8fe2db725fbf7",
+    "semantic_hash": "b0a6153395c53cea34f8fe2db725fbf7"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/fixtures/cli/distill_pilot.txt": {
+    "mtime": 1780762478.7456684,
+    "ast_hash": "5ce04fa49ce8702792246116a3218c3d",
+    "semantic_hash": "5ce04fa49ce8702792246116a3218c3d"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/backend/tests/fixtures/cli/extract_pilot.txt": {
+    "mtime": 1780762478.7460616,
+    "ast_hash": "9855575b188a584c81ed7bdaa0b74583",
+    "semantic_hash": "9855575b188a584c81ed7bdaa0b74583"
+  },
+  "/Users/evgesha/Projects/trading/Verasig/apps/frontend/src/assets/verasig-mark.svg": {
+    "mtime": 1781206398.9573014,
+    "ast_hash": "f0fa074c0f8663fd32c790822aa2e44a",
+    "semantic_hash": "f0fa074c0f8663fd32c790822aa2e44a"
+  }
+}
