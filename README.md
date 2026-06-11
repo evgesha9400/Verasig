@@ -33,6 +33,7 @@ Compose uses `apps/backend/Dockerfile` and `apps/backend/alembic.ini`.
 
 ## Documents
 
+- [Graphify protocol](docs/GRAPHIFY.md)
 - [Product requirements](docs/business/requirements.md)
 - [Architecture decisions](docs/business/architecture-decisions.md)
 - [Design and domain language](docs/context/CONTEXT.md)
