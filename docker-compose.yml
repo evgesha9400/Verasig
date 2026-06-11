@@ -14,7 +14,7 @@ services:
       retries: 15
 
   app:
-    build: .
+    build: ./apps/backend
     env_file: [.env]
     environment:
       VERASIG_DB_HOST: db

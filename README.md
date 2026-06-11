@@ -2,26 +2,38 @@
 
 Proof-first signal provider intelligence.
 
-## Scope
+## Repo structure
 
-- Monitor public and private Telegram trading signal channels.
-- Extract historical messages.
-- Identify real trade signals.
-- Generate provider-specific deterministic parser rules.
-- Fall back to LLM extraction for unsupported formats.
-- Score signal providers by evidence.
-- Expose provider performance dashboards to signed-up users.
+- `apps/backend/` — Python backend service (logic, migrations, CLI, tests).
+- `apps/frontend/` — React/Vite frontend shell for future production UI.
+- `libs/contracts/` — shared API contract definitions (reserved for phase 2+).
+- `docs/` — architecture docs and design references.
 
-## Parent Platform
+## Backend (current behavior preserved)
 
-- `Deltalytic` remains the future umbrella platform.
-- `Verasig` is the standalone signal-processing and signal-provider-verification direction.
-- Integration back into Deltalytic stays a future option.
+- `cd apps/backend`
+- `uv sync`
+- `uv run pytest`
+- `uv run verasig health`
+- `uv run verasig migrate`
+
+Backend package remains `verasig` and CLI command remains `verasig`.
+
+## Database migrations and app container
+
+- `docker compose up --build`
+
+Compose uses `apps/backend/Dockerfile` and `apps/backend/alembic.ini`.
+
+## Environment
+
+- Keep the root `.env` for local compose/runtime.
+- Keep environment variable names unchanged (`VERASIG_*`) in this phase.
+- `.env.example` remains at repository root.
 
 ## Documents
 
-- [Business Pack](docs/business/README.md)
-- [Requirements](docs/business/requirements.md)
-- [Validation Stages](docs/business/validation-stages.md)
-- [Architecture Decisions](docs/business/architecture-decisions.md)
-
+- [Product requirements](docs/business/requirements.md)
+- [Architecture decisions](docs/business/architecture-decisions.md)
+- [Design and domain language](docs/context/CONTEXT.md)
+- [Design artifacts](docs/design/prototypes/Verasig)
