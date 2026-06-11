@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { Icon } from '../../design-system/index.js'
+import { Icon } from '@verasig/design-system'
 
 /* Verasig prototype — pipeline stepper shown across the verification workflow */
 export const PIPELINE_STEPS = [

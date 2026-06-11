@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import './design-system/styles.css'
+import '@verasig/design-system/styles.css'
 import './app.css'
 import App from './App.jsx'
 

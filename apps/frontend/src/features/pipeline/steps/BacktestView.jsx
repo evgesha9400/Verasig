@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Button, MetricStat, ConfidenceBar, Card } from '../../../design-system/index.js'
-import { Icon } from '../../../design-system/index.js'
+import { Button, MetricStat, ConfidenceBar, Card } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 
 /* Verasig prototype — Backtest run + signal quality results */
 function ThinkOrb() {

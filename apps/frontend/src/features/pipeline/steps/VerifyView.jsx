@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Badge, Button } from '../../../design-system/index.js'
-import { Icon } from '../../../design-system/index.js'
+import { Badge, Button } from '@verasig/design-system'
+import { Icon } from '@verasig/design-system'
 import { MESSAGES, VERIFY_MIN, VERIFY_MISCLASSIFIED } from '../../../data/seed.js'
 
 /* Verasig prototype — Verify step: confirm the ruleset's classifications.

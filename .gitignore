@@ -7,6 +7,10 @@ secrets/
 *.session
 *.session-journal
 
+# Node
+node_modules/
+*.tsbuildinfo
+
 # Python / uv
 .venv/
 __pycache__/

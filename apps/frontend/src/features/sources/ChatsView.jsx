@@ -1,7 +1,7 @@
 /* Verasig prototype — Telegram chat list */
 import { useState } from 'react';
-import { Badge, Button, IconButton } from '../../design-system/index.js';
-import { Icon } from '../../design-system/index.js';
+import { Badge, Button, IconButton } from '@verasig/design-system';
+import { Icon } from '@verasig/design-system';
 
 function fmtNum(n) {
   if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K';
