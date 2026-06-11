@@ -1,0 +1,22 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Corner radius" subtitle="Crisp, mechanical corners — sm controls, lg cards, pill status" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 22px; background: var(--bg-app); display: flex; gap: 18px; align-items: flex-end; }
+  .item { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .box { width: 76px; height: 60px; background: var(--surface-raised); border: 1px solid var(--border-strong); border-top: 2px solid var(--accent); }
+  .tag { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="item"><div class="box" style="border-radius:var(--radius-xs)"></div><span class="tag">xs · 3</span></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-sm)"></div><span class="tag">sm · 5</span></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-md)"></div><span class="tag">md · 8</span></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-lg)"></div><span class="tag">lg · 12</span></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-xl)"></div><span class="tag">xl · 16</span></div>
+  <div class="item"><div class="box" style="border-radius:var(--radius-pill);width:60px"></div><span class="tag">pill</span></div>
+</body>
+</html>

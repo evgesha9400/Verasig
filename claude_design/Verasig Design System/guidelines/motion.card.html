@@ -1,0 +1,24 @@
+<!-- @dsCard group="Spacing" viewport="700x180" name="Motion" subtitle="Quick, precise easing — no bounce. Hover to replay." -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 22px; background: var(--bg-app); }
+  .row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .tag { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+  .track { height: 24px; background: var(--surface-sunken); border-radius: 999px; position: relative; border: 1px solid var(--border-subtle); }
+  .dot { position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 999px; background: var(--accent); }
+  @keyframes run { 0%,12% { left: 4px; } 70%,100% { left: calc(100% - 18px); } }
+  .a1 { animation: run 2.6s var(--ease-out) infinite alternate; }
+  .a2 { animation: run 2.6s var(--ease-snap) infinite alternate; }
+  .a3 { animation: run 2.6s var(--ease-in-out) infinite alternate; }
+</style>
+</head>
+<body>
+  <div class="row"><span class="tag">ease-out</span><div class="track"><div class="dot a1"></div></div></div>
+  <div class="row"><span class="tag">ease-snap</span><div class="track"><div class="dot a2"></div></div></div>
+  <div class="row"><span class="tag">ease-in-out</span><div class="track"><div class="dot a3"></div></div></div>
+</body>
+</html>
