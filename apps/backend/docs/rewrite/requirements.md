@@ -212,7 +212,7 @@ Static catalog in code (bybit `available`; others `soon`). `account` = masked ke
 
 **Signal** = `{id, feedId, side, symbol, status, outcome, pnl, date, time, entry, stop, tp[], deleted, cancelled, mods[], effective}`
 
-- `status`: `tested` (sim outcome R_MULTIPLE/MARK_TO_MARKET) | `skipped` (UNFILLED) | `untested` (no sim); `outcome`: sign of return; `deleted` from `deleted_signal_evidence`; `mods[]`/`effective{}` projected from `FoldedSignal` timeline (kind from `classify_patch`, `via: reply|inferred`).
+- `status`: `tested` (outcome kind R_MULTIPLE/MARK_TO_MARKET) | `skipped` (UNFILLED) | `untested` (no outcome); read from the latest `backtest_result.outcomes` snapshot — never refetches klines on read (D15); `outcome`: sign of return; `deleted` from `deleted_signal_evidence`; `mods[]`/`effective{}` projected from `FoldedSignal` timeline (kind from `classify_patch`, `via: reply|inferred`).
 - **OrphanMod** = `{id, feedId, symbol, date, time, text, suggestId, reason}` — modifier-labeled/classified messages with no `reply_to` linkage; `suggestId` = latest open same-symbol signal.
 - Observer plan: max 200 signals per calendar month surfaced; truncated ⇒ `limitReached: true`.
 
@@ -235,7 +235,7 @@ Static catalog in code (bybit `available`; others `soon`). `account` = masked ke
 | `user_channel` | **(user_id, channel_id)** FKs, status (chat status enum, default `new`), verify_attempt int default 1, added_at | per-user subscription + pipeline state |
 | `user_exchange_connection` | **(user_id, exchange_id str)**, api_key_masked, api_key_encrypted, api_secret_encrypted, connected bool, connected_at | |
 | `chat_risk_config` | **(user_id, channel_id)**, entry_mode, levels, weighting, exit_source, stop_pct, tp_pct, risk_pct, leverage, updated_at | numeric pcts |
-| `backtest_result` | **id** UUID, user_id FK, channel_id FK, score int, win_rate numeric, pnl numeric, completed_at | latest-per-chat read |
+| `backtest_result` | **id** UUID, user_id FK, channel_id FK, score int, win_rate numeric, pnl numeric, outcomes JSONB, completed_at | latest-per-chat read; `outcomes` = per-signal sim snapshot `[{rootSignalId, kind, rMultiple, pctReturn, exitReason}]` (D15) |
 | `lifecycle_link` | **id** UUID, user_id FK, channel_id, message_id, root_signal_id FK, created_at, UNIQUE(user_id, channel_id, message_id) | durable HUMAN_AUDIT linkage for fold |
 
 ### Modified tables
@@ -245,6 +245,10 @@ Static catalog in code (bybit `available`; others `soon`). `account` = masked ke
 | `golden_label` | + `user_id` FK; + `label` (`signal\|noise\|modifier`); `is_signal` kept, derived (`label = 'signal'`); UNIQUE → (user_id, channel_id, message_id) |
 | `filter_rule` | + `user_id` FK; + `display` JSONB (per-pattern `{label, detail}`) |
 | `parser_rule` | + `user_id` FK |
+| `extracted_signal` | + `user_id` FK (nullable through transition); UNIQUE(event_id) → UNIQUE NULLS NOT DISTINCT (user_id, event_id) — outcomes of per-user parser rules are per-user projections (D16) |
+| `unrecognized_signal` | + `user_id` FK; UNIQUE → NULLS NOT DISTINCT (user_id, event_id) |
+| `parser_drift_warning` | + `user_id` FK; UNIQUE → NULLS NOT DISTINCT (user_id, event_id) |
+| `filter_drift_warning` | + `user_id` FK; UNIQUE → NULLS NOT DISTINCT (user_id, channel_id, message_id) |
 
 ### Decision: capture stays global (deviation from rough requirements)
 
@@ -316,6 +320,8 @@ Remove: `typer`. Config additions (env `VERASIG_`): `jwt_secret`, `fernet_key`, 
 | D12 | Register takes `firstName`/`lastName` | matches user model + `/auth/me`; frontend splits its single `name` field (frontend follow-up) |
 | D13 | `media` ∈ `image\|doc\|null`; `chart` never emitted | backend cannot distinguish chart from image |
 | D14 | On verify pass status → `verified` immediately | "stop here" path needs no extra call; backtest later flips to `analyzed` |
+| D15 | `backtest_result` snapshots score **and per-signal `outcomes` JSONB** | `/signals` must not refetch klines per read; deviation from ADR 0009 ("never stored") is deliberate — the canonical score stays recomputable, stored rows are display snapshots of one run |
+| D16 | Tenant boundary: capture + seed-heuristic candidates stay global and user-independent; **all rule-driven projections are user-scoped** (extraction outcomes, drift warnings); user `FilterRule`s apply at read time, never materializing global `raw_signal_event` rows | per-user rules over a global `extracted_signal` would collide on UNIQUE(event_id); rule-driven late-materialization (`sweep_advisory`) is not API-exposed in v1 |
 
 ## 10. Frontend follow-ups (out of backend scope, tracked here)
 
