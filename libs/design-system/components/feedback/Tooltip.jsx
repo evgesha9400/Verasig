@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-tip { position: relative; display: inline-flex; }
 .vrs-tip__pop {
@@ -14,22 +13,30 @@ const CSS = `
 .vrs-tip__pop[data-side="bottom"] { bottom: auto; top: calc(100% + 8px); transform: translateX(-50%) translateY(-4px); }
 .vrs-tip:hover .vrs-tip__pop, .vrs-tip:focus-within .vrs-tip__pop { opacity: 1; transform: translateX(-50%) translateY(0); }
 .vrs-tip__pop kbd { font-family: var(--font-mono); color: var(--text-muted); margin-left: 6px; }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-tip-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-tip-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-tip-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Hover/focus tooltip wrapping its single child. */
-export function Tooltip({ label, side = 'top', shortcut, className = '', children, ...rest }) {
+export function Tooltip({
+  label,
+  side = 'top',
+  shortcut,
+  className = '',
+  children,
+  ...rest
+}) {
   return (
     <span className={['vrs-tip', className].filter(Boolean).join(' ')} {...rest}>
       {children}
       <span className="vrs-tip__pop" role="tooltip" data-side={side}>
-        {label}{shortcut && <kbd>{shortcut}</kbd>}
+        {label}
+        {shortcut && <kbd>{shortcut}</kbd>}
       </span>
     </span>
-  );
+  )
 }

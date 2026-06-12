@@ -1,4 +1,4 @@
-import { ReactNode, ButtonHTMLAttributes } from 'react';
+import { ReactNode, ButtonHTMLAttributes } from 'react'
 
 /**
  * Verasig primary action button. Use for the single most important action in a
@@ -8,20 +8,20 @@ import { ReactNode, ButtonHTMLAttributes } from 'react';
  */
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Visual emphasis. @default "primary" */
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   /** Control height. @default "md" */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg'
   /** Icon node rendered before the label. */
-  iconLeft?: ReactNode;
+  iconLeft?: ReactNode
   /** Icon node rendered after the label. */
-  iconRight?: ReactNode;
+  iconRight?: ReactNode
   /** Show a spinner and block interaction. @default false */
-  loading?: boolean;
+  loading?: boolean
   /** Stretch to the width of the container. @default false */
-  fullWidth?: boolean;
+  fullWidth?: boolean
   /** Render as a different element (e.g. "a" for links). @default "button" */
-  as?: 'button' | 'a';
-  children?: ReactNode;
+  as?: 'button' | 'a'
+  children?: ReactNode
 }
 
-export function Button(props: ButtonProps): JSX.Element;
+export function Button(props: ButtonProps): JSX.Element

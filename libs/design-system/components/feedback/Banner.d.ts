@@ -1,4 +1,4 @@
-import { ReactNode, HTMLAttributes } from 'react';
+import { ReactNode, HTMLAttributes } from 'react'
 
 /**
  * Inline banner / alert with a semantic tone, accent rail, icon and optional
@@ -6,17 +6,17 @@ import { ReactNode, HTMLAttributes } from 'react';
  */
 export interface BannerProps extends HTMLAttributes<HTMLDivElement> {
   /** Semantic tone. @default "info" */
-  tone?: 'verified' | 'pending' | 'rejected' | 'info' | 'neutral';
+  tone?: 'verified' | 'pending' | 'rejected' | 'info' | 'neutral'
   /** Bold title line. */
-  title?: string;
+  title?: string
   /** Override the default tone icon. */
-  icon?: ReactNode;
+  icon?: ReactNode
   /** When set, shows a dismiss (×) button. */
-  onClose?: () => void;
+  onClose?: () => void
   /** Action buttons row. */
-  actions?: ReactNode;
+  actions?: ReactNode
   /** Message body. */
-  children?: ReactNode;
+  children?: ReactNode
 }
 
-export function Banner(props: BannerProps): JSX.Element;
+export function Banner(props: BannerProps): JSX.Element

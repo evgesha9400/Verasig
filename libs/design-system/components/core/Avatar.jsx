@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-avatar {
   --_s: 36px;
@@ -19,34 +18,55 @@ const CSS = `
   width: 30%; height: 30%; min-width: 8px; min-height: 8px;
   border-radius: 50%; border: 2px solid var(--surface-card);
 }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-avatar-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-avatar-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-avatar-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 const TONE = {
   verified: 'var(--verified-500)',
   pending: 'var(--pending-500)',
   rejected: 'var(--rejected-500)',
-  offline: 'var(--ink-500)',
-};
+  offline: 'var(--ink-500)'
+}
 
 /** Avatar — image, or initials fallback on a tinted chip. */
-export function Avatar({ src, name = '', size = 'md', square = false, status, tint, className = '', ...rest }) {
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('');
+export function Avatar({
+  src,
+  name = '',
+  size = 'md',
+  square = false,
+  status,
+  tint,
+  className = '',
+  ...rest
+}) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
   const cls = [
     'vrs-avatar',
     size !== 'md' ? `vrs-avatar__sz-${size}` : '',
     square ? 'vrs-avatar__square' : '',
-    className,
-  ].filter(Boolean).join(' ');
+    className
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
     <span className={cls} style={tint ? { background: tint } : undefined} {...rest}>
       {src ? <img src={src} alt={name} /> : <span>{initials || '—'}</span>}
-      {status && <span className="vrs-avatar__status" style={{ background: TONE[status] || status }} />}
+      {status && (
+        <span
+          className="vrs-avatar__status"
+          style={{ background: TONE[status] || status }}
+        />
+      )}
     </span>
-  );
+  )
 }

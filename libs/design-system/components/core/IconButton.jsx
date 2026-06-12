@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-iconbtn {
   --_s: 38px;
@@ -33,12 +32,12 @@ const CSS = `
 .vrs-iconbtn__accent { background: var(--accent-quiet); color: var(--accent-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
 .vrs-iconbtn__accent:hover:not(:disabled) { color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 14px var(--signal-glow); }
 .vrs-iconbtn__accent:active:not(:disabled) { transform: translateY(1px); }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-iconbtn-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-iconbtn-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-iconbtn-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Square icon-only button. */
@@ -54,11 +53,13 @@ export function IconButton({
     'vrs-iconbtn',
     variant !== 'ghost' ? `vrs-iconbtn__${variant}` : '',
     size !== 'md' ? `vrs-iconbtn__sz-${size}` : '',
-    className,
-  ].filter(Boolean).join(' ');
+    className
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
     <button className={cls} aria-label={label} title={label} {...rest}>
       {children}
     </button>
-  );
+  )
 }

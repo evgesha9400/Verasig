@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode } from 'react'
 
 /**
  * Modal dialog with scrim, header (icon + title + description), body and footer.
@@ -6,19 +6,19 @@ import { ReactNode } from 'react';
  */
 export interface DialogProps {
   /** Whether the dialog is visible. */
-  open: boolean;
+  open: boolean
   /** Title line. */
-  title?: string;
+  title?: string
   /** Supporting description under the title. */
-  description?: string;
+  description?: string
   /** Header icon node. */
-  icon?: ReactNode;
+  icon?: ReactNode
   /** Close handler (scrim click + × button). */
-  onClose?: () => void;
+  onClose?: () => void
   /** Footer node — typically the action buttons. */
-  footer?: ReactNode;
+  footer?: ReactNode
   /** Body content. */
-  children?: ReactNode;
+  children?: ReactNode
 }
 
-export function Dialog(props: DialogProps): JSX.Element | null;
+export function Dialog(props: DialogProps): JSX.Element | null

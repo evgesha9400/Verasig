@@ -1,4 +1,4 @@
-import { InputHTMLAttributes } from 'react';
+import { InputHTMLAttributes } from 'react'
 
 /**
  * Toggle switch for binary on/off settings (e.g. enable a channel). For
@@ -6,7 +6,7 @@ import { InputHTMLAttributes } from 'react';
  */
 export interface SwitchProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Label rendered to the right of the switch. */
-  label?: string;
+  label?: string
 }
 
-export function Switch(props: SwitchProps): JSX.Element;
+export function Switch(props: SwitchProps): JSX.Element

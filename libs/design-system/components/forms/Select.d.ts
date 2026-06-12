@@ -1,8 +1,8 @@
-import { ReactNode, SelectHTMLAttributes } from 'react';
+import { ReactNode, SelectHTMLAttributes } from 'react'
 
 export interface SelectOption {
-  value: string;
-  label: string;
+  value: string
+  label: string
 }
 
 /**
@@ -11,10 +11,10 @@ export interface SelectOption {
  */
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   /** Field label. */
-  label?: string;
+  label?: string
   /** Option list — strings or `{value, label}`. */
-  options?: (SelectOption | string)[];
-  children?: ReactNode;
+  options?: (SelectOption | string)[]
+  children?: ReactNode
 }
 
-export function Select(props: SelectProps): JSX.Element;
+export function Select(props: SelectProps): JSX.Element

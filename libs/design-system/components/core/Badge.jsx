@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -16,21 +15,27 @@ const CSS = `
 .vrs-badge__info     { background: var(--info-bg);     color: var(--info-500); }
 .vrs-badge__outline  { background: transparent; border-color: var(--border-strong); color: var(--text-body); }
 .vrs-badge__solid    { background: var(--accent); color: var(--text-on-accent); }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-badge-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-badge-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-badge-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Status badge — small, mono, uppercase. */
-export function Badge({ tone = 'neutral', dot = false, className = '', children, ...rest }) {
-  const cls = ['vrs-badge', `vrs-badge__${tone}`, className].filter(Boolean).join(' ');
+export function Badge({
+  tone = 'neutral',
+  dot = false,
+  className = '',
+  children,
+  ...rest
+}) {
+  const cls = ['vrs-badge', `vrs-badge__${tone}`, className].filter(Boolean).join(' ')
   return (
     <span className={cls} {...rest}>
       {dot && <span className="vrs-badge__dot" aria-hidden="true" />}
       {children}
     </span>
-  );
+  )
 }

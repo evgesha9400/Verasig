@@ -1,4 +1,4 @@
-import { ReactNode, InputHTMLAttributes } from 'react';
+import { ReactNode, InputHTMLAttributes } from 'react'
 
 /**
  * Text input with label, hint, error and optional leading icon / trailing node.
@@ -6,19 +6,19 @@ import { ReactNode, InputHTMLAttributes } from 'react';
  */
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Field label rendered above the control. */
-  label?: string;
+  label?: string
   /** Helper text below the field. */
-  hint?: string;
+  hint?: string
   /** Error message — also flips the field to the error style. */
-  error?: string;
+  error?: string
   /** Show a required asterisk. @default false */
-  required?: boolean;
+  required?: boolean
   /** Leading icon node. */
-  iconLeft?: ReactNode;
+  iconLeft?: ReactNode
   /** Trailing node (kbd hint, unit, button). */
-  trailing?: ReactNode;
+  trailing?: ReactNode
   /** Use the mono font (signal IDs, keys, endpoints). @default false */
-  mono?: boolean;
+  mono?: boolean
 }
 
-export function Input(props: InputProps): JSX.Element;
+export function Input(props: InputProps): JSX.Element

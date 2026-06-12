@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-dialog__scrim {
   position: fixed; inset: 0; z-index: var(--z-modal);
@@ -24,31 +23,49 @@ const CSS = `
 .vrs-dialog__close:hover { color: var(--text-strong); background: var(--surface-hover); }
 .vrs-dialog__body { padding: 16px 20px; font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-body); line-height: 1.55; }
 .vrs-dialog__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px 20px; }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-dialog-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-dialog-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-dialog-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Modal dialog. Render conditionally on `open`. */
-export function Dialog({ open, title, description, icon, onClose, footer, className = '', children }) {
-  if (!open) return null;
+export function Dialog({
+  open,
+  title,
+  description,
+  icon,
+  onClose,
+  footer,
+  className = '',
+  children
+}) {
+  if (!open) return null
   return (
     <div className="vrs-dialog__scrim" onClick={onClose}>
-      <div className={['vrs-dialog', className].filter(Boolean).join(' ')} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={['vrs-dialog', className].filter(Boolean).join(' ')}
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="vrs-dialog__head">
           {icon && <span className="vrs-dialog__icon">{icon}</span>}
           <div className="vrs-dialog__titles">
             {title && <div className="vrs-dialog__title">{title}</div>}
             {description && <div className="vrs-dialog__desc">{description}</div>}
           </div>
-          {onClose && <button className="vrs-dialog__close" aria-label="Close" onClick={onClose}>×</button>}
+          {onClose && (
+            <button className="vrs-dialog__close" aria-label="Close" onClick={onClose}>
+              ×
+            </button>
+          )}
         </div>
         {children && <div className="vrs-dialog__body">{children}</div>}
         {footer && <div className="vrs-dialog__foot">{footer}</div>}
       </div>
     </div>
-  );
+  )
 }

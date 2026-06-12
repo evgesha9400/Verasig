@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-select { position: relative; display: flex; flex-direction: column; gap: 6px; }
 .vrs-select__label { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--fw-medium); color: var(--text-body); }
@@ -19,17 +18,26 @@ const CSS = `
 }
 .vrs-select__chev svg { width: 15px; height: 15px; display:block; }
 .vrs-select.is-disabled { opacity: 0.5; pointer-events: none; }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-select-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-select-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-select-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Native select, styled. Pass `options` or `children`. */
-export function Select({ label, options, disabled = false, className = '', children, ...rest }) {
-  const cls = ['vrs-select', disabled ? 'is-disabled' : '', className].filter(Boolean).join(' ');
+export function Select({
+  label,
+  options,
+  disabled = false,
+  className = '',
+  children,
+  ...rest
+}) {
+  const cls = ['vrs-select', disabled ? 'is-disabled' : '', className]
+    .filter(Boolean)
+    .join(' ')
   return (
     <div className={cls}>
       {label && <label className="vrs-select__label">{label}</label>}
@@ -37,16 +45,29 @@ export function Select({ label, options, disabled = false, className = '', child
         <select disabled={disabled} {...rest}>
           {options
             ? options.map((o) => {
-                const value = typeof o === 'string' ? o : o.value;
-                const text = typeof o === 'string' ? o : o.label;
-                return <option key={value} value={value}>{text}</option>;
+                const value = typeof o === 'string' ? o : o.value
+                const text = typeof o === 'string' ? o : o.label
+                return (
+                  <option key={value} value={value}>
+                    {text}
+                  </option>
+                )
               })
             : children}
         </select>
         <span className="vrs-select__chev">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
         </span>
       </div>
     </div>
-  );
+  )
 }

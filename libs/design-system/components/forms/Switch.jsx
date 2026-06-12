@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
 .vrs-switch.is-disabled { opacity: 0.5; cursor: not-allowed; }
@@ -18,22 +17,26 @@ const CSS = `
 .vrs-switch input:checked + .vrs-switch__track .vrs-switch__thumb { transform: translateX(16px); background: var(--text-on-accent); }
 .vrs-switch input:focus-visible + .vrs-switch__track { box-shadow: var(--focus-ring); }
 .vrs-switch__label { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-strong); }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-switch-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-switch-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-switch-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Toggle switch. */
 export function Switch({ label, disabled = false, className = '', id, ...rest }) {
-  const cls = ['vrs-switch', disabled ? 'is-disabled' : '', className].filter(Boolean).join(' ');
+  const cls = ['vrs-switch', disabled ? 'is-disabled' : '', className]
+    .filter(Boolean)
+    .join(' ')
   return (
     <label className={cls}>
       <input type="checkbox" role="switch" disabled={disabled} id={id} {...rest} />
-      <span className="vrs-switch__track"><span className="vrs-switch__thumb" /></span>
+      <span className="vrs-switch__track">
+        <span className="vrs-switch__thumb" />
+      </span>
       {label && <span className="vrs-switch__label">{label}</span>}
     </label>
-  );
+  )
 }

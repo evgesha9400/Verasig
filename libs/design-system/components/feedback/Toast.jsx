@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-toast {
   display: flex; align-items: flex-start; gap: 11px;
@@ -21,30 +20,49 @@ const CSS = `
 .vrs-toast__close { flex: none; border: 0; background: transparent; color: var(--text-faint); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px; border-radius: var(--radius-xs); }
 .vrs-toast__close:hover { color: var(--text-strong); }
 .vrs-toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: var(--z-toast); display: flex; flex-direction: column; gap: 10px; }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-toast-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-toast-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-toast-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** A single toast notification (presentational). */
-export function Toast({ tone = 'info', title, time, onClose, className = '', children, ...rest }) {
-  const cls = ['vrs-toast', `vrs-toast__${tone}`, className].filter(Boolean).join(' ');
+export function Toast({
+  tone = 'info',
+  title,
+  time,
+  onClose,
+  className = '',
+  children,
+  ...rest
+}) {
+  const cls = ['vrs-toast', `vrs-toast__${tone}`, className].filter(Boolean).join(' ')
   return (
     <div className={cls} role="status" {...rest}>
       <span className="vrs-toast__dot" aria-hidden="true" />
       <div className="vrs-toast__body">
-        <div className="vrs-toast__title">{title}{time && <span className="vrs-toast__time">{time}</span>}</div>
+        <div className="vrs-toast__title">
+          {title}
+          {time && <span className="vrs-toast__time">{time}</span>}
+        </div>
         {children && <div className="vrs-toast__msg">{children}</div>}
       </div>
-      {onClose && <button className="vrs-toast__close" aria-label="Dismiss" onClick={onClose}>×</button>}
+      {onClose && (
+        <button className="vrs-toast__close" aria-label="Dismiss" onClick={onClose}>
+          ×
+        </button>
+      )}
     </div>
-  );
+  )
 }
 
 /** Fixed bottom-right container for stacking toasts. */
 export function ToastStack({ className = '', children, ...rest }) {
-  return <div className={['vrs-toast-stack', className].filter(Boolean).join(' ')} {...rest}>{children}</div>;
+  return (
+    <div className={['vrs-toast-stack', className].filter(Boolean).join(' ')} {...rest}>
+      {children}
+    </div>
+  )
 }

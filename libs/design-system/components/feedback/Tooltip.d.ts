@@ -1,4 +1,4 @@
-import { ReactNode, HTMLAttributes } from 'react';
+import { ReactNode, HTMLAttributes } from 'react'
 
 /**
  * Lightweight hover/focus tooltip. Wraps a single trigger child; shows `label`
@@ -6,13 +6,13 @@ import { ReactNode, HTMLAttributes } from 'react';
  */
 export interface TooltipProps extends HTMLAttributes<HTMLSpanElement> {
   /** Tooltip text. */
-  label: string;
+  label: string
   /** Which side to show on. @default "top" */
-  side?: 'top' | 'bottom';
+  side?: 'top' | 'bottom'
   /** Optional keyboard shortcut shown in mono. */
-  shortcut?: string;
+  shortcut?: string
   /** The trigger element. */
-  children: ReactNode;
+  children: ReactNode
 }
 
-export function Tooltip(props: TooltipProps): JSX.Element;
+export function Tooltip(props: TooltipProps): JSX.Element

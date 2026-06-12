@@ -9,9 +9,9 @@
   --radius-none: 0;
   --radius-xs: 3px;
   --radius-sm: 5px;
-  --radius-md: 8px;     /* default control radius */
-  --radius-lg: 12px;    /* cards */
-  --radius-xl: 16px;    /* panels */
+  --radius-md: 8px; /* default control radius */
+  --radius-lg: 12px; /* cards */
+  --radius-xl: 16px; /* panels */
   --radius-2xl: 22px;
   --radius-pill: 999px; /* status pills, tags, avatars */
 
@@ -20,7 +20,7 @@
      drop shadows. Elevation shadows are deep & low-spread. */
   --shadow-none: none;
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.40);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
   --shadow-pop: 0 24px 70px rgba(0, 0, 0, 0.62);

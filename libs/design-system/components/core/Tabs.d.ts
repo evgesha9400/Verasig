@@ -1,10 +1,10 @@
-import { HTMLAttributes } from 'react';
+import { HTMLAttributes } from 'react'
 
 export interface TabItem {
-  id: string;
-  label: string;
+  id: string
+  label: string
   /** Optional count pill (e.g. number of signals). */
-  count?: number;
+  count?: number
 }
 
 /**
@@ -13,13 +13,13 @@ export interface TabItem {
  */
 export interface TabsProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
   /** Tab definitions. Strings are shorthand for `{id, label}`. */
-  items: (TabItem | string)[];
+  items: (TabItem | string)[]
   /** Currently selected tab id. */
-  value: string;
+  value: string
   /** Called with the new tab id. */
-  onChange?: (id: string) => void;
+  onChange?: (id: string) => void
   /** @default "line" */
-  variant?: 'line' | 'pill';
+  variant?: 'line' | 'pill'
 }
 
-export function Tabs(props: TabsProps): JSX.Element;
+export function Tabs(props: TabsProps): JSX.Element
