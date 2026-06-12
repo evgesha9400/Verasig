@@ -1,5 +1,12 @@
 import { useState, useEffect, useLayoutEffect } from 'react'
-import { Button, IconButton, ToastStack, Toast, Dialog } from '@verasig/design-system'
+import {
+  Button,
+  IconButton,
+  ToastStack,
+  Toast,
+  Dialog,
+  useTheme
+} from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { Shell } from './layout/Shell.jsx'
 import { Pipeline } from './features/pipeline/Pipeline.jsx'
@@ -20,20 +27,6 @@ import { useWorkflowState } from './features/workflow/useWorkflowState.js'
 import { MESSAGES } from './data/seed.js'
 import './product.css'
 
-const THEME_ACCENTS = {
-  dark: ['#B9EE2E', '#CBF457', '#8FB81E', 'rgba(185,238,46,0.28)'],
-  light: ['#5197FF', '#82B6FF', '#2F6FE0', 'rgba(81,151,255,0.30)']
-}
-
-const THEME_KEY = 'vrs-theme-1'
-function loadTheme() {
-  try {
-    return localStorage.getItem(THEME_KEY) || 'dark'
-  } catch {
-    return 'dark'
-  }
-}
-
 const USER_KEY = 'vrs-user-1'
 const USER_DEFAULTS = {
   firstName: 'Mara',
@@ -52,15 +45,7 @@ function loadUser() {
 }
 
 export function ProductApp({ onLogout }) {
-  const [theme, setTheme] = useState(loadTheme())
-  function changeTheme(next) {
-    setTheme(next)
-    try {
-      localStorage.setItem(THEME_KEY, next)
-    } catch {
-      /* ignore */
-    }
-  }
+  const [theme, setTheme] = useTheme()
 
   const [user, setUser] = useState(loadUser())
   function updateUser(patch) {
@@ -124,20 +109,9 @@ export function ProductApp({ onLogout }) {
 
   useEffect(() => {
     const root = document.documentElement
-    const [a, hover, press, quiet] = THEME_ACCENTS[theme] || THEME_ACCENTS.dark
-    root.style.setProperty('--accent', a)
-    root.style.setProperty('--accent-hover', hover)
-    root.style.setProperty('--accent-press', press)
-    root.style.setProperty('--accent-text', hover)
-    root.style.setProperty('--accent-quiet', quiet)
-    root.style.setProperty('--signal-500', a)
-    root.style.setProperty('--signal-400', hover)
-    root.style.setProperty('--signal-glow', quiet)
-    root.style.setProperty('--verified-500', a)
     root.setAttribute('data-density', 'regular')
-    root.setAttribute('data-theme', theme)
     root.setAttribute('data-wide', 'center')
-  }, [theme])
+  }, [])
 
   // Any view that renders a persistent right rail (Label, Verify, …) needs the
   // topbar + stepper to center over the work area, not the full main width.
@@ -363,7 +337,7 @@ export function ProductApp({ onLogout }) {
         actions={actions}
         pipeline={pipeline}
         theme={theme}
-        onThemeChange={changeTheme}
+        onThemeChange={setTheme}
         onLogout={onLogout}
         user={user}
         onOpenSettings={openSettings}

@@ -1,6 +1,6 @@
 /* Verasig prototype — Telegram connect flow: credentials -> verification code */
-import { useState, useRef } from 'react'
-import { Input, Button, Banner } from '@verasig/design-system'
+import { useState } from 'react'
+import { Input, Button, Banner, OTPInput } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
 export function TelegramSetup({ onConnected, onCancel }) {
@@ -9,9 +9,8 @@ export function TelegramSetup({ onConnected, onCancel }) {
   const [apiId, setApiId] = useState('2040315')
   const [apiHash, setApiHash] = useState('a1b2c3d4e5f6079a8b7c6d5e4f30219a')
   const [phone, setPhone] = useState('+44 7700 900142')
-  const [code, setCode] = useState(['', '', '', '', ''])
+  const [code, setCode] = useState('')
   const [err, setErr] = useState(null)
-  const codeRefs = useRef([])
 
   const credsValid =
     apiId.trim().length >= 5 &&
@@ -27,22 +26,10 @@ export function TelegramSetup({ onConnected, onCancel }) {
     setPhase('sending')
     setTimeout(() => {
       setPhase('code')
-      setTimeout(() => codeRefs.current[0] && codeRefs.current[0].focus(), 60)
     }, 1400)
   }
 
-  function setDigit(i, v) {
-    v = v.replace(/[^0-9]/g, '').slice(-1)
-    const next = [...code]
-    next[i] = v
-    setCode(next)
-    if (v && i < 4) codeRefs.current[i + 1] && codeRefs.current[i + 1].focus()
-  }
-  function onCodeKey(i, e) {
-    if (e.key === 'Backspace' && !code[i] && i > 0)
-      codeRefs.current[i - 1] && codeRefs.current[i - 1].focus()
-  }
-  const codeComplete = code.every((d) => d !== '')
+  const codeComplete = code.length === 5
   function verify() {
     if (!codeComplete) return
     setPhase('verifying')
@@ -146,20 +133,13 @@ export function TelegramSetup({ onConnected, onCancel }) {
               on Telegram. Enter it below.
             </Banner>
             <div className="vrs-form">
-              <div className="vrs-code">
-                {code.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={(el) => (codeRefs.current[i] = el)}
-                    value={d}
-                    inputMode="numeric"
-                    className={d ? 'is-filled' : ''}
-                    disabled={phase === 'verifying'}
-                    onChange={(e) => setDigit(i, e.target.value)}
-                    onKeyDown={(e) => onCodeKey(i, e)}
-                  />
-                ))}
-              </div>
+              <OTPInput
+                length={5}
+                value={code}
+                onChange={setCode}
+                disabled={phase === 'verifying'}
+                className="vrs-code"
+              />
               <div className="vrs-help" style={{ textAlign: 'center' }}>
                 Demo: enter any 5 digits. Didn’t get it?{' '}
                 <span className="vrs-link">Resend code</span> ·{' '}

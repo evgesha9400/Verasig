@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Input, Banner, Badge } from '@verasig/design-system'
+import { Button, Input, Banner, Badge, RadioCard } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { EXCHANGES } from '../../../data/seed.js'
 
@@ -79,12 +79,14 @@ export function ExchangeView({ onConnected, bybitConnected }) {
             d.status === 'available' &&
             (isReconfig || (selected === d.id && !dConnected))
           return (
-            <div
+            <RadioCard
               key={d.id}
+              as="div"
+              selected={selected === d.id}
+              aria-disabled={d.status === 'soon'}
               className={`vrs-opt ${selected === d.id ? 'is-selected' : ''} ${d.status === 'soon' ? 'is-soon' : ''}`}
               onClick={() => d.status === 'available' && selectExchange(d.id)}
             >
-              <span className="vrs-opt__radio" />
               <span
                 className="vrs-src-logo"
                 style={{
@@ -197,7 +199,7 @@ export function ExchangeView({ onConnected, bybitConnected }) {
                   </div>
                 )}
               </div>
-            </div>
+            </RadioCard>
           )
         })}
       </div>

@@ -4,14 +4,6 @@
 .mk-page {
   background: var(--bg-app);
 }
-
-/* Fix DS double focus-ring globally: the .vrs-input wrapper owns the ring;
-   suppress the inner <input>'s own :focus-visible box-shadow from base.css. */
-.vrs-input input:focus,
-.vrs-input input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
 .mk-mono {
   font-family: var(--font-mono);
   font-feature-settings: 'tnum' 1;
@@ -105,44 +97,6 @@
   height: 22px;
   background: var(--border-default);
   flex: none;
-}
-.mk-theme {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-}
-.mk-theme__btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 26px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-}
-.mk-theme__btn:hover {
-  color: var(--text-strong);
-}
-.mk-theme__btn.is-on {
-  background-color: var(--surface-card);
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-card) 90%, #fff),
-    var(--surface-card)
-  );
-  color: var(--accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 1px 1.5px rgba(0, 0, 0, 0.3);
 }
 
 /* ---- Hero ---- */

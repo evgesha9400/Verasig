@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Input, Select, Tabs, Switch } from '@verasig/design-system'
+import { Button, Input, Select, Tabs, Switch, RadioCard } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import './execution.css'
 
@@ -161,13 +161,17 @@ function VxPreview({
 
 function VxRadio({ on, onClick, title, desc }) {
   return (
-    <div className={`vx-radio ${on ? 'is-on' : ''}`} onClick={onClick}>
-      <span className="vrs-opt__radio"></span>
+    <RadioCard
+      as="div"
+      selected={on}
+      className={`vx-radio ${on ? 'is-on' : ''}`}
+      onClick={onClick}
+    >
       <div>
         <div className="vx-radio__t">{title}</div>
         {desc && <div className="vx-radio__d">{desc}</div>}
       </div>
-    </div>
+    </RadioCard>
   )
 }
 

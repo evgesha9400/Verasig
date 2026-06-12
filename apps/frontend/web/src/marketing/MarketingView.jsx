@@ -1,71 +1,8 @@
-import { useState, useEffect, Fragment } from 'react'
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Icon } from '@verasig/design-system'
+import { Button, Icon, ThemeToggle, useTheme } from '@verasig/design-system'
 import { ROUTES } from '../routes/paths.js'
 import './marketing.css'
-
-// Theme drives the brand signal color: dark = lime trace, light = azure.
-// Shared with the app via the same localStorage key.
-const THEME_ACCENTS = {
-  dark: ['#B9EE2E', '#CBF457', '#8FB81E', 'rgba(185,238,46,0.28)'],
-  light: ['#5197FF', '#82B6FF', '#2F6FE0', 'rgba(81,151,255,0.30)']
-}
-const THEME_KEY = 'vrs-theme-1'
-function loadTheme() {
-  try {
-    return localStorage.getItem(THEME_KEY) || 'dark'
-  } catch {
-    return 'dark'
-  }
-}
-function useTheme() {
-  const [theme, setTheme] = useState(loadTheme())
-  useEffect(() => {
-    const root = document.documentElement
-    const [a, hover, press, quiet] = THEME_ACCENTS[theme] || THEME_ACCENTS.dark
-    root.style.setProperty('--accent', a)
-    root.style.setProperty('--accent-hover', hover)
-    root.style.setProperty('--accent-press', press)
-    root.style.setProperty('--accent-text', hover)
-    root.style.setProperty('--accent-quiet', quiet)
-    root.style.setProperty('--signal-500', a)
-    root.style.setProperty('--signal-400', hover)
-    root.style.setProperty('--signal-glow', quiet)
-    root.style.setProperty('--verified-500', a)
-    root.setAttribute('data-theme', theme)
-    try {
-      localStorage.setItem(THEME_KEY, theme)
-    } catch {
-      /* ignore */
-    }
-  }, [theme])
-  return [theme, setTheme]
-}
-
-function ThemeToggle({ theme, onChange }) {
-  const themes = [
-    { id: 'light', icon: 'sun', label: 'Light' },
-    { id: 'dark', icon: 'moon', label: 'Dark' }
-  ]
-  return (
-    <div className="mk-theme" role="radiogroup" aria-label="Theme">
-      {themes.map((th) => (
-        <button
-          key={th.id}
-          type="button"
-          role="radio"
-          aria-checked={theme === th.id}
-          className={`mk-theme__btn ${theme === th.id ? 'is-on' : ''}`}
-          title={th.label}
-          aria-label={th.label}
-          onClick={() => onChange(th.id)}
-        >
-          <Icon name={th.icon} size={15} />
-        </button>
-      ))}
-    </div>
-  )
-}
 
 /* ---------- brand mark ---------- */
 function Mark({ size = 26 }) {
@@ -106,7 +43,7 @@ function Nav({ theme, onThemeChange }) {
           <a href="#principles">Principles</a>
         </nav>
         <div className="mk-nav__actions">
-          <ThemeToggle theme={theme} onChange={onThemeChange} />
+          <ThemeToggle value={theme} onChange={onThemeChange} />
           <span className="mk-nav__divider" aria-hidden="true" />
           <Link className="mk-nav__signin" to={ROUTES.login}>
             Log in

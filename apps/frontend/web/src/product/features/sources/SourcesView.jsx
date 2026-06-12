@@ -1,5 +1,5 @@
 /* Verasig prototype — Sources page */
-import { Badge, Button } from '@verasig/design-system'
+import { Badge, Button, InteractiveCard } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
 export function SourcesView({
@@ -22,7 +22,7 @@ export function SourcesView({
         </div>
         <div className="vrs-src-grid" style={{ marginTop: 12 }}>
           {telegramConnected ? (
-            <div className="vrs-src-card is-clickable" onClick={onOpenTelegram}>
+            <InteractiveCard className="vrs-src-card" onClick={onOpenTelegram}>
               <div className="vrs-src-card__top">
                 <span
                   className="vrs-src-logo"
@@ -49,15 +49,12 @@ export function SourcesView({
                 <span className="vrs-src-meta">
                   <Icon name="users" size={13} /> mara@northwave.io
                 </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  iconRight={<Icon name="arrowRight" size={14} />}
-                >
+                <span className="vrs-src-card__cta">
                   Open
-                </Button>
+                  <Icon name="arrowRight" size={14} />
+                </span>
               </div>
-            </div>
+            </InteractiveCard>
           ) : (
             <div
               className="vrs-src-card"

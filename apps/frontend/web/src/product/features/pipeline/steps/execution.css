@@ -266,11 +266,6 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
-  cursor: pointer;
-  transition: border-color 120ms var(--ease-out);
-}
-.vx-radio:hover {
-  border-color: var(--border-strong);
 }
 .vx-radio.is-on {
   border-color: var(--accent);
