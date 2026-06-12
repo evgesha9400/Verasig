@@ -9,6 +9,7 @@ from verasig.api.routers import (
     auth,
     chats,
     distill,
+    exchanges,
     health,
     labels,
     telegram,
@@ -18,6 +19,7 @@ from verasig.api.routers import (
 from verasig.config import Settings
 from verasig.foundation import telegram_session
 from verasig.foundation.anthropic_runner import make_anthropic_runner
+from verasig.foundation.bybit_account import verify_api_keys
 from verasig.foundation.db import make_session_factory
 from verasig.foundation.security import SecretCipher
 from verasig.services.distillation.rule_distiller import AnthropicDistiller
@@ -28,6 +30,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     auth.router,
     user.router,
     telegram.router,
+    exchanges.router,
     chats.router,
     labels.router,
     distill.router,
@@ -46,6 +49,7 @@ def create_app(
     app.state.jobs = JobRegistry()
     app.state.secret_cipher = SecretCipher.from_spec(settings.secret_keys)
     app.state.telegram_auth = telegram_session
+    app.state.exchange_verifier = verify_api_keys
     app.state.distiller_factory = lambda: AnthropicDistiller(
         runner=make_anthropic_runner(
             settings.anthropic_api_key, settings.anthropic_model
