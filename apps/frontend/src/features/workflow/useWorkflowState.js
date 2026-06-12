@@ -12,7 +12,7 @@ const PIPELINE_SCREEN_BY_SCREEN = {
   exchange: 'exchange',
   risk: 'risk',
   backtest: 'backtest',
-  'backtest-result': 'backtest',
+  'backtest-result': 'backtest'
 }
 
 const WORKFLOW_SCREENS = new Set(Object.keys(PIPELINE_SCREEN_BY_SCREEN))
@@ -30,7 +30,9 @@ function mergeChatFlags(savedChats) {
   const seed = Object.fromEntries(CHATS.map((c) => [c.id, c]))
   return savedChats.map((c) => {
     const source = seed[c.id]
-    return source ? { ...c, historyGaps: source.historyGaps, signalDeletion: source.signalDeletion } : c
+    return source
+      ? { ...c, historyGaps: source.historyGaps, signalDeletion: source.signalDeletion }
+      : c
   })
 }
 
@@ -39,7 +41,7 @@ function createToast(title, msg, tone) {
     tone,
     title,
     msg,
-    time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   }
 }
 
@@ -48,12 +50,16 @@ export function useWorkflowState() {
 
   const [nav, setNav] = useState('sources')
   const [screen, setScreen] = useState(saved ? saved.screen : 'sources')
-  const [telegramConnected, setTelegramConnected] = useState(saved ? saved.telegramConnected : false)
+  const [telegramConnected, setTelegramConnected] = useState(
+    saved ? saved.telegramConnected : false
+  )
   const [chats, setChats] = useState(saved ? mergeChatFlags(saved.chats) : CHATS)
   const [activeChatId, setActiveChatId] = useState(saved ? saved.activeChatId : null)
   const [labelsByChat, setLabelsByChat] = useState(saved ? saved.labelsByChat : {})
   const [verifyAttempt, setVerifyAttempt] = useState(saved ? saved.verifyAttempt : 1)
-  const [bybitConnected, setBybitConnected] = useState(saved ? saved.bybitConnected : false)
+  const [bybitConnected, setBybitConnected] = useState(
+    saved ? saved.bybitConnected : false
+  )
   const [toast, setToast] = useState(null)
   const [backTarget, setBackTarget] = useState(null)
   const [signalsPreset, setSignalsPreset] = useState(null)
@@ -70,14 +76,24 @@ export function useWorkflowState() {
         activeChatId,
         labelsByChat,
         verifyAttempt,
-        bybitConnected,
-      }),
+        bybitConnected
+      })
     )
-  }, [screen, telegramConnected, chats, activeChatId, labelsByChat, verifyAttempt, bybitConnected])
+  }, [
+    screen,
+    telegramConnected,
+    chats,
+    activeChatId,
+    labelsByChat,
+    verifyAttempt,
+    bybitConnected
+  ])
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) || null
   const labels = (activeChatId && labelsByChat[activeChatId]) || {}
-  const signalCount = Object.values(labels).filter((value) => value === 'signal' || value === 'modifier').length
+  const signalCount = Object.values(labels).filter(
+    (value) => value === 'signal' || value === 'modifier'
+  ).length
   const noiseCount = Object.values(labels).filter((value) => value === 'noise').length
 
   function fireToast(tone, title, msg) {
@@ -90,7 +106,9 @@ export function useWorkflowState() {
   }
 
   function patchChat(id, patch) {
-    setChats((currentChats) => currentChats.map((chat) => (chat.id === id ? { ...chat, ...patch } : chat)))
+    setChats((currentChats) =>
+      currentChats.map((chat) => (chat.id === id ? { ...chat, ...patch } : chat))
+    )
   }
 
   function setLabel(msgId, label) {
@@ -98,8 +116,8 @@ export function useWorkflowState() {
       ...current,
       [activeChatId]: {
         ...(current[activeChatId] || {}),
-        [msgId]: label,
-      },
+        [msgId]: label
+      }
     }))
   }
 
@@ -141,7 +159,7 @@ export function useWorkflowState() {
       lastDate: null,
       score: null,
       winRate: null,
-      pnl: null,
+      pnl: null
     })
     setLabelsByChat((current) => {
       const next = { ...current }
@@ -153,11 +171,23 @@ export function useWorkflowState() {
 
   function checkGaps(chat) {
     if (chat.signalDeletion) {
-      fireToast('rejected', 'Signal deletion confirmed', `${chat.name} is missing extracted signals — quality is floored to 0.`)
+      fireToast(
+        'rejected',
+        'Signal deletion confirmed',
+        `${chat.name} is missing extracted signals — quality is floored to 0.`
+      )
     } else if (chat.historyGaps) {
-      fireToast('pending', 'History gaps found', `${chat.name} has breaks in its message-ID sequence — some history may be missing.`)
+      fireToast(
+        'pending',
+        'History gaps found',
+        `${chat.name} has breaks in its message-ID sequence — some history may be missing.`
+      )
     } else {
-      fireToast('verified', 'No gaps found', `${chat.name}'s message history is contiguous — no missing IDs.`)
+      fireToast(
+        'verified',
+        'No gaps found',
+        `${chat.name}'s message history is contiguous — no missing IDs.`
+      )
     }
   }
 
@@ -165,7 +195,11 @@ export function useWorkflowState() {
     const current = chats.find((chat) => chat.id === activeChatId)
     patchChat(activeChatId, { status: 'verified', hasRisk: true })
     setScreen('chats')
-    fireToast('verified', 'Source verified', `${current ? current.name : 'Feed'} is verified and saved. Backtest it any time from the feed options.`)
+    fireToast(
+      'verified',
+      'Source verified',
+      `${current ? current.name : 'Feed'} is verified and saved. Backtest it any time from the feed options.`
+    )
   }
 
   function backtestFeed(chat) {
@@ -177,7 +211,7 @@ export function useWorkflowState() {
     patchChat(activeChatId, {
       status: 'backfilled',
       fetched: total,
-      lastDate: 'Nov 18, 2025',
+      lastDate: 'Nov 18, 2025'
     })
     setScreen('label')
   }
@@ -186,10 +220,14 @@ export function useWorkflowState() {
     patchChat(activeChatId, {
       status: 'cancelled',
       fetched: count,
-      lastDate: date,
+      lastDate: date
     })
     setScreen('chats')
-    fireToast('pending', 'Backfill paused', `Saved at ${count.toLocaleString()} messages. Retry any time.`)
+    fireToast(
+      'pending',
+      'Backfill paused',
+      `Saved at ${count.toLocaleString()} messages. Retry any time.`
+    )
   }
 
   function onBacktestComplete(result) {
@@ -199,10 +237,14 @@ export function useWorkflowState() {
       score: summary.score,
       winRate: summary.winRate,
       pnl: summary.pnl,
-      hasRisk: true,
+      hasRisk: true
     })
     setScreen('chats')
-    fireToast('verified', 'Source verified', `${activeChat?.name || 'Feed'} scored ${summary.score}/100 and is ready to go live.`)
+    fireToast(
+      'verified',
+      'Source verified',
+      `${activeChat?.name || 'Feed'} scored ${summary.score}/100 and is ready to go live.`
+    )
   }
 
   function requestStepBack(stepId) {
@@ -219,7 +261,11 @@ export function useWorkflowState() {
     const target = backTarget
     setBackTarget(null)
     setScreen(target)
-    fireToast('pending', 'Back to Label', 'Your labels are kept. Distill and Verify will run again before signals can route.')
+    fireToast(
+      'pending',
+      'Back to Label',
+      'Your labels are kept. Distill and Verify will run again before signals can route.'
+    )
   }
 
   function openSettings() {
@@ -254,7 +300,11 @@ export function useWorkflowState() {
 
   function disconnectBybit() {
     setBybitConnected(false)
-    fireToast('rejected', 'Bybit disconnected', 'Verified signals are no longer routing to Bybit.')
+    fireToast(
+      'rejected',
+      'Bybit disconnected',
+      'Verified signals are no longer routing to Bybit.'
+    )
   }
 
   function connectTelegram() {
@@ -311,6 +361,6 @@ export function useWorkflowState() {
     disconnectBybit,
     connectTelegram,
     setActiveChatId,
-    setBackTarget,
+    setBackTarget
   }
 }

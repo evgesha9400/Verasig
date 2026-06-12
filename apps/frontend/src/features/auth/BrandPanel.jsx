@@ -1,7 +1,19 @@
 function AuthMark({ size = 26 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" style={{ color: 'var(--signal-500)' }}>
-      <path d="M4 22 L11 22 L17 30 L24 9 L30 18" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      fill="none"
+      style={{ color: 'var(--signal-500)' }}
+    >
+      <path
+        d="M4 22 L11 22 L17 30 L24 9 L30 18"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <circle cx="30" cy="18" r="3.4" fill="currentColor" />
     </svg>
   )
@@ -13,14 +25,20 @@ export function BrandPanel() {
       <div className="auth-brand__glow" />
       <div className="auth-brand__top">
         <a className="auth-brand__logo" href="#">
-          <AuthMark size={26} />Verasig<span style={{ color: 'var(--signal-500)' }}>.</span>
+          <AuthMark size={26} />
+          Verasig<span style={{ color: 'var(--signal-500)' }}>.</span>
         </a>
       </div>
       <div className="auth-brand__mid">
         <div>
-          <div className="auth-brand__head">Verify the signal<br />before you trade it.</div>
+          <div className="auth-brand__head">
+            Verify the signal
+            <br />
+            before you trade it.
+          </div>
           <p className="auth-brand__sub" style={{ marginTop: 16 }}>
-            Label what a real call looks like, backtest it across full history, and route only verified signals to your exchange.
+            Label what a real call looks like, backtest it across full history, and
+            route only verified signals to your exchange.
           </p>
         </div>
         <div className="auth-card">
@@ -47,8 +65,10 @@ export function BrandPanel() {
         </div>
       </div>
       <div className="auth-brand__foot">
-        <span>Telegram source</span><span className="dot" />
-        <span>Trade-only keys</span><span className="dot" />
+        <span>Telegram source</span>
+        <span className="dot" />
+        <span>Trade-only keys</span>
+        <span className="dot" />
         <span>Backtest before live</span>
       </div>
     </aside>
