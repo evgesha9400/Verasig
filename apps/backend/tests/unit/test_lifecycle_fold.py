@@ -187,6 +187,18 @@ def test_transitive_reply_through_a_non_entry_message_joins_the_root():
     assert timeline[1].effective_stop_loss == Decimal("65000")
 
 
+def test_manual_link_joins_unthreaded_modifier_to_root_signal():
+    signal, event, entry_msg = _entry(1, 0, entry_low="65000")
+    patch = _message(2, 30, "move SL to BE")
+
+    folded = fold([signal], [event], [entry_msg, patch], manual_links={2: signal.id})
+
+    timeline = folded[0].timeline
+    assert len(timeline) == 2
+    assert timeline[1].source_message_id == 2
+    assert timeline[1].effective_stop_loss == Decimal("65000")
+
+
 def test_different_symbol_reply_that_is_a_signal_starts_its_own_root():
     btc, btc_event, btc_msg = _entry(1, 0, symbol="BTC", entry_low="65000")
     eth, eth_event, eth_msg = _entry(2, 30, symbol="ETH", entry_low="3000")

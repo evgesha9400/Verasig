@@ -13,6 +13,7 @@ then `RawSignalEvent.message_id → RawTelegramMessage` (for `reply_to` + `poste
 
 from dataclasses import dataclass
 from decimal import Decimal
+from uuid import UUID
 
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.lifecycle import FOLD_VERSION, FoldedSignal, FoldStep
@@ -61,14 +62,20 @@ def _members_by_root(
     entry_message_ids: dict[int, ExtractedSignal],
     messages_by_id: dict[int, RawTelegramMessage],
     messages: list[RawTelegramMessage],
+    manual_links: dict[int, UUID],
 ) -> dict[int, list[RawTelegramMessage]]:
     members: dict[int, list[RawTelegramMessage]] = {
         root: [] for root in entry_message_ids
     }
+    root_by_signal_id = {
+        signal.id: message_id for message_id, signal in entry_message_ids.items()
+    }
     for message in messages:
         if message.message_id in entry_message_ids:
             continue  # an entry is its own root, never a member
-        root = _nearest_root_message_id(message, messages_by_id, entry_message_ids)
+        root = root_by_signal_id.get(manual_links.get(message.message_id))
+        if root is None:
+            root = _nearest_root_message_id(message, messages_by_id, entry_message_ids)
         if root is not None:
             members[root].append(message)
     for member_list in members.values():
@@ -225,11 +232,14 @@ def fold(
     events: list[RawSignalEvent],
     messages: list[RawTelegramMessage],
     version: int = FOLD_VERSION,
+    manual_links: dict[int, UUID] | None = None,
 ) -> list[FoldedSignal]:
     """Fold each entry signal + its reply-chain patches into a FoldedSignal."""
     entry_message_ids = _entry_message_ids(signals, events)
     messages_by_id = {message.message_id: message for message in messages}
-    members = _members_by_root(entry_message_ids, messages_by_id, messages)
+    members = _members_by_root(
+        entry_message_ids, messages_by_id, messages, manual_links or {}
+    )
     return [
         _fold_one(signal, messages_by_id[message_id], members[message_id], version)
         for message_id, signal in entry_message_ids.items()
