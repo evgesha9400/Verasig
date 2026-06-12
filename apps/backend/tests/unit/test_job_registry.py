@@ -57,7 +57,7 @@ async def test_two_concurrent_subscribers_each_receive_every_event():
 
 
 @pytest.mark.asyncio
-async def test_late_subscriber_receives_latest_progress_and_terminal_event():
+async def test_late_subscriber_receives_progress_replay_and_terminal_event():
     registry = JobRegistry()
 
     async def run(publisher):
@@ -69,6 +69,7 @@ async def test_late_subscriber_receives_latest_progress_and_terminal_event():
     await asyncio.sleep(0)
 
     assert await _collect(registry, "job") == [
+        ("progress", {"step": 1}),
         ("progress", {"step": 2}),
         ("done", {"ok": True}),
     ]
