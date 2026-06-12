@@ -103,6 +103,8 @@ def _entry_step(
         effective_take_profits=list(position.take_profits),
         effective_size=position.size,
         effective_entry=position.entry,
+        entry_low=signal.entry_low,
+        entry_high=signal.entry_high or signal.entry_low,
         leg_size=Decimal(1),
         leg_price=position.entry,
     )
