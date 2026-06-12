@@ -42,8 +42,8 @@ async def test_backfill_persists_all_messages(session_factory):
     result = await backfill(source, "@pilot", session_factory, batch_size=2)
     assert result.inserted == 5
     assert result.captured_through_message_id == 5
-    with session_factory() as session:
-        assert repo.count_messages(session, 1) == 5
+    with session_factory() as db_session:
+        assert repo.count_messages(db_session, 1) == 5
 
 
 async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
@@ -52,8 +52,8 @@ async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
     result = await backfill(rerun, "@pilot", session_factory, batch_size=2)
     assert result.inserted == 0
     assert rerun.requested_afters[0] == 5  # resumed at cursor, not 0
-    with session_factory() as session:
-        assert repo.count_messages(session, 1) == 5
+    with session_factory() as db_session:
+        assert repo.count_messages(db_session, 1) == 5
 
 
 async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
@@ -61,29 +61,29 @@ async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
     crashed = FakeSource(_channel(), messages, fail_after_batch=1)
     with pytest.raises(FakeStreamInterrupted):
         await backfill(crashed, "@pilot", session_factory, batch_size=2)
-    with session_factory() as session:
-        assert repo.count_messages(session, 1) == 2
-        assert repo.read_cursor(session, 1) == 2
+    with session_factory() as db_session:
+        assert repo.count_messages(db_session, 1) == 2
+        assert repo.read_cursor(db_session, 1) == 2
 
     resumed = FakeSource(_channel(), messages)
     result = await backfill(resumed, "@pilot", session_factory, batch_size=2)
     assert resumed.requested_afters[0] == 2
     assert all(message_id > 2 for message_id in resumed.yielded_ids)
     assert result.captured_through_message_id == 6
-    with session_factory() as session:
-        assert repo.count_messages(session, 1) == 6
+    with session_factory() as db_session:
+        assert repo.count_messages(db_session, 1) == 6
 
 
 async def test_backfill_commits_each_batch_before_pulling_the_next(session_factory):
     def assert_prior_batches_persisted(index: int, yielded_so_far: int) -> None:
         if index > 0:
-            with session_factory() as session:
-                assert repo.count_messages(session, 1) == yielded_so_far
+            with session_factory() as db_session:
+                assert repo.count_messages(db_session, 1) == yielded_so_far
 
     source = FakeSource(
         _channel(), _messages(2000), before_batch=assert_prior_batches_persisted
     )
     result = await backfill(source, "@pilot", session_factory, batch_size=200)
     assert result.inserted == 2000
-    with session_factory() as session:
-        assert repo.count_messages(session, 1) == 2000
+    with session_factory() as db_session:
+        assert repo.count_messages(db_session, 1) == 2000

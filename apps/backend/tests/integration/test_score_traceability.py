@@ -157,10 +157,14 @@ def _stored_refs(session_factory) -> set[str]:
         message_count = repo.count_messages(session, _CHANNEL_ID)
     refs = {f"channel:{_CHANNEL_ID}"} if message_count == 3 else set()
     refs.update(f"message:{item.channel_id}/{item.message_id}" for item in messages)
-    refs.update(f"event:{item.id}" for item in events)
-    refs.update(f"signal:{item.id}" for item in signals)
-    refs.update(f"unrecognized:{item.id}" for item in unrecognized)
-    refs.update(f"deletion:{item.id}" for item in deletions)
+    refs.update(f"event:{item.id.urn.removeprefix('urn:uuid:')}" for item in events)
+    refs.update(f"signal:{item.id.urn.removeprefix('urn:uuid:')}" for item in signals)
+    refs.update(
+        f"unrecognized:{item.id.urn.removeprefix('urn:uuid:')}" for item in unrecognized
+    )
+    refs.update(
+        f"deletion:{item.id.urn.removeprefix('urn:uuid:')}" for item in deletions
+    )
     return refs
 
 

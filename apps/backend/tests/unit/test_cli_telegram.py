@@ -61,7 +61,7 @@ def test_backfill_without_credentials_exits_with_hint():
 
 
 def test_backfill_reference_error_exits_without_traceback(monkeypatch):
-    async def fail_backfill(*args):
+    async def fail_backfill(*_args):
         raise ChannelReferenceResolutionError("No joined dialog has title 'Missing'")
 
     monkeypatch.setattr("verasig.cli.make_client", lambda settings: object())
