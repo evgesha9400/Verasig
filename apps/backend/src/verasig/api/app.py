@@ -8,6 +8,7 @@ from verasig.api.errors import ApiError, api_error_handler
 from verasig.api.routers import health
 from verasig.config import Settings
 from verasig.foundation.db import make_session_factory
+from verasig.foundation.security import SecretCipher
 from verasig.services.jobs.registry import JobRegistry
 
 ALL_ROUTERS: Sequence[APIRouter] = (health.router,)
@@ -22,6 +23,7 @@ def create_app(
         settings.database_url
     )
     app.state.jobs = JobRegistry()
+    app.state.secret_cipher = SecretCipher.from_spec(settings.secret_keys)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
