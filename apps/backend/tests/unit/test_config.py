@@ -83,3 +83,15 @@ def test_extractor_command_defaults_to_claude():
 def test_extractor_command_loads_from_env(monkeypatch):
     monkeypatch.setenv("VERASIG_EXTRACTOR_COMMAND", "codex")
     assert Settings().extractor_command == "codex"
+
+
+def test_settings_carry_api_secrets(monkeypatch):
+    monkeypatch.setenv("VERASIG_JWT_SECRET", "jwt-secret")
+    monkeypatch.setenv("VERASIG_SECRET_KEYS", "2026-06:newb64key,2026-01:oldb64key")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.jwt_secret == "jwt-secret"
+    assert settings.secret_keys == "2026-06:newb64key,2026-01:oldb64key"
+    assert settings.anthropic_model == "claude-sonnet-4-6"
+    assert settings.cors_origins == ["http://localhost:5173"]

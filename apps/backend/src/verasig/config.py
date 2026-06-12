@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     distiller_command: str = "claude"  # LLM CLI for rule distillation
     extractor_fallback_enabled: bool = True  # LLM fallback on deterministic miss
     extractor_command: str = "claude"  # LLM CLI for fallback extraction (gated)
+    jwt_secret: str = "dev-secret"
+    jwt_ttl_days: int = 7
+    secret_keys: str = ""
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-6"
+    cors_origins: list[str] = ["http://localhost:5173"]
 
     @property
     def database_url(self) -> str:
