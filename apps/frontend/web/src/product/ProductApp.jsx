@@ -16,10 +16,9 @@ import { ExecutionView } from './features/pipeline/steps/ExecutionView.jsx'
 import { BacktestView } from './features/pipeline/steps/BacktestView.jsx'
 import { ExchangesView } from './features/exchanges/ExchangesView.jsx'
 import { SettingsView } from './features/settings/SettingsView.jsx'
-import { LoginView } from './features/auth/LoginView.jsx'
-import { RegisterView } from './features/auth/RegisterView.jsx'
 import { useWorkflowState } from './features/workflow/useWorkflowState.js'
 import { MESSAGES } from './data/seed.js'
+import './product.css'
 
 const THEME_ACCENTS = {
   dark: ['#B9EE2E', '#CBF457', '#8FB81E', 'rgba(185,238,46,0.28)'],
@@ -52,19 +51,7 @@ function loadUser() {
   }
 }
 
-// The marketing site (root domain) links here with ?signup=1 for "Get started".
-const MARKETING_URL = import.meta.env.VITE_MARKETING_URL || 'http://localhost:5174'
-function initialAuthScreen() {
-  try {
-    return new URLSearchParams(window.location.search).get('signup') === '1'
-      ? 'register'
-      : 'login'
-  } catch {
-    return 'login'
-  }
-}
-
-export default function App() {
+export function ProductApp({ onLogout }) {
   const [theme, setTheme] = useState(loadTheme())
   function changeTheme(next) {
     setTheme(next)
@@ -87,8 +74,6 @@ export default function App() {
       return next
     })
   }
-
-  const [authScreen, setAuthScreen] = useState(initialAuthScreen) // 'login' | 'register' | null
 
   const {
     nav,
@@ -169,24 +154,6 @@ export default function App() {
     mo.observe(document.body, { childList: true, subtree: true })
     return () => mo.disconnect()
   }, [])
-
-  // ---- auth early-return ----
-  if (authScreen === 'login') {
-    return (
-      <LoginView
-        onLogin={() => setAuthScreen(null)}
-        onRegister={() => setAuthScreen('register')}
-      />
-    )
-  }
-  if (authScreen === 'register') {
-    return (
-      <RegisterView
-        onRegister={() => setAuthScreen(null)}
-        onLogin={() => setAuthScreen('login')}
-      />
-    )
-  }
 
   let title = 'Sources'
   let subtitle = 'Connect where your signals come from'
@@ -397,9 +364,7 @@ export default function App() {
         pipeline={pipeline}
         theme={theme}
         onThemeChange={changeTheme}
-        onLogout={() => {
-          window.location.href = MARKETING_URL
-        }}
+        onLogout={onLogout}
         user={user}
         onOpenSettings={openSettings}
       >
@@ -442,3 +407,5 @@ export default function App() {
     </>
   )
 }
+
+export default ProductApp

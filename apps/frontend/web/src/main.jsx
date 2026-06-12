@@ -1,11 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import '@verasig/design-system/styles.css'
-import './app.css'
-import App from './App.jsx'
+import AppRouter from './routes/AppRouter.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <AppRouter />
   </React.StrictMode>
 )
