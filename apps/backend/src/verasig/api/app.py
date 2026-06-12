@@ -12,6 +12,7 @@ from verasig.api.routers import (
     exchanges,
     health,
     labels,
+    risk,
     telegram,
     user,
     verify,
@@ -35,6 +36,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     labels.router,
     distill.router,
     verify.router,
+    risk.router,
 )
 
 
