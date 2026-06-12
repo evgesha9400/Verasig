@@ -38,21 +38,21 @@ function ThinkOrb() {
   )
 }
 
+const DISTILL_STEPS = [
+  'Reading your labelled signals',
+  'Extracting structure & tickers',
+  'Inferring discriminative patterns',
+  'Cross-checking against non-signals',
+  'Compiling filter ruleset'
+]
+
 export function DistillView({ onComplete }) {
   const [phase, setPhase] = useState('thinking')
   const [step, setStep] = useState(0)
 
-  const steps = [
-    'Reading your labelled signals',
-    'Extracting structure & tickers',
-    'Inferring discriminative patterns',
-    'Cross-checking against non-signals',
-    'Compiling filter ruleset'
-  ]
-
   useEffect(() => {
     if (phase !== 'thinking') return
-    if (step < steps.length) {
+    if (step < DISTILL_STEPS.length) {
       const t = setTimeout(() => setStep(step + 1), 720)
       return () => clearTimeout(t)
     }
@@ -72,7 +72,7 @@ export function DistillView({ onComplete }) {
           </div>
         </div>
         <div className="vrs-think__steps">
-          {steps.map((s, i) => (
+          {DISTILL_STEPS.map((s, i) => (
             <div
               key={i}
               className={`vrs-think__step ${i < step ? 'is-done' : ''} ${i === step ? 'is-active' : ''}`}

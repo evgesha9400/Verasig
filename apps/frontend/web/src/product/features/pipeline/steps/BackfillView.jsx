@@ -12,6 +12,7 @@ export function BackfillView({ chat, onCancel, onComplete }) {
   // simulated, accelerating backfill that completes after a believable run
   useEffect(() => {
     const TARGET = (chat.fetched || 0) + 9800 + Math.floor(Math.random() * 3000)
+    let doneTimer = null
     const dates = [
       'Jun 7, 2026',
       'Jun 4, 2026',
@@ -43,7 +44,7 @@ export function BackfillView({ chat, onCancel, onComplete }) {
         clearInterval(tick)
         clearInterval(logTick)
         setLogLine('Backfill complete · finalizing index')
-        setTimeout(() => onComplete(TARGET), 900)
+        doneTimer = setTimeout(() => onComplete(TARGET), 900)
         return
       }
       setCount(countRef.current)
@@ -60,8 +61,9 @@ export function BackfillView({ chat, onCancel, onComplete }) {
     return () => {
       clearInterval(tick)
       clearInterval(logTick)
+      clearTimeout(doneTimer)
     }
-  }, [])
+  }, [chat.fetched, onComplete])
 
   return (
     <div className="vrs-backfill vrs-fade-in">

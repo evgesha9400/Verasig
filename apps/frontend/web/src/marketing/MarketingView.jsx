@@ -1,13 +1,8 @@
-/* Verasig — marketing landing page. Grounded entirely in the product:
-   connect Telegram signal channels, backfill, label signal/noise, distill
-   rules, verify on fresh messages, route to an exchange, set risk, backtest.
-   No fabricated metrics. Log in / Sign up cross over to the app subdomain. */
 import { useState, useEffect, Fragment } from 'react'
+import { Link } from 'react-router-dom'
 import { Button, Icon } from '@verasig/design-system'
-
-// The app lives on its own subdomain; CTAs link there. Configured per env.
-const APP_URL = import.meta.env.VITE_APP_URL || 'http://localhost:5173'
-const appHref = (mode) => (mode === 'signup' ? `${APP_URL}/?signup=1` : `${APP_URL}/`)
+import { ROUTES } from '../routes/paths.js'
+import './marketing.css'
 
 // Theme drives the brand signal color: dark = lime trace, light = azure.
 // Shared with the app via the same localStorage key.
@@ -113,10 +108,10 @@ function Nav({ theme, onThemeChange }) {
         <div className="mk-nav__actions">
           <ThemeToggle theme={theme} onChange={onThemeChange} />
           <span className="mk-nav__divider" aria-hidden="true" />
-          <a className="mk-nav__signin" href={appHref('login')}>
+          <Link className="mk-nav__signin" to={ROUTES.login}>
             Log in
-          </a>
-          <Button as="a" href={appHref('signup')} variant="primary" size="sm">
+          </Link>
+          <Button as={Link} to={ROUTES.signup} variant="primary" size="sm">
             Sign up
           </Button>
         </div>
@@ -169,15 +164,15 @@ function Hero() {
           </p>
           <div className="mk-hero__cta">
             <Button
-              as="a"
-              href={appHref('signup')}
+              as={Link}
+              to={ROUTES.signup}
               variant="primary"
               size="lg"
               iconRight={<Icon name="arrowRight" size={16} />}
             >
               Sign up
             </Button>
-            <Button as="a" href={appHref('login')} variant="secondary" size="lg">
+            <Button as={Link} to={ROUTES.login} variant="secondary" size="lg">
               Log in
             </Button>
           </div>
@@ -498,15 +493,15 @@ function CTA() {
         </p>
         <div className="mk-cta__btns">
           <Button
-            as="a"
-            href={appHref('signup')}
+            as={Link}
+            to={ROUTES.signup}
             variant="primary"
             size="lg"
             iconRight={<Icon name="arrowRight" size={16} />}
           >
             Sign up
           </Button>
-          <Button as="a" href={appHref('login')} variant="secondary" size="lg">
+          <Button as={Link} to={ROUTES.login} variant="secondary" size="lg">
             Log in
           </Button>
         </div>

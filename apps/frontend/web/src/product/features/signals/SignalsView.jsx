@@ -79,7 +79,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
       .filter((s) => source === 'all' || feedSource(feedById[s.feedId]) === source)
       .filter((s) => feed === 'all' || s.feedId === feed)
       .sort((a, b) => sortKey(b) - sortKey(a))
-  }, [allSignals, analyzedFeeds, source, feed])
+  }, [allSignals, analyzedFeeds, source, feed, feedById])
 
   // Tab buckets — Tested / Not tested / Skipped exclude deleted; Deleted is its own bucket.
   const live = scoped.filter((s) => !s.deleted)

@@ -37,6 +37,13 @@ function ThinkOrb() {
   )
 }
 
+const BACKTEST_STEPS = [
+  'Replaying 12,840 historical signals',
+  'Applying your risk model',
+  'Simulating fills & slippage',
+  'Scoring confidence & drawdown'
+]
+
 function ScoreRing({ value, size = 132 }) {
   const r = (size - 16) / 2
   const c = 2 * Math.PI * r
@@ -107,15 +114,9 @@ export function BacktestView({ chat, onComplete, skipRun = false }) {
     winRate = (skipRun && chat.winRate) || 66.4,
     pnl = (skipRun && chat.pnl) || 47.3
 
-  const steps = [
-    'Replaying 12,840 historical signals',
-    'Applying your risk model',
-    'Simulating fills & slippage',
-    'Scoring confidence & drawdown'
-  ]
   useEffect(() => {
     if (phase !== 'running') return
-    if (step < steps.length) {
+    if (step < BACKTEST_STEPS.length) {
       const t = setTimeout(() => setStep(step + 1), 820)
       return () => clearTimeout(t)
     }
@@ -135,7 +136,7 @@ export function BacktestView({ chat, onComplete, skipRun = false }) {
           </div>
         </div>
         <div className="vrs-think__steps">
-          {steps.map((s, i) => (
+          {BACKTEST_STEPS.map((s, i) => (
             <div
               key={i}
               className={`vrs-think__step ${i < step ? 'is-done' : ''} ${i === step ? 'is-active' : ''}`}
