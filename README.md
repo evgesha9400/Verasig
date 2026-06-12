@@ -59,5 +59,5 @@ Compose uses `apps/backend/.env`, `apps/backend/Dockerfile`, and `apps/backend/a
 - [Product requirements](docs/business/requirements.md)
 - [Architecture decisions](docs/business/architecture-decisions.md)
 - [Design and domain language](docs/context/CONTEXT.md)
-- [Design system](docs/DESIGN.md)
+- [Design system source](apps/frontend/design-system)
 - [Current project structure](docs/business/project-structure.md)
