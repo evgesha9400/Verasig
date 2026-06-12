@@ -33,8 +33,12 @@ data/
 graphify-out/.graphify_python
 graphify-out/.graphify_*.json
 graphify-out/cache/
+graphify-out/.graphify_root
 graphify-out/cost.json
 graphify-out/manifest.json
+.graphify_ast.json
+.graphify_incremental.json
+apps/graphify-out/
 
 # IDE metadata (JetBrains)
 .idea/
