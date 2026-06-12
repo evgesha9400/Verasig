@@ -5,7 +5,7 @@ Proof-first signal provider intelligence.
 ## Repo structure
 
 - `apps/backend/` — Python backend service (logic, migrations, CLI, tests).
-- `apps/frontend/` — React/Vite frontend shell for future production UI.
+- `apps/frontend/` — frontend workspace: product app, marketing app, design system, and JS tooling.
 - `libs/contracts/` — shared API contract definitions (reserved for phase 2+).
 - `docs/` — architecture docs, domain language, product docs, and design references.
 - `graphify-out/` — canonical project graph outputs; cache/state files are ignored.
@@ -19,6 +19,17 @@ Proof-first signal provider intelligence.
 - `uv run verasig migrate`
 
 Backend package remains `verasig` and CLI command remains `verasig`.
+
+## Frontend
+
+- `cd apps/frontend`
+- `npm ci`
+- `make format-check`
+- `make lint`
+- `make test`
+- `make build`
+
+Frontend package management stays inside `apps/frontend/`.
 
 ## Database migrations and app container
 
