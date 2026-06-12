@@ -5,7 +5,7 @@ Proof-first signal provider intelligence.
 ## Repo structure
 
 - `apps/backend/` — Python backend service (logic, migrations, CLI, tests).
-- `apps/frontend/` — frontend workspace: product app, marketing app, design system, and JS tooling.
+- `apps/frontend/` — frontend workspace: unified web app, design system, and JS tooling.
 - `libs/contracts/` — shared API contract definitions (reserved for phase 2+).
 - `docs/` — architecture docs, domain language, product docs, and design references.
 - `graphify-out/` — canonical project graph outputs; cache/state files are ignored.
@@ -31,17 +31,27 @@ Backend package remains `verasig` and CLI command remains `verasig`.
 
 Frontend package management stays inside `apps/frontend/`.
 
+The unified frontend app serves marketing, auth, and product routes from one Vite
+runtime:
+
+- `/` — public marketing landing.
+- `/login` — public login view.
+- `/signup` — public registration view.
+- `/app` — authenticated product shell.
+
 ## Database migrations and app container
 
-- `docker compose up --build`
+- `make env`
+- `make up`
 
-Compose uses `apps/backend/Dockerfile` and `apps/backend/alembic.ini`.
+Compose uses `apps/backend/.env`, `apps/backend/Dockerfile`, and `apps/backend/alembic.ini`.
 
 ## Environment
 
-- Keep the root `.env` for local compose/runtime.
+- Keep backend runtime values in `apps/backend/.env`.
+- Create local values with `make env`.
 - Keep environment variable names unchanged (`VERASIG_*`) in this phase.
-- `.env.example` remains at repository root.
+- Keep the tracked template at `apps/backend/.env.example`.
 
 ## Documents
 
