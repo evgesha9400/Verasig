@@ -13,7 +13,7 @@ def app(session_factory, pg_url):
     settings = Settings(
         _env_file=None,
         database_url_override=pg_url,
-        jwt_secret="test-secret",
+        jwt_secret="s" * 32,
         secret_keys=f"test:{base64.b64encode(os.urandom(32)).decode()}",
     )
     return create_app(settings, session_factory=session_factory)

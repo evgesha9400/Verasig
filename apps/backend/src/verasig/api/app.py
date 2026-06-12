@@ -5,13 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from verasig.api.errors import ApiError, api_error_handler
-from verasig.api.routers import health
+from verasig.api.routers import auth, health
 from verasig.config import Settings
 from verasig.foundation.db import make_session_factory
 from verasig.foundation.security import SecretCipher
 from verasig.services.jobs.registry import JobRegistry
 
-ALL_ROUTERS: Sequence[APIRouter] = (health.router,)
+ALL_ROUTERS: Sequence[APIRouter] = (health.router, auth.router)
 
 
 def create_app(
