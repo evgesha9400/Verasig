@@ -48,6 +48,9 @@ apps/backend/
 |   |-- integration/
 |   `-- fixtures/
 |-- Dockerfile
+|-- .dockerignore
+|-- .env.example
+|-- .python-version
 |-- Makefile
 |-- alembic.ini
 |-- pyproject.toml
@@ -61,6 +64,9 @@ apps/backend/
 - `foundation/` owns concrete external adapters and runtime setup.
 - `storage/` owns SQLAlchemy rows and repository modules.
 - `cli.py` owns the Typer entrypoint and should stay thin over services.
+- `.env.example`, `.python-version`, and `pyproject.toml` are backend-owned runtime/tooling contracts.
+- `.env` is backend-local, gitignored, and copied from `.env.example` by `make env`.
+- `.dockerignore` must exclude `.env` from backend container build context.
 - No `application/` layer exists; ADR 0010 explicitly defers that split.
 - Pure modules use names such as `diff`, `fold`, `hygiene`, and `scorecard`.
 - IO orchestration modules use names such as `backfill`, `live`, `rescan`, and `extract_service`.
@@ -69,21 +75,14 @@ apps/backend/
 
 ```text
 apps/frontend/
-|-- product/
+|-- web/
 |   |-- src/
 |   |   |-- assets/
-|   |   |-- data/
-|   |   |-- features/
-|   |   |-- layout/
-|   |   |-- App.jsx
-|   |   |-- app.css
+|   |   |-- auth/
+|   |   |-- marketing/
+|   |   |-- product/
+|   |   |-- routes/
 |   |   `-- main.jsx
-|   |-- public/
-|   |-- index.html
-|   |-- package.json
-|   `-- vite.config.js
-|-- marketing/
-|   |-- src/
 |   |-- index.html
 |   |-- package.json
 |   `-- vite.config.js
@@ -102,13 +101,16 @@ apps/frontend/
 ## Frontend Module Rules
 
 - `apps/frontend/package.json` owns frontend workspaces and frontend-only tooling.
-- `product/` owns the production client shell and product workflows.
-- `marketing/` owns the marketing site.
+- `web/` owns the single Vite runtime for marketing, auth, and product routes.
 - `design-system/` owns reusable runtime UI modules and tokens.
-- `product/src/features/` owns user workflow screens grouped by product capability.
-- `product/src/layout/` owns shell-level navigation and page chrome.
-- `product/src/data/` owns prototype seed data until backend payload contracts exist.
-- `product/src/App.jsx` is the product composition root and should not absorb feature internals.
+- `web/src/routes/` owns route constants and route-level auth decisions.
+- `web/src/marketing/` owns the public landing page.
+- `web/src/auth/` owns public login, registration, and prototype local auth state.
+- `web/src/product/` owns the authenticated product shell and product workflows.
+- `web/src/product/features/` owns user workflow screens grouped by product capability.
+- `web/src/product/layout/` owns shell-level navigation and page chrome.
+- `web/src/product/data/` owns prototype seed data until backend payload contracts exist.
+- `web/src/product/ProductApp.jsx` is the product composition root and should not absorb feature internals.
 
 ## Contract Library
 

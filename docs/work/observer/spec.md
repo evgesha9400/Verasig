@@ -7,7 +7,7 @@
 - Prove Verasig can **evaluate Telegram signal-provider quality** from historical + live-observed messages.
 - **Observe-only.** No execution, no orders, no exchange credentials, no cloud.
 - **Local-only** = the whole stack runs via `docker compose` on any machine with Docker.
-- Disposable: easy to delete (`docker compose down -v`) or change.
+- Disposable: easy to delete (`docker compose --env-file apps/backend/.env down -v`) or change.
 
 ## 2. Success Criterion (from validation-roadmap.md)
 
@@ -105,7 +105,8 @@ Telegram ──backfill──▶ RawTelegramMessage ──candidate filter──
 ```
 verasig/
 ├── docker-compose.yml      Dockerfile      pyproject.toml   alembic.ini
-├── .env.example            .gitignore       (secrets/, .env, *.session ignored)
+├── apps/backend/.env.example
+├── .gitignore              (secrets/, apps/backend/.env, *.session ignored)
 ├── secrets/                # gitignored: telegram .session, .env
 ├── migrations/             # alembic
 ├── docs/                   # business/ context/ adr/ work/
@@ -144,8 +145,8 @@ verasig/
 
 ## 7. Secrets & auth
 
-- `.env` + `secrets/` are **gitignored**; compose mounts `secrets/` read-only, injects env from `.env`.
-- Telethon **first login is interactive** → dedicated `login` subcommand run once via `docker compose run --rm -it app login`; persists a `StringSession` into the mounted volume.
+- `apps/backend/.env` + `secrets/` are **gitignored**; compose mounts `secrets/` read-only, injects env from `apps/backend/.env`.
+- Telethon **first login is interactive** → dedicated `login` subcommand run once via `docker compose --env-file apps/backend/.env run --rm -it app login`; persists a `StringSession` into the mounted volume.
 - All other commands load the session **non-interactively**; missing/invalid → fail fast ("run `login` first").
 - The `.session` is **password-equivalent** (full account access); a **dedicated Telegram account** is advised given ban risk.
 
@@ -169,8 +170,8 @@ verasig/
 
 ## 9. Acceptance Criteria
 
-- [ ] Fresh clone → `cp .env.example .env` → `docker compose up` brings up `db` + app on **any** Docker host.
-- [ ] `docker compose run --rm -it app login` completes interactive auth; session persists across restarts.
+- [ ] Fresh clone → `make env` → `docker compose --env-file apps/backend/.env up` brings up `db` + app on **any** Docker host.
+- [ ] `docker compose --env-file apps/backend/.env run --rm -it app login` completes interactive auth; session persists across restarts.
 - [ ] ≥3 pilot channels backfilled; **100%** of accessible messages captured, append-only, idempotent re-run = 0 dupes.
 - [ ] Backfill is **resumable** from a persisted cursor; a mid-run kill + restart resumes and **does not refetch** captured messages.
 - [ ] Pipeline runs in **bounded chunks**; peak memory stays flat on a large channel (no full-history RAM load).

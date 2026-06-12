@@ -39,10 +39,10 @@
 
 ## work item 0: Foundation & skeleton
 
-**Outcome:** `docker compose up` brings up Postgres + app; `app health` connects to the DB. pytest + ruff wired.
+**Outcome:** `make up` brings up Postgres + app; `app health` connects to the DB. pytest + ruff wired.
 
 **Files:**
-- Create: `pyproject.toml`, `Dockerfile`, `docker-compose.yml`, `.env.example`, `.gitignore`, `alembic.ini`
+- Create: `pyproject.toml`, `Dockerfile`, `docker-compose.yml`, `apps/backend/.env.example`, `.gitignore`, `alembic.ini`
 - Create: `src/verasig/config.py`, `src/verasig/foundation/db.py`, `src/verasig/cli.py`
 - Create: `migrations/env.py`, `migrations/versions/0001_baseline.py`
 - Test: `tests/conftest.py`, `tests/integration/test_foundation.py`, `tests/integration/test_migrations.py`
@@ -235,7 +235,7 @@ __pycache__/
 
 - [ ] **Step 12: Verify health + commit**
 
-Run: `docker compose up -d db && docker compose run --rm app health`
+Run: `docker compose --env-file apps/backend/.env up -d db && docker compose --env-file apps/backend/.env run --rm app health`
 Expected: `OK: db connected`.
 ```bash
 git add -A && git commit -m "feat: foundation skeleton (compose, postgres, config, cli health)"
@@ -249,7 +249,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Output:** persisted `StringSession` (bare UTF-8 string at `session_path`); non-interactive client for all other commands.
 - **Decisive test (unit):** session-string round-trips (`save`→`load`); missing/empty session raises `SessionMissingError("run `login` first")`; absent creds raise `CredentialsMissingError`.
 - **Contract:** `TelegramSource` Protocol (`domain/protocols.py`, `data-contracts.md` §9) — Protocol-only stub here; `backfill_batches`/`live_events` are implemented in work items 2/10. work item 1's own seam is the session store + guarded client factory in `telegram_session.py`.
-- **Acceptance:** `docker compose run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
+- **Acceptance:** `docker compose --env-file apps/backend/.env run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
 - **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are verified outside automated tests; only load/persist/guard + the pure `format_account` formatter are unit-tested.
 
 **Resolved gaps (grill, 2026-06-03):**
@@ -261,7 +261,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 
 **Files:**
 - Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/domain/telegram.py`, `src/verasig/domain/protocols.py`, `src/verasig/foundation/telethon_source.py`, `src/verasig/foundation/telegram_session.py`
-- Edit: `src/verasig/config.py` (+`telegram_phone`), `src/verasig/cli.py` (+`login`, +`whoami`), `.env`, `.env.example`
+- Edit: `src/verasig/config.py` (+`telegram_phone`), `src/verasig/cli.py` (+`login`, +`whoami`), `apps/backend/.env`, `apps/backend/.env.example`
 - Test: `tests/unit/test_domain_message.py`, `tests/unit/test_telegram_source.py`, `tests/unit/test_telegram_session.py`
 
 ---
@@ -293,7 +293,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 **Files:**
 - Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/storage/repositories.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
 - Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telethon_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
-- Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the work item-2 tables before `backfill` (`docker compose run --rm app migrate`).
+- Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the work item-2 tables before `backfill` (`docker compose --env-file apps/backend/.env run --rm app migrate`).
 - Test: `tests/fixtures/messages/*.jsonl`, `tests/integration/test_backfill.py`, `tests/unit/test_fake_source.py` (+ Protocol conformance)
 
 ---
