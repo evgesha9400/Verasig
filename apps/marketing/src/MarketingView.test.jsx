@@ -12,7 +12,16 @@ describe('Marketing landing', () => {
 
   it('renders the eight pipeline steps', () => {
     render(<Marketing />)
-    for (const step of ['Connect', 'Backfill', 'Label', 'Distill', 'Verify', 'Route', 'Risk', 'Backtest']) {
+    for (const step of [
+      'Connect',
+      'Backfill',
+      'Label',
+      'Distill',
+      'Verify',
+      'Route',
+      'Risk',
+      'Backtest'
+    ]) {
       expect(screen.getAllByText(step).length).toBeGreaterThan(0)
     }
   })
