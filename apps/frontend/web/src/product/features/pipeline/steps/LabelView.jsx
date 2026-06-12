@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Button } from '@verasig/design-system'
+import { Button, IconButton } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
 /* Verasig prototype — Label step: Tinder-style signal / non-signal classification.
@@ -244,40 +244,50 @@ export function LabelView({
         </div>
 
         <div className="vrs-swipe-controls">
-          <button
-            className="vrs-swipe-btn no"
+          <IconButton
+            variant="solid"
+            size="lg"
+            className="vrs-swipe-key vrs-swipe-key--no"
+            label="Non-signal"
             onClick={() => commit('noise')}
             disabled={atEnd}
             title="Non-signal (←)"
           >
             <Icon name="x" size={22} />
-          </button>
+          </IconButton>
           <div className="vrs-deck__nav">
-            <button
-              className="vrs-swipe-btn nav"
+            <IconButton
+              variant="solid"
+              className="vrs-swipe-key vrs-swipe-key--nav"
+              label="Previous"
               onClick={goPrev}
               disabled={idx === 0}
               title="Previous (↑)"
             >
               <Icon name="arrowUp" size={18} />
-            </button>
-            <button
-              className="vrs-swipe-btn nav"
+            </IconButton>
+            <IconButton
+              variant="solid"
+              className="vrs-swipe-key vrs-swipe-key--nav"
+              label="Next"
               onClick={goNext}
               disabled={atEnd}
               title="Next (↓)"
             >
               <Icon name="arrowDown" size={18} />
-            </button>
+            </IconButton>
           </div>
-          <button
-            className="vrs-swipe-btn yes"
+          <IconButton
+            variant="accent"
+            size="lg"
+            className="vrs-swipe-key vrs-swipe-key--yes"
+            label="Signal"
             onClick={() => commit('signal')}
             disabled={atEnd}
             title="Signal (→)"
           >
             <Icon name="check" size={22} />
-          </button>
+          </IconButton>
         </div>
         <div className="vrs-deck__hint">
           <kbd>←</kbd> Non-signal &nbsp;·&nbsp; <kbd>→</kbd> Signal &nbsp;·&nbsp;{' '}

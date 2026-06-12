@@ -77,6 +77,16 @@ describe('AppRoutes', () => {
     }
   })
 
+  it('updates marketing theme through shared DS radio semantics', async () => {
+    const user = userEvent.setup()
+    renderRoute('/')
+
+    await user.click(screen.getByRole('radio', { name: 'Light' }))
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#8FB81E')
+  })
+
   it('navigates from login submit to the product shell', async () => {
     renderRoute('/login')
     fireEvent.submit(screen.getByText('Log in').closest('form'))

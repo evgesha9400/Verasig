@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Badge, Button } from '@verasig/design-system'
+import { Badge, Button, IconButton, InteractiveCard } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { MESSAGES, VERIFY_MIN, VERIFY_MISCLASSIFIED } from '../../../data/seed.js'
 
@@ -216,35 +216,35 @@ export function VerifyView({ attempt, onPass, onStop, onLoop }) {
           </div>
         </div>
         <div className="vrs-next">
-          <button className="vrs-next-card is-primary" onClick={onPass}>
-            <span className="vrs-next-card__ic">
+          <InteractiveCard className="vrs-next-option is-primary" onClick={onPass}>
+            <span className="vrs-next-option__ic">
               <Icon name="chart" size={20} />
             </span>
-            <span className="vrs-next-card__body">
-              <span className="vrs-next-card__t">
+            <span className="vrs-next-option__body">
+              <span className="vrs-next-option__t">
                 Connect an exchange &amp; backtest
                 <span className="vrs-next-tag">Recommended</span>
               </span>
-              <span className="vrs-next-card__d">
+              <span className="vrs-next-option__d">
                 Route verified signals to an exchange and simulate the source over its
                 full history for a quality score and win rate.
               </span>
             </span>
             <Icon name="arrowRight" size={18} />
-          </button>
-          <button className="vrs-next-card" onClick={onStop}>
-            <span className="vrs-next-card__ic">
+          </InteractiveCard>
+          <InteractiveCard className="vrs-next-option" onClick={onStop}>
+            <span className="vrs-next-option__ic">
               <Icon name="check" size={20} />
             </span>
-            <span className="vrs-next-card__body">
-              <span className="vrs-next-card__t">Stop here — keep it verified</span>
-              <span className="vrs-next-card__d">
+            <span className="vrs-next-option__body">
+              <span className="vrs-next-option__t">Stop here — keep it verified</span>
+              <span className="vrs-next-option__d">
                 Save the verified source without connecting an exchange or backtesting.
                 You can backtest later, any time, from the feed’s options.
               </span>
             </span>
             <Icon name="arrowRight" size={18} />
-          </button>
+          </InteractiveCard>
         </div>
       </div>
     )
@@ -356,40 +356,50 @@ export function VerifyView({ attempt, onPass, onStop, onLoop }) {
         </div>
 
         <div className="vrs-swipe-controls">
-          <button
-            className="vrs-swipe-btn no"
+          <IconButton
+            variant="solid"
+            size="lg"
+            className="vrs-swipe-key vrs-swipe-key--no"
+            label="Misclassified"
             onClick={() => commit('wrong')}
             disabled={atEnd}
             title="Misclassified (←)"
           >
             <Icon name="x" size={22} />
-          </button>
+          </IconButton>
           <div className="vrs-deck__nav">
-            <button
-              className="vrs-swipe-btn nav"
+            <IconButton
+              variant="solid"
+              className="vrs-swipe-key vrs-swipe-key--nav"
+              label="Previous"
               onClick={goPrev}
               disabled={idx === 0}
               title="Previous (↑)"
             >
               <Icon name="arrowUp" size={18} />
-            </button>
-            <button
-              className="vrs-swipe-btn nav"
+            </IconButton>
+            <IconButton
+              variant="solid"
+              className="vrs-swipe-key vrs-swipe-key--nav"
+              label="Skip"
               onClick={goNext}
               disabled={atEnd}
               title="Skip (↓)"
             >
               <Icon name="arrowDown" size={18} />
-            </button>
+            </IconButton>
           </div>
-          <button
-            className="vrs-swipe-btn yes"
+          <IconButton
+            variant="accent"
+            size="lg"
+            className="vrs-swipe-key vrs-swipe-key--yes"
+            label="Correct"
             onClick={() => commit('correct')}
             disabled={atEnd}
             title="Correct (→)"
           >
             <Icon name="check" size={22} />
-          </button>
+          </IconButton>
         </div>
         <div className="vrs-deck__hint">
           <kbd>←</kbd> Misclassified &nbsp;·&nbsp; <kbd>→</kbd> Correct &nbsp;·&nbsp;{' '}

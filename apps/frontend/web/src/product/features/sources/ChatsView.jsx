@@ -1,6 +1,12 @@
 /* Verasig prototype — Telegram chat list */
-import { useState } from 'react'
-import { Badge, Button, IconButton } from '@verasig/design-system'
+import {
+  Badge,
+  Button,
+  IconButton,
+  Menu,
+  MenuItem,
+  Popover
+} from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
 function fmtNum(n) {
@@ -19,58 +25,61 @@ export function ChatsView({
   onCheckGaps,
   onBacktest
 }) {
-  const [menuFor, setMenuFor] = useState(null)
-
   function FeedFlag({ kind, onLink }) {
     if (kind === 'gaps') {
       return (
-        <span className="vrs-pilltip" onClick={(e) => e.stopPropagation()}>
-          <Badge tone="pending" dot>
-            History gaps
-          </Badge>
-          <span className="vrs-pilltip__pop" role="tooltip">
-            <span className="vrs-pilltip__t">
-              <Icon name="alert" size={13} /> Possible history gaps
-            </span>
-            <span className="vrs-pilltip__b">
-              The backfill found breaks in this feed&rsquo;s message ID sequence — some
-              messages appear to be missing from the channel history. They may have been
-              deleted. There&rsquo;s no confirmation that any of the deleted messages
-              were signals.
-            </span>
+        <Popover
+          className="vrs-feed-pop"
+          trigger={
+            <Badge tone="pending" dot>
+              History gaps
+            </Badge>
+          }
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="vrs-pilltip__t">
+            <Icon name="alert" size={13} /> Possible history gaps
           </span>
-        </span>
+          <span className="vrs-pilltip__b">
+            The backfill found breaks in this feed&rsquo;s message ID sequence — some
+            messages appear to be missing from the channel history. They may have been
+            deleted. There&rsquo;s no confirmation that any of the deleted messages were
+            signals.
+          </span>
+        </Popover>
       )
     }
     return (
-      <span
-        className="vrs-pilltip vrs-pilltip--danger"
+      <Popover
+        className="vrs-feed-pop"
+        trigger={
+          <Badge tone="rejected" dot>
+            Scam
+          </Badge>
+        }
         onClick={(e) => e.stopPropagation()}
       >
-        <Badge tone="rejected" dot>
-          Scam
-        </Badge>
-        <span className="vrs-pilltip__pop" role="tooltip">
-          <span className="vrs-pilltip__t vrs-pilltip__t--danger">
-            <Icon name="alert" size={13} /> Confirmed signal deletion
-          </span>
-          <span className="vrs-pilltip__b">
-            On the latest backfill, messages previously classified as signals are gone
-            from this feed&rsquo;s history. Deleting losing &mdash; or winning &mdash;
-            calls to rewrite a track record is a known scam pattern, so the quality
-            score is floored to 0.
-          </span>
-          <button
-            className="vrs-pilltip__link"
-            onClick={(e) => {
-              e.stopPropagation()
-              onLink && onLink()
-            }}
-          >
-            <Icon name="externalLink" size={12} /> View deleted signals
-          </button>
+        <span className="vrs-pilltip__t vrs-pilltip__t--danger">
+          <Icon name="alert" size={13} /> Confirmed signal deletion
         </span>
-      </span>
+        <span className="vrs-pilltip__b">
+          On the latest backfill, messages previously classified as signals are gone
+          from this feed&rsquo;s history. Deleting losing &mdash; or winning &mdash;
+          calls to rewrite a track record is a known scam pattern, so the quality score
+          is floored to 0.
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft={<Icon name="externalLink" size={12} />}
+          onClick={(e) => {
+            e.stopPropagation()
+            onLink && onLink()
+          }}
+        >
+          View deleted signals
+        </Button>
+      </Popover>
     )
   }
 
@@ -104,46 +113,33 @@ export function ChatsView({
 
   function optionsMenu(c) {
     return (
-      <div style={{ position: 'relative' }}>
-        <IconButton
-          label="Options"
-          onClick={(e) => {
-            e.stopPropagation()
-            setMenuFor(menuFor === c.id ? null : c.id)
-          }}
+      <Menu
+        trigger={
+          <IconButton label="Options">
+            <Icon name="settings" size={16} />
+          </IconButton>
+        }
+      >
+        <MenuItem
+          iconLeft={<Icon name="refresh" size={15} />}
+          onClick={() => onReanalyze(c)}
         >
-          <Icon name="settings" size={16} />
-        </IconButton>
-        {menuFor === c.id && (
-          <div className="vrs-menu" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => {
-                setMenuFor(null)
-                onReanalyze(c)
-              }}
-            >
-              <Icon name="refresh" size={15} /> Backfill new signals
-            </button>
-            <button
-              onClick={() => {
-                setMenuFor(null)
-                onCheckGaps && onCheckGaps(c)
-              }}
-            >
-              <Icon name="search" size={15} /> Check gaps
-            </button>
-            <button
-              className="danger"
-              onClick={() => {
-                setMenuFor(null)
-                onRestart(c)
-              }}
-            >
-              <Icon name="trash" size={15} /> Delete & restart
-            </button>
-          </div>
-        )}
-      </div>
+          Backfill new signals
+        </MenuItem>
+        <MenuItem
+          iconLeft={<Icon name="search" size={15} />}
+          onClick={() => onCheckGaps && onCheckGaps(c)}
+        >
+          Check gaps
+        </MenuItem>
+        <MenuItem
+          tone="danger"
+          iconLeft={<Icon name="trash" size={15} />}
+          onClick={() => onRestart(c)}
+        >
+          Delete & restart
+        </MenuItem>
+      </Menu>
     )
   }
 
@@ -239,7 +235,7 @@ export function ChatsView({
     c.status === 'analyzed' || c.status === 'backfilled' || c.status === 'verified'
 
   return (
-    <div className="vrs-page" onClick={() => setMenuFor(null)}>
+    <div className="vrs-page">
       <div className="vrs-sec-h">
         <span className="vrs-sec-t">Feeds from Telegram</span>
         <span className="vrs-sec-c">{chats.length} available</span>

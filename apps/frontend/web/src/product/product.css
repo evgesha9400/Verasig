@@ -146,6 +146,13 @@
 /* ---- User account menu (Vercel-style popover) ---- */
 .vrs-um {
   position: relative;
+  width: 100%;
+}
+.vrs-um .vrs-menu {
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  z-index: 40;
 }
 .vrs-um__trigger {
   display: flex;
@@ -193,31 +200,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.vrs-um__panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 8px);
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  padding: 6px;
-  background: var(--surface-overlay, var(--surface-card));
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg, 0 12px 40px rgba(0, 0, 0, 0.4));
-}
 .vrs-um__head {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 8px 10px;
-}
-.vrs-um__sep {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 4px 2px;
 }
 .vrs-um__row {
   display: flex;
@@ -230,77 +217,6 @@
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   color: var(--text-body);
-}
-.vrs-um__seg {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-}
-.vrs-um__seg-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 26px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-}
-.vrs-um__seg-btn:hover:not(.is-on) {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-.vrs-um__seg-btn.is-on {
-  background-color: var(--surface-card);
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-card) 90%, #fff),
-    var(--surface-card)
-  );
-  color: var(--accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 1px 1.5px rgba(0, 0, 0, 0.3);
-}
-.vrs-um__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-body);
-  text-align: left;
-  white-space: nowrap;
-  transition:
-    background var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-}
-.vrs-um__item:hover {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-.vrs-um__item > svg {
-  flex: none;
-  color: var(--text-faint);
-}
-.vrs-um__item:hover > svg {
-  color: var(--text-strong);
 }
 
 /* ---- Main / topbar ---- */
@@ -541,6 +457,15 @@
   justify-content: space-between;
   gap: 10px;
 }
+.vrs-src-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--accent-text);
+}
 .vrs-src-meta {
   display: flex;
   align-items: center;
@@ -606,55 +531,7 @@
 
 /* ---- Code entry ---- */
 .vrs-code {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
   margin: 6px 0 4px;
-}
-.vrs-code input {
-  width: 52px;
-  height: 62px;
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: var(--text-2xl);
-  color: var(--text-strong);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  outline: none;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
-}
-.vrs-code input:focus {
-  border-color: var(--border-focus);
-  box-shadow: none;
-  background: var(--surface-card);
-}
-.vrs-code input.is-filled {
-  border-color: var(--border-strong);
-}
-
-/* ---- Focus: single highlight only. The wrapper border brighten is the ONE highlight.
-   1) wrapper: brighten border, no ring. 2) kill the GLOBAL :focus-visible ring that
-   base.css paints on the inner <input> element itself (that was the second/outer ring). ---- */
-.vrs-input.vrs-input:focus-within {
-  border-color: var(--border-focus);
-  box-shadow: none;
-}
-.vrs-input.vrs-input.is-error:focus-within {
-  border-color: var(--rejected-500);
-  box-shadow: none;
-}
-.vrs-input input:focus,
-.vrs-input input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-.vrs-code input:focus,
-.vrs-code input:focus-visible {
-  outline: none;
-  box-shadow: none;
 }
 
 /* ---- Chat list ---- */
@@ -755,45 +632,6 @@
   color: var(--rejected-500);
 }
 
-/* ---- Interactive pill tooltip (history gaps / scam flags) ---- */
-.vrs-pilltip {
-  position: relative;
-  display: inline-flex;
-}
-.vrs-pilltip__pop {
-  position: absolute;
-  z-index: 60;
-  top: calc(100% + 8px);
-  left: 0;
-  width: 290px;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-overlay);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 12px 13px 13px;
-  box-shadow: var(--shadow-lg);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition:
-    opacity var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out);
-}
-.vrs-pilltip__pop::before {
-  content: '';
-  position: absolute;
-  top: -10px;
-  left: 0;
-  right: 0;
-  height: 10px;
-}
-.vrs-pilltip:hover .vrs-pilltip__pop,
-.vrs-pilltip:focus-within .vrs-pilltip__pop {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
 .vrs-pilltip__t {
   display: flex;
   align-items: center;
@@ -816,28 +654,6 @@
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--text-muted);
-}
-.vrs-pilltip__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  margin-top: 11px;
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  letter-spacing: 0.04em;
-  color: var(--info-500);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-}
-.vrs-pilltip__link svg {
-  flex: none;
-}
-.vrs-pilltip__link:hover {
-  color: var(--info-400, var(--info-500));
-  text-decoration: underline;
 }
 
 /* ---- Backfill loader ---- */
@@ -1168,7 +984,6 @@ button.vrs-pipe__step:active {
   border: 1px solid var(--border-default);
 }
 
-/* swipe controls */
 .vrs-swipe-controls {
   display: flex;
   align-items: center;
@@ -1176,76 +991,17 @@ button.vrs-pipe__step:active {
   gap: 16px;
   margin-top: 4px;
 }
-/* Machined keys — circular variant of the DS secondary button: brushed gradient,
-   inset top highlight, 1px press travel (matches .vrs-btn in the updated bundle). */
-.vrs-swipe-btn {
+.vrs-swipe-key {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  color: var(--text-body);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background-color: var(--surface-raised);
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-raised) 90%, #fff),
-    color-mix(in srgb, var(--surface-raised) 94%, #000)
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 1px 1.5px rgba(0, 0, 0, 0.3);
-  transition:
-    background-color var(--dur-fast) var(--ease-out),
-    background-image var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out),
-    transform var(--dur-instant) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
 }
-.vrs-swipe-btn:hover:not(:disabled) {
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-hover) 90%, #fff),
-    var(--surface-hover)
-  );
-  color: var(--text-strong);
-}
-.vrs-swipe-btn:active:not(:disabled) {
-  transform: translateY(1px);
-  background-image: none;
-  background-color: var(--surface-card);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-.vrs-swipe-btn:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent),
-    0 0 18px var(--signal-glow);
-}
-.vrs-swipe-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.vrs-swipe-btn.no:hover:not(:disabled) {
-  border-color: var(--rejected-500);
-  color: var(--rejected-500);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    0 0 14px -2px color-mix(in srgb, var(--rejected-500) 40%, transparent);
-}
-.vrs-swipe-btn.yes:hover:not(:disabled) {
-  border-color: var(--signal-500);
-  color: var(--signal-500);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    0 0 16px var(--signal-glow);
-}
-.vrs-swipe-btn.nav {
+.vrs-swipe-key--nav {
   width: 44px;
   height: 44px;
+}
+.vrs-swipe-key--no {
+  color: var(--rejected-500);
 }
 .vrs-deck__nav {
   display: flex;
@@ -1428,7 +1184,7 @@ button.vrs-pipe__step:active {
   text-align: left;
   margin-top: 2px;
 }
-.vrs-next-card {
+.vrs-next-option {
   display: flex;
   align-items: flex-start;
   gap: 14px;
@@ -1437,30 +1193,15 @@ button.vrs-pipe__step:active {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-card);
-  cursor: pointer;
   text-align: left;
-  transition:
-    border-color var(--dur-base) var(--ease-out),
-    background var(--dur-base),
-    transform var(--dur-fast) var(--ease-snap);
 }
-.vrs-next-card:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-raised);
-}
-.vrs-next-card:active {
-  transform: scale(0.992) translateY(1px);
-}
-.vrs-next-card.is-primary {
+.vrs-next-option.is-primary {
   border-color: var(--accent);
   box-shadow:
     0 0 0 1px var(--accent),
     var(--glow-soft, 0 0 24px var(--accent-quiet));
 }
-.vrs-next-card.is-primary:hover {
-  background: var(--accent-quiet);
-}
-.vrs-next-card__ic {
+.vrs-next-option__ic {
   flex: none;
   width: 40px;
   height: 40px;
@@ -1471,17 +1212,17 @@ button.vrs-pipe__step:active {
   background: var(--surface-raised);
   color: var(--text-muted);
 }
-.vrs-next-card.is-primary .vrs-next-card__ic {
+.vrs-next-option.is-primary .vrs-next-option__ic {
   background: var(--accent-quiet);
   color: var(--accent-text);
 }
-.vrs-next-card__body {
+.vrs-next-option__body {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.vrs-next-card__t {
+.vrs-next-option__t {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1490,18 +1231,18 @@ button.vrs-pipe__step:active {
   font-weight: var(--fw-semibold);
   color: var(--text-strong);
 }
-.vrs-next-card__d {
+.vrs-next-option__d {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   color: var(--text-muted);
   line-height: var(--lh-body);
 }
-.vrs-next-card > svg:last-child {
+.vrs-next-option > svg:last-child {
   flex: none;
   color: var(--text-faint);
   margin-top: 9px;
 }
-.vrs-next-card.is-primary > svg:last-child {
+.vrs-next-option.is-primary > svg:last-child {
   color: var(--accent-text);
 }
 .vrs-next-tag {
@@ -1595,14 +1336,7 @@ button.vrs-pipe__step:active {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-card);
-  cursor: pointer;
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
   align-items: flex-start;
-}
-.vrs-opt:hover {
-  border-color: var(--border-strong);
 }
 .vrs-opt.is-selected {
   border-color: var(--accent);
@@ -1613,28 +1347,6 @@ button.vrs-pipe__step:active {
 .vrs-opt.is-soon {
   opacity: 0.6;
   cursor: default;
-}
-.vrs-opt__radio {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
-  flex: none;
-  margin-top: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.vrs-opt.is-selected .vrs-opt__radio {
-  border-color: var(--accent);
-}
-.vrs-opt.is-selected .vrs-opt__radio::after {
-  content: '';
-  display: block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent);
 }
 .vrs-opt__body {
   flex: 1;
@@ -2010,48 +1722,6 @@ button.vrs-pipe__step:active {
     opacity: 1;
     transform: none;
   }
-}
-
-/* ---- Dropdown menu (chat options) ---- */
-.vrs-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
-  min-width: 200px;
-  background: var(--surface-overlay);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-pop);
-  padding: 5px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.vrs-menu button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 11px;
-  border: 0;
-  background: transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  color: var(--text-body);
-  text-align: left;
-}
-.vrs-menu button:hover {
-  background: var(--surface-hover);
-  color: var(--text-strong);
-}
-.vrs-menu button.danger {
-  color: var(--rejected-500);
-}
-.vrs-menu button.danger:hover {
-  background: var(--rejected-bg);
 }
 
 /* ---- kbd chip + pulse dot ---- */
