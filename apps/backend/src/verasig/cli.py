@@ -346,7 +346,11 @@ def candidates(reference: str) -> None:
     """Derive advisory RawSignalEvents from stored messages (seed + FilterRules)."""
     session_factory = make_session_factory(Settings().database_url)
     channel_id = _resolve_channel_id(session_factory, reference)
-    created = derive_candidates(session_factory, channel_id, StaticExchange())
+    with session_factory() as session:
+        filter_rules = repo.read_filter_rules(session, channel_id)
+    created = derive_candidates(
+        session_factory, channel_id, StaticExchange(), filter_rules=filter_rules
+    )
     typer.echo(f"candidates derived: channel {channel_id} · +{created} new")
 
 

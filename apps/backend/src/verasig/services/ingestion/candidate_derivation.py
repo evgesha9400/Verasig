@@ -9,6 +9,8 @@ event and emits exactly one `FilterDriftWarning`. Both page by message-id cursor
 and commit per batch (spec §4.1: bounded, never the full history in RAM).
 """
 
+from collections.abc import Sequence
+
 from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.drift import FilterDriftWarning, MissDiscoveredBy
@@ -26,7 +28,7 @@ from verasig.storage import repositories as repo
 
 
 def _filter_event(
-    message: RawTelegramMessage, filter_rules: list[FilterRule]
+    message: RawTelegramMessage, filter_rules: Sequence[FilterRule]
 ) -> RawSignalEvent | None:
     if not message.text:
         return None
@@ -43,7 +45,7 @@ def _filter_event(
 
 
 def _derive_event(
-    message: RawTelegramMessage, exchange: Exchange, filter_rules: list[FilterRule]
+    message: RawTelegramMessage, exchange: Exchange, filter_rules: Sequence[FilterRule]
 ) -> RawSignalEvent | None:
     # distilled FilterRule wins over the cold-start seed (ADR 0005)
     return _filter_event(message, filter_rules) or seed_candidate(message, exchange)
@@ -65,10 +67,9 @@ def derive_candidates(
     channel_id: int,
     exchange: Exchange,
     *,
+    filter_rules: Sequence[FilterRule] = (),
     batch_size: int = 200,
 ) -> int:
-    with session_factory() as session:
-        filter_rules = repo.read_filter_rules(session, channel_id)
     created = 0
     for page in _pages(session_factory, channel_id, batch_size):
         events = [

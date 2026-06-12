@@ -87,3 +87,19 @@ async def test_backfill_commits_each_batch_before_pulling_the_next(session_facto
     assert result.inserted == 2000
     with session_factory() as db_session:
         assert repo.count_messages(db_session, 1) == 2000
+
+
+async def test_backfill_reports_inserted_total_and_oldest_batch_date(session_factory):
+    seen: list[tuple[int, datetime]] = []
+
+    source = FakeSource(_channel(), _messages(5))
+    result = await backfill(
+        source,
+        "@pilot",
+        session_factory,
+        batch_size=2,
+        on_batch=lambda inserted, oldest: seen.append((inserted, oldest)),
+    )
+
+    assert result.inserted == 5
+    assert seen == [(2, _instant()), (4, _instant()), (5, _instant())]
