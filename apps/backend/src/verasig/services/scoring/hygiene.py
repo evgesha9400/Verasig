@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from statistics import median
 from typing import Protocol
+from uuid import UUID
 
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
@@ -41,12 +42,16 @@ class ExcludedMeasurement:
 Measurement = HygieneMeasurement | ExcludedMeasurement
 
 
+def _uuid_text(value: UUID) -> str:
+    return value.urn.removeprefix("urn:uuid:")
+
+
 def _event_ref(event: RawSignalEvent) -> str:
-    return f"event:{event.id}"
+    return f"event:{_uuid_text(event.id)}"
 
 
 def _deletion_ref(evidence: DeletedSignalEvidence) -> str:
-    return f"deletion:{evidence.id}"
+    return f"deletion:{_uuid_text(evidence.id)}"
 
 
 def _channel_ref(channel_id: int) -> str:
@@ -63,15 +68,15 @@ def _append_unique(refs: list[str], ref: str) -> None:
 
 
 def _signal_ref(signal: ExtractedSignal) -> str:
-    return f"signal:{signal.id}"
+    return f"signal:{_uuid_text(signal.id)}"
 
 
 def _unrecognized_ref(item: UnrecognizedSignal) -> str:
-    return f"unrecognized:{item.id}"
+    return f"unrecognized:{_uuid_text(item.id)}"
 
 
 def _outcome_ref(outcome: SimOutcome) -> str:
-    return f"signal:{outcome.folded_signal_id}"
+    return f"signal:{_uuid_text(outcome.folded_signal_id)}"
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:

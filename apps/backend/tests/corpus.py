@@ -25,6 +25,10 @@ def load_messages(path: Path) -> list[RawTelegramMessage]:
     return [RawTelegramMessage.model_validate(record) for record in _lines(path)]
 
 
+def _new_uuid_text() -> str:
+    return uuid4().urn.removeprefix("urn:uuid:")
+
+
 def load_labels(path: Path, channel_id: int) -> list[GoldenLabel]:
     labels = []
     for record in _lines(path):
@@ -34,7 +38,7 @@ def load_labels(path: Path, channel_id: int) -> list[GoldenLabel]:
                 **record,
                 "expected": {
                     **expected,
-                    "event_id": str(uuid4()),
+                    "event_id": _new_uuid_text(),
                     "channel_id": channel_id,
                 },
             }

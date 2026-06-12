@@ -59,6 +59,20 @@ def _is_correct(label: GoldenLabel | None, signal: TradeIntent) -> bool:
     return signal.symbol == label.expected.symbol and signal.side == label.expected.side
 
 
+def _parse_predictions(
+    messages: list[RawTelegramMessage], parser_rules: list[ParserRule]
+) -> dict[int, TradeIntent]:
+    predictions = {}
+    for message in messages:
+        if not message.text:
+            continue
+        signal = _parse_message(message, parser_rules)
+        if signal is None:
+            continue
+        predictions[message.message_id] = signal
+    return predictions
+
+
 def evaluate(
     messages: list[RawTelegramMessage],
     labels: list[GoldenLabel],
@@ -67,11 +81,7 @@ def evaluate(
 ) -> EvalReport:
     labels_by_id = {label.message_id: label for label in labels}
     signal_ids = {label.message_id for label in labels if label.is_signal}
-    predictions = {
-        message.message_id: signal
-        for message in messages
-        if message.text and (signal := _parse_message(message, parser_rules))
-    }
+    predictions = _parse_predictions(messages, parser_rules)
     true_positives = sum(
         1
         for message_id, signal in predictions.items()
