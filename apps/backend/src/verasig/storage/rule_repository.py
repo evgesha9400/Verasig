@@ -1,5 +1,7 @@
 """Rule repository functions."""
 
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -17,6 +19,7 @@ def _str_list(values: list) -> list[str]:
 def upsert_filter_rule(session: Session, rule: FilterRule) -> None:
     statement = pg_insert(FilterRuleRow).values(
         rule_id=rule.rule_id,
+        user_id=rule.user_id,
         channel_id=rule.channel_id,
         version=rule.version,
         include_patterns=rule.include_patterns,
@@ -24,6 +27,7 @@ def upsert_filter_rule(session: Session, rule: FilterRule) -> None:
         matched_reason_template=rule.matched_reason_template,
         recall_target=rule.recall_target,
         python_filter=rule.python_filter,
+        display=rule.display,
         created_at=rule.created_at,
         distilled_from_label_ids=_str_list(rule.distilled_from_label_ids),
     )
@@ -37,19 +41,28 @@ def upsert_filter_rule(session: Session, rule: FilterRule) -> None:
             "matched_reason_template": statement.excluded.matched_reason_template,
             "recall_target": statement.excluded.recall_target,
             "python_filter": statement.excluded.python_filter,
+            "display": statement.excluded.display,
             "distilled_from_label_ids": statement.excluded.distilled_from_label_ids,
         },
     )
     session.execute(statement)
 
 
-def read_filter_rules(session: Session, channel_id: int) -> list[FilterRule]:
+def read_filter_rules(
+    session: Session, channel_id: int, user_id: UUID | None = None
+) -> list[FilterRule]:
     rows = session.scalars(
-        select(FilterRuleRow).where(FilterRuleRow.channel_id == channel_id)
+        select(FilterRuleRow).where(
+            FilterRuleRow.channel_id == channel_id,
+            FilterRuleRow.user_id.is_(None)
+            if user_id is None
+            else FilterRuleRow.user_id == user_id,
+        )
     ).all()
     return [
         FilterRule(
             rule_id=row.rule_id,
+            user_id=row.user_id,
             channel_id=row.channel_id,
             version=row.version,
             include_patterns=row.include_patterns,
@@ -57,6 +70,7 @@ def read_filter_rules(session: Session, channel_id: int) -> list[FilterRule]:
             matched_reason_template=row.matched_reason_template,
             recall_target=row.recall_target,
             python_filter=row.python_filter,
+            display=row.display,
             created_at=row.created_at,
             distilled_from_label_ids=row.distilled_from_label_ids,
         )
@@ -68,6 +82,7 @@ def upsert_parser_rules(session: Session, rules: list[ParserRule]) -> None:
     for rule in rules:
         statement = pg_insert(ParserRuleRow).values(
             rule_id=rule.rule_id,
+            user_id=rule.user_id,
             channel_id=rule.channel_id,
             version=rule.version,
             patterns=rule.patterns,
@@ -92,13 +107,21 @@ def upsert_parser_rules(session: Session, rules: list[ParserRule]) -> None:
         session.execute(statement)
 
 
-def read_parser_rules(session: Session, channel_id: int) -> list[ParserRule]:
+def read_parser_rules(
+    session: Session, channel_id: int, user_id: UUID | None = None
+) -> list[ParserRule]:
     rows = session.scalars(
-        select(ParserRuleRow).where(ParserRuleRow.channel_id == channel_id)
+        select(ParserRuleRow).where(
+            ParserRuleRow.channel_id == channel_id,
+            ParserRuleRow.user_id.is_(None)
+            if user_id is None
+            else ParserRuleRow.user_id == user_id,
+        )
     ).all()
     return [
         ParserRule(
             rule_id=row.rule_id,
+            user_id=row.user_id,
             channel_id=row.channel_id,
             version=row.version,
             patterns=row.patterns,
@@ -116,8 +139,10 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
     for label in labels:
         statement = pg_insert(GoldenLabelRow).values(
             id=label.id,
+            user_id=label.user_id,
             channel_id=label.channel_id,
             message_id=label.message_id,
+            label=label.label.value,
             is_signal=label.is_signal,
             expected=(
                 label.expected.model_dump(mode="json") if label.expected else None
@@ -125,8 +150,9 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
             labeled_at=label.labeled_at,
         )
         statement = statement.on_conflict_do_update(
-            index_elements=["channel_id", "message_id"],
+            index_elements=["user_id", "channel_id", "message_id"],
             set_={
+                "label": statement.excluded.label,
                 "is_signal": statement.excluded.is_signal,
                 "expected": statement.excluded.expected,
                 "labeled_at": statement.excluded.labeled_at,
@@ -135,16 +161,24 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
         session.execute(statement)
 
 
-def read_labels(session: Session, channel_id: int) -> list[GoldenLabel]:
+def read_labels(
+    session: Session, channel_id: int, user_id: UUID | None = None
+) -> list[GoldenLabel]:
     rows = session.scalars(
-        select(GoldenLabelRow).where(GoldenLabelRow.channel_id == channel_id)
+        select(GoldenLabelRow).where(
+            GoldenLabelRow.channel_id == channel_id,
+            GoldenLabelRow.user_id.is_(None)
+            if user_id is None
+            else GoldenLabelRow.user_id == user_id,
+        )
     ).all()
     return [
         GoldenLabel(
             id=row.id,
+            user_id=row.user_id,
             channel_id=row.channel_id,
             message_id=row.message_id,
-            is_signal=row.is_signal,
+            label=row.label,
             expected=row.expected,
             labeled_at=row.labeled_at,
         )
