@@ -6,7 +6,7 @@ from fakes import FakeExtractor
 from verasig.domain.protocols import LlmExtractor
 from verasig.domain.signal import Side, TradeIntent
 from verasig.services.extraction.llm_fallback import (
-    ClaudeCliExtractor,
+    AnthropicExtractor,
     parse_extractor_output,
 )
 
@@ -46,18 +46,18 @@ def test_parse_extractor_output_drops_unknown_keys():
     assert isinstance(intent, TradeIntent)
 
 
-def test_claude_cli_extractor_satisfies_protocol():
-    assert isinstance(ClaudeCliExtractor(), LlmExtractor)
+def test_anthropic_extractor_satisfies_protocol():
+    assert isinstance(AnthropicExtractor(runner=lambda _prompt: _PILOT), LlmExtractor)
 
 
-def test_claude_cli_extractor_wires_runner_without_real_cli():
+def test_anthropic_extractor_wires_runner_without_real_network():
     prompts: list[str] = []
 
     def fake_runner(prompt: str) -> str:
         prompts.append(prompt)
         return _PILOT
 
-    extractor = ClaudeCliExtractor(runner=fake_runner)
+    extractor = AnthropicExtractor(runner=fake_runner)
     intent = extractor.extract("BTC long entry 65000 sl 64000 tp 67000 68000")
     assert isinstance(intent, TradeIntent) and intent.symbol == "BTCUSDT"
     assert len(prompts) == 1  # one extraction call; no real CLI

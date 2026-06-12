@@ -18,6 +18,7 @@ from verasig.domain.score import (
 )
 from verasig.domain.signal import ExtractedSignal, ExtractionMethod, SignalEventType
 from verasig.domain.simulation import SimOutcome
+from verasig.foundation.anthropic_runner import make_anthropic_runner
 from verasig.foundation.bybit_market_data import BybitKlineClient
 from verasig.foundation.db import make_engine, make_session_factory
 from verasig.foundation.static_exchange import StaticExchange
@@ -37,7 +38,7 @@ from verasig.foundation.telethon_source import (
 from verasig.services.deletion.rescan import RescanAborted
 from verasig.services.deletion.rescan import rescan as run_rescan
 from verasig.services.extraction.extract_service import ExtractOutcome, ExtractService
-from verasig.services.extraction.llm_fallback import ClaudeCliExtractor
+from verasig.services.extraction.llm_fallback import AnthropicExtractor
 from verasig.services.ingestion.backfill import backfill as run_backfill
 from verasig.services.ingestion.candidate_derivation import (
     derive_candidates,
@@ -526,7 +527,11 @@ def extract(
 
 
 def _make_fallback_extractor(settings: Settings) -> LlmExtractor:
-    return ClaudeCliExtractor(command=settings.extractor_command)
+    return AnthropicExtractor(
+        runner=make_anthropic_runner(
+            settings.anthropic_api_key, settings.anthropic_model
+        )
+    )
 
 
 def _resolve_fallback(settings: Settings, no_llm: bool) -> LlmExtractor | None:

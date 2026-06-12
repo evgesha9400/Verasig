@@ -10,8 +10,8 @@ invokes the real CLI (the subprocess runner is injectable).
 """
 
 import json
-import subprocess
 from collections.abc import Callable
+from uuid import UUID
 
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel
@@ -24,6 +24,7 @@ _FILTER_KEYS = {
     "exclude_patterns",
     "matched_reason_template",
     "recall_target",
+    "display",
 }
 _PARSER_KEYS = {"patterns", "field_map", "side_aliases"}
 
@@ -41,11 +42,22 @@ def _content(payload: dict, allowed: set[str]) -> dict:
 
 
 def parse_distiller_output(
-    stdout: str, *, channel_id: int, label_ids: list, version: int = 1
+    stdout: str,
+    *,
+    channel_id: int,
+    label_ids: list,
+    version: int = 1,
+    user_id: UUID | None = None,
 ) -> tuple[FilterRule, list[ParserRule]]:
     data = _extract_json(stdout)
+    filter_rule_id = (
+        f"{user_id}:{channel_id}-filter-v{version}"
+        if user_id is not None
+        else f"{channel_id}-filter-v{version}"
+    )
     filter_rule = FilterRule(
-        rule_id=f"{channel_id}-filter-v{version}",
+        rule_id=filter_rule_id,
+        user_id=user_id,
         channel_id=channel_id,
         version=version,
         distilled_from_label_ids=label_ids,
@@ -53,7 +65,12 @@ def parse_distiller_output(
     )
     parser_rules = [
         ParserRule(
-            rule_id=f"{channel_id}-parser-{index + 1}-v{version}",
+            rule_id=(
+                f"{user_id}:{channel_id}-parser-{index + 1}-v{version}"
+                if user_id is not None
+                else f"{channel_id}-parser-{index + 1}-v{version}"
+            ),
+            user_id=user_id,
             channel_id=channel_id,
             version=version,
             distilled_from_label_ids=label_ids,
@@ -80,7 +97,8 @@ def _filter_prompt(labels: list[GoldenLabel]) -> str:
         "flag every is_signal=true example (false positives are acceptable). "
         'Return JSON {"filter_rule": {"include_patterns": [...], '
         '"exclude_patterns": [...], "matched_reason_template": "...", '
-        '"recall_target": 0.95}, "parser_rules": []}.\n\n'
+        '"recall_target": 0.95, "display": [{"label": "...", "detail": "..."}]}, '
+        '"parser_rules": []}.\n\n'
         f"Labeled examples:\n{_label_lines(labels)}"
     )
 
@@ -95,34 +113,11 @@ def _parser_prompt(labels: list[GoldenLabel]) -> str:
     )
 
 
-def _subprocess_runner(command: str) -> Callable[[str], str]:
-    def run(prompt: str) -> str:
-        completed = subprocess.run(
-            [command],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return completed.stdout
+class AnthropicDistiller(RuleDistiller):
+    """Anthropic-backed rule distiller over an injected prompt runner."""
 
-    return run
-
-
-class ClaudeCliDistiller(RuleDistiller):
-    """LLM-CLI rule distiller.
-
-    The subprocess runner is injectable so tests drive it with canned stdout and
-    never touch the real CLI. Distinct recall-first vs precision-first prompts.
-    """
-
-    def __init__(
-        self,
-        command: str = "claude",
-        runner: Callable[[str], str] | None = None,
-        version: int = 1,
-    ) -> None:
-        self._runner = runner or _subprocess_runner(command)
+    def __init__(self, runner: Callable[[str], str], version: int = 1) -> None:
+        self._runner = runner
         self._version = version
 
     def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule:
