@@ -9,9 +9,17 @@ tests. No test authenticates against real Telegram.
 from pathlib import Path
 
 from telethon import TelegramClient
+from telethon.errors import PhoneCodeInvalidError, SessionPasswordNeededError
 from telethon.sessions import StringSession
 
 from verasig.config import Settings
+from verasig.domain.protocols import (
+    CodeInvalidError,
+    PendingCode,
+    TelegramSource,
+    TwoFactorUnsupportedError,
+)
+from verasig.foundation.telethon_source import TelethonSource
 
 _SESSION_MISSING_HINT = "run `login` first"
 _CREDENTIALS_MISSING_HINT = "set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH"
@@ -73,6 +81,46 @@ async def fetch_account(client: TelegramClient):
     """Connect, read the logged-in account, disconnect."""
     async with client:
         return await client.get_me()
+
+
+async def send_code(api_id: int, api_hash: str, phone: str) -> PendingCode:
+    client = TelegramClient(StringSession(), api_id, api_hash)
+    await client.connect()
+    try:
+        sent = await client.send_code_request(phone)
+        return PendingCode(
+            session_string=client.session.save(),
+            phone_code_hash=sent.phone_code_hash,
+        )
+    finally:
+        await client.disconnect()
+
+
+async def sign_in(
+    session_string: str,
+    api_id: int,
+    api_hash: str,
+    phone: str,
+    code: str,
+    phone_code_hash: str,
+) -> str:
+    client = TelegramClient(StringSession(session_string), api_id, api_hash)
+    await client.connect()
+    try:
+        try:
+            await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+        except PhoneCodeInvalidError as error:
+            raise CodeInvalidError() from error
+        except SessionPasswordNeededError as error:
+            raise TwoFactorUnsupportedError() from error
+        return client.session.save()
+    finally:
+        await client.disconnect()
+
+
+def make_user_source(session_string: str, api_id: int, api_hash: str) -> TelegramSource:
+    client = TelegramClient(StringSession(session_string), api_id, api_hash)
+    return TelethonSource(client)
 
 
 def _normalize_phone(phone: str) -> str:

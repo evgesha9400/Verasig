@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator, Callable
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
+from verasig.domain.protocols import CodeInvalidError, PendingCode
 from verasig.domain.signal import TradeIntent
 from verasig.foundation.static_exchange import normalize_base_symbol
 from verasig.services.distillation.rule_distiller import parse_distiller_output
@@ -17,6 +18,46 @@ from verasig.services.distillation.rule_distiller import parse_distiller_output
 
 class FakeStreamInterrupted(RuntimeError):
     """Raised by FakeSource to simulate a mid-backfill crash."""
+
+
+class FakeTelegramAuth:
+    def __init__(
+        self,
+        *,
+        valid_code: str = "12345",
+        pending_session: str = "pending-session",
+        final_session: str = "final-session",
+        phone_code_hash: str = "phone-code-hash",
+    ) -> None:
+        self.valid_code = valid_code
+        self.pending_session = pending_session
+        self.final_session = final_session
+        self.phone_code_hash = phone_code_hash
+        self.sent_codes: list[tuple[int, str, str]] = []
+        self.sign_ins: list[tuple[str, int, str, str, str, str]] = []
+
+    async def send_code(self, api_id: int, api_hash: str, phone: str) -> PendingCode:
+        self.sent_codes.append((api_id, api_hash, phone))
+        return PendingCode(
+            session_string=self.pending_session,
+            phone_code_hash=self.phone_code_hash,
+        )
+
+    async def sign_in(
+        self,
+        session_string: str,
+        api_id: int,
+        api_hash: str,
+        phone: str,
+        code: str,
+        phone_code_hash: str,
+    ) -> str:
+        self.sign_ins.append(
+            (session_string, api_id, api_hash, phone, code, phone_code_hash)
+        )
+        if code != self.valid_code:
+            raise CodeInvalidError()
+        return self.final_session
 
 
 class FakeSource:
