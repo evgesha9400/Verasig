@@ -1,6 +1,6 @@
 # Backend API Rewrite — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute task-by-task, tracking the checkbox (`- [ ]`) steps. If the superpowers plugin is available, use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans; otherwise follow the working rules below verbatim.
 
 **Goal:** Replace the CLI delivery layer with a multi-tenant FastAPI API implementing the contract in [requirements.md](requirements.md), keeping all domain services intact.
 
@@ -57,7 +57,7 @@ apps/backend/src/verasig/
 
 **Files:** Modify `pyproject.toml`, `src/verasig/config.py`, `.env.example`, `tests/unit/test_config.py`
 
-- [ ] **Step 1:** `uv add fastapi "uvicorn[standard]" sse-starlette anthropic pyjwt bcrypt cryptography && uv remove typer` (keep `verasig` script entry removed too — delete `[project.scripts]`).
+- [ ] **Step 1:** `uv add fastapi "uvicorn[standard]" sse-starlette anthropic pyjwt bcrypt cryptography`. Leave `typer`, `[project.scripts]`, and `cli.py` untouched — the CLI and its 11 importing test files stay green until Task 19 deletes them.
 - [ ] **Step 2:** Failing test in `tests/unit/test_config.py`:
 
 ```python
@@ -71,9 +71,9 @@ def test_settings_carry_api_secrets(monkeypatch):
     assert settings.cors_origins == ["http://localhost:5173"]
 ```
 
-- [ ] **Step 3:** In `Settings`: add `jwt_secret: str = "dev-secret"`, `fernet_key: str = ""`, `anthropic_api_key: str = ""`, `anthropic_model: str = "claude-sonnet-4-6"`, `cors_origins: list[str] = ["http://localhost:5173"]`, `jwt_ttl_days: int = 7`. Delete `session_path`, `telegram_api_id`, `telegram_api_hash`, `telegram_phone`, `distiller_command`, `extractor_command` (keep `extractor_fallback_enabled`). Fix tests that referenced deleted fields.
-- [ ] **Step 4:** Update `.env.example` with the new vars (+ note: `VERASIG_FERNET_KEY` from `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
-- [ ] **Step 5:** `uv run pytest tests/unit/test_config.py -v` → PASS. Commit `chore(backend): swap CLI deps for API stack`.
+- [ ] **Step 3:** In `Settings`: add `jwt_secret: str = "dev-secret"`, `fernet_key: str = ""`, `anthropic_api_key: str = ""`, `anthropic_model: str = "claude-sonnet-4-6"`, `cors_origins: list[str] = ["http://localhost:5173"]`, `jwt_ttl_days: int = 7`. CLI-era fields (`session_path`, `telegram_api_id/hash/phone`, `distiller_command`, `extractor_command`) stay until Task 19 — `cli.py` still reads them.
+- [ ] **Step 4:** Update `.env.example` with the new vars (+ note: `VERASIG_FERNET_KEY` from `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
+- [ ] **Step 5:** `uv run pytest tests/unit/test_config.py -v` → PASS. Commit `chore(backend): add API stack dependencies and settings`.
 
 ### Task 2: App factory, errors, health
 
@@ -134,10 +134,11 @@ def create_app(settings: Settings, session_factory: sessionmaker | None = None) 
 
 ### Task 3: Migration 0006 + ORM rows + repositories
 
-**Files:** Create `migrations/versions/0006_multi_tenant_api.py`, `storage/{account,telegram_link,user_channel,exchange,risk,backtest,lifecycle_link}_repository.py`, `domain/account.py`, `domain/risk_config.py`; Modify `storage/models.py`, `storage/repositories.py`, `tests/integration/test_migrations.py`, `tests/integration/test_repositories.py`
+**Files:** Create `migrations/versions/0006_multi_tenant_api.py`, `storage/{account,telegram_link,user_channel,exchange,risk,backtest,lifecycle_link}_repository.py`, `domain/account.py`, `domain/risk_config.py`; Modify `storage/models.py`, `storage/repositories.py`, `tests/conftest.py`, `tests/integration/test_migrations.py`, `tests/integration/test_repositories.py`
 
-- [ ] **Step 1:** Failing migration test: extend `test_migrations.py` asserting tables/columns from requirements §5 exist after `upgrade head` (all 7 new tables; `golden_label.user_id`+`label`; `filter_rule.user_id`+`display`; `parser_rule.user_id`).
-- [ ] **Step 2:** Add ORM rows to `models.py` (mirror requirements §5 exactly; chat-status enum as `String` + CHECK constraint like existing enum columns). Write migration 0006. Existing-table changes: add columns nullable, no backfill needed (pre-launch DB), then set NOT NULL on `user_id` where required — single migration, no data migration.
+- [ ] **Step 1:** Failing migration test: extend `test_migrations.py` asserting tables/columns from requirements §5 exist after `upgrade head` (all 7 new tables; `golden_label.user_id`+`label`; `filter_rule.user_id`+`display`; `parser_rule.user_id`; `user_id` on the four extraction-projection tables below).
+- [ ] **Step 2:** Add ORM rows to `models.py` (mirror requirements §5 exactly; chat-status enum as `String` + CHECK constraint like existing enum columns). Write migration 0006. Tenant boundary (requirements D16): capture + seed candidates stay global; **all rule-driven projections become user-scoped** — add `user_id` to `extracted_signal` + `unrecognized_signal` (UNIQUE(event_id) → UNIQUE(user_id, event_id)), `parser_drift_warning` (→ UNIQUE(user_id, event_id)), `filter_drift_warning` (→ UNIQUE(user_id, channel_id, message_id)). Existing-table changes: all added `user_id` columns **nullable** (CLI writes `None` until Task 19; uniques use `NULLS NOT DISTINCT`); new tables enforce NOT NULL. Single migration, no data migration (pre-launch DB).
+- [ ] **Step 2b:** Extend `_ALL_TABLES` in `tests/conftest.py` with all 7 new tables (truncation must cover them or state leaks across tests): `user_account`, `user_telegram_link`, `user_channel`, `user_exchange_connection`, `chat_risk_config`, `backtest_result`, `lifecycle_link`.
 - [ ] **Step 3:** Domain dataclasses:
 
 ```python
@@ -170,6 +171,7 @@ Also `domain/label.py`: add `class LabelKind(StrEnum): SIGNAL="signal"; NOISE="n
   - `backtest_repository`: `insert_result`, `read_latest_results(user_id) -> dict[channel_id, row]`
   - `lifecycle_link_repository`: `insert_link`, `read_links(user_id, channel_id)`
   - `rule_repository`: thread `user_id` through `upsert/read` for labels + rules
+  - `outcome_repository` + `drift_repository`: thread `user_id: UUID | None` through `record_outcome`, `insert_*`, `read_*`; CLI call sites pass `None` until Task 19 deletes them. The four projection tables keep `user_id` **nullable** with `UNIQUE NULLS NOT DISTINCT (user_id, event_id)` (PG ≥ 15) so the one-outcome-per-event invariant holds for both API and transitional CLI writes
 - [ ] **Step 5:** Round-trip integration tests per repo in `test_repositories.py` (insert → read → update → assert). `uv run pytest tests/integration/test_migrations.py tests/integration/test_repositories.py -v` → PASS. Commit `feat(backend): multi-tenant schema and repositories`.
 
 ### Task 4: Security foundation (bcrypt, Fernet, JWT)
@@ -241,9 +243,9 @@ Router: `POST /auth/register` (201, `{token, user}`), `POST /auth/login`, `POST 
 
 ### Task 7: Per-user Telegram link
 
-**Files:** Rewrite `foundation/telegram_session.py`; Create `services/telegram_link/service.py`, `api/routers/telegram.py`, `api/schemas/telegram.py`, `tests/unit/test_telegram_link.py`, `tests/api/test_telegram.py`; Modify `tests/fakes.py`; Delete `tests/unit/test_telegram_session.py`, `tests/unit/test_cli_telegram.py`
+**Files:** Modify `foundation/telegram_session.py` (add per-user functions; legacy global-session helpers and their tests stay until Task 19 — `cli.py` still imports them); Create `services/telegram_link/service.py`, `api/routers/telegram.py`, `api/schemas/telegram.py`, `tests/unit/test_telegram_link.py`, `tests/api/test_telegram.py`; Modify `tests/fakes.py`, `domain/protocols.py`
 
-- [ ] **Step 1:** Define the auth-client seam so tests need no Telethon network: `TelegramAuthClient` protocol in `domain/protocols.py` with `send_code(api_id, api_hash, phone) -> PendingCode(session_string, phone_code_hash)`, `sign_in(session_string, api_id, api_hash, phone, code, phone_code_hash) -> str` (returns final session string), `make_client(session_string, api_id, api_hash) -> TelegramClient`. Add `FakeTelegramAuth` to `tests/fakes.py` (canned hashes; raises `CodeInvalidError` on wrong code).
+- [ ] **Step 1:** Define the auth seam so tests need no Telethon network — vendor-neutral, pure types only (domain must not import Telethon): `TelegramAuth` protocol in `domain/protocols.py` with `send_code(api_id, api_hash, phone) -> PendingCode(session_string, phone_code_hash)` and `sign_in(session_string, api_id, api_hash, phone, code, phone_code_hash) -> str` (returns final session string). Per-user *sources* come from a separate foundation factory `make_user_source(session_string, api_id, api_hash) -> TelegramSource` (returns a connected `TelethonSource`; used by Tasks 9–10). Add `FakeTelegramAuth` to `tests/fakes.py` (canned hashes; raises `CodeInvalidError` on wrong code).
 - [ ] **Step 2:** Failing unit tests for `services/telegram_link/service.py`: connect stores encrypted pending link; verify flips to connected + stores encrypted session; wrong code surfaces error and stays pending; status masks phone (`+44 •••• 8821`).
 - [ ] **Step 3:** Implement service (encrypt `api_hash`/`session_string` with Fernet via settings) + real Telethon adapter in `foundation/telegram_session.py`:
 
@@ -267,14 +269,14 @@ async def sign_in(session_string, api_id, api_hash, phone, code, phone_code_hash
 ```
 
 - [ ] **Step 4:** Router: `POST /telegram/connect` → 202; `POST /telegram/verify` → `{connected: true}` (400 `TELEGRAM_CODE_INVALID` on bad code); `GET /telegram/status`. API tests use `FakeTelegramAuth` injected through `app.state.telegram_auth` (set in `create_app`, overridable in test fixture).
-- [ ] **Step 5:** Migrate still-valuable assertions from deleted CLI/session tests into the new unit tests. `uv run pytest tests/unit/test_telegram_link.py tests/api/test_telegram.py -v` → PASS. Commit `feat(backend): per-user telegram sessions with encrypted storage`.
+- [ ] **Step 5:** Port the still-valuable assertions from `test_telegram_session.py`/`test_cli_telegram.py` into the new unit tests now (the originals are deleted in Task 19). `uv run pytest tests/unit/test_telegram_link.py tests/api/test_telegram.py -v` → PASS. Commit `feat(backend): per-user telegram sessions with encrypted storage`.
 
 ### Task 8: Job registry + SSE
 
 **Files:** Create `services/jobs/registry.py`, `api/sse.py`, `tests/unit/test_job_registry.py`, `tests/api/test_sse.py`
 
-- [ ] **Step 1:** Failing unit tests: start runs coroutine and streams published events ending with `done`; duplicate start while running raises `JobAlreadyRunningError`; failing coroutine yields terminal `error` event; finished job re-startable.
-- [ ] **Step 2:** Implement:
+- [ ] **Step 1:** Failing unit tests: start runs coroutine and streams published events ending with `done`; **two concurrent subscribers each receive every event** (broadcast, not competing consumers); **a late subscriber (after completion) receives the replay: latest progress then the terminal event**; duplicate start while running raises `JobAlreadyRunningError`; failing coroutine yields terminal `error` event; finished job re-startable.
+- [ ] **Step 2:** Implement — one queue **per subscriber** (requirements §7), bounded replay (latest progress + terminal only, so hours-long backfills don't accumulate history):
 
 ```python
 # services/jobs/registry.py
@@ -282,7 +284,9 @@ class JobAlreadyRunningError(Exception): ...
 
 @dataclass
 class JobChannel:
-    queue: asyncio.Queue            # items: tuple[str, dict] = (event, data)
+    subscribers: list[asyncio.Queue]                  # one queue per stream() caller
+    last_progress: tuple[str, dict] | None = None     # bounded replay state
+    terminal: tuple[str, dict] | None = None
     task: asyncio.Task | None = None
 
 class JobRegistry:
@@ -291,23 +295,41 @@ class JobRegistry:
     def start(self, key: str, run: Callable[[JobPublisher], Awaitable[dict]]) -> None:
         channel = self._channels.get(key)
         if channel and channel.task and not channel.task.done(): raise JobAlreadyRunningError(key)
-        channel = self._channels[key] = JobChannel(queue=asyncio.Queue())
-        publisher = JobPublisher(channel.queue)
+        channel = self._channels[key] = JobChannel(subscribers=[])
+        publisher = JobPublisher(partial(self._broadcast, key))
         channel.task = asyncio.create_task(self._guard(run, publisher))
+
+    def _broadcast(self, key: str, event: str, data: dict) -> None:
+        channel = self._channels[key]
+        if event == "progress": channel.last_progress = (event, data)
+        else: channel.terminal = (event, data)
+        for queue in channel.subscribers: queue.put_nowait((event, data))
 
     async def _guard(self, run, publisher):
         try: publisher.done(await run(publisher))
         except asyncio.CancelledError: publisher.error("cancelled"); raise
         except Exception as error: publisher.error(str(error))
 
-    def cancel(self, key: str) -> None: ...        # task.cancel() if running
-    async def stream(self, key: str) -> AsyncIterator[tuple[str, dict]]:
-        ...  # yield from queue until ('done'|'error'); replay last terminal event to late subscribers
+    def cancel(self, key: str) -> None: ...           # task.cancel() if running
 
-class JobPublisher:
-    def progress(self, data: dict): self._put(("progress", data))
-    def done(self, data: dict):     self._put(("done", data))
-    def error(self, message: str):  self._put(("error", {"message": message}))
+    async def stream(self, key: str) -> AsyncIterator[tuple[str, dict]]:
+        channel = self._channels[key]                  # KeyError → 404 JOB_NOT_FOUND at router
+        queue: asyncio.Queue = asyncio.Queue()
+        for replay in (channel.last_progress, channel.terminal):
+            if replay: queue.put_nowait(replay)
+        channel.subscribers.append(queue)
+        try:
+            while True:
+                event, data = await queue.get()
+                yield event, data
+                if event in ("done", "error"): return
+        finally:
+            channel.subscribers.remove(queue)
+
+class JobPublisher:                                    # wraps the broadcast callable
+    def progress(self, data: dict): self._emit("progress", data)
+    def done(self, data: dict):     self._emit("done", data)
+    def error(self, message: str):  self._emit("error", {"message": message})
 ```
 
 Job key convention: `f"{user_id}:{channel_id}:{kind}"`, `kind ∈ {backfill, distill, backtest}`.
@@ -321,7 +343,7 @@ Job key convention: `f"{user_id}:{channel_id}:{kind}"`, `kind ∈ {backfill, dis
 - [ ] **Step 1:** `services/projection/dates.py`: `format_long(d) -> "Nov 18, 2025"`, `format_short(d) -> "Jun 7"`, `format_time(d) -> "14:32"` (`%-d` day, no locale deps). Unit-test all three.
 - [ ] **Step 2:** Failing projection tests: chat summary derives `fetched` (message count), `lastDate` (earliest `posted_at`, long format), flags from deletion evidence (SUSPECTED→`historyGaps`, CONFIRMED+`was_signal_candidate`→`signalDeletion`), score block from latest `backtest_result`, **score forced 0 when signalDeletion**, `hasRisk = status in {verified, analyzed}`, deterministic `initials`/`tint` from title hash (`var(--viz-{1..6})`).
 - [ ] **Step 3:** Implement `present_chats(session, user_id) -> list[dict]` joining `user_channel` + `telegram_channel` + counts + evidence + latest backtest. One query per concern, assembled in a main `present_chats` method.
-- [ ] **Step 4:** Failing API tests: GET empty → `{chats: []}`; POST `{tag}` resolves via user's Telethon client (`FakeSource.resolve_channel` injected as `app.state.telegram_source_factory`), subscribes, 201; POST without telegram link → 409 `TELEGRAM_NOT_CONNECTED`; observer second chat → 403 `PLAN_LIMIT_SOURCES`; DELETE → 204 and gone from list, capture rows remain.
+- [ ] **Step 4:** Failing API tests: GET empty → `{chats: []}`; POST `{tag}` resolves via the user's Telegram source (`app.state.telegram_source_factory(link) -> TelegramSource`; production default = `make_user_source` over the decrypted `user_telegram_link` from Task 7, tests inject a `FakeSource` factory), subscribes, 201; POST without telegram link → 409 `TELEGRAM_NOT_CONNECTED`; observer second chat → 403 `PLAN_LIMIT_SOURCES`; DELETE → 204 and gone from list, capture rows remain.
 - [ ] **Step 5:** Plan guard in `api/deps.py`:
 
 ```python
@@ -352,7 +374,9 @@ async def _run_backfill(publisher, source, channel_id, session_factory, settings
         publisher.progress({"fetched": fetched, "lastDate": format_long(oldest), "phase": next(phases)})
     result = await backfill(source, channel_id, session_factory, settings.backfill_batch_size, on_batch=on_batch)
     await rescan(source, channel_id, session_factory)          # auto deletion sweep
-    derive_candidates(session_factory, channel_id, StaticExchange())
+    derive_candidates(session_factory, channel_id, StaticExchange())   # SEED_HEURISTIC only:
+    # candidates stay global + user-independent (requirements D16); user FilterRules are
+    # applied at read time (verify samples, rule match) — never materialized into raw_signal_event
     with session_factory() as session:
         set_status(session, user_id, channel_id, "backfilled")
         session.commit()
@@ -372,7 +396,7 @@ async def _run_backfill(publisher, source, channel_id, session_factory, settings
 
 ### Task 12: Anthropic runner + distill job + rules
 
-**Files:** Create `foundation/anthropic_runner.py`, `services/projection/rules.py`, `api/routers/distill.py`, `api/schemas/rule.py`, `tests/unit/test_anthropic_runner.py`, `tests/api/test_distill.py`; Modify `services/extraction/llm_fallback.py`, `services/distillation/rule_distiller.py`, affected unit tests
+**Files:** Create `foundation/anthropic_runner.py`, `services/projection/rules.py`, `api/routers/distill.py`, `api/schemas/rule.py`, `tests/unit/test_anthropic_runner.py`, `tests/api/test_distill.py`; Modify `services/extraction/llm_fallback.py`, `services/distillation/rule_distiller.py`, `src/verasig/cli.py` (rewire call sites — CLI lives until Task 19), affected unit tests
 
 - [ ] **Step 1:** Failing runner test (mock `anthropic.Anthropic`): runner concatenates text blocks; passes model + max_tokens.
 
@@ -387,7 +411,7 @@ def make_anthropic_runner(api_key: str, model: str) -> Callable[[str], str]:
     return run
 ```
 
-- [ ] **Step 2:** Remove `_subprocess_runner` from `llm_fallback.py` + `rule_distiller.py`; rename `ClaudeCliExtractor → AnthropicExtractor`, `ClaudeCliDistiller → AnthropicDistiller`; constructor takes `runner: Callable[[str], str]` (required — wiring injects `make_anthropic_runner(...)`). Canned-runner unit tests only change class names.
+- [ ] **Step 2:** Remove `_subprocess_runner` from `llm_fallback.py` + `rule_distiller.py`; rename `ClaudeCliExtractor → AnthropicExtractor`, `ClaudeCliDistiller → AnthropicDistiller`; constructor takes `runner: Callable[[str], str]` (required — wiring injects `make_anthropic_runner(...)`). Canned-runner unit tests only change class names. Rewire `cli.py` `_resolve_fallback` (and any distiller construction) to inject `make_anthropic_runner(settings.anthropic_api_key, settings.anthropic_model)` so CLI commands and their tests stay green until Task 19.
 - [ ] **Step 3:** Extend `_filter_prompt` to request per-pattern `display: {label, detail}` in the JSON; `parse_distiller_output` carries it into `FilterRule.display` (new optional field, default `[]`); persist via `filter_rule.display` JSONB.
 - [ ] **Step 4:** `services/projection/rules.py`: `present_rules(session, user_id, channel_id)` → per include-pattern `{id, label, detail, match}` where `match` = share of golden `signal` labels whose text matches that single pattern (reuse `apply_filter_rule` with a one-pattern rule).
 - [ ] **Step 5:** API tests (FakeDistiller via `app.state.distiller_factory`): POST distill with < 5 signal labels → 409 `LABELS_INSUFFICIENT`; with ≥ 5 → 202, SSE emits the five §4 phase strings around real work (phases 1–4 before/after corpus read + distill calls, phase 5 before persist), `done`; GET `/chats/{id}/rules` returns display rules with computed match.
@@ -420,39 +444,57 @@ def make_anthropic_runner(api_key: str, model: str) -> Callable[[str], str]:
 - [ ] **Step 2:** Schema validates enums + `levels: int = Field(ge=2, le=5)`; router delegates to `risk_repository`.
 - [ ] **Step 3:** `uv run pytest tests/api/test_risk.py -v` → PASS. Commit `feat(backend): chat risk config endpoints`.
 
-### Task 16: Backtest job
+### Task 16: Risk-config execution policy
+
+**Files:** Create `services/scoring/risk_policy.py`, `tests/unit/test_risk_policy.py`; Modify `services/scoring/policies.py` (extract shared helpers)
+
+`ProviderStatedPolicy` only simulates provider-stated entry/stop/first-TP — it cannot express entry modes, laddering, custom exits, or leverage. The RiskConfig semantics need their own `ExecutionPolicy`.
+
+- [ ] **Step 1:** Failing unit tests over hand-built klines, one behavior each:
+  - `entry_mode=first`: fills the full position at the near edge of the entry range on first touch
+  - `entry_mode=mid`: fills at the range midpoint when price trades through it
+  - `entry_mode=ladder` + `weighting=equal`: `levels` evenly spaced across the range; average entry = mean of **filled** levels (untouched levels never fill)
+  - `weighting=martingale`: level weights double down the ladder (1, 2, 4 …); average entry is weight-adjusted
+  - `exit_source=signal`: provider-stated stop/first-TP (same semantics as `ProviderStatedPolicy`)
+  - `exit_source=custom`: stop = avg_entry × (1 ∓ stop_pct/100), tp = avg_entry × (1 ± tp_pct/100) (sign by side)
+  - `pct_return` scales with `leverage` × `risk_pct` position sizing; no level touched → `UNFILLED`
+  - same-candle stop+target tie resolves **stop-first** (conservative, ADR 0003 / existing `TIE_BREAK`)
+- [ ] **Step 2:** Implement `RiskConfigPolicy(ExecutionPolicy)` with `__init__(config: RiskConfig)`; micro-steps `_entry_levels`, `_filled_levels`, `_average_entry`, `_exit_prices`, `_outcome`. Extract the shared candle helpers (`_touches_stop`, `_touches_target`, `_mfe`, `_mae`, `_risk`) from `policies.py` for reuse — do not duplicate them.
+- [ ] **Step 3:** `uv run pytest tests/unit/test_risk_policy.py tests/unit/test_simulation_policy.py -v` → PASS (existing policy tests untouched). Commit `feat(backend): risk-config execution policy`.
+
+### Task 17: Backtest job
 
 **Files:** Create `services/backtesting/service.py`, `api/routers/backtest.py`, `api/schemas/backtest.py`, `tests/unit/test_backtesting.py`, `tests/api/test_backtest.py`
 
-- [ ] **Step 1:** Failing unit test with fixture klines (`tests/fixtures/klines/`) + seeded extracted signals: `run_backtest(session_factory, user_id, channel_id, market_data, risk_config, now)` extracts candidates if missing → folds → simulates each folded signal (existing `simulator.py` + `policies.py`; risk config maps to policy parameters: `exit_source=custom` overrides stop/tp pcts, `risk_pct`/`leverage` size the position) → `build_provider_score` → returns `BacktestSummary(score: int, win_rate: float, pnl: float)` and persists `backtest_result` + status `analyzed`.
+- [ ] **Step 1:** Failing unit test with fixture klines (`tests/fixtures/klines/`) + seeded extracted signals: `run_backtest(session_factory, user_id, channel_id, market_data, risk_config, now)` extracts candidates if missing (user-scoped outcomes, Task 3) → folds → simulates each folded signal under `RiskConfigPolicy(risk_config)` (Task 16) → `build_provider_score` → returns `BacktestSummary(score: int, win_rate: float, pnl: float, outcomes: list[SimOutcome])` and persists `backtest_result` **including per-signal `outcomes` JSONB** (`[{rootSignalId, kind, rMultiple, pctReturn, exitReason}]` — requirements D15; /signals reads these instead of refetching klines) + status `analyzed`.
 - [ ] **Step 2:** Implement with micro-steps `load_folded_signals`, `simulate_outcomes`, `compose_score`, `persist_result`. `win_rate` = wins/tested × 100 (1 dp); `pnl` = (∏(1+r·risk_pct/100) − 1) × 100 over tested outcomes.
-- [ ] **Step 3:** API tests (market data faked via `app.state.market_data_factory`): POST → 202; SSE: four §4 phase strings (emitted before load / simulate / score / persist) then `done: {score, winRate, pnl}`; chat now `analyzed` with metrics; chat with `signalDeletion` projects score 0 regardless of stored result.
+- [ ] **Step 3:** API tests (market data faked via `app.state.market_data_factory`): POST → 202; SSE: four §4 phase strings (emitted before load / simulate / score / persist) then `done: {score, winRate, pnl}`; chat now `analyzed` with metrics; stored `backtest_result.outcomes` carries one entry per folded signal; chat with `signalDeletion` projects score 0 regardless of stored result.
 - [ ] **Step 4:** `uv run pytest tests/unit/test_backtesting.py tests/api/test_backtest.py -v` → PASS. Commit `feat(backend): backtest job producing provider score`.
 
-### Task 17: Signals view + orphan mod linking
+### Task 18: Signals view + orphan mod linking
 
 **Files:** Create `services/projection/signals.py`, `api/routers/signals.py`, `api/schemas/signal.py`, `tests/unit/test_signal_projection.py`, `tests/api/test_signals.py`; Modify `services/lifecycle/fold.py` (accept manual links)
 
 - [ ] **Step 1:** Failing fold test: `fold(signals, events, messages, manual_links={message_id: root_signal_id})` treats a manually linked message as part of that signal's chain (same as a `reply_to` hit); existing calls unchanged via default `manual_links=None`.
-- [ ] **Step 2:** Failing projection tests covering the full Signal shape (requirements §4): root NEW_ENTRY signals → rows; `mods[]` from timeline steps (kind via `classify_patch` mapping: breakeven/stop→`move_stop`, add→`avg_down|avg_up` by price vs entry, reduce→`partial`, close→`close`), `via = reply` when `reply_to` evidence else `inferred` (manual link); `effective{}` from final timeline step (avg entry + note `"avg of N fills"`, moved stop + note, closedBy `author`, effective pnl from sim outcome); `status/outcome/pnl` from sim outcomes; `deleted` from evidence; orphan mods = modifier-labeled messages with no linkage, `suggestId` = latest open same-symbol signal; observer truncation to 200/month + `limitReached`.
+- [ ] **Step 2:** Failing projection tests covering the full Signal shape (requirements §4): root NEW_ENTRY signals → rows; `mods[]` from timeline steps (kind via `classify_patch` mapping: breakeven/stop→`move_stop`, add→`avg_down|avg_up` by price vs entry, reduce→`partial`, close→`close`), `via = reply` when `reply_to` evidence else `inferred` (manual link); `effective{}` from final timeline step (avg entry + note `"avg of N fills"`, moved stop + note, closedBy `author`, effective pnl from the stored outcome); `status/outcome/pnl` from the latest `backtest_result.outcomes` per channel (no kline refetch on read — requirements D15; no backtest yet → all `untested`); `deleted` from evidence; orphan mods = modifier-labeled messages with no linkage, `suggestId` = latest open same-symbol signal; observer truncation to 200/month + `limitReached`.
 - [ ] **Step 3:** Implement `present_signals(session, user_id, feed_id=None, status=None, plan=…)` assembling per-channel folds across the user's subscriptions; `present_signal(session, user_id, signal_id)`.
 - [ ] **Step 4:** API tests: GET list + filters; GET detail; POST `/signals/{id}/link-mod {modId}` writes `lifecycle_link`, response now contains the mod with `via: "inferred"`; unknown ids → 404.
 - [ ] **Step 5:** `uv run pytest tests/unit/test_signal_projection.py tests/api/test_signals.py -v` → PASS. Commit `feat(backend): signals projection with manual mod linking`.
 
-### Task 18: Teardown — delete CLI, ship runtime
+### Task 19: Teardown — delete CLI, ship runtime
 
-**Files:** Delete `src/verasig/cli.py`, `tests/integration/test_cli_*.py`, `tests/unit/test_cli_telegram.py` (if not already), `tests/unit/test_deletions_format.py`, `tests/unit/test_lifecycle_format.py` (CLI formatting); Modify `pyproject.toml`, `Makefile`, `Dockerfile`, `README.md`, `tests/integration/test_migrations.py` (alembic CLI), root `conftest.py` if it imports cli
+**Files:** Delete `src/verasig/cli.py`, `tests/integration/test_cli_*.py`, `tests/unit/test_cli_telegram.py`, `tests/unit/test_telegram_session.py`, `tests/unit/test_deletions_format.py`, `tests/unit/test_lifecycle_format.py` (CLI formatting); Modify `pyproject.toml`, `src/verasig/config.py`, `foundation/telegram_session.py`, `src/verasig/api/app.py`, `Makefile`, `Dockerfile`, `../../docker-compose.yml` (repo root), `README.md`, `tests/unit/test_config.py`, `tests/integration/test_migrations.py`
 
-- [ ] **Step 1:** Audit each deleted CLI test for unique coverage; port anything not already covered by Tasks 9–17 API tests into the matching `tests/api/` module (known: `test_cli_score.py` traceability assertions → extend `test_backtest.py`).
-- [ ] **Step 2:** Delete `cli.py` + CLI tests; drop typer import remnants; `make format && make lint` clean.
-- [ ] **Step 3:** Makefile: replace `cli` target with `serve` (`uv run uvicorn verasig.api.app:create_app --factory --reload`) — add module-level `def create_app_from_env()` factory wrapper reading `Settings()`; `migrate` target → `uv run alembic upgrade head`; `health` → `curl -fsS localhost:8000/health`.
-- [ ] **Step 4:** Dockerfile `ENTRYPOINT ["uv", "run", "--no-sync", "uvicorn", "verasig.api.app:create_app_from_env", "--factory", "--host", "0.0.0.0", "--port", "8000"]`. Update README (run, env, API summary table linking requirements.md).
-- [ ] **Step 5:** Full suite: `make test` → all green; `make lint` clean. Commit `refactor(backend)!: remove cli delivery layer, serve fastapi`.
+- [ ] **Step 1:** Audit each to-be-deleted CLI test for unique coverage; port anything not already covered by Tasks 9–18 API tests into the matching `tests/api/` module (known: `test_cli_score.py` traceability assertions → extend `test_backtest.py`; `test_migrations.py` drops `CliRunner` and calls `alembic.command.upgrade` directly).
+- [ ] **Step 2:** Delete `cli.py` + CLI tests; `uv remove typer` and delete `[project.scripts]` from `pyproject.toml`; remove the legacy global-session helpers from `foundation/telegram_session.py` (`load_session_string`, `save_session_string`, `make_client(settings)`, `run_login`) — only the Task 7 per-user functions remain; delete CLI-era `Settings` fields (`session_path`, `telegram_api_id/hash/phone`, `distiller_command`, `extractor_command`) and fix `test_config.py`; drop the `user_id=None` branches the transitional CLI writes needed (repos now require a real user id). `make format && make lint` clean.
+- [ ] **Step 3:** Add module-level `def create_app_from_env() -> FastAPI` in `api/app.py` (reads `Settings()`, calls `create_app`). Makefile: replace `cli` target with `serve` = `uv run uvicorn verasig.api.app:create_app_from_env --factory --reload`; `migrate` → `uv run alembic upgrade head`; `health` → `curl -fsS localhost:8000/health`.
+- [ ] **Step 4:** Dockerfile `ENTRYPOINT ["uv", "run", "--no-sync", "uvicorn", "verasig.api.app:create_app_from_env", "--factory", "--host", "0.0.0.0", "--port", "8000"]`. Root `docker-compose.yml`: **remove `command: ["health"]`** (it would override the new entrypoint), add `ports: ["8000:8000"]`, remove the `tgsession` named volume + `/session` mount (sessions live in the DB now; keep the `secrets` mount). Update README (run, env, API summary table linking requirements.md).
+- [ ] **Step 5:** Full suite: `make test` → all green; `make lint` clean; `docker compose up --build` serves `/health` on :8000. Commit `refactor(backend)!: remove cli delivery layer, serve fastapi`.
 
-### Task 19: Final review gate
+### Task 20: Final review gate
 
 - [ ] **Step 1:** Sweep requirements.md §4 endpoint-by-endpoint against routers; §5 table-by-table against `models.py`; §6 limits against guards. Fix gaps.
-- [ ] **Step 2:** `make test && make lint` → green. Use superpowers:requesting-code-review, then superpowers:finishing-a-development-branch (squash broken commits, merge to `develop`).
+- [ ] **Step 2:** `make test && make lint` → green. Request code review (superpowers:requesting-code-review if available), then finish the branch per repo flow: squash broken commits, merge to `develop` (superpowers:finishing-a-development-branch if available).
 
 ---
 
@@ -461,10 +503,11 @@ def make_anthropic_runner(api_key: str, model: str) -> Callable[[str], str]:
 ```
 1 → 2 → 3 → 4 → 5 → 6
               5 → 7 → 9 → 10 → 11 → 12 → 13
-              5 → 8 ─┘            (8 before 10)
-              5 → 14, 15          (any time after 5)
-              12,13,15,16 → 17 needs 10,11; 16 needs 15
-              all → 18 → 19
+              5 → 8 ─┘                  (8 before 10: backfill job needs registry)
+              5 → 14                    (exchanges)
+              5 → 15 → 16 → 17          (risk endpoints → risk policy → backtest job)
+              10, 11, 17 → 18           (signals projection reads capture, labels, outcomes)
+              all → 19 → 20
 ```
 
-Parallelizable after Task 5: {6}, {7+9+10…13}, {8}, {14}, {15}.
+Parallelizable after Task 5: {6}, {7+9+10…13}, {8}, {14}, {15+16}.
