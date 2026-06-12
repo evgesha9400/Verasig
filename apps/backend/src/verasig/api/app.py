@@ -73,3 +73,7 @@ def create_app(
     for router in ALL_ROUTERS:
         app.include_router(router)
     return app
+
+
+def create_app_from_env() -> FastAPI:
+    return create_app(Settings())
