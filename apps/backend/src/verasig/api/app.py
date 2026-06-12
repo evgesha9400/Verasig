@@ -5,13 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from verasig.api.errors import ApiError, api_error_handler
-from verasig.api.routers import auth, health, user
+from verasig.api.routers import auth, health, telegram, user
 from verasig.config import Settings
+from verasig.foundation import telegram_session
 from verasig.foundation.db import make_session_factory
 from verasig.foundation.security import SecretCipher
 from verasig.services.jobs.registry import JobRegistry
 
-ALL_ROUTERS: Sequence[APIRouter] = (health.router, auth.router, user.router)
+ALL_ROUTERS: Sequence[APIRouter] = (
+    health.router,
+    auth.router,
+    user.router,
+    telegram.router,
+)
 
 
 def create_app(
@@ -24,6 +30,7 @@ def create_app(
     )
     app.state.jobs = JobRegistry()
     app.state.secret_cipher = SecretCipher.from_spec(settings.secret_keys)
+    app.state.telegram_auth = telegram_session
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

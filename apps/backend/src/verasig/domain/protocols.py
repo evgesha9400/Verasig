@@ -1,6 +1,7 @@
 """Pure Protocol seams for adapters and injectable service policies."""
 
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
@@ -13,6 +14,20 @@ from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import TradeIntent
 from verasig.domain.simulation import Kline, SimOutcome
 from verasig.domain.telegram import TelegramLiveEvent
+
+
+@dataclass(frozen=True)
+class PendingCode:
+    session_string: str
+    phone_code_hash: str
+
+
+class CodeInvalidError(Exception):
+    """Telegram rejected the submitted login code."""
+
+
+class TwoFactorUnsupportedError(Exception):
+    """Telegram account requires 2FA, which v1 does not support."""
 
 
 @runtime_checkable
@@ -46,6 +61,23 @@ class RuleDistiller(Protocol):
 @runtime_checkable
 class ExecutionPolicy(Protocol):
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome: ...
+
+
+@runtime_checkable
+class TelegramAuth(Protocol):
+    async def send_code(
+        self, api_id: int, api_hash: str, phone: str
+    ) -> PendingCode: ...
+
+    async def sign_in(
+        self,
+        session_string: str,
+        api_id: int,
+        api_hash: str,
+        phone: str,
+        code: str,
+        phone_code_hash: str,
+    ) -> str: ...
 
 
 @runtime_checkable
