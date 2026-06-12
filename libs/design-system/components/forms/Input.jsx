@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-field { display: flex; flex-direction: column; gap: 6px; }
 .vrs-field__label { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--fw-medium); color: var(--text-body); display: flex; gap: 6px; align-items: center; }
@@ -35,27 +34,45 @@ const CSS = `
 .vrs-input.is-mono input { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.01em; }
 .vrs-input.is-disabled { opacity: 0.5; pointer-events: none; }
 .vrs-input__kbd { font-family: var(--font-mono); font-size: var(--text-3xs); color: var(--text-faint); border: 1px solid var(--border-default); border-radius: var(--radius-xs); padding: 1px 5px; }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-input-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-input-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-input-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Text input with optional label, icon, hint and error state. */
 export function Input({
-  label, hint, error, required = false,
-  iconLeft, trailing, mono = false, disabled = false,
-  id, className = '', ...rest
+  label,
+  hint,
+  error,
+  required = false,
+  iconLeft,
+  trailing,
+  mono = false,
+  disabled = false,
+  id,
+  className = '',
+  ...rest
 }) {
-  const fieldId = id || (label ? `vrs-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined);
-  const boxCls = ['vrs-input', error ? 'is-error' : '', mono ? 'is-mono' : '', disabled ? 'is-disabled' : '', className].filter(Boolean).join(' ');
+  const fieldId =
+    id || (label ? `vrs-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined)
+  const boxCls = [
+    'vrs-input',
+    error ? 'is-error' : '',
+    mono ? 'is-mono' : '',
+    disabled ? 'is-disabled' : '',
+    className
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
     <div className="vrs-field">
       {label && (
         <label className="vrs-field__label" htmlFor={fieldId}>
-          {label}{required && <span className="vrs-field__req">*</span>}
+          {label}
+          {required && <span className="vrs-field__req">*</span>}
         </label>
       )}
       <div className={boxCls}>
@@ -63,7 +80,11 @@ export function Input({
         <input id={fieldId} disabled={disabled} {...rest} />
         {trailing}
       </div>
-      {(error || hint) && <span className={`vrs-field__hint ${error ? 'is-error' : ''}`}>{error || hint}</span>}
+      {(error || hint) && (
+        <span className={`vrs-field__hint ${error ? 'is-error' : ''}`}>
+          {error || hint}
+        </span>
+      )}
     </div>
-  );
+  )
 }

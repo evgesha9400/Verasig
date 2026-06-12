@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-banner {
   display: flex; align-items: flex-start; gap: 12px;
@@ -21,37 +20,81 @@ const CSS = `
 .vrs-banner__rejected .vrs-banner__accent, .vrs-banner__rejected .vrs-banner__icon { background: var(--rejected-500); color: var(--rejected-500); }
 .vrs-banner__info     .vrs-banner__accent, .vrs-banner__info .vrs-banner__icon     { background: var(--info-500);     color: var(--info-500); }
 .vrs-banner__verified .vrs-banner__icon, .vrs-banner__pending .vrs-banner__icon, .vrs-banner__rejected .vrs-banner__icon, .vrs-banner__info .vrs-banner__icon { background: transparent; }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-banner-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-banner-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-banner-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 const ICONS = {
-  verified: <path d="M20 6 9 17l-5-5"/>,
-  pending: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
-  rejected: <><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></>,
-  info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></>,
-  neutral: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></>,
-};
+  verified: <path d="M20 6 9 17l-5-5" />,
+  pending: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  rejected: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v5M12 16h.01" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  ),
+  neutral: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5M12 8h.01" />
+    </>
+  )
+}
 
 /** Inline banner / alert with semantic tone. */
-export function Banner({ tone = 'info', title, icon, onClose, actions, className = '', children, ...rest }) {
-  const cls = ['vrs-banner', `vrs-banner__${tone}`, className].filter(Boolean).join(' ');
+export function Banner({
+  tone = 'info',
+  title,
+  icon,
+  onClose,
+  actions,
+  className = '',
+  children,
+  ...rest
+}) {
+  const cls = ['vrs-banner', `vrs-banner__${tone}`, className].filter(Boolean).join(' ')
   return (
     <div className={cls} role="status" {...rest}>
       <span className="vrs-banner__accent" aria-hidden="true" />
       <span className="vrs-banner__icon">
-        {icon || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{ICONS[tone] || ICONS.info}</svg>}
+        {icon || (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {ICONS[tone] || ICONS.info}
+          </svg>
+        )}
       </span>
       <div className="vrs-banner__body">
         {title && <div className="vrs-banner__title">{title}</div>}
         {children && <div className="vrs-banner__msg">{children}</div>}
         {actions && <div className="vrs-banner__actions">{actions}</div>}
       </div>
-      {onClose && <button className="vrs-banner__close" aria-label="Dismiss" onClick={onClose}>×</button>}
+      {onClose && (
+        <button className="vrs-banner__close" aria-label="Dismiss" onClick={onClose}>
+          ×
+        </button>
+      )}
     </div>
-  );
+  )
 }

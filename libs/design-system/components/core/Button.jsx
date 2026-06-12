@@ -1,4 +1,3 @@
-
 /* Inject component styles once (self-contained, token-driven). */
 const CSS = `
 .vrs-btn {
@@ -81,12 +80,12 @@ const CSS = `
   border: 2px solid currentColor; border-top-color: transparent;
   animation: vrs-btn-spin 0.6s linear infinite; }
 @keyframes vrs-btn-spin { to { transform: rotate(360deg); } }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-button-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-button-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-button-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /**
@@ -105,22 +104,28 @@ export function Button({
   children,
   ...rest
 }) {
-  const Tag = as;
+  const Tag = as
   const cls = [
     'vrs-btn',
     `vrs-btn__${variant}`,
     size !== 'md' ? `vrs-btn__sz-${size}` : '',
     fullWidth ? 'vrs-btn__full' : '',
     loading ? 'vrs-btn__loading' : '',
-    className,
-  ].filter(Boolean).join(' ');
+    className
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <Tag className={cls} disabled={Tag === 'button' ? (disabled || loading) : undefined} {...rest}>
+    <Tag
+      className={cls}
+      disabled={Tag === 'button' ? disabled || loading : undefined}
+      {...rest}
+    >
       {loading && <span className="vrs-btn__spin" aria-hidden="true" />}
       {!loading && iconLeft}
       {children}
       {!loading && iconRight}
     </Tag>
-  );
+  )
 }

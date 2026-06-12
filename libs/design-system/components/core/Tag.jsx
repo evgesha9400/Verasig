@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-tag {
   display: inline-flex; align-items: center; gap: 6px;
@@ -19,25 +18,41 @@ const CSS = `
 .vrs-tag__rm:hover { background: var(--surface-hover); color: var(--text-strong); }
 .vrs-tag__clickable { cursor: pointer; }
 .vrs-tag__clickable:hover { border-color: var(--border-strong); background: var(--surface-hover); }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-tag-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-tag-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-tag-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Interactive tag / chip for filters, channels and providers. */
 export function Tag({ swatch, onRemove, onClick, className = '', children, ...rest }) {
-  const cls = ['vrs-tag', onClick ? 'vrs-tag__clickable' : '', className].filter(Boolean).join(' ');
+  const cls = ['vrs-tag', onClick ? 'vrs-tag__clickable' : '', className]
+    .filter(Boolean)
+    .join(' ')
   return (
     <span className={cls} onClick={onClick} {...rest}>
-      {swatch && <span className="vrs-tag__sw" style={{ background: swatch }} aria-hidden="true" />}
+      {swatch && (
+        <span
+          className="vrs-tag__sw"
+          style={{ background: swatch }}
+          aria-hidden="true"
+        />
+      )}
       {children}
       {onRemove && (
-        <button className="vrs-tag__rm" aria-label="Remove"
-          onClick={(e) => { e.stopPropagation(); onRemove(e); }}>×</button>
+        <button
+          className="vrs-tag__rm"
+          aria-label="Remove"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove(e)
+          }}
+        >
+          ×
+        </button>
       )}
     </span>
-  );
+  )
 }

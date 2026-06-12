@@ -1,4 +1,4 @@
-import { ReactNode, HTMLAttributes } from 'react';
+import { ReactNode, HTMLAttributes } from 'react'
 
 /**
  * Compact status badge — mono, uppercase, pill-shaped. Use for verification
@@ -6,10 +6,10 @@ import { ReactNode, HTMLAttributes } from 'react';
  */
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   /** Semantic color. @default "neutral" */
-  tone?: 'neutral' | 'verified' | 'pending' | 'rejected' | 'info' | 'outline' | 'solid';
+  tone?: 'neutral' | 'verified' | 'pending' | 'rejected' | 'info' | 'outline' | 'solid'
   /** Show a leading status dot. @default false */
-  dot?: boolean;
-  children?: ReactNode;
+  dot?: boolean
+  children?: ReactNode
 }
 
-export function Badge(props: BadgeProps): JSX.Element;
+export function Badge(props: BadgeProps): JSX.Element

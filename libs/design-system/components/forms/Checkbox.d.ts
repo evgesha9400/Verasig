@@ -1,4 +1,4 @@
-import { InputHTMLAttributes } from 'react';
+import { InputHTMLAttributes } from 'react'
 
 /**
  * Checkbox with an optional label and description line. Native checkbox under
@@ -6,9 +6,9 @@ import { InputHTMLAttributes } from 'react';
  */
 export interface CheckboxProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Label text beside the box. */
-  label?: string;
+  label?: string
   /** Secondary description under the label. */
-  description?: string;
+  description?: string
 }
 
-export function Checkbox(props: CheckboxProps): JSX.Element;
+export function Checkbox(props: CheckboxProps): JSX.Element

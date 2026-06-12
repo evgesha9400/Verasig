@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-tabs { display: flex; align-items: center; gap: 2px; position: relative; }
 .vrs-tabs__line { border-bottom: 1px solid var(--border-default); }
@@ -27,35 +26,49 @@ const CSS = `
   background: var(--surface-hover); border-radius: var(--radius-pill); padding: 1px 6px;
 }
 .vrs-tab[aria-selected="true"] .vrs-tab__count { color: var(--accent-text); }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-tabs-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-tabs-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-tabs-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Tab bar — underline or pill style. Controlled via `value`/`onChange`. */
-export function Tabs({ items = [], value, onChange, variant = 'line', className = '', ...rest }) {
+export function Tabs({
+  items = [],
+  value,
+  onChange,
+  variant = 'line',
+  className = '',
+  ...rest
+}) {
   const cls = [
     'vrs-tabs',
     variant === 'line' ? 'vrs-tabs__line' : 'vrs-tabs__pill',
-    className,
-  ].filter(Boolean).join(' ');
+    className
+  ]
+    .filter(Boolean)
+    .join(' ')
   return (
     <div className={cls} role="tablist" {...rest}>
       {items.map((it) => {
-        const id = typeof it === 'string' ? it : it.id;
-        const label = typeof it === 'string' ? it : it.label;
-        const count = typeof it === 'string' ? undefined : it.count;
+        const id = typeof it === 'string' ? it : it.id
+        const label = typeof it === 'string' ? it : it.label
+        const count = typeof it === 'string' ? undefined : it.count
         return (
-          <button key={id} role="tab" aria-selected={value === id}
-            className="vrs-tab" onClick={() => onChange && onChange(id)}>
+          <button
+            key={id}
+            role="tab"
+            aria-selected={value === id}
+            className="vrs-tab"
+            onClick={() => onChange && onChange(id)}
+          >
             {label}
             {count != null && <span className="vrs-tab__count">{count}</span>}
           </button>
-        );
+        )
       })}
     </div>
-  );
+  )
 }

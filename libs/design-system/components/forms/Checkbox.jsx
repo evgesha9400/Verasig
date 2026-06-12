@@ -1,4 +1,3 @@
-
 const CSS = `
 .vrs-check { display: inline-flex; align-items: flex-start; gap: 10px; cursor: pointer; user-select: none; }
 .vrs-check.is-disabled { opacity: 0.5; cursor: not-allowed; }
@@ -19,22 +18,39 @@ const CSS = `
 .vrs-check__text { display: flex; flex-direction: column; gap: 2px; }
 .vrs-check__label { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-strong); line-height: 1.3; }
 .vrs-check__desc { font-family: var(--font-sans); font-size: var(--text-2xs); color: var(--text-muted); }
-`;
+`
 if (typeof document !== 'undefined' && !document.getElementById('vrs-check-css')) {
-  const s = document.createElement('style');
-  s.id = 'vrs-check-css';
-  s.textContent = CSS;
-  document.head.appendChild(s);
+  const s = document.createElement('style')
+  s.id = 'vrs-check-css'
+  s.textContent = CSS
+  document.head.appendChild(s)
 }
 
 /** Checkbox with optional label + description. */
-export function Checkbox({ label, description, disabled = false, className = '', id, ...rest }) {
-  const cls = ['vrs-check', disabled ? 'is-disabled' : '', className].filter(Boolean).join(' ');
+export function Checkbox({
+  label,
+  description,
+  disabled = false,
+  className = '',
+  id,
+  ...rest
+}) {
+  const cls = ['vrs-check', disabled ? 'is-disabled' : '', className]
+    .filter(Boolean)
+    .join(' ')
   return (
     <label className={cls}>
       <input type="checkbox" disabled={disabled} id={id} {...rest} />
       <span className="vrs-check__box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
       </span>
       {(label || description) && (
         <span className="vrs-check__text">
@@ -43,5 +59,5 @@ export function Checkbox({ label, description, disabled = false, className = '',
         </span>
       )}
     </label>
-  );
+  )
 }
