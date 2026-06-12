@@ -15,4 +15,10 @@
 - `uv run pytest`
 - `uv run verasig health`
 - `uv run verasig migrate`
-- `cd ../.. && docker compose up --build`
+- `cd ../.. && make up`
+
+## Environment
+
+- `.env.example` is the tracked backend runtime template.
+- `.env` is local, gitignored, and read by backend commands run from this directory.
+- Root `make env` creates `.env` from `.env.example` when missing.
