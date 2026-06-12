@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from verasig.api.errors import ApiError, api_error_handler
 from verasig.api.routers import (
     auth,
+    backtest,
     chats,
     distill,
     exchanges,
@@ -21,6 +22,7 @@ from verasig.config import Settings
 from verasig.foundation import telegram_session
 from verasig.foundation.anthropic_runner import make_anthropic_runner
 from verasig.foundation.bybit_account import verify_api_keys
+from verasig.foundation.bybit_market_data import BybitKlineClient
 from verasig.foundation.db import make_session_factory
 from verasig.foundation.security import SecretCipher
 from verasig.services.distillation.rule_distiller import AnthropicDistiller
@@ -33,6 +35,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     telegram.router,
     exchanges.router,
     chats.router,
+    backtest.router,
     labels.router,
     distill.router,
     verify.router,
@@ -52,6 +55,7 @@ def create_app(
     app.state.secret_cipher = SecretCipher.from_spec(settings.secret_keys)
     app.state.telegram_auth = telegram_session
     app.state.exchange_verifier = verify_api_keys
+    app.state.market_data_factory = BybitKlineClient
     app.state.distiller_factory = lambda: AnthropicDistiller(
         runner=make_anthropic_runner(
             settings.anthropic_api_key, settings.anthropic_model

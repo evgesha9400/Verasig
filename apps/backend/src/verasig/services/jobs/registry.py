@@ -11,7 +11,7 @@ class JobAlreadyRunningError(Exception):
 @dataclass
 class JobChannel:
     subscribers: list[asyncio.Queue] = field(default_factory=list)
-    last_progress: tuple[str, dict] | None = None
+    progress_events: list[tuple[str, dict]] = field(default_factory=list)
     terminal: tuple[str, dict] | None = None
     task: asyncio.Task | None = None
 
@@ -51,7 +51,8 @@ class JobRegistry:
     def _broadcast(self, key: str, event: str, data: dict) -> None:
         channel = self._channels[key]
         if event == "progress":
-            channel.last_progress = (event, data)
+            channel.progress_events.append((event, data))
+            channel.progress_events = channel.progress_events[-20:]
         else:
             channel.terminal = (event, data)
         for queue in channel.subscribers:
@@ -73,7 +74,7 @@ class JobRegistry:
     async def stream(self, key: str) -> AsyncIterator[tuple[str, dict]]:
         channel = self._channels[key]
         queue: asyncio.Queue = asyncio.Queue()
-        for replay in (channel.last_progress, channel.terminal):
+        for replay in (*channel.progress_events, channel.terminal):
             if replay:
                 queue.put_nowait(replay)
         channel.subscribers.append(queue)
