@@ -28,6 +28,8 @@ class FoldStep(BaseModel):
     effective_take_profits: list[Decimal] = Field(default_factory=list)
     effective_size: Decimal  # cumulative (entry = 1; multipliers stated)
     effective_entry: Decimal | None = None  # size-weighted avg of PRICED legs
+    entry_low: Decimal | None = None  # original entry range low, if available
+    entry_high: Decimal | None = None  # original entry range high, if available
     leg_size: Decimal | None = None  # this step's size delta (+add / −reduce)
     leg_price: Decimal | None = None  # this step's leg price; None ⇒ market-at-`at`
 
