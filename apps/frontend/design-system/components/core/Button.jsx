@@ -16,7 +16,7 @@ const CSS = `
               transform var(--dur-instant) var(--ease-out),
               box-shadow var(--dur-fast) var(--ease-out);
 }
-.vrs-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 18px var(--signal-glow); }
+.vrs-btn:focus-visible { outline: none; box-shadow: var(--focus-ring), 0 0 18px var(--signal-glow); }
 .vrs-btn:disabled:not(.vrs-btn__loading) { opacity: 0.4; cursor: not-allowed; }
 .vrs-btn__loading { cursor: progress; }
 .vrs-btn__sz-sm { --_h: 30px; --_px: 12px; --_fs: var(--text-xs); }
@@ -100,6 +100,7 @@ export function Button({
   fullWidth = false,
   disabled = false,
   as = 'button',
+  type = 'button',
   className = '',
   children,
   ...rest
@@ -119,6 +120,7 @@ export function Button({
   return (
     <Tag
       className={cls}
+      type={Tag === 'button' ? type : undefined}
       disabled={Tag === 'button' ? disabled || loading : undefined}
       {...rest}
     >

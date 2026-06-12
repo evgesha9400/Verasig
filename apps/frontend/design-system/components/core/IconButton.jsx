@@ -15,7 +15,7 @@ const CSS = `
 .vrs-iconbtn svg { width: 18px; height: 18px; display: block; }
 .vrs-iconbtn:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-strong); }
 .vrs-iconbtn:active:not(:disabled) { transform: translateY(1px); background: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.25); }
-.vrs-iconbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 18px var(--signal-glow); }
+.vrs-iconbtn:focus-visible { outline: none; box-shadow: var(--focus-ring), 0 0 18px var(--signal-glow); }
 .vrs-iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
 .vrs-iconbtn__sz-sm { --_s: 30px; }
 .vrs-iconbtn__sz-sm svg { width: 15px; height: 15px; }
@@ -45,6 +45,7 @@ export function IconButton({
   variant = 'ghost',
   size = 'md',
   label,
+  type = 'button',
   className = '',
   children,
   ...rest
@@ -58,7 +59,7 @@ export function IconButton({
     .filter(Boolean)
     .join(' ')
   return (
-    <button className={cls} aria-label={label} title={label} {...rest}>
+    <button className={cls} type={type} aria-label={label} title={label} {...rest}>
       {children}
     </button>
   )
