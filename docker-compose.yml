@@ -15,7 +15,7 @@ services:
 
   app:
     build: ./apps/backend
-    env_file: [.env]
+    env_file: [apps/backend/.env]
     environment:
       VERASIG_DB_HOST: db
       VERASIG_DB_PORT: "5432"

@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 
 BACKEND_DIR := apps/backend
+BACKEND_ENV_FILE := $(BACKEND_DIR)/.env
+COMPOSE := docker compose --env-file $(BACKEND_ENV_FILE)
 FRONTEND_DIR := apps/frontend
 ARGS ?= --help
 
@@ -9,7 +11,7 @@ ARGS ?= --help
         check format format-check lint test build build-image \
         backend-format backend-format-check backend-lint backend-test \
         frontend-format frontend-format-check frontend-lint frontend-test frontend-build \
-        dev-frontend dev-marketing \
+        dev-frontend \
         db-up db-down migrate db-migrate health \
         up down logs cli clean clean-all \
         fe-install fe-dev fe-build fe-test fe-lint \
@@ -27,8 +29,8 @@ doctor: ## Verify root-level developer tools
 	@docker compose version >/dev/null
 	@echo "OK: root toolchain is available"
 
-env: ## Create root .env from .env.example when missing
-	@if [ ! -f .env ]; then cp .env.example .env; fi
+env: ## Create backend .env from backend .env.example when missing
+	@if [ ! -f $(BACKEND_ENV_FILE) ]; then cp $(BACKEND_DIR)/.env.example $(BACKEND_ENV_FILE); fi
 
 # Setup
 
@@ -52,7 +54,7 @@ lint: frontend-lint backend-lint ## Lint frontend and backend code
 
 test: backend-test frontend-test ## Run backend and frontend tests
 
-build: frontend-build build-image ## Build frontend apps and backend image
+build: frontend-build build-image ## Build frontend app and backend image
 
 frontend-format: ## Format frontend workspace files
 	$(MAKE) -C $(FRONTEND_DIR) format
@@ -66,7 +68,7 @@ frontend-lint: ## Lint frontend workspace
 frontend-test: ## Run frontend workspace tests
 	$(MAKE) -C $(FRONTEND_DIR) test
 
-frontend-build: ## Build frontend workspace apps
+frontend-build: ## Build frontend workspace app
 	$(MAKE) -C $(FRONTEND_DIR) build
 
 backend-format: ## Format backend Python
@@ -81,24 +83,21 @@ backend-lint: ## Lint backend Python
 backend-test: ## Run backend tests
 	$(MAKE) -C $(BACKEND_DIR) test
 
-build-image: ## Build backend Docker image
-	docker compose build app
+build-image: env ## Build backend Docker image
+	$(COMPOSE) build app
 
 # Development
 
-dev-frontend: ## Start product frontend dev server
-	$(MAKE) -C $(FRONTEND_DIR) dev-product
-
-dev-marketing: ## Start marketing dev server
-	$(MAKE) -C $(FRONTEND_DIR) dev-marketing
+dev-frontend: ## Start unified frontend dev server
+	$(MAKE) -C $(FRONTEND_DIR) dev
 
 # Runtime and database
 
-db-up: ## Start Postgres
-	docker compose up -d db
+db-up: env ## Start Postgres
+	$(COMPOSE) up -d db
 
-db-down: ## Stop Postgres
-	docker compose stop db
+db-down: env ## Stop Postgres
+	$(COMPOSE) stop db
 
 migrate: ## Run database migrations
 	$(MAKE) -C $(BACKEND_DIR) migrate
@@ -108,14 +107,14 @@ db-migrate: migrate ## Alias for migrate
 health: ## Check backend health through the local CLI
 	$(MAKE) -C $(BACKEND_DIR) health
 
-up: ## Start all services with rebuilds
-	docker compose up --build
+up: env ## Start all services with rebuilds
+	$(COMPOSE) up --build
 
-down: ## Stop and remove local services
-	docker compose down
+down: env ## Stop and remove local services
+	$(COMPOSE) down
 
-logs: ## Follow backend app logs
-	docker compose logs -f app
+logs: env ## Follow backend app logs
+	$(COMPOSE) logs -f app
 
 cli: ## Run backend CLI command, e.g. make cli ARGS="stats <channel>"
 	$(MAKE) -C $(BACKEND_DIR) cli ARGS="$(ARGS)"
