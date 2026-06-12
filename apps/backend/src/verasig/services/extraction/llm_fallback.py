@@ -4,14 +4,10 @@ When the deterministic parser misses, an `LlmExtractor` attempts the same
 `text -> TradeIntent | None` contract via a one-task LLM call. The model emits
 EXACTLY a `TradeIntent` JSON (no self-grading, no lifecycle classification);
 `parse_extractor_output` tolerantly extracts it and returns None on absent/invalid
-JSON or a missing symbol+side — a fallback miss, not a crash (contrast the
-distiller, which raises). `ClaudeCliExtractor` mirrors `ClaudeCliDistiller`: an
-injectable subprocess runner so no test touches the real CLI; pass
-`command="codex"` to drive Codex instead.
+JSON or a missing symbol+side — a fallback miss, not a crash.
 """
 
 import json
-import subprocess
 from collections.abc import Callable
 
 from pydantic import ValidationError
@@ -68,33 +64,11 @@ def _extraction_prompt(candidate_text: str) -> str:
     )
 
 
-def _subprocess_runner(command: str) -> Callable[[str], str]:
-    def run(prompt: str) -> str:
-        completed = subprocess.run(
-            [command],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return completed.stdout
+class AnthropicExtractor(LlmExtractor):
+    """Anthropic-backed fallback extractor over an injected prompt runner."""
 
-    return run
-
-
-class ClaudeCliExtractor(LlmExtractor):
-    """LLM-CLI fallback extractor.
-
-    The subprocess runner is injectable so tests drive it with canned stdout and
-    never touch the real CLI. Pass `command="codex"` to drive Codex instead.
-    """
-
-    def __init__(
-        self,
-        command: str = "claude",
-        runner: Callable[[str], str] | None = None,
-    ) -> None:
-        self._runner = runner or _subprocess_runner(command)
+    def __init__(self, runner: Callable[[str], str]) -> None:
+        self._runner = runner
 
     def extract(self, candidate_text: str) -> TradeIntent | None:
         stdout = self._runner(_extraction_prompt(candidate_text))

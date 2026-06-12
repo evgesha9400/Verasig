@@ -10,7 +10,7 @@ from verasig.domain.parser_rule import ParserRule
 from verasig.domain.protocols import RuleDistiller
 from verasig.domain.signal import Side
 from verasig.services.distillation.rule_distiller import (
-    ClaudeCliDistiller,
+    AnthropicDistiller,
     parse_distiller_output,
 )
 
@@ -71,18 +71,40 @@ def test_parse_distiller_output_stamps_version_into_rule_ids():
     assert filter_rule.version == 3
 
 
-def test_claude_cli_distiller_satisfies_protocol():
-    assert isinstance(ClaudeCliDistiller(), RuleDistiller)
+def test_parse_distiller_output_stamps_user_scope_and_display():
+    user_id = uuid4()
+    payload = json.dumps(
+        {
+            "filter_rule": {
+                "include_patterns": ["alpha"],
+                "display": [{"label": "Alpha", "detail": "Mentions alpha"}],
+            },
+            "parser_rules": [{"patterns": ["x"], "field_map": {}, "side_aliases": {}}],
+        }
+    )
+
+    filter_rule, parser_rules = parse_distiller_output(
+        payload, channel_id=7, label_ids=[], user_id=user_id
+    )
+
+    assert filter_rule.user_id == user_id
+    assert filter_rule.rule_id == f"{user_id}:7-filter-v1"
+    assert filter_rule.display == [{"label": "Alpha", "detail": "Mentions alpha"}]
+    assert parser_rules[0].rule_id == f"{user_id}:7-parser-1-v1"
 
 
-def test_claude_cli_distiller_wires_runner_to_parser_without_real_cli():
+def test_anthropic_distiller_satisfies_protocol():
+    assert isinstance(AnthropicDistiller(runner=lambda _prompt: FIXTURE), RuleDistiller)
+
+
+def test_anthropic_distiller_wires_runner_to_parser_without_real_network():
     prompts: list[str] = []
 
     def fake_runner(prompt: str) -> str:
         prompts.append(prompt)
         return FIXTURE
 
-    distiller = ClaudeCliDistiller(runner=fake_runner)
+    distiller = AnthropicDistiller(runner=fake_runner)
     filter_rule = distiller.distill_filter(_labels())
     parser_rules = distiller.distill_parsers(_labels())
     assert isinstance(filter_rule, FilterRule) and filter_rule.channel_id == 7

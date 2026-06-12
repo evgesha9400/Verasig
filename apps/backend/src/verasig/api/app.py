@@ -5,11 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from verasig.api.errors import ApiError, api_error_handler
-from verasig.api.routers import auth, chats, health, labels, telegram, user
+from verasig.api.routers import auth, chats, distill, health, labels, telegram, user
 from verasig.config import Settings
 from verasig.foundation import telegram_session
+from verasig.foundation.anthropic_runner import make_anthropic_runner
 from verasig.foundation.db import make_session_factory
 from verasig.foundation.security import SecretCipher
+from verasig.services.distillation.rule_distiller import AnthropicDistiller
 from verasig.services.jobs.registry import JobRegistry
 
 ALL_ROUTERS: Sequence[APIRouter] = (
@@ -19,6 +21,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     telegram.router,
     chats.router,
     labels.router,
+    distill.router,
 )
 
 
@@ -33,6 +36,11 @@ def create_app(
     app.state.jobs = JobRegistry()
     app.state.secret_cipher = SecretCipher.from_spec(settings.secret_keys)
     app.state.telegram_auth = telegram_session
+    app.state.distiller_factory = lambda: AnthropicDistiller(
+        runner=make_anthropic_runner(
+            settings.anthropic_api_key, settings.anthropic_model
+        )
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
