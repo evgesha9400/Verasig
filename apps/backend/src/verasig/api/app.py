@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from verasig.api.errors import ApiError, api_error_handler
-from verasig.api.routers import auth, health, telegram, user
+from verasig.api.routers import auth, chats, health, telegram, user
 from verasig.config import Settings
 from verasig.foundation import telegram_session
 from verasig.foundation.db import make_session_factory
@@ -17,6 +17,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     auth.router,
     user.router,
     telegram.router,
+    chats.router,
 )
 
 
