@@ -98,7 +98,9 @@ def test_derive_uses_distilled_filter_rule_over_seed(session_factory):
     with session_factory() as session:
         repo.upsert_filter_rule(session, rule)
         session.commit()
-    created = derive_candidates(session_factory, 7, StaticExchange())
+    created = derive_candidates(
+        session_factory, 7, StaticExchange(), filter_rules=[rule]
+    )
     assert created == 1
     with session_factory() as session:
         event = repo.read_signal_events(session, 7)[0]
