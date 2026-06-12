@@ -18,7 +18,7 @@ function createTestStorage() {
     },
     clear: () => {
       entries.clear()
-    },
+    }
   }
 }
 
@@ -26,11 +26,11 @@ beforeEach(() => {
   const storage = createTestStorage()
   Object.defineProperty(globalThis, 'localStorage', {
     value: storage,
-    configurable: true,
+    configurable: true
   })
   Object.defineProperty(window, 'localStorage', {
     value: storage,
-    configurable: true,
+    configurable: true
   })
 })
 

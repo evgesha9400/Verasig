@@ -23,7 +23,7 @@ import { MESSAGES } from './data/seed.js'
 
 const THEME_ACCENTS = {
   dark: ['#B9EE2E', '#CBF457', '#8FB81E', 'rgba(185,238,46,0.28)'],
-  light: ['#5197FF', '#82B6FF', '#2F6FE0', 'rgba(81,151,255,0.30)'],
+  light: ['#5197FF', '#82B6FF', '#2F6FE0', 'rgba(81,151,255,0.30)']
 }
 
 const THEME_KEY = 'vrs-theme-1'
@@ -36,7 +36,14 @@ function loadTheme() {
 }
 
 const USER_KEY = 'vrs-user-1'
-const USER_DEFAULTS = { firstName: 'Mara', lastName: 'Voss', email: 'mara@northwave.io', plan: 'operator', pendingEmail: null, cancelAt: null }
+const USER_DEFAULTS = {
+  firstName: 'Mara',
+  lastName: 'Voss',
+  email: 'mara@northwave.io',
+  plan: 'operator',
+  pendingEmail: null,
+  cancelAt: null
+}
 function loadUser() {
   try {
     return { ...USER_DEFAULTS, ...(JSON.parse(localStorage.getItem(USER_KEY)) || {}) }
@@ -49,7 +56,9 @@ function loadUser() {
 const MARKETING_URL = import.meta.env.VITE_MARKETING_URL || 'http://localhost:5174'
 function initialAuthScreen() {
   try {
-    return new URLSearchParams(window.location.search).get('signup') === '1' ? 'register' : 'login'
+    return new URLSearchParams(window.location.search).get('signup') === '1'
+      ? 'register'
+      : 'login'
   } catch {
     return 'login'
   }
@@ -59,7 +68,11 @@ export default function App() {
   const [theme, setTheme] = useState(loadTheme())
   function changeTheme(next) {
     setTheme(next)
-    try { localStorage.setItem(THEME_KEY, next) } catch { /* ignore */ }
+    try {
+      localStorage.setItem(THEME_KEY, next)
+    } catch {
+      /* ignore */
+    }
   }
 
   const [user, setUser] = useState(loadUser())
@@ -68,7 +81,9 @@ export default function App() {
       const next = { ...current, ...patch }
       try {
         localStorage.setItem(USER_KEY, JSON.stringify(next))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       return next
     })
   }
@@ -119,7 +134,7 @@ export default function App() {
     connectBybit,
     disconnectBybit,
     connectTelegram,
-    setBackTarget,
+    setBackTarget
   } = useWorkflowState()
 
   useEffect(() => {
@@ -157,10 +172,20 @@ export default function App() {
 
   // ---- auth early-return ----
   if (authScreen === 'login') {
-    return <LoginView onLogin={() => setAuthScreen(null)} onRegister={() => setAuthScreen('register')} />
+    return (
+      <LoginView
+        onLogin={() => setAuthScreen(null)}
+        onRegister={() => setAuthScreen('register')}
+      />
+    )
   }
   if (authScreen === 'register') {
-    return <RegisterView onRegister={() => setAuthScreen(null)} onLogin={() => setAuthScreen('login')} />
+    return (
+      <RegisterView
+        onRegister={() => setAuthScreen(null)}
+        onLogin={() => setAuthScreen('login')}
+      />
+    )
   }
 
   let title = 'Sources'
@@ -174,33 +199,75 @@ export default function App() {
   if (nav === 'signals') {
     title = 'Signals'
     subtitle = 'Signals extracted from your analyzed feeds'
-    body = <SignalsView feeds={chats} initial={signalsPreset} onGoToSources={() => { setNav('sources'); setScreen(telegramConnected ? 'chats' : 'sources') }} />
+    body = (
+      <SignalsView
+        feeds={chats}
+        initial={signalsPreset}
+        onGoToSources={() => {
+          setNav('sources')
+          setScreen(telegramConnected ? 'chats' : 'sources')
+        }}
+      />
+    )
   } else if (nav === 'exchanges') {
     title = 'Exchanges'
     subtitle = 'Where verified signals are routed'
-    body = <ExchangesView bybitConnected={bybitConnected} onConnect={() => connectBybit()} onDisconnect={() => disconnectBybit()} />
+    body = (
+      <ExchangesView
+        bybitConnected={bybitConnected}
+        onConnect={() => connectBybit()}
+        onDisconnect={() => disconnectBybit()}
+      />
+    )
   } else if (nav === 'settings') {
     title = 'Account settings'
     subtitle = 'Profile, security & subscription'
     breadcrumb = 'Back'
     onExit = () => restoreNav()
-    body = <SettingsView user={user} onUpdateUser={updateUser} onToast={(...toastProps) => fireToast(...toastProps)} />
+    body = (
+      <SettingsView
+        user={user}
+        onUpdateUser={updateUser}
+        onToast={(...toastProps) => fireToast(...toastProps)}
+      />
+    )
   } else if (screen === 'sources') {
     title = 'Sources'
     subtitle = 'Connect where your signals come from'
-    body = <SourcesView telegramConnected={telegramConnected} chats={chats} onConnectTelegram={() => setScreen('tg-setup')} onOpenTelegram={() => setScreen('chats')} />
+    body = (
+      <SourcesView
+        telegramConnected={telegramConnected}
+        chats={chats}
+        onConnectTelegram={() => setScreen('tg-setup')}
+        onOpenTelegram={() => setScreen('chats')}
+      />
+    )
   } else if (screen === 'tg-setup') {
     title = 'Connect Telegram'
     subtitle = 'Source setup'
     breadcrumb = 'Sources'
     onExit = exitToSources
-    body = <TelegramSetup onConnected={() => connectTelegram()} onCancel={exitToSources} />
+    body = (
+      <TelegramSetup onConnected={() => connectTelegram()} onCancel={exitToSources} />
+    )
   } else if (screen === 'chats') {
     title = 'Telegram'
     subtitle = `${chats.length} feeds · ${chats.filter((c) => c.status === 'analyzed').length} analyzed`
     breadcrumb = 'Sources'
     onExit = exitToSources
-    body = <ChatsView chats={chats} onStartBackfill={startBackfill} onRetry={retryBackfill} onResume={resumeChat} onReanalyze={reanalyze} onRestart={restartChat} onViewDeleted={goToDeletedSignals} onCheckGaps={checkGaps} onBacktest={backtestFeed} />
+    body = (
+      <ChatsView
+        chats={chats}
+        onStartBackfill={startBackfill}
+        onRetry={retryBackfill}
+        onResume={resumeChat}
+        onReanalyze={reanalyze}
+        onRestart={restartChat}
+        onViewDeleted={goToDeletedSignals}
+        onCheckGaps={checkGaps}
+        onBacktest={backtestFeed}
+      />
+    )
   } else if (isWorkflow && activeChat) {
     breadcrumb = activeChat.name
     onExit = exitToChats
@@ -214,41 +281,128 @@ export default function App() {
       exchange: ['Exchange', 'Route verified signals'],
       risk: ['Execution', 'Size, entry and exit for every verified signal'],
       backtest: ['Backtest', 'Simulating performance'],
-      'backtest-result': ['Signal quality', 'Backtest results'],
+      'backtest-result': ['Signal quality', 'Backtest results']
     }
 
     title = stepTitles[screen][0]
     subtitle = `${activeChat.name} · ${stepTitles[screen][1]}`
 
     if (screen === 'backfill') {
-      body = <BackfillView chat={activeChat} onCancel={onBackfillCancel} onComplete={onBackfillComplete} />
+      body = (
+        <BackfillView
+          chat={activeChat}
+          onCancel={onBackfillCancel}
+          onComplete={onBackfillComplete}
+        />
+      )
     } else if (screen === 'label') {
-      body = <LabelView messages={MESSAGES} labels={labels} onLabel={setLabel} signalCount={signalCount} noiseCount={noiseCount} onDistill={() => setScreen('distill')} key={`label-${verifyAttempt}`} />
+      body = (
+        <LabelView
+          messages={MESSAGES}
+          labels={labels}
+          onLabel={setLabel}
+          signalCount={signalCount}
+          noiseCount={noiseCount}
+          onDistill={() => setScreen('distill')}
+          key={`label-${verifyAttempt}`}
+        />
+      )
     } else if (screen === 'distill') {
       body = <DistillView onComplete={() => setScreen('verify')} />
     } else if (screen === 'verify') {
-      body = <VerifyView key={`verify-${verifyAttempt}`} attempt={verifyAttempt} onPass={() => setScreen('exchange')} onStop={stopAfterVerify} onLoop={() => { setVerifyAttempt((a) => a + 1); setScreen('label'); fireToast('pending', 'Refining rules', "Label a few more, then we'll re-verify.") }} />
+      body = (
+        <VerifyView
+          key={`verify-${verifyAttempt}`}
+          attempt={verifyAttempt}
+          onPass={() => setScreen('exchange')}
+          onStop={stopAfterVerify}
+          onLoop={() => {
+            setVerifyAttempt((a) => a + 1)
+            setScreen('label')
+            fireToast(
+              'pending',
+              'Refining rules',
+              "Label a few more, then we'll re-verify."
+            )
+          }}
+        />
+      )
     } else if (screen === 'exchange') {
-      body = <ExchangeView bybitConnected={bybitConnected} onConnected={() => { connectBybit(); setScreen('risk') }} />
+      body = (
+        <ExchangeView
+          bybitConnected={bybitConnected}
+          onConnected={() => {
+            connectBybit()
+            setScreen('risk')
+          }}
+        />
+      )
     } else if (screen === 'risk') {
-      body = <ExecutionView layout="flow" controls="segmented" hasRisk={true} onRun={() => setScreen('backtest')} />
+      body = (
+        <ExecutionView
+          layout="flow"
+          controls="segmented"
+          hasRisk={true}
+          onRun={() => setScreen('backtest')}
+        />
+      )
     } else if (screen === 'backtest') {
-      body = <BacktestView chat={activeChat} onComplete={(sd) => onBacktestComplete(sd)} />
+      body = (
+        <BacktestView chat={activeChat} onComplete={(sd) => onBacktestComplete(sd)} />
+      )
     } else if (screen === 'backtest-result') {
-      body = <BacktestView chat={activeChat} skipRun={true} onComplete={() => setScreen('chats')} />
+      body = (
+        <BacktestView
+          chat={activeChat}
+          skipRun={true}
+          onComplete={() => setScreen('chats')}
+        />
+      )
     }
   } else {
     title = 'Sources'
-    body = <SourcesView telegramConnected={telegramConnected} chats={chats} onConnectTelegram={() => setScreen('tg-setup')} onOpenTelegram={() => setScreen('chats')} />
+    body = (
+      <SourcesView
+        telegramConnected={telegramConnected}
+        chats={chats}
+        onConnectTelegram={() => setScreen('tg-setup')}
+        onOpenTelegram={() => setScreen('chats')}
+      />
+    )
   }
 
   if (nav === 'sources' && screen === 'chats') {
-    actions = <IconButton label="Refresh feeds" onClick={() => fireToast('info', 'Refreshed', 'Feed list synced with Telegram.')}><Icon name="refresh" size={16} /></IconButton>
+    actions = (
+      <IconButton
+        label="Refresh feeds"
+        onClick={() =>
+          fireToast('info', 'Refreshed', 'Feed list synced with Telegram.')
+        }
+      >
+        <Icon name="refresh" size={16} />
+      </IconButton>
+    )
   }
 
   return (
     <>
-      <Shell nav={nav} onNavigate={handleNav} title={title} subtitle={subtitle} breadcrumb={breadcrumb} onExit={onExit} actions={actions} pipeline={pipeline} theme={theme} onThemeChange={changeTheme} onLogout={() => { window.location.href = MARKETING_URL }} user={user} onOpenSettings={openSettings}>
+      <Shell
+        nav={nav}
+        onNavigate={handleNav}
+        title={title}
+        subtitle={subtitle}
+        breadcrumb={breadcrumb}
+        onExit={onExit}
+        actions={actions}
+        pipeline={pipeline}
+        theme={theme}
+        onThemeChange={changeTheme}
+        onLogout={() => {
+          window.location.href = MARKETING_URL
+        }}
+        user={user}
+        onOpenSettings={openSettings}
+      >
         {body}
       </Shell>
 
@@ -260,17 +414,29 @@ export default function App() {
         icon={<Icon name="alert" size={19} />}
         footer={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setBackTarget(null)}>Stay here</Button>
-            <Button variant="primary" size="sm" onClick={confirmStepBack}>Go back to Label</Button>
+            <Button variant="ghost" size="sm" onClick={() => setBackTarget(null)}>
+              Stay here
+            </Button>
+            <Button variant="primary" size="sm" onClick={confirmStepBack}>
+              Go back to Label
+            </Button>
           </>
         }
       >
-        Your existing labels are kept, but Distill and Verify will run again before signals can route. Exchange and execution settings are unaffected.
+        Your existing labels are kept, but Distill and Verify will run again before
+        signals can route. Exchange and execution settings are unaffected.
       </Dialog>
 
       {toast && (
         <ToastStack>
-          <Toast tone={toast.tone} title={toast.title} time={toast.time} onClose={clearToast}>{toast.msg}</Toast>
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            time={toast.time}
+            onClose={clearToast}
+          >
+            {toast.msg}
+          </Toast>
         </ToastStack>
       )}
     </>
