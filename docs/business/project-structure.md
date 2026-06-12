@@ -24,7 +24,7 @@ Verasig/
 ## Root Ownership
 
 - `apps/backend/` owns backend runtime code, migrations, CLI, and tests.
-- `apps/frontend/` owns production UI code and runtime design-system modules.
+- `apps/frontend/` owns all frontend code, frontend package management, and runtime design-system modules.
 - `docs/` owns product, architecture, domain, and implementation records.
 - `libs/contracts/` is reserved for shared backend/frontend payload contracts.
 - `graphify-out/` owns canonical graph outputs only.
@@ -48,6 +48,7 @@ apps/backend/
 |   |-- integration/
 |   `-- fixtures/
 |-- Dockerfile
+|-- Makefile
 |-- alembic.ini
 |-- pyproject.toml
 `-- uv.lock
@@ -68,37 +69,46 @@ apps/backend/
 
 ```text
 apps/frontend/
-|-- src/
-|   |-- assets/
-|   |-- data/
-|   |-- design-system/
-|   |   |-- components/
-|   |   |-- icons/
-|   |   `-- tokens/
-|   |-- features/
-|   |   |-- auth/
-|   |   |-- exchanges/
-|   |   |-- pipeline/
-|   |   |-- settings/
-|   |   |-- signals/
-|   |   `-- sources/
-|   |-- layout/
-|   |-- App.jsx
-|   |-- app.css
-|   `-- main.jsx
-|-- public/
-|-- index.html
+|-- product/
+|   |-- src/
+|   |   |-- assets/
+|   |   |-- data/
+|   |   |-- features/
+|   |   |-- layout/
+|   |   |-- App.jsx
+|   |   |-- app.css
+|   |   `-- main.jsx
+|   |-- public/
+|   |-- index.html
+|   |-- package.json
+|   `-- vite.config.js
+|-- marketing/
+|   |-- src/
+|   |-- index.html
+|   |-- package.json
+|   `-- vite.config.js
+|-- design-system/
+|   |-- components/
+|   |-- icons/
+|   |-- tokens/
+|   |-- index.js
+|   |-- package.json
+|   `-- styles.css
+|-- Makefile
 |-- package.json
 `-- package-lock.json
 ```
 
 ## Frontend Module Rules
 
+- `apps/frontend/package.json` owns frontend workspaces and frontend-only tooling.
+- `product/` owns the production client shell and product workflows.
+- `marketing/` owns the marketing site.
 - `design-system/` owns reusable runtime UI modules and tokens.
-- `features/` owns user workflow screens grouped by product capability.
-- `layout/` owns shell-level navigation and page chrome.
-- `data/` owns prototype seed data until backend payload contracts exist.
-- `App.jsx` is the composition root and should not absorb feature internals.
+- `product/src/features/` owns user workflow screens grouped by product capability.
+- `product/src/layout/` owns shell-level navigation and page chrome.
+- `product/src/data/` owns prototype seed data until backend payload contracts exist.
+- `product/src/App.jsx` is the product composition root and should not absorb feature internals.
 
 ## Contract Library
 
@@ -120,7 +130,7 @@ graphify-out/
 
 ## Generated Artifact Rules
 
-- Track lockfiles.
+- Track lockfiles in the owning workspace.
 - Do not track `node_modules/`.
 - Do not track Python virtual environments.
 - Do not track Graphify cache/state files.

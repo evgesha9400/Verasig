@@ -3,13 +3,13 @@
 ## Boundaries
 
 - `apps/backend/`: backend application and runtime surface.
-- `apps/frontend/`: UI shell and future production client.
+- `apps/frontend/`: frontend workspace and runtime UI surface.
 - `libs/contracts/`: shared contracts when backend/frontend communicate over DTOs.
 
 ## Ownership
 
 - `apps/backend` owns data models, CLI, and persistence behavior.
-- `apps/frontend` owns interaction design and client-side presentation only.
+- `apps/frontend` owns product UI, marketing UI, design-system code, and frontend tooling.
 - `libs/contracts` owns cross-layer payload shapes and versioned API types.
 
 ## Environment loading
