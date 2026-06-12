@@ -11,7 +11,8 @@ _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 
 
 class CustomRiskPolicy:
-    def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome:
+    @staticmethod
+    def simulate(folded: FoldedSignal, klines: list[Kline]) -> SimOutcome:
         return SimOutcome(
             folded_signal_id=folded.root_signal_id,
             kind=SimOutcomeKind.UNFILLED,

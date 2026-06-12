@@ -37,11 +37,11 @@ class FakeSource:
         self.requested_afters: list[int | None] = []
         self.yielded_ids: list[int] = []
 
-    async def resolve_channel(self, reference: str | int) -> TelegramChannel:
+    async def resolve_channel(self, _reference: str | int) -> TelegramChannel:
         return self.channel
 
     async def backfill_batches(
-        self, channel_id: int, after_message_id: int | None, batch_size: int
+        self, _channel_id: int, after_message_id: int | None, batch_size: int
     ) -> AsyncIterator[list[RawTelegramMessage]]:
         self.requested_afters.append(after_message_id)
         after = after_message_id or 0
@@ -57,10 +57,11 @@ class FakeSource:
             yielded += len(batch)
             yield batch
 
-    async def live_message_ids(self, channel_id: int) -> set[int]:
+    async def live_message_ids(self, _channel_id: int) -> set[int]:
         return set(self.live_ids)  # canned live snapshot for rescan tests
 
-    async def live_events(self, channel_ids: list[int]):
+    @staticmethod
+    async def live_events(_channel_ids: list[int]):
         yield None  # unused by backfill tests
 
 
@@ -106,6 +107,6 @@ class FakeExtractor:
         self._returns = returns
         self.calls = 0
 
-    def extract(self, candidate_text: str) -> TradeIntent | None:
+    def extract(self, _candidate_text: str) -> TradeIntent | None:
         self.calls += 1
         return self._returns

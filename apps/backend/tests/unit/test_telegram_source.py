@@ -46,7 +46,8 @@ def test_delivery_event_wraps_message_with_mode_and_defaults_source_pts():
 
 def test_conforming_source_satisfies_protocol():
     class FakeSource:
-        async def resolve_channel(self, reference) -> TelegramChannel:
+        @staticmethod
+        async def resolve_channel(_reference) -> TelegramChannel:
             return TelegramChannel(
                 channel_id=1,
                 title="t",
@@ -54,17 +55,18 @@ def test_conforming_source_satisfies_protocol():
                 first_seen_at=_instant(),
             )
 
+        @staticmethod
         async def backfill_batches(
-            self, channel_id, after_message_id, batch_size
+            _channel_id, _after_message_id, _batch_size
         ) -> AsyncIterator[list[RawTelegramMessage]]:
             yield []
 
-        async def live_message_ids(self, channel_id) -> set[int]:
+        @staticmethod
+        async def live_message_ids(_channel_id) -> set[int]:
             return set()
 
-        async def live_events(
-            self, channel_ids
-        ) -> AsyncIterator[TelegramDeliveryEvent]:
+        @staticmethod
+        async def live_events(_channel_ids) -> AsyncIterator[TelegramDeliveryEvent]:
             yield TelegramDeliveryEvent(
                 message=_message(),
                 mode=DeliveryMode.PUSH,
@@ -77,10 +79,12 @@ def test_conforming_source_satisfies_protocol():
 
 def test_source_missing_resolve_channel_does_not_satisfy_protocol():
     class NoResolve:
-        async def backfill_batches(self, channel_id, after_message_id, batch_size):
+        @staticmethod
+        async def backfill_batches(_channel_id, _after_message_id, _batch_size):
             yield []
 
-        async def live_events(self, channel_ids):
+        @staticmethod
+        async def live_events(_channel_ids):
             yield None
 
     assert not isinstance(NoResolve(), TelegramSource)
@@ -88,7 +92,8 @@ def test_source_missing_resolve_channel_does_not_satisfy_protocol():
 
 def test_source_missing_live_events_does_not_satisfy_protocol():
     class BackfillOnly:
-        async def backfill_batches(self, channel_id, after_message_id, batch_size):
+        @staticmethod
+        async def backfill_batches(_channel_id, _after_message_id, _batch_size):
             yield []
 
     assert not isinstance(BackfillOnly(), TelegramSource)
@@ -96,15 +101,18 @@ def test_source_missing_live_events_does_not_satisfy_protocol():
 
 def test_source_missing_live_message_ids_does_not_satisfy_protocol():
     class NoLiveIds:
-        async def resolve_channel(self, reference) -> TelegramChannel:
+        @staticmethod
+        async def resolve_channel(_reference) -> TelegramChannel:
             return TelegramChannel(
                 channel_id=1, title="t", is_private=False, first_seen_at=_instant()
             )
 
-        async def backfill_batches(self, channel_id, after_message_id, batch_size):
+        @staticmethod
+        async def backfill_batches(_channel_id, _after_message_id, _batch_size):
             yield []
 
-        async def live_events(self, channel_ids):
+        @staticmethod
+        async def live_events(_channel_ids):
             yield None
 
     assert not isinstance(NoLiveIds(), TelegramSource)

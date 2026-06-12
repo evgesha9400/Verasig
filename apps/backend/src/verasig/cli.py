@@ -16,7 +16,6 @@ from verasig.domain.score import (
     ProviderScoreExplanation,
     ScoreComponent,
 )
-from verasig.domain.score import _now as _score_now
 from verasig.domain.signal import ExtractedSignal, ExtractionMethod, SignalEventType
 from verasig.domain.simulation import SimOutcome
 from verasig.foundation.bybit_market_data import BybitKlineClient
@@ -62,6 +61,10 @@ def main() -> None:
 def _fail(error: Exception) -> typer.Exit:
     typer.echo(str(error), err=True)
     return typer.Exit(1)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(tz=timezone.utc)
 
 
 @app.command()
@@ -256,7 +259,7 @@ def _format_step(step: FoldStep) -> str:
 def _format_header(folded: FoldedSignal) -> str:
     closed = folded.closed_at.strftime("%Y-%m-%dT%H:%MZ") if folded.closed_at else "-"
     return (
-        f"{folded.symbol} {folded.side.value}  root={str(folded.root_signal_id)[:8]}  "
+        f"{folded.symbol} {folded.side.value}  root={folded.root_signal_id.hex[:8]}  "
         f"steps={len(folded.timeline)}  closed={closed}"
     )
 
@@ -411,7 +414,7 @@ def _score_channel(
         events = repo.read_signal_events(session, channel_id)
         signals = repo.read_extracted_signals(session, channel_id)
         unrecognized = repo.read_unrecognized_signals(session, channel_id)
-        deletions = repo.read_deletion_evidence(session, channel_id)
+        deletion_evidence = repo.read_deletion_evidence(session, channel_id)
         message_count = repo.count_messages(session, channel_id)
     sim_outcomes = (
         []
@@ -425,9 +428,9 @@ def _score_channel(
         events=events,
         signals=signals,
         unrecognized=unrecognized,
-        deletions=deletions,
+        deletions=deletion_evidence,
         sim_outcomes=sim_outcomes,
-        computed_at=_score_now(),
+        computed_at=_utc_now(),
     )
     return channel, score, explanation
 

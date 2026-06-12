@@ -10,13 +10,13 @@ never runs against real Telegram in tests.
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
     DeletionConfidence,
-    _now,
 )
 from verasig.domain.protocols import TelegramSource
 from verasig.services.deletion.diff import detect_deletions
@@ -33,6 +33,10 @@ class RescanResult:
     confirmed: int  # CONFIRMED deletions detected this rescan
     suspected: int  # SUSPECTED gaps detected this rescan
     written: int  # rows newly written/upgraded (0 on a same-state re-run)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(tz=timezone.utc)
 
 
 async def rescan(
@@ -68,7 +72,7 @@ def _detect(
     with session_factory() as session:
         stored = repo.read_messages(session, channel_id)
         candidates = repo.candidate_message_ids(session, channel_id)
-    return detect_deletions(channel_id, stored, live_ids, candidates, _now())
+    return detect_deletions(channel_id, stored, live_ids, candidates, _utc_now())
 
 
 def _persist(

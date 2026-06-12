@@ -133,8 +133,9 @@ class TelethonSource(TelegramSource):
         if batch:
             yield batch
 
+    @staticmethod
     def _to_raw_message(
-        self, channel_id: int, message, captured_at: datetime | None = None
+        channel_id: int, message, captured_at: datetime | None = None
     ) -> RawTelegramMessage:
         return RawTelegramMessage(
             channel_id=channel_id,
@@ -246,7 +247,8 @@ class TelethonSource(TelegramSource):
             )
         )
 
-    async def _enqueue_deleted_messages(self, state: _LiveEventState, event) -> None:
+    @staticmethod
+    async def _enqueue_deleted_messages(state: _LiveEventState, event) -> None:
         channel_id = _deletion_channel_id(event)
         if channel_id not in state.channel_ids:
             return
