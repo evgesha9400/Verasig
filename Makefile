@@ -1,120 +1,96 @@
 .DEFAULT_GOAL := help
 
 BACKEND_DIR := apps/backend
-FRONTEND_WORKSPACE := verasig-frontend
-MARKETING_WORKSPACE := verasig-marketing
-DESIGN_SYSTEM_WORKSPACE := @verasig/design-system
-
+FRONTEND_DIR := apps/frontend
 ARGS ?= --help
 
 .PHONY: help doctor env \
-        install install-backend install-web \
-        check format format-check lint lint-backend lint-web \
-        test test-backend test-backend-unit test-backend-integration test-web \
-        test-frontend test-marketing test-design-system \
-        build build-web build-image \
-        js-format js-format-check format-backend format-backend-check \
+        install install-backend install-frontend \
+        check format format-check lint test build build-image \
+        backend-format backend-format-check backend-lint backend-test \
+        frontend-format frontend-format-check frontend-lint frontend-test frontend-build \
         dev-frontend dev-marketing \
         db-up db-down migrate db-migrate health \
-        up down logs cli \
-        clean clean-all \
+        up down logs cli clean clean-all \
         fe-install fe-dev fe-build fe-test fe-lint \
         be-install be-test be-lint be-format
 
-help: ## Show available targets
+help: ## Show available root targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-26s\033[0m %s\n", $$1, $$2}'
 
-doctor: ## Verify local developer tools
-	@command -v npm >/dev/null
-	@command -v uv >/dev/null
+doctor: ## Verify root-level developer tools
 	@command -v docker >/dev/null
+	@command -v make >/dev/null
+	@$(MAKE) -C $(FRONTEND_DIR) doctor
+	@$(MAKE) -C $(BACKEND_DIR) doctor
 	@docker compose version >/dev/null
-	@echo "OK: required tools are available"
+	@echo "OK: root toolchain is available"
 
-env: ## Create .env from .env.example when missing
+env: ## Create root .env from .env.example when missing
 	@if [ ! -f .env ]; then cp .env.example .env; fi
 
 # Setup
 
-install: install-web install-backend ## Install all project dependencies
+install: install-frontend install-backend ## Install frontend and backend dependencies
 
-install-web: ## Install JavaScript workspace dependencies
-	npm ci
+install-frontend: ## Install frontend workspace dependencies
+	$(MAKE) -C $(FRONTEND_DIR) install
 
 install-backend: ## Install backend dependencies
-	cd $(BACKEND_DIR) && uv sync --all-groups
+	$(MAKE) -C $(BACKEND_DIR) install
 
 # Quality gates
 
 check: format-check lint test build ## Run the full local verification gate
 
-format: js-format format-backend ## Format JavaScript and Python files
+format: frontend-format backend-format ## Format frontend and backend code
 
-format-check: js-format-check format-backend-check ## Check JavaScript and Python formatting
+format-check: frontend-format-check backend-format-check ## Check frontend and backend formatting
 
-lint: lint-web lint-backend ## Lint JavaScript workspaces and backend
+lint: frontend-lint backend-lint ## Lint frontend and backend code
 
-lint-web: ## Lint all JavaScript workspaces
-	npm run lint --workspaces --if-present
+test: backend-test frontend-test ## Run backend and frontend tests
 
-lint-backend: ## Lint backend Python
-	cd $(BACKEND_DIR) && uv run ruff check .
+build: frontend-build build-image ## Build frontend apps and backend image
 
-js-format: ## Format JavaScript workspace files
-	npm run format:js
+frontend-format: ## Format frontend workspace files
+	$(MAKE) -C $(FRONTEND_DIR) format
 
-js-format-check: ## Check JavaScript workspace formatting
-	npm run format:js:check
+frontend-format-check: ## Check frontend workspace formatting
+	$(MAKE) -C $(FRONTEND_DIR) format-check
 
-format-backend: ## Format backend Python
-	cd $(BACKEND_DIR) && uv run ruff format . && uv run ruff check --fix .
+frontend-lint: ## Lint frontend workspace
+	$(MAKE) -C $(FRONTEND_DIR) lint
 
-format-backend-check: ## Check backend Python formatting
-	cd $(BACKEND_DIR) && uv run ruff format --check . && uv run ruff check .
+frontend-test: ## Run frontend workspace tests
+	$(MAKE) -C $(FRONTEND_DIR) test
 
-# Tests
+frontend-build: ## Build frontend workspace apps
+	$(MAKE) -C $(FRONTEND_DIR) build
 
-test: test-backend test-web ## Run all tests
+backend-format: ## Format backend Python
+	$(MAKE) -C $(BACKEND_DIR) format
 
-test-backend: ## Run backend tests
-	cd $(BACKEND_DIR) && uv run pytest
+backend-format-check: ## Check backend Python formatting
+	$(MAKE) -C $(BACKEND_DIR) format-check
 
-test-backend-unit: ## Run backend unit tests
-	cd $(BACKEND_DIR) && uv run pytest tests/unit
+backend-lint: ## Lint backend Python
+	$(MAKE) -C $(BACKEND_DIR) lint
 
-test-backend-integration: ## Run backend integration tests
-	cd $(BACKEND_DIR) && uv run pytest tests/integration
-
-test-web: test-design-system test-frontend test-marketing ## Run all JavaScript workspace tests
-
-test-design-system: ## Run design-system tests
-	npm run test --workspace $(DESIGN_SYSTEM_WORKSPACE)
-
-test-frontend: ## Run frontend tests once
-	npm run test --workspace $(FRONTEND_WORKSPACE) -- --run
-
-test-marketing: ## Run marketing tests once
-	npm run test --workspace $(MARKETING_WORKSPACE) -- --run
-
-# Builds
-
-build: build-web build-image ## Build web apps and backend image
-
-build-web: ## Build frontend and marketing apps
-	npm run build --workspace $(FRONTEND_WORKSPACE)
-	npm run build --workspace $(MARKETING_WORKSPACE)
+backend-test: ## Run backend tests
+	$(MAKE) -C $(BACKEND_DIR) test
 
 build-image: ## Build backend Docker image
 	docker compose build app
 
 # Development
 
-dev-frontend: ## Start frontend dev server
-	npm run dev --workspace $(FRONTEND_WORKSPACE)
+dev-frontend: ## Start product frontend dev server
+	$(MAKE) -C $(FRONTEND_DIR) dev-product
 
 dev-marketing: ## Start marketing dev server
-	npm run dev --workspace $(MARKETING_WORKSPACE)
+	$(MAKE) -C $(FRONTEND_DIR) dev-marketing
 
 # Runtime and database
 
@@ -125,12 +101,12 @@ db-down: ## Stop Postgres
 	docker compose stop db
 
 migrate: ## Run database migrations
-	cd $(BACKEND_DIR) && uv run verasig migrate
+	$(MAKE) -C $(BACKEND_DIR) migrate
 
 db-migrate: migrate ## Alias for migrate
 
 health: ## Check backend health through the local CLI
-	cd $(BACKEND_DIR) && uv run verasig health
+	$(MAKE) -C $(BACKEND_DIR) health
 
 up: ## Start all services with rebuilds
 	docker compose up --build
@@ -142,38 +118,34 @@ logs: ## Follow backend app logs
 	docker compose logs -f app
 
 cli: ## Run backend CLI command, e.g. make cli ARGS="stats <channel>"
-	cd $(BACKEND_DIR) && uv run verasig $(ARGS)
+	$(MAKE) -C $(BACKEND_DIR) cli ARGS="$(ARGS)"
 
 # Cleanup
 
 clean: ## Remove safe generated artifacts
-	rm -rf apps/frontend/dist apps/marketing/dist
-	rm -rf apps/frontend/.vite apps/marketing/.vite libs/design-system/.vite
-	find $(BACKEND_DIR) -type d -name __pycache__ -exec rm -rf {} +
-	find $(BACKEND_DIR) -type d -name .pytest_cache -exec rm -rf {} +
-	find $(BACKEND_DIR) -type d -name .ruff_cache -exec rm -rf {} +
-	find $(BACKEND_DIR) -type f -name '*.pyc' -delete
+	$(MAKE) -C $(FRONTEND_DIR) clean
+	$(MAKE) -C $(BACKEND_DIR) clean
 
-clean-all: clean ## Remove dependencies and local virtual environments
-	rm -rf node_modules apps/frontend/node_modules apps/marketing/node_modules
-	rm -rf libs/design-system/node_modules apps/backend/.venv
+clean-all: ## Remove dependencies and local virtual environments
+	$(MAKE) -C $(FRONTEND_DIR) clean-all
+	$(MAKE) -C $(BACKEND_DIR) clean-all
 
 # Compatibility aliases
 
-fe-install: install-web ## Alias for install-web
+fe-install: install-frontend ## Alias for install-frontend
 
 fe-dev: dev-frontend ## Alias for dev-frontend
 
-fe-build: build-web ## Alias for build-web
+fe-build: frontend-build ## Alias for frontend-build
 
-fe-test: test-web ## Alias for test-web
+fe-test: frontend-test ## Alias for frontend-test
 
-fe-lint: lint-web ## Alias for lint-web
+fe-lint: frontend-lint ## Alias for frontend-lint
 
 be-install: install-backend ## Alias for install-backend
 
-be-test: test-backend ## Alias for test-backend
+be-test: backend-test ## Alias for backend-test
 
-be-lint: lint-backend ## Alias for lint-backend
+be-lint: backend-lint ## Alias for backend-lint
 
-be-format: format-backend ## Alias for format-backend
+be-format: backend-format ## Alias for backend-format
