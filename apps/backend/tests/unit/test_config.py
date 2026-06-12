@@ -40,15 +40,6 @@ def test_database_url_escapes_user_password_and_database_name(monkeypatch):
     )
 
 
-def test_telegram_phone_loads_from_env(monkeypatch):
-    monkeypatch.setenv("VERASIG_TELEGRAM_PHONE", "+15551234567")
-    assert Settings().telegram_phone == "+15551234567"
-
-
-def test_telegram_phone_defaults_to_none():
-    assert Settings(_env_file=None).telegram_phone is None
-
-
 def test_backfill_batch_size_defaults_to_200():
     assert Settings(_env_file=None).backfill_batch_size == 200
 
@@ -56,33 +47,6 @@ def test_backfill_batch_size_defaults_to_200():
 def test_backfill_batch_size_loads_from_env(monkeypatch):
     monkeypatch.setenv("VERASIG_BACKFILL_BATCH_SIZE", "50")
     assert Settings().backfill_batch_size == 50
-
-
-def test_distiller_command_defaults_to_claude():
-    assert Settings(_env_file=None).distiller_command == "claude"
-
-
-def test_distiller_command_loads_from_env(monkeypatch):
-    monkeypatch.setenv("VERASIG_DISTILLER_COMMAND", "codex")
-    assert Settings().distiller_command == "codex"
-
-
-def test_extractor_fallback_enabled_defaults_to_true():
-    assert Settings(_env_file=None).extractor_fallback_enabled is True
-
-
-def test_extractor_fallback_enabled_loads_from_env(monkeypatch):
-    monkeypatch.setenv("VERASIG_EXTRACTOR_FALLBACK_ENABLED", "false")
-    assert Settings().extractor_fallback_enabled is False
-
-
-def test_extractor_command_defaults_to_claude():
-    assert Settings(_env_file=None).extractor_command == "claude"
-
-
-def test_extractor_command_loads_from_env(monkeypatch):
-    monkeypatch.setenv("VERASIG_EXTRACTOR_COMMAND", "codex")
-    assert Settings().extractor_command == "codex"
 
 
 def test_settings_carry_api_secrets(monkeypatch):

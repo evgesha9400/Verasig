@@ -19,14 +19,14 @@ services:
     environment:
       VERASIG_DB_HOST: db
       VERASIG_DB_PORT: "5432"
+      VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+    ports:
+      - "8000:8000"
     volumes:
       - ./secrets:/secrets:ro     # read-only provided secrets (gitignored)
-      - tgsession:/session        # writable Telegram session (named volume)
     depends_on:
       db:
         condition: service_healthy
-    command: ["health"]
 
 volumes:
   pgdata: {}
-  tgsession: {}

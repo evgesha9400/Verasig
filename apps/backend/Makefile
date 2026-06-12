@@ -3,7 +3,7 @@
 ARGS ?= --help
 
 .PHONY: help doctor install format format-check lint test test-unit test-integration \
-        migrate health cli clean clean-all
+        migrate health serve clean clean-all
 
 help: ## Show backend targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -35,13 +35,13 @@ test-integration: ## Run backend integration tests
 	uv run pytest tests/integration
 
 migrate: ## Run database migrations
-	uv run verasig migrate
+	uv run alembic upgrade head
 
-health: ## Check backend health through the local CLI
-	uv run verasig health
+health: ## Check local API health
+	curl -fsS localhost:8000/health
 
-cli: ## Run backend CLI command, e.g. make cli ARGS="stats <channel>"
-	uv run verasig $(ARGS)
+serve: ## Run the FastAPI server locally
+	uv run uvicorn verasig.api.app:create_app_from_env --factory --reload
 
 clean: ## Remove safe backend generated artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} +
