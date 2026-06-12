@@ -72,7 +72,7 @@ def _members_by_root(
         if root is not None:
             members[root].append(message)
     for member_list in members.values():
-        member_list.sort(key=lambda message: message.posted_at)
+        member_list.sort(key=lambda member: member.posted_at)
     return members
 
 
