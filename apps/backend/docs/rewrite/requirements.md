@@ -47,7 +47,8 @@ auth, and tenancy are replaced.
 ### Defer (explicitly out of v1)
 
 - Stripe billing (plan changes are direct writes, no payment)
-- Outbound email (mailer is a logging stub; confirm tokens surfaced in logs)
+- Outbound email (mailer is a logging stub; email-change confirm tokens surfaced in logs)
+- Password-reset completion (request endpoint only in v1 — no token, no consumer endpoint)
 - Live ingestion API exposure (`services/ingestion/live.py` stays internal)
 - Desk-tier public API keys ("API access" plan row)
 - 2FA-protected Telegram accounts (`SessionPasswordNeededError` → clean error)
@@ -104,7 +105,7 @@ auth, and tenancy are replaced.
 | `/user` | PATCH | `{firstName?, lastName?}` | user |
 | `/user/email` | POST | `{email}` | user (`pendingEmail` set; confirm token logged — mail stub) |
 | `/user/email/confirm` | POST | `{token}` | user (email applied, `pendingEmail` null) |
-| `/user/password/reset-request` | POST | — | `202` (reset link logged — mail stub) |
+| `/user/password/reset-request` | POST | — | `202` (request logged — mail stub; no token issued, reset completion deferred with email infra) |
 | `/user/subscription/change` | POST | `{plan}` | user |
 | `/user/subscription/cancel` | POST | — | user (`cancelAt` = now + 30 d) |
 | `/user/subscription/resume` | POST | — | user (`cancelAt` null) |
@@ -243,8 +244,8 @@ Static catalog in code (bybit `available`; others `soon`). `account` = masked ke
 | Table | Change |
 |---|---|
 | `golden_label` | + `user_id` FK; + `label` (`signal\|noise\|modifier`); `is_signal` kept, derived (`label = 'signal'`); UNIQUE → (user_id, channel_id, message_id) |
-| `filter_rule` | + `user_id` FK; + `display` JSONB (per-pattern `{label, detail}`) |
-| `parser_rule` | + `user_id` FK |
+| `filter_rule` | + `user_id` FK; + `display` JSONB (per-pattern `{label, detail}`); `rule_id` PK stamped user-scoped (`{user_id}:{channel_id}-filter-v{version}` — legacy stamp collides across users); + UNIQUE NULLS NOT DISTINCT (user_id, channel_id, version) |
+| `parser_rule` | + `user_id` FK; `rule_id` stamped user-scoped (`{user_id}:{channel_id}-parser-{n}-v{version}`; many per version, no version unique) |
 | `extracted_signal` | + `user_id` FK (nullable through transition); UNIQUE(event_id) → UNIQUE NULLS NOT DISTINCT (user_id, event_id) — outcomes of per-user parser rules are per-user projections (D16) |
 | `unrecognized_signal` | + `user_id` FK; UNIQUE → NULLS NOT DISTINCT (user_id, event_id) |
 | `parser_drift_warning` | + `user_id` FK; UNIQUE → NULLS NOT DISTINCT (user_id, event_id) |
