@@ -6,7 +6,7 @@
 
 **Architecture:** Three layers — `foundation` (db, security, telegram, bybit, anthropic), `services` (existing domain services + new `accounts`, `telegram_link`, `exchanges`, `jobs`, `projection`), `api` (routers + schemas + deps). API routers call services; services never import `api`.
 
-**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2.0 (sync), Alembic, PostgreSQL 16, Telethon, Anthropic SDK, PyJWT, bcrypt, cryptography (Fernet), sse-starlette, UV.
+**Tech Stack:** Python 3.12, FastAPI, SQLAlchemy 2.0 (sync), Alembic, PostgreSQL 16, Telethon, Anthropic SDK, PyJWT, bcrypt, cryptography (AES-GCM), sse-starlette, UV.
 
 **Working rules (every task):**
 - TDD: failing test → minimal code → green → `make format && make lint` → commit (conventional, bulleted body).
@@ -40,7 +40,7 @@ apps/backend/src/verasig/
 │   ├── backtesting/     # service.py        (fold→klines→simulate→score→persist)
 │   └── projection/      # chats.py signals.py rules.py dates.py
 ├── foundation/
-│   ├── security.py      # bcrypt + Fernet helpers
+│   ├── security.py      # bcrypt + SecretCipher (AES-GCM envelopes)
 │   ├── anthropic_runner.py
 │   ├── bybit_account.py # HMAC key verification
 │   └── telegram_session.py   # REWRITTEN: stateless helpers for per-user sessions
@@ -64,16 +64,16 @@ apps/backend/src/verasig/
 ```python
 def test_settings_carry_api_secrets(monkeypatch):
     monkeypatch.setenv("VERASIG_JWT_SECRET", "jwt-secret")
-    monkeypatch.setenv("VERASIG_FERNET_KEY", "fkey")
+    monkeypatch.setenv("VERASIG_SECRET_KEYS", "2026-06:newb64key,2026-01:oldb64key")
     settings = Settings(_env_file=None)
     assert settings.jwt_secret == "jwt-secret"
-    assert settings.fernet_key == "fkey"
+    assert settings.secret_keys == "2026-06:newb64key,2026-01:oldb64key"
     assert settings.anthropic_model == "claude-sonnet-4-6"
     assert settings.cors_origins == ["http://localhost:5173"]
 ```
 
-- [ ] **Step 3:** In `Settings`: add `jwt_secret: str = "dev-secret"`, `fernet_key: str = ""`, `anthropic_api_key: str = ""`, `anthropic_model: str = "claude-sonnet-4-6"`, `cors_origins: list[str] = ["http://localhost:5173"]`, `jwt_ttl_days: int = 7`. CLI-era fields (`session_path`, `telegram_api_id/hash/phone`, `distiller_command`, `extractor_command`) stay until Task 19 — `cli.py` still reads them.
-- [ ] **Step 4:** Update `.env.example` with the new vars (+ note: `VERASIG_FERNET_KEY` from `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
+- [ ] **Step 3:** In `Settings`: add `jwt_secret: str = "dev-secret"`, `secret_keys: str = ""` (cipher keyring: comma-separated `key_id:base64key`, first entry = primary; parsed by `SecretCipher.from_spec`, Task 4), `anthropic_api_key: str = ""`, `anthropic_model: str = "claude-sonnet-4-6"`, `cors_origins: list[str] = ["http://localhost:5173"]`, `jwt_ttl_days: int = 7`. CLI-era fields (`session_path`, `telegram_api_id/hash/phone`, `distiller_command`, `extractor_command`) stay until Task 19 — `cli.py` still reads them.
+- [ ] **Step 4:** Update `.env.example` with the new vars (+ note: `VERASIG_SECRET_KEYS=2026-06:<base64key>` — generate a key with `uv run python -c "import os, base64; print(base64.b64encode(os.urandom(32)).decode())"`; to rotate, prepend a new `key_id:base64key` pair and keep old pairs so existing envelopes still decrypt).
 - [ ] **Step 5:** `uv run pytest tests/unit/test_config.py -v` → PASS. Commit `chore(backend): add API stack dependencies and settings`.
 
 ### Task 2: App factory, errors, health
@@ -95,8 +95,8 @@ def test_health_ok(client):
 ```python
 @pytest.fixture()
 def app(session_factory, pg_url):
-    settings = Settings(_env_file=None, database_url_override=pg_url,
-                        jwt_secret="test-secret", fernet_key=Fernet.generate_key().decode())
+    settings = Settings(_env_file=None, database_url_override=pg_url, jwt_secret="test-secret",
+                        secret_keys=f"test:{base64.b64encode(os.urandom(32)).decode()}")
     return create_app(settings, session_factory=session_factory)
 
 @pytest.fixture()
@@ -175,11 +175,11 @@ Also `domain/label.py`: add `class LabelKind(StrEnum): SIGNAL="signal"; NOISE="n
   - `outcome_repository` + `drift_repository`: thread `user_id: UUID | None` through `record_outcome`, `insert_*`, `read_*`; CLI call sites pass `None` until Task 19 deletes them. The four projection tables keep `user_id` **nullable** with `UNIQUE NULLS NOT DISTINCT (user_id, event_id)` (PG ≥ 15) so the one-outcome-per-event invariant holds for both API and transitional CLI writes
 - [ ] **Step 5:** Round-trip integration tests per repo in `test_repositories.py` (insert → read → update → assert). `uv run pytest tests/integration/test_migrations.py tests/integration/test_repositories.py -v` → PASS. Commit `feat(backend): multi-tenant schema and repositories`.
 
-### Task 4: Security foundation (bcrypt, Fernet, JWT)
+### Task 4: Security foundation (bcrypt, SecretCipher, JWT)
 
-**Files:** Create `foundation/security.py`, `services/accounts/passwords.py`, `services/accounts/tokens.py`, `tests/unit/test_security.py`, `tests/unit/test_tokens.py`
+**Files:** Create `foundation/security.py`, `services/accounts/passwords.py`, `services/accounts/tokens.py`, `tests/unit/test_security.py`, `tests/unit/test_tokens.py`; Modify `api/app.py`
 
-- [ ] **Step 1:** Failing tests: hash→check round-trip true / wrong password false; encrypt→decrypt round-trip; access-token issue→read round-trip; expired token raises; garbage token raises; email-change token round-trips `(user_id, new_email)`; **wrong purpose rejected** (access token fed to `read_email_change_token` raises, and vice versa).
+- [ ] **Step 1:** Failing tests: hash→check round-trip true / wrong password false; cipher encrypt→decrypt round-trip (matching AAD); envelope shape `v1:<key_id>:<nonce_b64>:<ciphertext_b64>` stamped with the primary key id; **wrong AAD raises `SecretDecryptError`** (tenant/record binding); rotation: envelope encrypted under an old-only keyring decrypts under a two-key ring (key-id lookup); unknown key id / malformed envelope / tampered ciphertext raise `SecretDecryptError`; access-token issue→read round-trip; expired token raises; garbage token raises; email-change token round-trips `(user_id, new_email)`; **wrong purpose rejected** (access token fed to `read_email_change_token` raises, and vice versa).
 - [ ] **Step 2:** Implement:
 
 ```python
@@ -188,10 +188,42 @@ def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 def check_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
-def encrypt_secret(plain: str, fernet_key: str) -> str:
-    return Fernet(fernet_key.encode()).encrypt(plain.encode()).decode()
-def decrypt_secret(token: str, fernet_key: str) -> str:
-    return Fernet(fernet_key.encode()).decrypt(token.encode()).decode()
+
+class SecretDecryptError(Exception): ...
+
+class SecretCipher:
+    """AES-GCM envelope encryption over a keyring; AAD binds ciphertext to tenant/record."""
+    ENVELOPE_VERSION = "v1"
+
+    def __init__(self, keyring: dict[str, bytes], primary_id: str):
+        self._keyring = keyring
+        self._primary_id = primary_id
+
+    @classmethod
+    def from_spec(cls, spec: str) -> "SecretCipher":
+        # "2026-06:base64key,2026-01:oldbase64key" — first entry is the primary (encrypting) key
+        pairs = [entry.split(":", 1) for entry in spec.split(",")]
+        return cls({key_id: base64.b64decode(key) for key_id, key in pairs}, pairs[0][0])
+
+    def encrypt(self, plain: str, aad: str) -> str:
+        nonce = os.urandom(12)
+        sealed = AESGCM(self._keyring[self._primary_id]).encrypt(nonce, plain.encode(), aad.encode())
+        return ":".join((self.ENVELOPE_VERSION, self._primary_id,
+                         base64.b64encode(nonce).decode(), base64.b64encode(sealed).decode()))
+
+    def decrypt(self, envelope: str, aad: str) -> str:
+        try:
+            version, key_id, nonce, sealed = envelope.split(":")
+        except ValueError as error:
+            raise SecretDecryptError("malformed envelope") from error
+        key = self._keyring.get(key_id)
+        if version != self.ENVELOPE_VERSION or key is None:
+            raise SecretDecryptError(f"unreadable envelope (version={version}, key_id={key_id})")
+        try:
+            return AESGCM(key).decrypt(base64.b64decode(nonce),
+                                       base64.b64decode(sealed), aad.encode()).decode()
+        except InvalidTag as error:
+            raise SecretDecryptError("aad mismatch or tampered ciphertext") from error
 
 # services/accounts/tokens.py — purpose-claimed JWTs; one private pair, public helpers per purpose
 class TokenInvalidError(Exception): ...
@@ -223,8 +255,8 @@ def read_email_change_token(token: str, secret: str) -> tuple[UUID, str]:
     return UUID(claims["sub"]), claims["new_email"]
 ```
 
-(`passwords.py` re-exports hash/check so services never import foundation directly for this.)
-- [ ] **Step 3:** `uv run pytest tests/unit/test_security.py tests/unit/test_tokens.py -v` → PASS. Commit `feat(backend): password hashing, secret encryption, jwt tokens`.
+(`passwords.py` re-exports hash/check so services never import foundation directly for this.) Wire `app.state.secret_cipher = SecretCipher.from_spec(settings.secret_keys)` in `create_app` — parsed once; Tasks 7 & 14 read the cipher from app state.
+- [ ] **Step 3:** `uv run pytest tests/unit/test_security.py tests/unit/test_tokens.py -v` → PASS. Commit `feat(backend): password hashing, aes-gcm secret cipher, jwt tokens`.
 
 ### Task 5: Auth endpoints + current-user dependency
 
@@ -266,7 +298,7 @@ Router: `POST /auth/register` (201, `{token, user}`), `POST /auth/login`, `POST 
 
 - [ ] **Step 1:** Define the auth seam so tests need no Telethon network — vendor-neutral, pure types only (domain must not import Telethon): `TelegramAuth` protocol in `domain/protocols.py` with `send_code(api_id, api_hash, phone) -> PendingCode(session_string, phone_code_hash)` and `sign_in(session_string, api_id, api_hash, phone, code, phone_code_hash) -> str` (returns final session string). Per-user *sources* come from a separate foundation factory `make_user_source(session_string, api_id, api_hash) -> TelegramSource` (returns a connected `TelethonSource`; used by Tasks 9–10). Add `FakeTelegramAuth` to `tests/fakes.py` (canned hashes; raises `CodeInvalidError` on wrong code).
 - [ ] **Step 2:** Failing unit tests for `services/telegram_link/service.py`: connect stores encrypted pending link; verify flips to connected + stores encrypted session; wrong code surfaces error and stays pending; status masks phone (`+44 •••• 8821`).
-- [ ] **Step 3:** Implement service (encrypt `api_hash`/`session_string` with Fernet via settings) + real Telethon adapter in `foundation/telegram_session.py`:
+- [ ] **Step 3:** Implement service (encrypt `api_hash`/`session_string` via `app.state.secret_cipher` with AAD `f"{user_id}:telegram_link"` — Task 4 tenant/record binding) + real Telethon adapter in `foundation/telegram_session.py`:
 
 ```python
 async def send_code(api_id, api_hash, phone) -> PendingCode:
@@ -466,8 +498,8 @@ def make_anthropic_runner(api_key: str, model: str) -> Callable[[str], str]:
 
 - [ ] **Step 1:** Failing unit test for HMAC verifier (httpx `MockTransport`): correct signature headers (`X-BAPI-API-KEY`, `X-BAPI-TIMESTAMP`, `X-BAPI-RECV-WINDOW`, `X-BAPI-SIGN` = HMAC-SHA256 of `timestamp+key+recv_window` over the secret) on `GET https://api.bybit.com/v5/user/query-api`; `retCode == 0` → valid; non-zero → `KeyVerificationError`.
 - [ ] **Step 2:** Implement `async verify_api_keys(api_key, api_secret, transport=None) -> None`.
-- [ ] **Step 3:** `catalog.py` = static list mirroring frontend seed (bybit `available`, kind `Derivatives · Spot`, brand/tint/initials; others `soon`). Service: `connect` (verify → mask `f"{key[:4]}…{key[-2:]} · trade-only"` → encrypt+store), `disconnect`, `present_exchanges` (catalog ⨝ user connections).
-- [ ] **Step 4:** API tests (fake verifier via `app.state.exchange_verifier`): GET catalog shows `connected: false`; observer connect → 403 `PLAN_LIMIT_EXCHANGES`; operator connect → connected + masked account, secret absent from response and stored encrypted (assert ciphertext ≠ plaintext in DB); bad keys → 400 `EXCHANGE_KEYS_INVALID`; disconnect flips flag.
+- [ ] **Step 3:** `catalog.py` = static list mirroring frontend seed (bybit `available`, kind `Derivatives · Spot`, brand/tint/initials; others `soon`). Service: `connect` (verify → mask `f"{key[:4]}…{key[-2:]} · trade-only"` → encrypt via `app.state.secret_cipher` with AAD `f"{user_id}:exchange:{exchange_id}"` → store), `disconnect`, `present_exchanges` (catalog ⨝ user connections).
+- [ ] **Step 4:** API tests (fake verifier via `app.state.exchange_verifier`): GET catalog shows `connected: false`; observer connect → 403 `PLAN_LIMIT_EXCHANGES`; operator connect → connected + masked account, secret absent from response and stored as a `v1:` envelope (assert prefix + ciphertext ≠ plaintext in DB); bad keys → 400 `EXCHANGE_KEYS_INVALID`; disconnect flips flag.
 - [ ] **Step 5:** `uv run pytest tests/unit/test_bybit_account.py tests/api/test_exchanges.py -v` → PASS. Commit `feat(backend): bybit key verification and exchange connections`.
 
 ### Task 15: Risk config endpoints

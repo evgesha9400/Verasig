@@ -181,7 +181,7 @@ Semantics (replaces the sim's "planted misclassifications"): `predicted` = disti
 | `/exchanges/{id}/connect` | POST | `{apiKey, apiSecret}` | exchange (verified against Bybit `GET /v5/user/query-api`, HMAC-signed; plan-gated) |
 | `/exchanges/{id}/disconnect` | POST | — | exchange |
 
-Static catalog in code (bybit `available`; others `soon`). `account` = masked key `"J7n2…wL · trade-only"`. Secret stored Fernet-encrypted; never returned.
+Static catalog in code (bybit `available`; others `soon`). `account` = masked key `"J7n2…wL · trade-only"`. Secret stored AES-GCM-encrypted (`SecretCipher` envelope, AAD-bound to user+exchange); never returned.
 
 ### Risk config — `api/routers/risk.py`
 
@@ -297,9 +297,9 @@ Jobs: in-process `JobRegistry` (one running job per `(user, chat, kind)`, `409 J
 | `anthropic` | replaces `subprocess claude` |
 | `pyjwt` | JWT — chosen over python-jose (unmaintained, CVEs) / authlib (oversized for HS256) |
 | `bcrypt` | direct use — passlib is unmaintained and breaks with bcrypt ≥ 4.1 |
-| `cryptography` | Fernet for session strings + exchange secrets |
+| `cryptography` | AES-GCM (`SecretCipher` envelopes `v1:<key_id>:<nonce_b64>:<ciphertext_b64>`, AAD tenant binding, env keyring rotation) for session strings + exchange secrets |
 
-Remove: `typer`. Config additions (env `VERASIG_`): `jwt_secret`, `fernet_key`, `anthropic_api_key`, `anthropic_model` (default `claude-sonnet-4-6`), `cors_origins`. Removed: `session_path`, `telegram_api_id/hash/phone` (per-user now), `distiller_command`, `extractor_command`.
+Remove: `typer`. Config additions (env `VERASIG_`): `jwt_secret`, `secret_keys` (keyring: `2026-06:base64key,2026-01:oldbase64key`; first = primary), `anthropic_api_key`, `anthropic_model` (default `claude-sonnet-4-6`), `cors_origins`. Removed: `session_path`, `telegram_api_id/hash/phone` (per-user now), `distiller_command`, `extractor_command`.
 
 ---
 
@@ -312,7 +312,7 @@ Remove: `typer`. Config additions (env `VERASIG_`): `jwt_secret`, `fernet_key`, 
 | D3 | Verify = human audit of real rule predictions on holdout; wrong verdicts feed corpus + drift warnings | "planted errors" was sim scaffolding; real rules err naturally on attempt 1 |
 | D4 | `golden_label.label` 3-way enum | frontend labels signal/noise/modifier; modifier feeds lifecycle |
 | D5 | `lifecycle_link` table added | `/signals/{id}/link-mod` needs durable HUMAN_AUDIT evidence for the pure fold |
-| D6 | PyJWT + bcrypt + Fernet | maintained, minimal, well-established |
+| D6 | PyJWT + bcrypt + AES-GCM (`SecretCipher`) | maintained, minimal, well-established; envelope key ids enable rotation |
 | D7 | Anthropic SDK as injected `runner`; `ClaudeCli*` adapters renamed `Anthropic*` | existing seam; canned-runner tests unchanged |
 | D8 | `POST /chats/{id}/backfill/cancel`, subscription change/resume, email confirm added | frontend workflow needs them; rough requirements omitted |
 | D9 | RiskConfig + `riskPct`, `leverage` | simulator requires position sizing inputs |
