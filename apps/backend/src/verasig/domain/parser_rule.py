@@ -20,6 +20,7 @@ def _now() -> datetime:
 
 class ParserRule(BaseModel):
     rule_id: str
+    user_id: UUID | None = None
     channel_id: int | None = None  # null = global
     version: int = 1
     patterns: list[str]  # ordered regexes

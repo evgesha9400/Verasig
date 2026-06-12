@@ -10,7 +10,9 @@ from verasig.domain.drift import FilterDriftWarning, ParserDriftWarning
 from verasig.storage.models import FilterDriftWarningRow, ParserDriftWarningRow
 
 
-def insert_drift_warnings(session: Session, warnings: list[FilterDriftWarning]) -> int:
+def insert_drift_warnings(
+    session: Session, warnings: list[FilterDriftWarning], user_id: UUID | None = None
+) -> int:
     if not warnings:
         return 0
     statement = (
@@ -19,6 +21,7 @@ def insert_drift_warnings(session: Session, warnings: list[FilterDriftWarning]) 
             [
                 {
                     "id": warning.id,
+                    "user_id": user_id,
                     "channel_id": warning.channel_id,
                     "message_id": warning.message_id,
                     "filter_rule_version": warning.filter_rule_version,
@@ -30,16 +33,21 @@ def insert_drift_warnings(session: Session, warnings: list[FilterDriftWarning]) 
                 for warning in warnings
             ]
         )
-        .on_conflict_do_nothing(index_elements=["channel_id", "message_id"])
+        .on_conflict_do_nothing(index_elements=["user_id", "channel_id", "message_id"])
         .returning(FilterDriftWarningRow.id)
     )
     return len(session.execute(statement).fetchall())
 
 
-def read_drift_warnings(session: Session, channel_id: int) -> list[FilterDriftWarning]:
+def read_drift_warnings(
+    session: Session, channel_id: int, user_id: UUID | None = None
+) -> list[FilterDriftWarning]:
     rows = session.scalars(
         select(FilterDriftWarningRow).where(
-            FilterDriftWarningRow.channel_id == channel_id
+            FilterDriftWarningRow.channel_id == channel_id,
+            FilterDriftWarningRow.user_id.is_(None)
+            if user_id is None
+            else FilterDriftWarningRow.user_id == user_id,
         )
     ).all()
     return [
@@ -57,9 +65,12 @@ def read_drift_warnings(session: Session, channel_id: int) -> list[FilterDriftWa
     ]
 
 
-def _parser_drift_values(drift: ParserDriftWarning, fallback_signal_id: UUID) -> dict:
+def _parser_drift_values(
+    drift: ParserDriftWarning, fallback_signal_id: UUID, user_id: UUID | None
+) -> dict:
     return {
         "id": drift.id,
+        "user_id": user_id,
         "event_id": drift.event_id,
         "channel_id": drift.channel_id,
         "deterministic_result": drift.deterministic_result,
@@ -70,11 +81,14 @@ def _parser_drift_values(drift: ParserDriftWarning, fallback_signal_id: UUID) ->
 
 
 def read_parser_drift_warnings(
-    session: Session, channel_id: int
+    session: Session, channel_id: int, user_id: UUID | None = None
 ) -> list[ParserDriftWarning]:
     rows = session.scalars(
         select(ParserDriftWarningRow).where(
-            ParserDriftWarningRow.channel_id == channel_id
+            ParserDriftWarningRow.channel_id == channel_id,
+            ParserDriftWarningRow.user_id.is_(None)
+            if user_id is None
+            else ParserDriftWarningRow.user_id == user_id,
         )
     ).all()
     return [
@@ -100,13 +114,18 @@ def _excluded_except(statement, row_type, keep: set[str]) -> dict:
 
 
 def _upsert_parser_drift(
-    session: Session, drift: ParserDriftWarning, fallback_signal_id: UUID
+    session: Session,
+    drift: ParserDriftWarning,
+    fallback_signal_id: UUID,
+    user_id: UUID | None = None,
 ) -> None:
     statement = pg_insert(ParserDriftWarningRow).values(
-        _parser_drift_values(drift, fallback_signal_id)
+        _parser_drift_values(drift, fallback_signal_id, user_id)
     )
     statement = statement.on_conflict_do_update(
-        index_elements=["event_id"],
-        set_=_excluded_except(statement, ParserDriftWarningRow, {"id", "event_id"}),
+        index_elements=["user_id", "event_id"],
+        set_=_excluded_except(
+            statement, ParserDriftWarningRow, {"id", "user_id", "event_id"}
+        ),
     )
     session.execute(statement)

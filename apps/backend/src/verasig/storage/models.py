@@ -11,6 +11,7 @@ from uuid import UUID
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -92,9 +93,19 @@ class RawSignalEventRow(Base):
 
 class ExtractedSignalRow(Base):
     __tablename__ = "extracted_signal"
-    __table_args__ = (UniqueConstraint("event_id", name="uq_extracted_signal_event"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "event_id",
+            name="uq_extracted_signal_user_event",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     event_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("raw_signal_event.id"), nullable=False
     )
@@ -120,10 +131,18 @@ class ExtractedSignalRow(Base):
 class UnrecognizedSignalRow(Base):
     __tablename__ = "unrecognized_signal"
     __table_args__ = (
-        UniqueConstraint("event_id", name="uq_unrecognized_signal_event"),
+        UniqueConstraint(
+            "user_id",
+            "event_id",
+            name="uq_unrecognized_signal_user_event",
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     event_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("raw_signal_event.id"), nullable=False
     )
@@ -136,8 +155,20 @@ class UnrecognizedSignalRow(Base):
 
 class FilterRuleRow(Base):
     __tablename__ = "filter_rule"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "channel_id",
+            "version",
+            name="uq_filter_rule_user_channel_version",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
 
     rule_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     channel_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=True
     )
@@ -147,6 +178,7 @@ class FilterRuleRow(Base):
     matched_reason_template: Mapped[str] = mapped_column(String, nullable=False)
     recall_target: Mapped[float] = mapped_column(Float, nullable=False)
     python_filter: Mapped[str | None] = mapped_column(String, nullable=True)
+    display: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -157,6 +189,9 @@ class ParserRuleRow(Base):
     __tablename__ = "parser_rule"
 
     rule_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     channel_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=True
     )
@@ -174,14 +209,24 @@ class ParserRuleRow(Base):
 class GoldenLabelRow(Base):
     __tablename__ = "golden_label"
     __table_args__ = (
-        UniqueConstraint("channel_id", "message_id", name="uq_golden_label_msg"),
+        UniqueConstraint(
+            "user_id",
+            "channel_id",
+            "message_id",
+            name="uq_golden_label_user_msg",
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     channel_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=False
     )
     message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
     is_signal: Mapped[bool] = mapped_column(Boolean, nullable=False)
     expected: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     labeled_at: Mapped[datetime] = mapped_column(
@@ -192,10 +237,19 @@ class GoldenLabelRow(Base):
 class FilterDriftWarningRow(Base):
     __tablename__ = "filter_drift_warning"
     __table_args__ = (
-        UniqueConstraint("channel_id", "message_id", name="uq_filter_drift_msg"),
+        UniqueConstraint(
+            "user_id",
+            "channel_id",
+            "message_id",
+            name="uq_filter_drift_user_msg",
+            postgresql_nulls_not_distinct=True,
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     channel_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=False
     )
@@ -215,9 +269,19 @@ class FilterDriftWarningRow(Base):
 
 class ParserDriftWarningRow(Base):
     __tablename__ = "parser_drift_warning"
-    __table_args__ = (UniqueConstraint("event_id", name="uq_parser_drift_event"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "event_id",
+            name="uq_parser_drift_user_event",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=True
+    )
     event_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("raw_signal_event.id"), nullable=False
     )
@@ -257,3 +321,150 @@ class DeletedSignalEvidenceRow(Base):
         DateTime(timezone=True), nullable=False
     )
     was_signal_candidate: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class UserAccountRow(Base):
+    __tablename__ = "user_account"
+    __table_args__ = (
+        CheckConstraint(
+            "plan IN ('observer', 'operator', 'desk')",
+            name="ck_user_account_plan",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    first_name: Mapped[str] = mapped_column(String, nullable=False)
+    last_name: Mapped[str] = mapped_column(String, nullable=False)
+    plan: Mapped[str] = mapped_column(String, nullable=False, default="observer")
+    pending_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    cancel_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class UserTelegramLinkRow(Base):
+    __tablename__ = "user_telegram_link"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'connected')",
+            name="ck_user_telegram_link_status",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), primary_key=True
+    )
+    api_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    api_hash_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    phone: Mapped[str] = mapped_column(String, nullable=False)
+    session_string_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone_code_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class UserChannelRow(Base):
+    __tablename__ = "user_channel"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('new', 'backfilling', 'backfilled', 'verified', "
+            "'analyzed', 'cancelled')",
+            name="ck_user_channel_status",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), primary_key=True
+    )
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("telegram_channel.channel_id"), primary_key=True
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False, default="new")
+    verify_attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UserExchangeConnectionRow(Base):
+    __tablename__ = "user_exchange_connection"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), primary_key=True
+    )
+    exchange_id: Mapped[str] = mapped_column(String, primary_key=True)
+    api_key_masked: Mapped[str] = mapped_column(String, nullable=False)
+    api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    api_secret_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    connected: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    connected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class ChatRiskConfigRow(Base):
+    __tablename__ = "chat_risk_config"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), primary_key=True
+    )
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("telegram_channel.channel_id"), primary_key=True
+    )
+    entry_mode: Mapped[str] = mapped_column(String, nullable=False)
+    levels: Mapped[int] = mapped_column(Integer, nullable=False)
+    weighting: Mapped[str] = mapped_column(String, nullable=False)
+    exit_source: Mapped[str] = mapped_column(String, nullable=False)
+    stop_pct: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    tp_pct: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    risk_pct: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    leverage: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class BacktestResultRow(Base):
+    __tablename__ = "backtest_result"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=False
+    )
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=False
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    win_rate: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    pnl: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    outcomes: Mapped[list] = mapped_column(JSONB, nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class LifecycleLinkRow(Base):
+    __tablename__ = "lifecycle_link"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "channel_id", "message_id", name="uq_lifecycle_link_msg"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=False
+    )
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=False
+    )
+    message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    root_signal_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )

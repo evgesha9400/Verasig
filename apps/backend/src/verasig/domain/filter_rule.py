@@ -18,6 +18,7 @@ def _now() -> datetime:
 
 class FilterRule(BaseModel):
     rule_id: str
+    user_id: UUID | None = None
     channel_id: int | None = None  # null = global / seed
     version: int = 1
     include_patterns: list[str]  # OR-joined, recall-first
@@ -25,5 +26,6 @@ class FilterRule(BaseModel):
     matched_reason_template: str = "filter_rule"
     recall_target: float = 0.95
     python_filter: str | None = None  # dotted path; escape hatch
+    display: list[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)
     distilled_from_label_ids: list[UUID] = Field(default_factory=list)
