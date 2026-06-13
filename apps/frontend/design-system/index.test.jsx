@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import * as DS from './index.js'
-import { Icon } from './icons/Icon.jsx'
+import { Icon } from './src/icons/Icon.jsx'
 
 describe('design-system barrel', () => {
   const expected = [

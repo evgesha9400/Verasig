@@ -1,0 +1,160 @@
+<!-- @dsCard group="Components" viewport="700x520" name="Data & surfaces — signals, metrics, status" subtitle="Card · MetricStat · ConfidenceBar · StatusPill · SignalRow" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../../../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg-app);
+      }
+      .grp {
+        margin-bottom: 20px;
+      }
+      .lab {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin-bottom: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .signals {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+    </style>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+    <script src="../../../_ds_bundle.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { Card, MetricStat, ConfidenceBar, StatusPill, SignalRow } =
+        window.VerasigDesignSystem_fd565b
+
+      function Demo() {
+        return (
+          <div>
+            <div className="grp">
+              <div className="lab">MetricStat</div>
+              <div className="metrics">
+                <Card>
+                  <MetricStat
+                    label="Uptime"
+                    value="99.98"
+                    unit="%"
+                    delta="+0.01"
+                    trend="up"
+                    caption="Last 30 days"
+                  />
+                </Card>
+                <Card>
+                  <MetricStat
+                    label="Median latency"
+                    value="182"
+                    unit="ms"
+                    delta="−12ms"
+                    trend="up"
+                    caption="p50 · 24h"
+                  />
+                </Card>
+                <Card>
+                  <MetricStat
+                    label="Rejected today"
+                    value="3"
+                    delta="+1"
+                    trend="down"
+                    caption="of 248 signals"
+                  />
+                </Card>
+              </div>
+            </div>
+
+            <div className="grp">
+              <div className="lab">StatusPill · ConfidenceBar</div>
+              <div className="row" style={{ alignItems: 'flex-start' }}>
+                <StatusPill status="verified" />
+                <StatusPill status="pending" pulse />
+                <StatusPill status="rejected" label="Spoofed" />
+                <StatusPill status="observing" />
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: '200px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}
+                >
+                  <ConfidenceBar value={99.4} threshold={80} />
+                  <ConfidenceBar value={62} threshold={80} label="Quorum" />
+                </div>
+              </div>
+            </div>
+
+            <div className="grp" style={{ marginBottom: 0 }}>
+              <div className="lab">SignalRow</div>
+              <div className="signals">
+                <SignalRow
+                  symbol="BTC/USD"
+                  signalId="SIG-7F2A·0x9d4e"
+                  provider="Coinbase"
+                  providerTint="var(--viz-2)"
+                  channel="WebSocket"
+                  confidence={99.4}
+                  status="verified"
+                  time="11:32:04"
+                />
+                <SignalRow
+                  symbol="ELECTION-2028"
+                  signalId="SIG-7F19·0x2b81"
+                  provider="Polymarket"
+                  providerTint="var(--viz-3)"
+                  channel="REST · us-east"
+                  confidence={62}
+                  status="pending"
+                  time="11:31:58"
+                />
+                <SignalRow
+                  symbol="AAPL.pre"
+                  signalId="SIG-7F03·0x77ac"
+                  provider="Caplight"
+                  providerTint="var(--viz-4)"
+                  channel="gRPC"
+                  confidence={41}
+                  status="rejected"
+                  time="11:30:51"
+                />
+              </div>
+            </div>
+          </div>
+        )
+      }
+      ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
+    </script>
+  </body>
+</html>
