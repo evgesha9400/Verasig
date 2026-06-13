@@ -49,14 +49,12 @@ def upsert_filter_rule(session: Session, rule: FilterRule) -> None:
 
 
 def read_filter_rules(
-    session: Session, channel_id: int, user_id: UUID | None = None
+    session: Session, channel_id: int, user_id: UUID
 ) -> list[FilterRule]:
     rows = session.scalars(
         select(FilterRuleRow).where(
             FilterRuleRow.channel_id == channel_id,
-            FilterRuleRow.user_id.is_(None)
-            if user_id is None
-            else FilterRuleRow.user_id == user_id,
+            FilterRuleRow.user_id == user_id,
         )
     ).all()
     return [
@@ -108,14 +106,12 @@ def upsert_parser_rules(session: Session, rules: list[ParserRule]) -> None:
 
 
 def read_parser_rules(
-    session: Session, channel_id: int, user_id: UUID | None = None
+    session: Session, channel_id: int, user_id: UUID
 ) -> list[ParserRule]:
     rows = session.scalars(
         select(ParserRuleRow).where(
             ParserRuleRow.channel_id == channel_id,
-            ParserRuleRow.user_id.is_(None)
-            if user_id is None
-            else ParserRuleRow.user_id == user_id,
+            ParserRuleRow.user_id == user_id,
         )
     ).all()
     return [
@@ -159,15 +155,11 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
         session.execute(statement)
 
 
-def read_labels(
-    session: Session, channel_id: int, user_id: UUID | None = None
-) -> list[GoldenLabel]:
+def read_labels(session: Session, channel_id: int, user_id: UUID) -> list[GoldenLabel]:
     rows = session.scalars(
         select(GoldenLabelRow).where(
             GoldenLabelRow.channel_id == channel_id,
-            GoldenLabelRow.user_id.is_(None)
-            if user_id is None
-            else GoldenLabelRow.user_id == user_id,
+            GoldenLabelRow.user_id == user_id,
         )
     ).all()
     return [

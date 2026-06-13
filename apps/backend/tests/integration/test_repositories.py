@@ -4,15 +4,19 @@ from uuid import uuid4
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
+from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import EntryMode, RiskConfig
+from verasig.domain.signal import ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
 from verasig.features.exchanges import repository as exchange_repository
 from verasig.features.risk import repository as risk_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
+    event_repository,
     lifecycle_link_repository,
+    outcome_repository,
 )
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.sources import (
@@ -167,6 +171,7 @@ def test_telegram_link_repository_round_trips_pending_and_connected(db_session):
 def test_user_channel_repository_round_trips_and_cascades_user_scope(db_session):
     account = account_repository.insert_account(db_session, _account())
     channel_repository.upsert_channel(db_session, _channel())
+    message_repository.insert_messages(db_session, [_message(99)])
     db_session.commit()
 
     subscription = user_channel_repository.subscribe(
@@ -203,6 +208,22 @@ def test_user_channel_repository_round_trips_and_cascades_user_scope(db_session)
 def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session):
     account = account_repository.insert_account(db_session, _account())
     channel_repository.upsert_channel(db_session, _channel())
+    message_repository.insert_messages(db_session, [_message(77)])
+    event = RawSignalEvent(
+        channel_id=1,
+        message_id=77,
+        candidate_text="BTC long",
+        materialized_by=MaterializationPath.SEED_HEURISTIC,
+        created_at=_instant(),
+    )
+    event_repository.insert_signal_events(db_session, [event])
+    signal = ExtractedSignal(
+        event_id=event.id,
+        channel_id=1,
+        symbol="BTCUSDT",
+        side=Side.LONG,
+    )
+    outcome_repository.insert_extracted_signals(db_session, [signal], account.id)
     db_session.commit()
 
     exchange = exchange_repository.upsert_connection(
@@ -244,7 +265,7 @@ def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session
         datetime(2026, 6, 4, 13, 0, tzinfo=timezone.utc),
     )
     link = lifecycle_link_repository.insert_link(
-        db_session, account.id, 1, 77, uuid4(), _instant()
+        db_session, account.id, 1, 77, signal.id, _instant()
     )
     db_session.commit()
 
