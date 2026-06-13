@@ -7,9 +7,14 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
-from verasig.services.accounts.tokens import read_user_id
-from verasig.storage import repositories as repo
-from verasig.storage import user_channel_repository
+from verasig.features.accounts.tokens import read_user_id
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
+from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 
@@ -38,7 +43,7 @@ def _instant(day: int) -> datetime:
 
 def _seed_chat(app, user_id, signal_count: int) -> None:
     with app.state.session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -60,8 +65,8 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
             )
             for idx in range(1, signal_count + 1)
         ]
-        repo.insert_messages(session, messages)
-        repo.insert_signal_events(
+        message_repository.insert_messages(session, messages)
+        event_repository.insert_signal_events(
             session,
             [
                 RawSignalEvent(
@@ -73,7 +78,7 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
                 for message in messages
             ],
         )
-        repo.upsert_labels(
+        rule_repository.upsert_labels(
             session,
             [
                 GoldenLabel(
@@ -135,3 +140,13 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
             "match": 100.0,
         }
     ]
+
+
+def test_distill_progress_reports_missing_job_as_404(client, app):
+    token, user_id = _register(client)
+    _seed_chat(app, user_id, signal_count=5)
+
+    response = client.get("/chats/7/distill/progress", headers=_auth(token))
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "JOB_NOT_FOUND"

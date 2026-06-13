@@ -139,3 +139,14 @@ def test_backfill_foreign_user_is_not_found(client, app):
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "CHAT_NOT_FOUND"
+
+
+def test_backfill_progress_reports_missing_job_as_404(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    response = client.get("/chats/7/backfill/progress", headers=_auth(token))
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "JOB_NOT_FOUND"

@@ -12,4 +12,4 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 # --no-sync: run from the baked --no-dev env (offline, no runtime re-download).
-ENTRYPOINT ["uv", "run", "--no-sync", "uvicorn", "verasig.api.app:create_app_from_env", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["uv", "run", "--no-sync", "uvicorn", "verasig.entrypoints.api:create_app_from_env", "--factory", "--host", "0.0.0.0", "--port", "8000"]

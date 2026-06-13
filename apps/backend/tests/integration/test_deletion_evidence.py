@@ -19,8 +19,13 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.services.deletion.rescan import RescanAborted, rescan
-from verasig.storage import repositories as repo
+from verasig.features.signals import event_repository
+from verasig.features.sources import (
+    channel_repository,
+    deletion_repository,
+    message_repository,
+)
+from verasig.features.sources.deletion_rescan import RescanAborted, rescan
 
 _CHANNEL_ID = 7
 _FIRST = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
@@ -39,7 +44,7 @@ def _channel() -> TelegramChannel:
 
 def _seed_channel(session_factory) -> None:
     with session_factory() as session:
-        repo.upsert_channel(session, _channel())
+        channel_repository.upsert_channel(session, _channel())
         session.commit()
 
 
@@ -71,14 +76,14 @@ def _suspected(message_id: int, detected_at: datetime) -> DeletedSignalEvidence:
 
 def _upsert(session_factory, evidence: list[DeletedSignalEvidence]) -> int:
     with session_factory() as session:
-        count = repo.upsert_deletion_evidence(session, evidence)
+        count = deletion_repository.upsert_deletion_evidence(session, evidence)
         session.commit()
         return count
 
 
 def _read(session_factory) -> list[DeletedSignalEvidence]:
     with session_factory() as session:
-        return repo.read_deletion_evidence(session, _CHANNEL_ID)
+        return deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
 
 
 def test_upsert_then_read_round_trips_confirmed_and_suspected(session_factory):
@@ -150,8 +155,8 @@ def _message(message_id: int, text: str) -> RawTelegramMessage:
 def _seed_corpus(session_factory) -> None:
     """Channel + messages {1,2,3}; message 2 is a signal candidate (RawSignalEvent)."""
     with session_factory() as session:
-        repo.upsert_channel(session, _channel())
-        repo.insert_messages(
+        channel_repository.upsert_channel(session, _channel())
+        message_repository.insert_messages(
             session,
             [
                 _message(1, "gm frens"),
@@ -159,7 +164,7 @@ def _seed_corpus(session_factory) -> None:
                 _message(3, "still chatting"),
             ],
         )
-        repo.insert_signal_events(
+        event_repository.insert_signal_events(
             session,
             [
                 RawSignalEvent(

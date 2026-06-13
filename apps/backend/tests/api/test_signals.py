@@ -7,14 +7,15 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
-from verasig.services.accounts.tokens import read_user_id
-from verasig.storage import (
-    backtest_repository,
-    user_channel_repository,
+from verasig.features.accounts.tokens import read_user_id
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.simulation import repository as backtest_repository
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
 )
-from verasig.storage import (
-    repositories as repo,
-)
+from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
@@ -82,7 +83,7 @@ def test_signal_routes_mask_foreign_user(client, app):
 
 def _seed(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -92,7 +93,7 @@ def _seed(app, user_id: UUID) -> None:
                 first_seen_at=_BASE,
             ),
         )
-        repo.insert_messages(
+        message_repository.insert_messages(
             session,
             [
                 _message(1, "BTC long entry", None),
@@ -100,9 +101,9 @@ def _seed(app, user_id: UUID) -> None:
                 _message(3, "close BTC at 110", None),
             ],
         )
-        repo.insert_signal_events(session, [_event()])
-        repo.insert_extracted_signals(session, [_signal()], user_id)
-        repo.upsert_labels(
+        event_repository.insert_signal_events(session, [_event()])
+        outcome_repository.insert_extracted_signals(session, [_signal()], user_id)
+        rule_repository.upsert_labels(
             session,
             [
                 GoldenLabel(

@@ -1,3 +1,12 @@
+x-backend-service: &backend-service
+  build: ./apps/backend
+  image: verasig-backend:local
+  env_file: [apps/backend/.env]
+  environment:
+    VERASIG_DB_HOST: db
+    VERASIG_DB_PORT: "5432"
+    VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+
 services:
   db:
     image: postgres:16
@@ -13,20 +22,58 @@ services:
       timeout: 3s
       retries: 15
 
-  app:
-    build: ./apps/backend
-    env_file: [apps/backend/.env]
-    environment:
-      VERASIG_DB_HOST: db
-      VERASIG_DB_PORT: "5432"
-      VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./secrets:/secrets:ro     # read-only provided secrets (gitignored)
+  migrate:
+    <<: *backend-service
+    entrypoint: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
     depends_on:
       db:
         condition: service_healthy
 
+  app:
+    <<: *backend-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/backend/secrets:/secrets:ro     # read-only provided secrets (gitignored)
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  frontend:
+    image: node:22-slim
+    working_dir: /workspace
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_BASE_URL: http://localhost:8000
+    command:
+      [
+        "sh",
+        "-lc",
+        "npm ci && npm run dev --workspace verasig-web -- --host 0.0.0.0",
+      ]
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/frontend:/workspace
+      - frontend_node_modules:/workspace/node_modules
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   pgdata: {}
+  frontend_node_modules: {}

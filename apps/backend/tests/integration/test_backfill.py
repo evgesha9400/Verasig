@@ -5,8 +5,11 @@ from fakes import FakeSource, FakeStreamInterrupted
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
-from verasig.services.ingestion.backfill import backfill
-from verasig.storage import repositories as repo
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
+from verasig.features.sources.backfill import backfill
 
 
 def _instant() -> datetime:
@@ -43,7 +46,7 @@ async def test_backfill_persists_all_messages(session_factory):
     assert result.inserted == 5
     assert result.captured_through_message_id == 5
     with session_factory() as db_session:
-        assert repo.count_messages(db_session, 1) == 5
+        assert message_repository.count_messages(db_session, 1) == 5
 
 
 async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
@@ -53,7 +56,7 @@ async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
     assert result.inserted == 0
     assert rerun.requested_afters[0] == 5  # resumed at cursor, not 0
     with session_factory() as db_session:
-        assert repo.count_messages(db_session, 1) == 5
+        assert message_repository.count_messages(db_session, 1) == 5
 
 
 async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
@@ -62,8 +65,8 @@ async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
     with pytest.raises(FakeStreamInterrupted):
         await backfill(crashed, "@pilot", session_factory, batch_size=2)
     with session_factory() as db_session:
-        assert repo.count_messages(db_session, 1) == 2
-        assert repo.read_cursor(db_session, 1) == 2
+        assert message_repository.count_messages(db_session, 1) == 2
+        assert channel_repository.read_cursor(db_session, 1) == 2
 
     resumed = FakeSource(_channel(), messages)
     result = await backfill(resumed, "@pilot", session_factory, batch_size=2)
@@ -71,14 +74,16 @@ async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
     assert all(message_id > 2 for message_id in resumed.yielded_ids)
     assert result.captured_through_message_id == 6
     with session_factory() as db_session:
-        assert repo.count_messages(db_session, 1) == 6
+        assert message_repository.count_messages(db_session, 1) == 6
 
 
 async def test_backfill_commits_each_batch_before_pulling_the_next(session_factory):
     def assert_prior_batches_persisted(index: int, yielded_so_far: int) -> None:
         if index > 0:
             with session_factory() as db_session:
-                assert repo.count_messages(db_session, 1) == yielded_so_far
+                assert (
+                    message_repository.count_messages(db_session, 1) == yielded_so_far
+                )
 
     source = FakeSource(
         _channel(), _messages(2000), before_batch=assert_prior_batches_persisted
@@ -86,7 +91,7 @@ async def test_backfill_commits_each_batch_before_pulling_the_next(session_facto
     result = await backfill(source, "@pilot", session_factory, batch_size=200)
     assert result.inserted == 2000
     with session_factory() as db_session:
-        assert repo.count_messages(db_session, 1) == 2000
+        assert message_repository.count_messages(db_session, 1) == 2000
 
 
 async def test_backfill_reports_inserted_total_and_oldest_batch_date(session_factory):

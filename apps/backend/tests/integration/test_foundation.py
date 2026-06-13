@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from verasig.config import Settings
-from verasig.foundation.db import make_engine
+from verasig.foundation.database.session import make_engine
 
 
 def test_settings_load_from_env(monkeypatch):

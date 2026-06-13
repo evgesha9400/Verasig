@@ -2,7 +2,7 @@
 
 `FilterRule` is recall-first: `include_patterns` are OR-joined (ANY match → a
 candidate), `exclude_patterns` are rare carve-outs (precision is recovered
-downstream by extraction). Distilled from `GoldenLabel.is_signal`; shares a regex
+downstream by extraction). Distilled from signal `GoldenLabel.label`s; shares a regex
 engine with `ParserRule` but is a distinct entity (it decides inclusion).
 """
 

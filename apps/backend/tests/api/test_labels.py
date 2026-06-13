@@ -3,9 +3,13 @@ from datetime import datetime, timezone
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.services.accounts.tokens import read_user_id
-from verasig.storage import repositories as repo
-from verasig.storage import user_channel_repository
+from verasig.features.accounts.tokens import read_user_id
+from verasig.features.signals import event_repository
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
+from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 
@@ -35,7 +39,7 @@ def _instant(day: int) -> datetime:
 
 def _seed_chat(app, user_id: str) -> None:
     with app.state.session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -45,7 +49,7 @@ def _seed_chat(app, user_id: str) -> None:
                 first_seen_at=_instant(1),
             ),
         )
-        repo.insert_messages(
+        message_repository.insert_messages(
             session,
             [
                 RawTelegramMessage(
@@ -68,7 +72,7 @@ def _seed_chat(app, user_id: str) -> None:
                 ),
             ],
         )
-        repo.insert_signal_events(
+        event_repository.insert_signal_events(
             session,
             [
                 RawSignalEvent(

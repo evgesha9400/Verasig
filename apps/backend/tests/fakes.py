@@ -10,10 +10,10 @@ from collections.abc import AsyncIterator, Callable
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.protocols import CodeInvalidError, PendingCode
 from verasig.domain.signal import TradeIntent
-from verasig.foundation.static_exchange import normalize_base_symbol
-from verasig.services.distillation.rule_distiller import parse_distiller_output
+from verasig.domain.telegram_ports import CodeInvalidError, PendingCode
+from verasig.features.rules.rule_distiller import parse_distiller_output
+from verasig.foundation.market_data.static_exchange import normalize_base_symbol
 
 
 class FakeStreamInterrupted(RuntimeError):

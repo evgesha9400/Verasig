@@ -10,7 +10,7 @@ from pathlib import Path
 from corpus import load_labels, load_messages
 from fakes import FakeDistiller
 
-from verasig.services.distillation.evaluation import evaluate
+from verasig.features.rules.evaluation import evaluate
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures"
 _DISTILL = (_FIXTURES / "cli" / "distill_pilot.txt").read_text(encoding="utf-8")

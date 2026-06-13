@@ -4,14 +4,12 @@ from uuid import UUID
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.risk_config import EntryMode, ExitSource, RiskConfig, Weighting
-from verasig.services.accounts.tokens import read_user_id
-from verasig.storage import (
-    repositories as repo,
+from verasig.features.accounts.tokens import read_user_id
+from verasig.features.risk import repository as risk_repository
+from verasig.features.sources import (
+    channel_repository,
 )
-from verasig.storage import (
-    risk_repository,
-    user_channel_repository,
-)
+from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 
@@ -36,7 +34,7 @@ def _auth(token: str) -> dict:
 
 def _seed_subscription(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -106,6 +104,39 @@ def test_risk_rejects_invalid_levels_and_unknown_enums(client, app):
 
     assert low_level.status_code == 422
     assert unknown_mode.status_code == 422
+
+
+def test_risk_rejects_invalid_risk_values(client, app):
+    token, user_id = _register(client)
+    _seed_subscription(app, user_id)
+
+    base = _risk_json(RiskConfig())
+
+    invalid_stop = client.put(
+        "/chats/7/risk",
+        headers=_auth(token),
+        json={**base, "stopPct": "0"},
+    )
+    invalid_tp = client.put(
+        "/chats/7/risk",
+        headers=_auth(token),
+        json={**base, "tpPct": "0"},
+    )
+    invalid_risk = client.put(
+        "/chats/7/risk",
+        headers=_auth(token),
+        json={**base, "riskPct": "-1"},
+    )
+    invalid_leverage = client.put(
+        "/chats/7/risk",
+        headers=_auth(token),
+        json={**base, "leverage": 0},
+    )
+
+    assert invalid_stop.status_code == 422
+    assert invalid_tp.status_code == 422
+    assert invalid_risk.status_code == 422
+    assert invalid_leverage.status_code == 422
 
 
 def test_risk_routes_mask_foreign_user(client, app):

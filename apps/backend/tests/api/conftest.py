@@ -4,8 +4,8 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from verasig.api.app import create_app
 from verasig.config import Settings
+from verasig.entrypoints.api import create_app
 
 
 @pytest.fixture
