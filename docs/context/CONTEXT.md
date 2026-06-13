@@ -52,7 +52,7 @@ _Avoid_: merged signal, final signal.
 ### Parsing rules
 
 **FilterRule**:
-A declarative, versioned, provider-specific **inclusion** rule (recall-first include/exclude patterns) deciding whether a `RawTelegramMessage` is a `RawSignalEvent`. Distilled from `GoldenLabel.is_signal`; shares a regex engine with `ParserRule` but is a distinct entity — it decides inclusion, the parser maps fields.
+A declarative, versioned, provider-specific **inclusion** rule (recall-first include/exclude patterns) deciding whether a `RawTelegramMessage` is a `RawSignalEvent`. Distilled from signal `GoldenLabel.label`s; shares a regex engine with `ParserRule` but is a distinct entity — it decides inclusion, the parser maps fields.
 _Avoid_: candidate regex, keyword list (those are the cold-start seed, not the distilled rule).
 
 **ParserRule**:
@@ -60,7 +60,7 @@ A declarative, versioned, provider-specific **extraction** rule (ordered pattern
 _Avoid_: parser, regex, grammar.
 
 **Distillation loop**:
-The human-assisted labeling cycle: operator labels signal messages → AI distills both a `FilterRule` (from `is_signal`) and `ParserRule`s (from `expected` fields) from the examples → rules are applied and measured against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus.
+The human-assisted labeling cycle: operator classifies messages → AI distills both a `FilterRule` (from signal labels) and `ParserRule`s (from `expected` fields) from the examples → rules are applied and measured against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus.
 
 **Golden corpus**:
 The operator-labeled set of messages (signal / not-signal + expected fields) used as ground truth for parser precision and recall.

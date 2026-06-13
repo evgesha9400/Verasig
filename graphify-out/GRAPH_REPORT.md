@@ -1,16 +1,16 @@
-# Graph Report - Verasig  (2026-06-12)
+# Graph Report - Verasig  (2026-06-13)
 
 ## Corpus Check
-- 257 files · ~137,762 words
+- 367 files · ~110,929 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3160 nodes · 12747 edges · 213 communities (159 shown, 54 thin omitted)
-- Extraction: 48% EXTRACTED · 52% INFERRED · 0% AMBIGUOUS · INFERRED: 6634 edges (avg confidence: 0.52)
+- 2973 nodes · 9532 edges · 247 communities (178 shown, 69 thin omitted)
+- Extraction: 52% EXTRACTED · 48% INFERRED · 0% AMBIGUOUS · INFERRED: 4591 edges (avg confidence: 0.53)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `276bac16`
+- Built from commit: `62dc5ef6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -79,7 +79,6 @@
 - [[_COMMUNITY_Community 61|Community 61]]
 - [[_COMMUNITY_Community 62|Community 62]]
 - [[_COMMUNITY_Community 63|Community 63]]
-- [[_COMMUNITY_Community 64|Community 64]]
 - [[_COMMUNITY_Community 65|Community 65]]
 - [[_COMMUNITY_Community 66|Community 66]]
 - [[_COMMUNITY_Community 67|Community 67]]
@@ -115,6 +114,19 @@
 - [[_COMMUNITY_Community 97|Community 97]]
 - [[_COMMUNITY_Community 98|Community 98]]
 - [[_COMMUNITY_Community 99|Community 99]]
+- [[_COMMUNITY_Community 100|Community 100]]
+- [[_COMMUNITY_Community 101|Community 101]]
+- [[_COMMUNITY_Community 102|Community 102]]
+- [[_COMMUNITY_Community 103|Community 103]]
+- [[_COMMUNITY_Community 105|Community 105]]
+- [[_COMMUNITY_Community 106|Community 106]]
+- [[_COMMUNITY_Community 107|Community 107]]
+- [[_COMMUNITY_Community 108|Community 108]]
+- [[_COMMUNITY_Community 109|Community 109]]
+- [[_COMMUNITY_Community 110|Community 110]]
+- [[_COMMUNITY_Community 111|Community 111]]
+- [[_COMMUNITY_Community 113|Community 113]]
+- [[_COMMUNITY_Community 114|Community 114]]
 - [[_COMMUNITY_Community 115|Community 115]]
 - [[_COMMUNITY_Community 116|Community 116]]
 - [[_COMMUNITY_Community 117|Community 117]]
@@ -148,7 +160,6 @@
 - [[_COMMUNITY_Community 145|Community 145]]
 - [[_COMMUNITY_Community 146|Community 146]]
 - [[_COMMUNITY_Community 147|Community 147]]
-- [[_COMMUNITY_Community 148|Community 148]]
 - [[_COMMUNITY_Community 149|Community 149]]
 - [[_COMMUNITY_Community 150|Community 150]]
 - [[_COMMUNITY_Community 151|Community 151]]
@@ -158,9 +169,6 @@
 - [[_COMMUNITY_Community 155|Community 155]]
 - [[_COMMUNITY_Community 156|Community 156]]
 - [[_COMMUNITY_Community 157|Community 157]]
-- [[_COMMUNITY_Community 158|Community 158]]
-- [[_COMMUNITY_Community 159|Community 159]]
-- [[_COMMUNITY_Community 160|Community 160]]
 - [[_COMMUNITY_Community 161|Community 161]]
 - [[_COMMUNITY_Community 162|Community 162]]
 - [[_COMMUNITY_Community 163|Community 163]]
@@ -172,16 +180,12 @@
 - [[_COMMUNITY_Community 169|Community 169]]
 - [[_COMMUNITY_Community 170|Community 170]]
 - [[_COMMUNITY_Community 171|Community 171]]
-- [[_COMMUNITY_Community 172|Community 172]]
-- [[_COMMUNITY_Community 173|Community 173]]
-- [[_COMMUNITY_Community 174|Community 174]]
 - [[_COMMUNITY_Community 175|Community 175]]
 - [[_COMMUNITY_Community 176|Community 176]]
 - [[_COMMUNITY_Community 177|Community 177]]
 - [[_COMMUNITY_Community 178|Community 178]]
 - [[_COMMUNITY_Community 179|Community 179]]
 - [[_COMMUNITY_Community 180|Community 180]]
-- [[_COMMUNITY_Community 181|Community 181]]
 - [[_COMMUNITY_Community 182|Community 182]]
 - [[_COMMUNITY_Community 183|Community 183]]
 - [[_COMMUNITY_Community 184|Community 184]]
@@ -191,6 +195,11 @@
 - [[_COMMUNITY_Community 188|Community 188]]
 - [[_COMMUNITY_Community 189|Community 189]]
 - [[_COMMUNITY_Community 190|Community 190]]
+- [[_COMMUNITY_Community 191|Community 191]]
+- [[_COMMUNITY_Community 192|Community 192]]
+- [[_COMMUNITY_Community 193|Community 193]]
+- [[_COMMUNITY_Community 194|Community 194]]
+- [[_COMMUNITY_Community 195|Community 195]]
 - [[_COMMUNITY_Community 196|Community 196]]
 - [[_COMMUNITY_Community 197|Community 197]]
 - [[_COMMUNITY_Community 198|Community 198]]
@@ -208,620 +217,669 @@
 - [[_COMMUNITY_Community 210|Community 210]]
 - [[_COMMUNITY_Community 211|Community 211]]
 - [[_COMMUNITY_Community 212|Community 212]]
+- [[_COMMUNITY_Community 213|Community 213]]
+- [[_COMMUNITY_Community 214|Community 214]]
+- [[_COMMUNITY_Community 215|Community 215]]
+- [[_COMMUNITY_Community 216|Community 216]]
+- [[_COMMUNITY_Community 217|Community 217]]
+- [[_COMMUNITY_Community 218|Community 218]]
+- [[_COMMUNITY_Community 219|Community 219]]
+- [[_COMMUNITY_Community 220|Community 220]]
+- [[_COMMUNITY_Community 221|Community 221]]
+- [[_COMMUNITY_Community 222|Community 222]]
+- [[_COMMUNITY_Community 223|Community 223]]
+- [[_COMMUNITY_Community 224|Community 224]]
+- [[_COMMUNITY_Community 225|Community 225]]
+- [[_COMMUNITY_Community 226|Community 226]]
+- [[_COMMUNITY_Community 227|Community 227]]
+- [[_COMMUNITY_Community 228|Community 228]]
+- [[_COMMUNITY_Community 229|Community 229]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `RawTelegramMessage` - 492 edges
-2. `RawSignalEvent` - 322 edges
-3. `TelegramChannel` - 297 edges
-4. `ExtractedSignal` - 269 edges
-5. `DeletedSignalEvidence` - 246 edges
-6. `DeletionConfidence` - 231 edges
-7. `SimOutcome` - 221 edges
-8. `MaterializationPath` - 192 edges
-9. `Side` - 182 edges
-10. `FoldedSignal` - 179 edges
+1. `RawTelegramMessage` - 289 edges
+2. `RawSignalEvent` - 191 edges
+3. `TelegramChannel` - 178 edges
+4. `ExtractedSignal` - 137 edges
+5. `MaterializationPath` - 131 edges
+6. `Side` - 122 edges
+7. `DeletedSignalEvidence` - 114 edges
+8. `SimOutcome` - 111 edges
+9. `SimOutcomeKind` - 108 edges
+10. `UserAccount` - 102 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `int` --uses--> `Settings`  [INFERRED]
-  backend/src/verasig/foundation/telegram_session.py → apps/backend/src/verasig/config.py
-- `bool` --uses--> `Exchange`  [INFERRED]
-  backend/src/verasig/foundation/static_exchange.py → apps/backend/src/verasig/domain/protocols.py
-- `TelegramChannel` --uses--> `TelegramChannel`  [INFERRED]
-  backend/tests/unit/test_cli_telegram.py → apps/backend/src/verasig/domain/channel.py
-- `Shared DTOs And JSON Contracts` --semantically_similar_to--> `Canonical Pydantic Contracts`  [INFERRED] [semantically similar]
-  libs/contracts/README.md → docs/work/observer/data-contracts.md
-- `TelegramChannel` --uses--> `FakeSource`  [INFERRED]
-  backend/tests/integration/test_deletion_evidence.py → apps/backend/tests/fakes.py
+- `test_fake_exchange_satisfies_protocol_and_honours_injected_symbols()` --calls--> `FakeExchange`  [INFERRED]
+  apps/backend/tests/exchanges/test_exchange.py → apps/backend/tests/fakes.py
+- `test_fake_extractor_returns_canned_intent_and_counts_calls()` --calls--> `FakeExtractor`  [INFERRED]
+  apps/backend/tests/rules/test_llm_fallback.py → apps/backend/tests/fakes.py
+- `test_completeness_excludes_empty_signal_denominator()` --calls--> `measure_completeness()`  [INFERRED]
+  apps/backend/tests/provider_scores/test_hygiene.py → apps/backend/src/verasig/features/provider_scores/hygiene.py
+- `test_parser_confidence_excludes_empty_candidate_denominator()` --calls--> `measure_parser_confidence()`  [INFERRED]
+  apps/backend/tests/provider_scores/test_hygiene.py → apps/backend/src/verasig/features/provider_scores/hygiene.py
+- `test_telethon_source_satisfies_protocol()` --calls--> `TelethonSource`  [INFERRED]
+  apps/backend/tests/foundation/test_telegram_source.py → apps/backend/src/verasig/foundation/telegram/telethon_source.py
 
-## Hyperedges (group relationships)
-- **Backend Runtime Stack** — dockercompose_backend_app_container, dockercompose_postgres_database, readme_root_environment_contract, backendreadme_alembic_migrations [EXTRACTED 1.00]
-- **Trade Signal Extraction Contract** — distillpilot_filter_rule, distillpilot_parser_rules, distillpilot_trade_signal_field_map, extractpilot_single_trade_extraction, extractmiss_non_tradable_message [INFERRED 0.88]
-- **Verification UI State System** — domain_verification_state_taxonomy, core_badge, feedback_banner, feedback_toast, core_avatar [EXTRACTED 1.00]
-- **Human Assisted Rule Distillation Loop** — adr0002_operator_labeling, adr0001_golden_label, adr0002_golden_corpus, adr0002_llm_rule_distillation, adr0005_filter_rule, adr0002_parser_rule, adr0005_filter_drift_warning, adr0002_parser_drift_warning [EXTRACTED 1.00]
-- **Proof First Evidence Chain** — adr0001_raw_telegram_message, adr0001_raw_signal_event, adr0006_trade_intent, adr0006_extracted_signal, adr0008_deleted_signal_evidence, adr0009_provider_score_explanation, adr0009_provider_score [INFERRED 0.86]
-- **Storage Placement Taxonomy** — adr0001_raw_telegram_message, adr0006_extracted_signal, adr0007_folded_signal, adr0008_deleted_signal_evidence, adr0009_provider_score [EXTRACTED 1.00]
-- **Observer Evidence Pipeline** — context_rawtelegrammessage, context_rawsignalevent, context_extractedsignal, context_foldedsignal, context_simulated_outcome, context_providerscore, context_providerscoreexplanation [EXTRACTED 1.00]
-- **Source Labeling Workflow** — requirements_sources_page, requirements_telegram_setup, requirements_channel_list, requirements_backfill_progress, requirements_label_distill_verify_loop, requirements_extraction_after_verification, requirements_destination_setup, requirements_risk_policy, requirements_analysis_provider_score [EXTRACTED 1.00]
-- **Labeling UI Variants** — a_focus_deck_labeling_mockup, b_refined_ledger_labeling_mockup, c_reading_stream_labeling_mockup [EXTRACTED 1.00]
-- **Verasig Mark Visual Form** — verasig_mark_brand_mark, verasig_mark_angular_signal_stroke, verasig_mark_terminal_dot, verasig_mark_current_color_theming [EXTRACTED 1.00]
-
-## Communities (213 total, 54 thin omitted)
+## Communities (247 total, 69 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.11
-Nodes (102): TelegramSource, UnrecognizedSignal, bool, str, str, datetime, int, Kline (+94 more)
+Cohesion: 0.06
+Nodes (109): FilterDriftWarning, int, ParserDriftWarning, Session, str, UUID, datetime, int (+101 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.11
-Nodes (57): bool, FoldedSignal, FoldStep, RawSignalEvent, FoldStep, FoldedSignal, int, datetime (+49 more)
+Cohesion: 0.10
+Nodes (96): FakeMarketData, RawTelegramMessage, TelegramChannel, TelegramLiveEvent, FilterRule, RawTelegramMessage, datetime, Kline (+88 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.08
-Nodes (164): bool, datetime, DeletedSignalEvidence, ExtractedSignal, ExtractOutcome, FoldedSignal, FoldStep, int (+156 more)
+Cohesion: 0.09
+Nodes (72): _auth(), _read_config(), _register(), _risk_json(), _seed_subscription(), test_risk_get_returns_default_config(), test_risk_put_persists_and_echoes_config(), test_risk_rejects_invalid_levels_and_unknown_enums() (+64 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.06
-Nodes (112): datetime, ExtractedSignal, LlmExtractor, ParserRule, RawSignalEvent, str, TradeIntent, UnrecognizedSignal (+104 more)
+Nodes (77): datetime, DeletedSignalEvidence, int, sessionmaker, str, TelegramSource, int, _channel() (+69 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (64): int, RawTelegramMessage, sessionmaker, str, TelegramSource, int, int, RawTelegramMessage (+56 more)
+Cohesion: 0.21
+Nodes (55): datetime, Measurement, bool, datetime, DeletedSignalEvidence, ExtractedSignal, float, int (+47 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.09
-Nodes (61): bool, datetime, FilterRule, FoldedSignal, GoldenLabel, int, Kline, ParserRule (+53 more)
+Cohesion: 0.11
+Nodes (54): bool, DeletedSignalEvidence, ExtractedSignal, float, int, RawSignalEvent, RawTelegramMessage, SimOutcome (+46 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.07
-Nodes (85): Decimal, ExtractedSignal, int, RawTelegramMessage, bool, Decimal, str, Decimal (+77 more)
+Cohesion: 0.15
+Nodes (43): FoldedSignal, Kline, SimOutcome, bool, FoldedSignal, RawSignalEvent, LifecyclePatch, Plan (+35 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.11
-Nodes (40): bool, Exchange, RawSignalEvent, RawTelegramMessage, str, bool, datetime, RawTelegramMessage (+32 more)
+Cohesion: 0.18
+Nodes (49): int, LabelKind, Session, bool, FilterRule, GoldenLabel, int, LabelKind (+41 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.10
-Nodes (46): datetime, DeletedSignalEvidence, int, RawTelegramMessage, datetime, DeletedSignalEvidence, int, sessionmaker (+38 more)
+Cohesion: 0.09
+Nodes (37): bool, Exchange, RawSignalEvent, RawTelegramMessage, str, RawSignalEvent, bool, datetime (+29 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.13
-Nodes (24): int, str, int, str, _dialog(), _entity(), FakeTelethonClient, FakeTelethonMessage (+16 more)
+Cohesion: 0.15
+Nodes (39): Decimal, FoldedSignal, FoldStep, int, RawTelegramMessage, Session, Side, str (+31 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.19
-Nodes (40): bool, Exchange, FilterDriftWarning, FilterRule, int, ParserRule, RawSignalEvent, RawTelegramMessage (+32 more)
+Cohesion: 0.12
+Nodes (50): FilterRule, GoldenLabel, ParserRule, str, TradeIntent, FilterRule, JobOut, ParserRule (+42 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.11
-Nodes (51): int, str, TelegramChannel, TelegramDeliveryEvent, TelegramLiveEvent, datetime, DeliveryMode, int (+43 more)
+Nodes (34): bool, Decimal, str, Decimal, str, test_to_decimal_parses_numbers_commas_spaces_and_suffixes(), test_to_decimal_returns_none_for_unparseable(), Shared number parsing for noisy signal text.  `to_decimal` turns a raw price/siz (+26 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.08
-Nodes (28): IconButton(), s, s, Tabs(), s, Tag(), trigger, Menu() (+20 more)
+Cohesion: 0.14
+Nodes (33): PendingEmailMismatchError, Raised when an email confirmation token does not match account state., str, Request, str, UserAccount, int, SecretCipher (+25 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.16
-Nodes (31): FilterRule, GoldenLabel, int, ParserRule, str, GoldenLabel, FilterRule, GoldenLabel (+23 more)
+Cohesion: 0.06
+Nodes (35): code:block1 (0 Foundation), code:yaml (# docker-compose.yml), code:dockerfile (# Dockerfile), code:gitignore (# .gitignore), code:bash (git add -A && git commit -m "feat: foundation skeleton (comp), code:python (# tests/unit/test_deterministic_parser.py), code:python (# src/verasig/domain/signal.py), code:python (# src/verasig/features/signals/deterministic_parser.py) (+27 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.20
-Nodes (33): bool, ChannelReference, DeliveryMode, TelegramChannel, TelegramLiveEvent, ChannelReference, int, Session (+25 more)
+Cohesion: 0.11
+Nodes (30): _auth(), _distiller_stdout(), _instant(), _register(), _seed_chat(), test_distill_job_persists_rules_and_streams_progress(), test_distill_progress_reports_missing_job_as_404(), test_distill_requires_five_signal_labels() (+22 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.15
-Nodes (33): int, Settings, str, TelegramClient, int, Settings, str, TelegramClient (+25 more)
+Cohesion: 0.12
+Nodes (29): Request, str, Request, str, UserAccount, UUID, Request, str (+21 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.26
-Nodes (18): FilterRule, float, GoldenLabel, ParserRule, RawTelegramMessage, TradeIntent, FilterRule, float (+10 more)
+Cohesion: 0.17
+Nodes (31): bool, Decimal, FoldedSignal, FoldStep, Kline, Side, Decimal, FoldedSignal (+23 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.17
-Nodes (25): bool, int, bool, int, channel_lookup_handle(), _is_numeric_reference(), _is_telegram_link(), _is_title_reference() (+17 more)
+Cohesion: 0.11
+Nodes (18): int, str, _dialog(), _entity(), FakeTelethonClient, FakeTelethonMessage, _full_chat(), _instant() (+10 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.08
-Nodes (26): dependencies, react, react-dom, devDependencies, eslint, eslint-plugin-react, eslint-plugin-react-hooks, jsdom (+18 more)
+Cohesion: 0.14
+Nodes (29): PlanLimits, PlanSourceLimitExceeded, Raised when a user has reached their source subscription limit., require_source_capacity(), Session, UserAccount, int, Request (+21 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.06
-Nodes (34): Button(), s, loadUser(), ProductApp(), USER_DEFAULTS, SourcesView(), chats, onOpenTelegram (+26 more)
+Cohesion: 0.15
+Nodes (26): FilterRule, GoldenLabel, int, ParserRule, str, UUID, GoldenLabel, RuleDistiller (+18 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.12
-Nodes (21): Conservative Compliance Copy, Platform Is End State Not MVP, Signal Is A First Class Dataset, InfraOps, PortfolioOps, Research Lab, StrategyOps, Unified GUI (+13 more)
+Cohesion: 0.16
+Nodes (19): ChannelReference, datetime, int, str, _advance_last_seen(), _deletion_channel_id(), _describe_entity(), _dialog_title() (+11 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.13
-Nodes (22): str, TradeIntent, str, str, TradeIntent, str, _content(), _extraction_prompt() (+14 more)
+Cohesion: 0.09
+Nodes (21): s, Tabs(), s, Tag(), ARROW, MetricStat(), s, Banner() (+13 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.14
-Nodes (62): bool, DeletedSignalEvidence, ExtractedSignal, float, int, RawSignalEvent, RawTelegramMessage, SimOutcome (+54 more)
-
-### Community 23 - "Community 23"
-Cohesion: 0.17
-Nodes (21): Avatar Component Contract, Badge Component Contract, Button Component Contract, IconButton Component Contract, Tabs Component Contract, Tag Component Contract, Core Component Showcase Card, Core Component Demo (+13 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.18
-Nodes (20): datetime, int, RawTelegramMessage, str, datetime, int, RawTelegramMessage, str (+12 more)
-
-### Community 25 - "Community 25"
-Cohesion: 0.19
-Nodes (20): ExtractedSignal, ExtractedSignal, _signal(), test_entry_type_has_market_single_and_range(), test_extracted_signal_constructs_with_required_symbol_side_and_linkage(), test_extracted_signal_defaults_provenance_and_optionals(), test_extracted_signal_extends_trade_intent(), test_extracted_signal_has_no_parser_confidence() (+12 more)
-
-### Community 26 - "Community 26"
-Cohesion: 0.13
-Nodes (18): Apps Workspace Boundaries, Backend Ownership Boundary, Contracts Ownership Boundary, Frontend Ownership Boundary, Runtime Environment Loading, Backend App Container, Postgres Database Service, Read-Only Secrets Mount (+10 more)
-
-### Community 27 - "Community 27"
-Cohesion: 0.16
-Nodes (17): Focus Deck Labeling Mockup, Refined Ledger Labeling Mockup, Reading Stream Labeling Mockup, Candidate Filter, Distillation Loop, FilterDriftWarning, FilterRule, Golden Corpus (+9 more)
-
-### Community 28 - "Community 28"
-Cohesion: 0.13
-Nodes (42): datetime, int, RawTelegramMessage, TelegramChannel, datetime, DeletedSignalEvidence, int, datetime (+34 more)
-
-### Community 29 - "Community 29"
-Cohesion: 0.23
-Nodes (13): Candidate Filter, GoldenLabel, Golden Corpus, Human Assisted Rule Distillation Decision, LLM Rule Distillation, Operator Labeling, ParserDriftWarning, ParserRule (+5 more)
-
-### Community 30 - "Community 30"
-Cohesion: 0.17
-Nodes (16): DeletedSignalEvidence, MFE / MAE, ProviderScore, ProviderScoreExplanation, R-Multiple, Simulated Outcome, TelegramDeletionEvent, TelegramDeliveryEvent (+8 more)
-
-### Community 31 - "Community 31"
-Cohesion: 0.16
-Nodes (15): DeliveryMode, Hybrid Push Poll Live Ingestion Decision, TDLib Escape Hatch, TelegramLiveEvent, TelegramSource Protocol, Telethon Adapter, live_message_ids, Codebase Structure Boundary Decision (+7 more)
-
-### Community 32 - "Community 32"
-Cohesion: 0.23
-Nodes (14): test_backfill_batch_size_defaults_to_200(), test_backfill_batch_size_loads_from_env(), test_database_url_assembles_from_db_env(), test_database_url_defaults_to_localhost_parts(), test_database_url_escapes_user_password_and_database_name(), test_database_url_override_takes_precedence(), test_distiller_command_defaults_to_claude(), test_distiller_command_loads_from_env() (+6 more)
-
-### Community 33 - "Community 33"
-Cohesion: 0.06
-Nodes (35): Backend API Rewrite — Implementation Plan, code:block1 (apps/backend/src/verasig/), code:python (# services/jobs/registry.py), code:python (# services/accounts/plans.py), code:python (async def _run_backfill(publisher, source, channel_id, sessi), code:python (# foundation/anthropic_runner.py), code:block14 (1 → 2 → 3 → 4 → 5 → 6), code:python (def test_settings_carry_api_secrets(monkeypatch):) (+27 more)
-
-### Community 34 - "Community 34"
-Cohesion: 0.15
-Nodes (15): ExecutionPolicy, ExtractedSignal, FoldedSignal, ParserDriftWarning, Signal Lifecycle, SignalModification, UnrecognizedSignal, Recomputable Extraction Projection (+7 more)
-
-### Community 35 - "Community 35"
-Cohesion: 0.11
-Nodes (12): Badge(), s, ExchangesView(), Banner(), ICONS, s, Dialog(), s (+4 more)
-
-### Community 36 - "Community 36"
-Cohesion: 0.33
-Nodes (14): datetime, int, Kline, str, datetime, int, Kline, str (+6 more)
-
-### Community 37 - "Community 37"
-Cohesion: 0.06
-Nodes (35): code:block1 (0 Foundation), code:yaml (# docker-compose.yml), code:dockerfile (# Dockerfile), code:gitignore (# .gitignore), code:bash (git add -A && git commit -m "feat: foundation skeleton (comp), code:python (# tests/unit/test_deterministic_parser.py), code:python (# src/verasig/domain/signal.py), code:python (# src/verasig/services/extraction/deterministic_parser.py) (+27 more)
-
-### Community 38 - "Community 38"
-Cohesion: 0.17
-Nodes (17): LlmExtractor, FoldedSignal, ProviderScore, ProviderScore Recomputable Scorecard Decision, ProviderScoreExplanation, services/scoring, Core Features, Feature Contracts (+9 more)
-
-### Community 39 - "Community 39"
-Cohesion: 0.29
-Nodes (17): datetime, int, str, datetime, int, str, derive_candidates(), _instant() (+9 more)
-
-### Community 40 - "Community 40"
-Cohesion: 0.24
-Nodes (15): datetime, int, RawTelegramMessage, TelegramChannel, datetime, int, RawTelegramMessage, TelegramChannel (+7 more)
-
-### Community 41 - "Community 41"
-Cohesion: 0.08
-Nodes (14): forgetAuthenticatedUser(), isAuthenticated(), rememberAuthenticatedUser(), Client, FLOW, PRINCIPLES, AppRoutes(), createTestStorage() (+6 more)
-
-### Community 42 - "Community 42"
-Cohesion: 0.20
-Nodes (10): Typed Evidence References, Dark Ledger Console, Data First Rule, Evidence Color Rule, No Fluid Type Rule, Rose Scarcity Rule, Verasig Design System, Forms Component Demo (+2 more)
-
-### Community 43 - "Community 43"
-Cohesion: 0.06
-Nodes (30): 10. Frontend follow-ups (out of backend scope, tracked here), 1. Scope, 2. User stories, 3. Protocol conventions, 4. API surface, 5. Data model changes, 6. Plan enforcement, 7. Long-running operations (+22 more)
-
-### Community 44 - "Community 44"
-Cohesion: 0.33
-Nodes (6): GoldenLabel, GoldenLabel, FakeDistiller, live_events(), In-memory TelegramSource fake for offline backfill tests.  Simulates Telegram's, Offline RuleDistiller: serves rules parsed from canned LLM stdout.
-
-### Community 45 - "Community 45"
-Cohesion: 0.18
-Nodes (11): TradeIntent, Shared DTOs And JSON Contracts, Canonical Pydantic Contracts, LlmExtractor Protocol, MarketData Protocol, Service Interfaces, Foundation Layer, Local Observer Stack (+3 more)
-
-### Community 46 - "Community 46"
-Cohesion: 0.18
-Nodes (11): Active-User Proxy, Rescan, TelegramChannel, Backend Frontend Decoupling, Contracts Library, TelegramSource Protocol, Telegram Channel List, Coming Soon Sources And Destinations (+3 more)
-
-### Community 47 - "Community 47"
-Cohesion: 0.47
-Nodes (7): ExecutionView(), VX_SAMPLE, vxFmt(), VxLadderRow(), vxPlan(), VxPreview(), VxRadio()
-
-### Community 48 - "Community 48"
-Cohesion: 0.60
-Nodes (4): hashId(), rawMessage(), SignalsView(), sortKey()
-
-### Community 49 - "Community 49"
-Cohesion: 0.31
-Nodes (10): ExtractService, ExtractedSignal, extraction_method, Extraction Outcomes Shape And Lifecycle Decision, record_outcome, TradeIntent, UnrecognizedSignal, lifecycle fold Function (+2 more)
-
-### Community 50 - "Community 50"
-Cohesion: 0.24
-Nodes (10): RawSignalEvent, RawTelegramMessage, Append-Only Capture Tables, Work Item 0 Foundation Skeleton, Work Item 2 History Backfill, Observer Implementation Plan, Work Item 1 Telegram Session Login, Backfill Progress (+2 more)
-
-### Community 51 - "Community 51"
-Cohesion: 0.20
-Nodes (10): Milestone C Cheap Cloud MVP, Milestone B Local MVP, Milestone A Operator Dogfood, Milestone E Paid Beta, Milestone D Pilot Interest, Milestone H Platform Scale, Milestone F Research Integration, Signal Lake (+2 more)
-
-### Community 52 - "Community 52"
-Cohesion: 0.24
-Nodes (12): RawSignalEvent, RawTelegramMessage, Two Layer Raw Capture Decision, FoldStep, Lifecycle Fold Recomputable Decision, SignalModification, DeletedSignalEvidence, Deletion Evidence Durable Projection Decision (+4 more)
-
-### Community 53 - "Community 53"
-Cohesion: 0.36
-Nodes (8): test_filter_drift_warning_constructs_with_miss_source_and_defaults(), test_filter_drift_warning_links_late_materialized_event(), test_golden_label_carries_expected_signal_when_positive(), test_golden_label_constructs_with_is_signal_and_defaults(), test_golden_label_rejects_missing_is_signal(), test_miss_discovered_by_has_the_three_discovery_paths(), test_parser_drift_warning_constructs_with_defaults(), test_parser_drift_warning_requires_fallback_signal_id()
-
-### Community 54 - "Community 54"
 Cohesion: 0.06
 Nodes (30): After Running, Before Broad Questions, code:text ($graphify . --update), code:text ($graphify . --watch), code:text ($graphify .), code:text ($graphify . recursively from the deepest level that fits the), code:text ($graphify apps/backend), code:text ($graphify . --cluster-only) (+22 more)
 
-### Community 55 - "Community 55"
-Cohesion: 0.29
-Nodes (8): result, category, list, symbol, retCode, retExtInfo, retMsg, time
+### Community 23 - "Community 23"
+Cohesion: 0.28
+Nodes (15): FilterRule, float, GoldenLabel, int, ParserRule, RawTelegramMessage, TradeIntent, EvalReport (+7 more)
 
-### Community 56 - "Community 56"
-Cohesion: 0.25
-Nodes (8): 3Commas, AI SRE Incumbents, Capitalise.ai, Competitive Gap, Cornix, QuantConnect, TradingView Webhooks, WunderTrading
+### Community 24 - "Community 24"
+Cohesion: 0.20
+Nodes (27): bool, DeletedSignalEvidence, int, sessionmaker, TelegramDeletionEvent, TelegramDeliveryEvent, TelegramLiveEvent, TelegramSource (+19 more)
 
-### Community 57 - "Community 57"
-Cohesion: 0.40
-Nodes (9): datetime, int, datetime, int, _at(), _message(), _seed_lifecycle(), test_lifecycle_cli_prints_folded_timeline() (+1 more)
+### Community 25 - "Community 25"
+Cohesion: 0.08
+Nodes (20): datetime, datetime, bool, datetime, datetime, str, _now(), Drift records — false-negative evidence for the next distillation (§1, §4).  A ` (+12 more)
 
-### Community 58 - "Community 58"
-Cohesion: 0.39
-Nodes (7): test_filter_rule_constructs_with_rule_id_and_include_patterns(), test_filter_rule_defaults_recall_first_optionals(), test_filter_rule_records_label_provenance(), test_filter_rule_rejects_missing_include_patterns(), test_parser_rule_constructs_and_coerces_side_aliases_to_side(), test_parser_rule_defaults_optionals(), test_parser_rule_rejects_missing_patterns()
-
-### Community 59 - "Community 59"
-Cohesion: 0.25
-Nodes (8): Observer Design Spec, Operator Classification Evidence, Milestone G Live Execution, First Source Telegram, Observe-Only Exchange Mode, Signal Performance Operating System, Verasig, Web Dashboard
-
-### Community 60 - "Community 60"
-Cohesion: 0.38
-Nodes (7): Bybit Historical Klines, Conservative Observe Only Simulation Decision, ExecutionPolicy, ProviderStatedPolicy, R Multiple Outcome, Execution Lifecycle Future Compatible, Execution Outside MVP
-
-### Community 61 - "Community 61"
-Cohesion: 0.21
-Nodes (7): bool, str, bool, str, normalize_base_symbol(), Static exchange listing adapter for the seed candidate filter.  `StaticExchange`, Reduce a raw text token (`$BTC`, `BTCUSDT`, `eth/usdt`) to its base coin.
-
-### Community 62 - "Community 62"
+### Community 26 - "Community 26"
 Cohesion: 0.22
-Nodes (10): Pipeline(), PIPELINE_PROCESS_STEPS, PIPELINE_STEPS, { container }, steps, loadState(), mergeChatFlags(), PIPELINE_SCREEN_BY_SCREEN (+2 more)
+Nodes (27): Decimal, ExtractedSignal, FoldStep, int, LifecyclePatch, RawTelegramMessage, UUID, _apply_add() (+19 more)
 
-### Community 63 - "Community 63"
-Cohesion: 0.44
-Nodes (7): datetime, datetime, _instant(), test_delivery_mode_has_the_three_latency_provenance_values(), test_raw_message_constructs_with_required_fields(), test_raw_message_defaults_optionals_to_none(), test_raw_message_rejects_missing_core_fields()
-
-### Community 64 - "Community 64"
-Cohesion: 0.54
-Nodes (6): datetime, datetime, _instant(), test_channel_constructs_with_required_fields(), test_channel_defaults_optionals_to_none(), test_channel_rejects_missing_title()
-
-### Community 65 - "Community 65"
-Cohesion: 0.38
-Nodes (4): ChatsView(), fmtNum(), feed, onCheckGaps
-
-### Community 66 - "Community 66"
-Cohesion: 0.47
-Nodes (6): Angular Signal Stroke, Verasig Mark, CurrentColor Theming, Verasig Product Identity, verasig-mark.svg Asset, Terminal Dot
-
-### Community 67 - "Community 67"
-Cohesion: 0.40
-Nodes (5): Alembic Migrations, Backend CLI Commands, Backend Layout, Backend Test Suite, Verasig Python Package Source
-
-### Community 68 - "Community 68"
-Cohesion: 0.60
-Nodes (3): test_migrate_command_applies_head(), test_migrations_apply(), test_raw_capture_tables_exist_after_upgrade()
-
-### Community 69 - "Community 69"
-Cohesion: 0.67
-Nodes (4): Distilled Trade Signal Parser Rules, LONG SHORT Side Aliases, Trade Signal Field Map, Single BTC LONG Trade Extraction
-
-### Community 70 - "Community 70"
-Cohesion: 0.26
-Nodes (6): AuthMark(), BrandPanel(), LoginView(), onLogin, onRegister, RegisterView()
-
-### Community 71 - "Community 71"
-Cohesion: 0.23
-Nodes (27): int, int, _channel(), _deletion(), _event(), _id_gap(), _message(), _message_with_proxy() (+19 more)
-
-### Community 72 - "Community 72"
+### Community 27 - "Community 27"
 Cohesion: 0.07
 Nodes (27): dependencies, react, react-dom, react-router-dom, @verasig/design-system, devDependencies, eslint, @eslint/js (+19 more)
 
-### Community 73 - "Community 73"
+### Community 28 - "Community 28"
+Cohesion: 0.23
+Nodes (24): send_email_confirm(), send_password_reset_requested(), EmailChangeIn, EmailConfirmIn, RenameUserIn, SubscriptionChangeIn, cancel_user_subscription(), change_subscription() (+16 more)
+
+### Community 29 - "Community 29"
 Cohesion: 0.17
-Nodes (23): Decimal, EntryType, ParserRule, str, TradeIntent, Decimal, EntryType, ParserRule (+15 more)
+Nodes (26): int, measure_active_user_proxy(), _saturate_proxy(), _channel(), _deletion(), _event(), _id_gap(), _message() (+18 more)
 
-### Community 74 - "Community 74"
-Cohesion: 0.50
-Nodes (4): Contract Test Layer, Integration Test Layer, Observer TDD Test Plan, Unit Test Layer
+### Community 30 - "Community 30"
+Cohesion: 0.18
+Nodes (25): datetime, ExecutionPolicy, FoldedSignal, Kline, MarketData, SimOutcome, str, ExecutionPolicy (+17 more)
 
-### Community 75 - "Community 75"
-Cohesion: 0.50
-Nodes (3): Alembic migration environment for Verasig.  URL resolution order: 1. ``sqlalchem, run_migrations_offline(), run_migrations_online()
+### Community 31 - "Community 31"
+Cohesion: 0.21
+Nodes (19): ExtractedSignal, ExtractOutcome, LlmExtractor, ParserRule, RawSignalEvent, str, TradeIntent, UnrecognizedSignal (+11 more)
 
-### Community 80 - "Community 80"
-Cohesion: 0.47
-Nodes (4): datetime, datetime, _now(), Distilled candidate-inclusion rule (data-contracts.md §4; ADR 0005).  `FilterRul
-
-### Community 81 - "Community 81"
-Cohesion: 0.47
-Nodes (4): datetime, datetime, _now(), Distilled field-extraction rule (data-contracts.md §4; ADR 0005).  `ParserRule`
-
-### Community 82 - "Community 82"
-Cohesion: 0.67
-Nodes (3): Distilled Trade Signal Filter Rule, Recall and Field Precision Goal, Non-Tradable Message
-
-### Community 86 - "Community 86"
+### Community 32 - "Community 32"
 Cohesion: 0.08
 Nodes (25): devDependencies, eslint, @eslint/js, eslint-plugin-react, eslint-plugin-react-hooks, globals, jsdom, @testing-library/react (+17 more)
 
-### Community 115 - "Community 115"
-Cohesion: 0.22
-Nodes (58): Measurement, bool, datetime, DeletedSignalEvidence, ExtractedSignal, float, int, Measurement (+50 more)
+### Community 33 - "Community 33"
+Cohesion: 0.21
+Nodes (24): ChannelReference, ChannelRow, int, Session, str, TelegramChannel, bool, DeliveryMode (+16 more)
 
-### Community 116 - "Community 116"
-Cohesion: 0.25
-Nodes (24): FilterRule, GoldenLabel, int, ParserRule, Session, str, FilterRule, GoldenLabel (+16 more)
-
-### Community 117 - "Community 117"
+### Community 34 - "Community 34"
 Cohesion: 0.28
-Nodes (34): bool, Decimal, FoldedSignal, FoldStep, Kline, bool, Decimal, FoldedSignal (+26 more)
+Nodes (14): FilterRule, GoldenLabel, int, ParserRule, Session, UUID, Rule repository functions., read_filter_rules() (+6 more)
 
-### Community 118 - "Community 118"
+### Community 35 - "Community 35"
+Cohesion: 0.28
+Nodes (23): datetime, float, int, MarketData, RiskConfig, sessionmaker, SimOutcome, UUID (+15 more)
+
+### Community 36 - "Community 36"
+Cohesion: 0.20
+Nodes (21): bool, int, channel_lookup_handle(), _is_numeric_reference(), _is_telegram_link(), _is_title_reference(), _is_username_reference(), _link_handle() (+13 more)
+
+### Community 37 - "Community 37"
+Cohesion: 0.17
+Nodes (9): JobRegistry, str, bool, str, EventSourceResponse, sse_stream(), JobChannel, JobPublisher (+1 more)
+
+### Community 38 - "Community 38"
+Cohesion: 0.19
+Nodes (21): datetime, DeletedSignalEvidence, int, datetime, int, _confirmed_evidence(), detect_deletions(), _gap_ids() (+13 more)
+
+### Community 39 - "Community 39"
+Cohesion: 0.19
+Nodes (15): int, str, datetime, int, RawTelegramMessage, sessionmaker, str, TelegramSource (+7 more)
+
+### Community 40 - "Community 40"
+Cohesion: 0.16
+Nodes (17): str, LlmExtractor, test_anthropic_extractor_satisfies_protocol(), test_anthropic_extractor_wires_runner_without_real_network(), test_fake_extractor_returns_canned_intent_and_counts_calls(), test_parse_extractor_output_builds_trade_intent_from_fenced_json(), test_parse_extractor_output_drops_unknown_keys(), test_parse_extractor_output_returns_none_on_invalid_json() (+9 more)
+
+### Community 41 - "Community 41"
+Cohesion: 0.14
+Nodes (10): ROUTES, forgetAuthenticatedUser(), isAuthenticated(), rememberAuthenticatedUser(), BrandPanel(), LoginView(), onLogin, onRegister (+2 more)
+
+### Community 42 - "Community 42"
+Cohesion: 0.19
+Nodes (18): Decimal, EntryType, ParserRule, str, TradeIntent, _all(), _build_signal(), _entry() (+10 more)
+
+### Community 43 - "Community 43"
 Cohesion: 0.10
 Nodes (19): 1. Enums, 2. Sources & capture, 3. Extraction, 4. Parser rules & drift, 5. Lifecycle (folded view), 6. Deletion, 7. Scoring, 8. Simulation (+11 more)
 
-### Community 119 - "Community 119"
+### Community 44 - "Community 44"
 Cohesion: 0.10
 Nodes (19): 10. Risks & open items (carry forward), 11. Rollout, 1. Purpose, 2. Success Criterion (from validation-roadmap.md), 3. Scope, 4.1 Processing model — resumable & chunked (hard requirement), 4. Architecture (2-layer, per CLAUDE.md), 5. Tech stack (+11 more)
 
-### Community 120 - "Community 120"
-Cohesion: 0.15
-Nodes (33): float, TelegramClient, bool, DeletedSignalEvidence, int, sessionmaker, TelegramDeletionEvent, TelegramDeliveryEvent (+25 more)
-
-### Community 121 - "Community 121"
+### Community 45 - "Community 45"
 Cohesion: 0.13
-Nodes (9): s, SegmentedControl(), ThemeToggleProps, DEFAULT_OPTIONS, ThemeToggle(), expected, onChange, onClick (+1 more)
+Nodes (13): app(), sessionmaker, Request, str, create_app(), create_app_from_env(), FastAPI, test_bybit_kline_client_maps_response_to_chronological_klines() (+5 more)
 
-### Community 122 - "Community 122"
+### Community 46 - "Community 46"
+Cohesion: 0.32
+Nodes (16): _auth_response(), login(), logout(), me(), register(), AuthOut, LoginIn, RegisterIn (+8 more)
+
+### Community 47 - "Community 47"
+Cohesion: 0.13
+Nodes (7): _signal(), test_extracted_signal_constructs_with_required_symbol_side_and_linkage(), test_extracted_signal_defaults_provenance_and_optionals(), test_extracted_signal_normalizes_symbol_via_inherited_validator(), test_extracted_signal_rejects_empty_symbol(), test_extracted_signal_rejects_missing_side(), test_extracted_signal_take_profits_are_ordered_decimals()
+
+### Community 48 - "Community 48"
+Cohesion: 0.32
+Nodes (18): int, SecretCipher, Session, str, UserTelegramLinkRow, UUID, CodeInvalidError, Telegram rejected the submitted login code. (+10 more)
+
+### Community 49 - "Community 49"
+Cohesion: 0.37
+Nodes (17): apply_pending_email(), find_by_email(), find_by_id(), insert_account(), set_cancel_at(), set_pending_email(), set_plan(), _to_account() (+9 more)
+
+### Community 50 - "Community 50"
+Cohesion: 0.27
+Nodes (17): authenticate(), cancel_subscription(), change_plan(), confirm_email_change(), EmailTakenError, InvalidCredentialsError, normalize_email(), Raised when an account already exists for an email. (+9 more)
+
+### Community 51 - "Community 51"
+Cohesion: 0.16
+Nodes (10): loadUser(), ProductApp(), USER_DEFAULTS, EXCHANGES, ExchangesView(), SettingsView(), BackfillView(), BACKTEST_STEPS (+2 more)
+
+### Community 52 - "Community 52"
+Cohesion: 0.38
+Nodes (17): fold(), Fold each entry signal + its reply-chain patches into a FoldedSignal., _at(), _entry(), _message(), test_chatter_reply_emits_no_phantom_step(), test_different_symbol_reply_that_is_a_signal_starts_its_own_root(), test_full_close_keyword_terminates_with_close_step_and_closed_at() (+9 more)
+
+### Community 53 - "Community 53"
 Cohesion: 0.11
 Nodes (17): Acceptance Criteria, Analysis, Backfill, Channel List, code:text (Sources), Destination Setup, Distill, Extraction (+9 more)
 
-### Community 123 - "Community 123"
-Cohesion: 0.30
-Nodes (14): DeletedSignalEvidence, int, Session, DeletedSignalEvidence, int, Session, DeletedSignalEvidenceRow, _deletion_values() (+6 more)
+### Community 54 - "Community 54"
+Cohesion: 0.15
+Nodes (11): BacktestSummary, CamelModel, JobOut, LinkModIn, BacktestDoneOut, done_out(), ChatCreateIn, TelegramConnectIn (+3 more)
 
-### Community 124 - "Community 124"
+### Community 55 - "Community 55"
+Cohesion: 0.17
+Nodes (12): DISTILLED_RULES, MOD_KINDS, ORPHAN_LINKED_MOD, ORPHAN_MODS, SIGNALS, SOURCES, VERIFY_SAMPLES, hashId() (+4 more)
+
+### Community 56 - "Community 56"
 Cohesion: 0.12
-Nodes (15): Backend, Backend Module Rules, code:text (Verasig/), code:text (apps/backend/), code:text (apps/frontend/), code:text (graphify-out/), Contract Library, Deferred Splits (+7 more)
+Nodes (16): Backend, Backend Module Rules, code:text (Verasig/), code:text (apps/backend/), code:text (apps/frontend/), code:text (graphify-out/), Contract Library, Deferred Splits (+8 more)
 
-### Community 125 - "Community 125"
+### Community 57 - "Community 57"
+Cohesion: 0.15
+Nodes (7): int, PendingCode, RawTelegramMessage, str, TelegramChannel, live_events(), In-memory TelegramSource fake for offline backfill tests.  Simulates Telegram's
+
+### Community 58 - "Community 58"
+Cohesion: 0.45
+Nodes (12): int, Request, str, UUID, distill_progress(), _job_key(), rules(), _run_distill() (+4 more)
+
+### Community 59 - "Community 59"
+Cohesion: 0.26
+Nodes (13): TradeIntent, datetime, _instant(), record_outcome = recomputable per-event projection (ADR 0006, amends 0001).  The, _record(), _seed_event(), test_record_outcome_persists_extracted_and_reextract_is_idempotent(), test_record_outcome_persists_parser_drift_one_to_one() (+5 more)
+
+### Community 60 - "Community 60"
+Cohesion: 0.19
+Nodes (11): CHATS, Pipeline(), { container }, steps, PIPELINE_PROCESS_STEPS, PIPELINE_STEPS, loadState(), mergeChatFlags() (+3 more)
+
+### Community 61 - "Community 61"
+Cohesion: 0.15
+Nodes (9): s, SegmentedControl(), ThemeToggleProps, DEFAULT_OPTIONS, ThemeToggle(), expected, onChange, onClick (+1 more)
+
+### Community 62 - "Community 62"
+Cohesion: 0.30
+Nodes (12): _auth(), FakeVerifier, _read_connection(), _register(), _set_plan(), test_connect_rejects_bad_exchange_keys(), test_exchanges_catalog_starts_disconnected(), test_observer_cannot_connect_exchange() (+4 more)
+
+### Community 63 - "Community 63"
+Cohesion: 0.33
+Nodes (14): datetime, int, JobOut, Request, RiskConfig, str, UUID, JobAlreadyRunningError (+6 more)
+
+### Community 65 - "Community 65"
+Cohesion: 0.26
+Nodes (12): Kline, UserAccount, _account(), _channel(), _event(), FakeMarketData, _klines(), _message() (+4 more)
+
+### Community 66 - "Community 66"
+Cohesion: 0.37
+Nodes (13): _channel(), _computed_at(), _event(), _message(), _signal(), _sim_outcome(), _snapshot_rescan_proof(), test_provider_score_builder_adds_simulation_components_when_outcomes_exist() (+5 more)
+
+### Community 67 - "Community 67"
+Cohesion: 0.24
+Nodes (14): UUID, str, datetime, label_counts(), labeling_sample(), record_label(), _account(), _instant() (+6 more)
+
+### Community 68 - "Community 68"
+Cohesion: 0.22
+Nodes (9): str, _key(), test_secret_cipher_encrypts_decrypts_and_stamps_primary_key(), test_secret_cipher_rejects_duplicate_key_ids(), test_secret_cipher_rejects_malformed_envelope_parts(), test_secret_cipher_rejects_malformed_unknown_or_bad_version(), test_secret_cipher_rejects_tampered_ciphertext(), test_secret_cipher_rejects_wrong_aad() (+1 more)
+
+### Community 69 - "Community 69"
+Cohesion: 0.35
+Nodes (13): RawSignalEvent, str, ExtractService, _event(), test_empty_rules_yield_unrecognized(), test_fallback_failure_yields_unrecognized_fallback_failed(), test_fallback_not_called_when_deterministic_matches(), test_fallback_success_emits_exactly_one_drift() (+5 more)
+
+### Community 70 - "Community 70"
+Cohesion: 0.37
+Nodes (12): datetime, _account(), _channel(), _instant(), _message(), test_account_repository_round_trips_profile_plan_and_email(), test_advance_cursor_is_monotonic(), test_exchange_risk_backtest_and_lifecycle_repositories_round_trip() (+4 more)
+
+### Community 71 - "Community 71"
+Cohesion: 0.27
+Nodes (12): int, PendingCode, str, TelegramSource, PendingCode, Pure Telegram adapter seams., Telegram account requires 2FA, which v1 does not support., TwoFactorUnsupportedError (+4 more)
+
+### Community 72 - "Community 72"
+Cohesion: 0.44
+Nodes (12): _auth(), _channel(), _connect_and_subscribe(), _messages(), _register(), SlowSource, test_backfill_duplicate_start_and_cancel(), test_backfill_foreign_user_is_not_found() (+4 more)
+
+### Community 73 - "Community 73"
+Cohesion: 0.15
+Nodes (12): devDependencies, prettier, name, private, scripts, build, format, format:check (+4 more)
+
+### Community 74 - "Community 74"
 Cohesion: 0.15
 Nodes (12): 1. Test layers, 2. Fixtures (the golden corpora), 3. Per-Work-Item Test Matrix, 4. Representative test specs (write these first, watch them fail), 5. Precision / recall harness (cross-cutting), 6. Definition of Done, code:block1 (tests/fixtures/), code:python (@pytest.mark.parametrize("text,expected", [) (+4 more)
 
-### Community 126 - "Community 126"
-Cohesion: 0.44
-Nodes (10): _event(), test_empty_rules_yield_unrecognized(), test_fallback_failure_yields_unrecognized_fallback_failed(), test_fallback_not_called_when_deterministic_matches(), test_fallback_success_emits_exactly_one_drift(), test_first_matching_rule_wins(), test_match_yields_exactly_one_signal_outcome(), test_miss_yields_unrecognized_with_no_match_reason_and_linkage() (+2 more)
+### Community 75 - "Community 75"
+Cohesion: 0.37
+Nodes (12): int, RawTelegramMessage, Session, candidate_message_ids(), count_messages(), insert_messages(), Message repository functions., One bounded page of messages with id > cursor (keyset pagination). (+4 more)
 
-### Community 127 - "Community 127"
-Cohesion: 0.23
-Nodes (7): Avatar(), s, TONE, Shell(), onThemeChange, user, UserMenu()
+### Community 76 - "Community 76"
+Cohesion: 0.40
+Nodes (12): _auth(), _channel(), _connect_telegram(), _register(), test_delete_chat_removes_subscription_not_capture_and_masks_foreign_user(), test_get_chats_empty(), test_observer_second_chat_hits_source_limit(), test_post_chat_requires_telegram_link() (+4 more)
 
-### Community 128 - "Community 128"
+### Community 77 - "Community 77"
+Cohesion: 0.30
+Nodes (9): _register(), _register_payload(), test_login_rejects_bad_password(), test_login_returns_token_for_valid_credentials(), test_me_returns_current_user_with_token(), test_register_rejects_duplicate_email(), test_register_rejects_short_password(), test_register_returns_token_and_user() (+1 more)
+
+### Community 78 - "Community 78"
+Cohesion: 0.18
+Nodes (5): MESSAGES, VERIFY_MISCLASSIFIED, LabelView(), onLabel, VerifyView()
+
+### Community 79 - "Community 79"
 Cohesion: 0.17
 Nodes (11): Deletion, Design references, Example dialogue, Extraction, Flagged ambiguities, Language, Parsing rules, Scoring (+3 more)
 
-### Community 129 - "Community 129"
-Cohesion: 0.38
-Nodes (9): RawSignalEvent, RawSignalEvent, _event(), test_event_carries_filter_rule_id_when_flagged_by_a_rule(), test_event_constructs_with_required_fields_and_defaults(), test_event_records_matched_reasons_as_a_list(), test_event_rejects_missing_candidate_text(), test_match_reason_has_the_three_seed_heuristics() (+1 more)
+### Community 80 - "Community 80"
+Cohesion: 0.21
+Nodes (8): Card(), s, ChoiceCard(), s, InteractiveCard(), s, RadioCard(), s
 
-### Community 130 - "Community 130"
+### Community 81 - "Community 81"
+Cohesion: 0.21
+Nodes (9): colorFor(), ConfidenceBar(), s, s, SignalRow(), GLYPH, LABELS, s (+1 more)
+
+### Community 83 - "Community 83"
+Cohesion: 0.41
+Nodes (10): datetime, int, Kline, str, _from_millis(), _kline_params(), _parse_kline(), _parse_klines() (+2 more)
+
+### Community 84 - "Community 84"
+Cohesion: 0.47
+Nodes (10): _auth(), _latest_backtest(), _parser_rule(), _register(), _seed(), _seed_confirmed_signal_deletion(), test_backtest_foreign_user_is_not_found(), test_backtest_job_streams_phases_persists_outcomes_and_updates_chat() (+2 more)
+
+### Community 85 - "Community 85"
+Cohesion: 0.45
+Nodes (10): _auth(), _event(), _message(), _register(), _seed(), _signal(), test_signal_routes_list_detail_filter_and_link_mod(), test_signal_routes_mask_foreign_user() (+2 more)
+
+### Community 86 - "Community 86"
+Cohesion: 0.29
+Nodes (9): int, str, AsyncBaseTransport, test_verify_api_keys_rejects_nonzero_ret_code(), test_verify_api_keys_signs_bybit_query_api_request(), _signature(), _signed_headers(), _timestamp_ms() (+1 more)
+
+### Community 87 - "Community 87"
 Cohesion: 0.18
 Nodes (10): §01 Position size, §02 Entry, §03 Exit, Display gates (corpus → UI), Engine matrix (signal → behavior), Execution step — adaptive display logic, Open questions (not yet ruled on), Preview: where combinations live (+2 more)
 
-### Community 131 - "Community 131"
-Cohesion: 0.29
-Nodes (8): datetime, str, datetime, str, _normalize_symbol(), _now(), Extraction contracts (data-contracts.md §1, §3).  `TradeIntent` is the provenanc, _require_symbol()
+### Community 88 - "Community 88"
+Cohesion: 0.45
+Nodes (10): bool, datetime, Session, str, UUID, read_connections(), set_connected(), upsert_connection() (+2 more)
 
-### Community 132 - "Community 132"
-Cohesion: 0.22
-Nodes (6): Marketing(), ThemeContext, ThemeProvider(), THEMES, useStoredThemeState(), useTheme()
+### Community 89 - "Community 89"
+Cohesion: 0.42
+Nodes (10): JobRegistry, str, _collect(), test_cancel_yields_cancelled_error_event(), test_duplicate_start_while_running_raises_and_finished_job_restarts(), test_failing_coroutine_yields_error_event(), test_has_job_tracks_active_job_keys(), test_late_subscriber_receives_progress_replay_and_terminal_event() (+2 more)
 
-### Community 133 - "Community 133"
+### Community 90 - "Community 90"
+Cohesion: 0.36
+Nodes (9): int, Request, Response, str, LabelIn, label_message(), labels(), messages() (+1 more)
+
+### Community 91 - "Community 91"
+Cohesion: 0.20
+Nodes (6): bool, str, bool, normalize_base_symbol(), Static exchange listing adapter for the seed candidate filter.  `StaticExchange`, Reduce a raw text token (`$BTC`, `BTCUSDT`, `eth/usdt`) to its base coin.
+
+### Community 92 - "Community 92"
+Cohesion: 0.25
+Nodes (10): Request, Response, UserAccount, connect_telegram(), telegram_status(), verify_telegram(), TelegramConnectIn, TelegramStatusOut (+2 more)
+
+### Community 93 - "Community 93"
 Cohesion: 0.20
 Nodes (9): ADR-BIZ-001 - Platform Is End-State, Not MVP, ADR-BIZ-002 - Signal Is A First-Class Dataset, ADR-BIZ-003 - Execution Stays Outside The MVP, ADR-BIZ-004 - Execution Lifecycle Is Future-Compatible, ADR-BIZ-005 - InfraOps Is Internal, ADR-BIZ-006 - Research Lab Follows Signal Lake, ADR-BIZ-007 - PortfolioOps Requires Multiple Proven Strategies, ADR-BIZ-008 - Compliance Copy Is Conservative (+1 more)
 
-### Community 134 - "Community 134"
+### Community 94 - "Community 94"
 Cohesion: 0.20
 Nodes (9): Business Decomposition, Core Thesis, InfraOps, PortfolioOps, Product Wedges, Research Lab, StrategyOps, Unified GUI (+1 more)
 
-### Community 135 - "Community 135"
+### Community 95 - "Community 95"
 Cohesion: 0.20
 Nodes (9): Milestone A - Operator Dogfood, Milestone B - Local MVP, Milestone C - Cheap Cloud MVP, Milestone D - Pilot Interest, Milestone E - Paid Beta, Milestone F - Research Integration, Milestone G - Live Execution, Milestone H - Platform Scale (+1 more)
 
-### Community 136 - "Community 136"
+### Community 96 - "Community 96"
+Cohesion: 0.22
+Nodes (6): Marketing(), ThemeContext, ThemeProvider(), THEMES, useStoredThemeState(), useTheme()
+
+### Community 97 - "Community 97"
+Cohesion: 0.29
+Nodes (7): str, BaseSettings, ValueError, database_url(), Raised when required runtime settings are missing or invalid., Settings, SettingsError
+
+### Community 98 - "Community 98"
+Cohesion: 0.44
+Nodes (9): datetime, int, Session, str, UserTelegramLinkRow, UUID, mark_connected(), read_link() (+1 more)
+
+### Community 99 - "Community 99"
+Cohesion: 0.49
+Nodes (9): SecretCipher, UserAccount, _account(), _cipher(), test_connect_stores_encrypted_pending_link(), test_status_masks_phone(), test_verify_flips_to_connected_and_stores_final_session(), test_wrong_code_surfaces_error_and_stays_pending() (+1 more)
+
+### Community 100 - "Community 100"
+Cohesion: 0.56
+Nodes (8): _auth(), _instant(), _register(), _seed_chat(), test_label_rejects_unknown_value(), test_label_routes_mask_foreign_user(), test_messages_label_and_counts(), str
+
+### Community 101 - "Community 101"
+Cohesion: 0.50
+Nodes (8): _auth(), _register(), test_email_change_sets_pending_and_confirm_applies(), test_password_reset_request_is_accepted(), test_patch_user_name_persists(), test_subscription_change_cancel_and_resume(), test_subscription_change_rejects_invalid_plan(), str
+
+### Community 102 - "Community 102"
+Cohesion: 0.64
+Nodes (8): _auth(), _register(), _seed(), test_verify_rejects_too_few_verdicts(), test_verify_routes_mask_foreign_user(), test_verify_samples_and_submit_verdicts(), str, UUID
+
+### Community 103 - "Community 103"
+Cohesion: 0.22
+Nodes (5): bool, datetime, Kline, str, Pure market and exchange adapter seams.
+
+### Community 105 - "Community 105"
+Cohesion: 0.25
+Nodes (7): AppRoutes(), createTestStorage(), h1, installTestStorage(), logins, signups, user
+
+### Community 106 - "Community 106"
+Cohesion: 0.22
+Nodes (6): domainFiles, domainSource, featureFiles, featureSource, pageCss, src
+
+### Community 107 - "Community 107"
 Cohesion: 0.22
 Nodes (8): Customer, First Pricing Hypotheses, Non-Promise, Pain, Product, Promise, Strongest Differentiator, Value Proposition
 
-### Community 137 - "Community 137"
+### Community 108 - "Community 108"
 Cohesion: 0.22
 Nodes (8): Accessibility & Inclusion, Anti-references, Brand Personality, Design Principles, Product, Product Purpose, Register, Users
 
-### Community 138 - "Community 138"
+### Community 109 - "Community 109"
+Cohesion: 0.22
+Nodes (8): result, category, list, symbol, retCode, retExtInfo, retMsg, time
+
+### Community 110 - "Community 110"
+Cohesion: 0.50
+Nodes (8): _channel(), _event(), _folded(), _load_klines(), _message(), _signal(), test_market_data_backed_simulation_feeds_scorecard_components(), _uuid()
+
+### Community 111 - "Community 111"
+Cohesion: 0.28
+Nodes (6): sessionmaker, str, make_engine(), make_session_factory(), Engine, test_health_connects()
+
+### Community 113 - "Community 113"
+Cohesion: 0.36
+Nodes (5): ExecutionView(), VX_SAMPLE, vxFmt(), vxPlan(), VxPreview()
+
+### Community 114 - "Community 114"
 Cohesion: 0.25
 Nodes (7): Business Implication, Competitive Gap, Confirmed Or Disproved, Market Evidence, Market Research, Regulatory Evidence, Verdict
 
-### Community 139 - "Community 139"
-Cohesion: 0.25
-Nodes (7): Backend (current behavior preserved), Database migrations and app container, Documents, Environment, Frontend, Repo structure, Verasig
+### Community 115 - "Community 115"
+Cohesion: 0.43
+Nodes (6): datetime, _instant(), _step(), test_fold_step_defaults_effective_optionals_to_empty_or_none(), test_fold_step_records_effective_state_after_step(), test_folded_signal_defaults_closed_at_none_and_stamps_fold_version()
 
-### Community 140 - "Community 140"
+### Community 116 - "Community 116"
+Cohesion: 0.25
+Nodes (7): Backend, Database migrations and app container, Documents, Environment, Frontend, Repo structure, Verasig
+
+### Community 117 - "Community 117"
+Cohesion: 0.57
+Nodes (6): datetime, _instant(), _seed(), test_apply_verdicts_records_wrong_feedback_and_passes_all_correct(), test_apply_verdicts_rejects_too_few_verdicts(), test_verification_samples_include_predictions()
+
+### Community 118 - "Community 118"
+Cohesion: 0.33
+Nodes (5): SourcesView(), chats, onOpenTelegram, sourceCard, user
+
+### Community 119 - "Community 119"
 Cohesion: 0.29
 Nodes (6): Decision, Documents, Project Name, Recommended Wedge, Verasig Business Pack, Why This Wedge
 
-### Community 141 - "Community 141"
-Cohesion: 0.07
-Nodes (28): deleted_files, files, code, document, image, paper, video, graphifyignore_patterns (+20 more)
+### Community 120 - "Community 120"
+Cohesion: 0.33
+Nodes (6): trigger, Menu(), MenuItem(), MenuSeparator(), mergeHandlers(), s
 
-### Community 142 - "Community 142"
-Cohesion: 0.47
-Nodes (4): datetime, datetime, _now(), Advisory candidate-event contracts (data-contracts.md §1, §2; ADR 0005).  `RawSi
+### Community 121 - "Community 121"
+Cohesion: 0.38
+Nodes (4): Path, _python_files_under(), test_backend_python_imports_use_canonical_modules(), test_source_files_do_not_contain_compatibility_wrapper_markers()
 
-### Community 143 - "Community 143"
-Cohesion: 0.47
-Nodes (4): datetime, datetime, _now(), Operator ground-truth label — the golden corpus (data-contracts.md §4).  A `Gold
+### Community 122 - "Community 122"
+Cohesion: 0.43
+Nodes (4): datetime, _instant(), test_raw_message_constructs_with_required_fields(), test_raw_message_defaults_optionals_to_none()
 
-### Community 144 - "Community 144"
+### Community 123 - "Community 123"
+Cohesion: 0.57
+Nodes (6): str, _event(), _message(), _seed(), _signal(), test_present_signals_projects_lifecycle_outcomes_and_orphan_mods()
+
+### Community 124 - "Community 124"
+Cohesion: 0.43
+Nodes (6): int, RawSignalEvent, Session, insert_signal_events(), Event repository functions., read_signal_events()
+
+### Community 125 - "Community 125"
+Cohesion: 0.62
+Nodes (6): _auth(), _register(), test_telegram_connect_verify_and_status(), test_telegram_status_without_link(), test_telegram_verify_rejects_bad_code(), str
+
+### Community 126 - "Community 126"
 Cohesion: 0.40
-Nodes (4): Commands, Environment, Layout, Verasig Backend
+Nodes (3): Shell(), onThemeChange, user
 
-### Community 145 - "Community 145"
+### Community 127 - "Community 127"
+Cohesion: 0.40
+Nodes (3): ChatsView(), feed, onCheckGaps
+
+### Community 128 - "Community 128"
+Cohesion: 0.33
+Nodes (5): API, Commands, Environment, Layout, Verasig Backend
+
+### Community 129 - "Community 129"
+Cohesion: 0.33
+Nodes (5): Core Features, Feature Contracts, MVP Exclusions, MVP Metrics, MVP Scope
+
+### Community 130 - "Community 130"
+Cohesion: 0.33
+Nodes (5): Assumptions, Open Research Questions, Requirements, Resolved Decisions, User Stories
+
+### Community 131 - "Community 131"
+Cohesion: 0.60
+Nodes (5): datetime, _instant(), test_channel_constructs_with_required_fields(), test_channel_defaults_optionals_to_none(), test_channel_rejects_missing_title()
+
+### Community 132 - "Community 132"
+Cohesion: 0.40
+Nodes (4): Consequences, Considered options, Refine codebase structure without adding a new application layer, Status update
+
+### Community 133 - "Community 133"
+Cohesion: 0.67
+Nodes (3): datetime, _now(), Distilled candidate-inclusion rule (data-contracts.md §4; ADR 0005).  `FilterRul
+
+### Community 134 - "Community 134"
 Cohesion: 0.40
 Nodes (4): printWidth, semi, singleQuote, trailingComma
 
-### Community 146 - "Community 146"
+### Community 135 - "Community 135"
 Cohesion: 0.40
 Nodes (4): Apps Workspace, Boundaries, Environment loading, Ownership
 
-### Community 147 - "Community 147"
+### Community 136 - "Community 136"
+Cohesion: 0.40
+Nodes (3): str, test_anthropic_runner_concatenates_text_blocks_and_passes_model(), make_anthropic_runner()
+
+### Community 137 - "Community 137"
+Cohesion: 0.50
+Nodes (3): str, _add_unique_nulls_not_distinct(), upgrade()
+
+### Community 138 - "Community 138"
 Cohesion: 0.50
 Nodes (3): Amendment (ADR 0005), Considered options, Two-layer raw capture: RawTelegramMessage vs RawSignalEvent
 
-### Community 148 - "Community 148"
+### Community 139 - "Community 139"
 Cohesion: 0.50
 Nodes (3): Amendment (ADR 0005), Consequences, Parser rules come from human-assisted distillation, not autonomous mining
 
-### Community 149 - "Community 149"
+### Community 140 - "Community 140"
 Cohesion: 0.50
 Nodes (3): Consequences, Considered options, Live ingestion is a hybrid push+poll inside the Telethon adapter
 
-### Community 150 - "Community 150"
+### Community 141 - "Community 141"
 Cohesion: 0.50
 Nodes (3): Consequences, Considered options, Filter rules are distilled too, and the candidate gate is advisory, not hard
 
-### Community 151 - "Community 151"
+### Community 142 - "Community 142"
 Cohesion: 0.50
 Nodes (3): Consequences, Considered options, Extraction outcomes: a provenance-free TradeIntent + a recomputable per-event projection
 
-### Community 152 - "Community 152"
+### Community 143 - "Community 143"
 Cohesion: 0.50
 Nodes (3): Consequences, Considered options, The signal lifecycle fold is a pure, recomputable, in-memory view — modifications are not signals
 
-### Community 153 - "Community 153"
+### Community 144 - "Community 144"
 Cohesion: 0.50
 Nodes (3): Consequences, Considered options, Deletion evidence is a durable, first-class projection — observed by live rescan, not recomputed
 
-### Community 154 - "Community 154"
+### Community 145 - "Community 145"
 Cohesion: 0.50
 Nodes (3): Consequences, Considered options, ProviderScore is a pure, recomputable, in-memory scorecard — honestly partial until simulation, fully evidence-traced
 
-### Community 155 - "Community 155"
-Cohesion: 0.50
-Nodes (3): Consequences, Considered options, Refine codebase structure without adding a new application layer
+### Community 147 - "Community 147"
+Cohesion: 0.32
+Nodes (10): int, Session, str, UUID, datetime, _instant(), test_present_rules_projects_display_and_signal_match(), _present_pattern() (+2 more)
 
-### Community 158 - "Community 158"
+### Community 149 - "Community 149"
+Cohesion: 0.50
+Nodes (3): str, find_json_object(), Shared tolerant JSON-object extraction from LLM-CLI stdout (ADR 0006).  Both the
+
+### Community 151 - "Community 151"
 Cohesion: 0.50
 Nodes (3): Contracts Library, Current state, Purpose
 
-### Community 196 - "Community 196"
-Cohesion: 0.24
-Nodes (26): datetime, ExecutionPolicy, FoldedSignal, Kline, MarketData, SimOutcome, str, datetime (+18 more)
+### Community 152 - "Community 152"
+Cohesion: 0.50
+Nodes (3): Avatar(), s, TONE
 
-### Community 197 - "Community 197"
-Cohesion: 0.41
-Nodes (16): int, int, _channel(), _computed_at(), _event(), _message(), _signal(), _sim_outcome() (+8 more)
-
-### Community 198 - "Community 198"
-Cohesion: 0.33
-Nodes (14): DeletedSignalEvidence, int, DeletedSignalEvidence, int, _channel(), _confirmed(), _evidence(), Pure deletion formatter (cli.format_deletions; ADR 0008).  Displays only signal- (+6 more)
-
-### Community 199 - "Community 199"
-Cohesion: 0.20
-Nodes (13): GoldenLabel, int, RawTelegramMessage, str, GoldenLabel, int, RawTelegramMessage, Path (+5 more)
-
-### Community 200 - "Community 200"
-Cohesion: 0.27
-Nodes (13): datetime, int, RawTelegramMessage, datetime, int, RawTelegramMessage, _instant(), _message() (+5 more)
-
-### Community 201 - "Community 201"
-Cohesion: 0.28
-Nodes (11): TelegramChannel, TelegramChannel, _channel(), _isolate_env(), test_backfill_reference_error_exits_without_traceback(), test_backfill_without_credentials_exits_with_hint(), test_format_stats_omits_handle_subs_and_marks_empty_cursor(), test_format_stats_renders_handle_cursor_and_subs() (+3 more)
-
-### Community 202 - "Community 202"
-Cohesion: 0.33
-Nodes (10): DeletedSignalEvidence, int, DeletedSignalEvidence, int, _confirmed(), Offline `deletions` reader (ADR 0008).  Seeds evidence via the repo, then drives, _seed_evidence(), _suspected() (+2 more)
-
-### Community 203 - "Community 203"
-Cohesion: 0.44
-Nodes (10): datetime, datetime, _at(), _folded(), test_add_row_is_annotated_and_carries_weighted_entry(), test_close_row_shows_zero_size(), test_entry_row_shows_effective_levels(), test_header_carries_symbol_side_root_prefix_steps_and_closed() (+2 more)
-
-### Community 204 - "Community 204"
-Cohesion: 0.33
-Nodes (11): float, object, SimOutcome, str, float, object, SimOutcome, str (+3 more)
-
-### Community 205 - "Community 205"
-Cohesion: 0.44
-Nodes (7): FakeMarketData, _message(), _seed_score(), test_score_cli_can_include_simulation_from_market_data(), test_score_cli_prints_scorecard_and_explanation(), test_score_cli_unknown_channel_exits_nonzero(), _uuid()
-
-### Community 206 - "Community 206"
-Cohesion: 0.44
-Nodes (8): datetime, datetime, _instant(), _step(), test_fold_step_defaults_effective_optionals_to_empty_or_none(), test_fold_step_records_effective_state_after_step(), test_fold_version_constant_is_one(), test_folded_signal_defaults_closed_at_none_and_stamps_fold_version()
-
-### Community 207 - "Community 207"
-Cohesion: 0.58
-Nodes (8): _channel(), _event(), _folded(), _load_klines(), _message(), _signal(), test_market_data_backed_simulation_feeds_scorecard_components(), _uuid()
-
-### Community 208 - "Community 208"
+### Community 153 - "Community 153"
 Cohesion: 0.67
-Nodes (7): _bar(), _folded(), _step(), test_limit_entry_stays_unfilled_when_price_never_reaches_entry(), test_market_entry_fills_at_next_kline_open_before_exit_checks(), test_mfe_and_mae_stop_at_the_exit_candle(), test_same_candle_stop_and_take_profit_resolves_stop_first()
+Nodes (3): charsFromValue(), OTPInput(), s
 
-### Community 209 - "Community 209"
-Cohesion: 0.54
-Nodes (6): Cross-cutting precision/recall harness over the committed golden corpus.  Distil, _report(), test_corpus_has_a_meaningful_signal_denominator(), test_filter_recall_meets_quality_gate(), test_parser_precision_meets_quality_gate(), test_parser_recall_is_reported_not_gated()
+### Community 154 - "Community 154"
+Cohesion: 0.50
+Nodes (3): Commands, Layout, Verasig Frontend
 
-### Community 210 - "Community 210"
-Cohesion: 0.47
-Nodes (4): datetime, datetime, _now(), Deletion-evidence contract (data-contracts.md §6; ADR 0008).  `DeletedSignalEvid
+### Community 155 - "Community 155"
+Cohesion: 0.67
+Nodes (3): datetime, _now(), Deletion-evidence contract (data-contracts.md §6; ADR 0008).  `DeletedSignalEvid
 
-### Community 211 - "Community 211"
-Cohesion: 0.40
-Nodes (4): Assumptions, Open Research Questions, Requirements, Resolved Decisions
-
-### Community 212 - "Community 212"
-Cohesion: 0.40
-Nodes (4): edges, input_tokens, nodes, output_tokens
+### Community 156 - "Community 156"
+Cohesion: 0.67
+Nodes (3): datetime, _now(), Distilled field-extraction rule (data-contracts.md §4; ADR 0005).  `ParserRule`
 
 ## Knowledge Gaps
-- **500 isolated node(s):** `nodes`, `edges`, `input_tokens`, `output_tokens`, `code` (+495 more)
+- **426 isolated node(s):** `printWidth`, `semi`, `singleQuote`, `trailingComma`, `name` (+421 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **54 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **69 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `RawTelegramMessage` connect `Community 5` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 13`, `Community 14`, `Community 16`, `Community 17`, `Community 22`, `Community 24`, `Community 28`, `Community 39`, `Community 40`, `Community 44`, `Community 57`, `Community 63`, `Community 196`, `Community 197`, `Community 199`, `Community 71`, `Community 200`, `Community 205`, `Community 115`, `Community 120`?**
-  _High betweenness centrality (0.123) - this node is a cross-community bridge._
-- **Why does `Client` connect `Community 41` to `Community 1`, `Community 2`, `Community 36`?**
-  _High betweenness centrality (0.120) - this node is a cross-community bridge._
-- **Why does `MarketData` connect `Community 2` to `Community 1`, `Community 36`, `Community 5`, `Community 196`, `Community 41`, `Community 10`, `Community 11`, `Community 115`?**
+- **Why does `Client` connect `Community 41` to `Community 35`, `Community 6`?**
+  _High betweenness centrality (0.118) - this node is a cross-community bridge._
+- **Why does `Kline` connect `Community 6` to `Community 65`, `Community 2`, `Community 1`, `Community 4`, `Community 35`, `Community 103`, `Community 41`, `Community 10`, `Community 45`, `Community 16`, `Community 83`, `Community 84`, `Community 30`?**
   _High betweenness centrality (0.105) - this node is a cross-community bridge._
-- **Are the 489 inferred relationships involving `RawTelegramMessage` (e.g. with `FakeStreamInterrupted` and `FakeSource`) actually correct?**
-  _`RawTelegramMessage` has 489 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 319 inferred relationships involving `RawSignalEvent` (e.g. with `RawSignalEvent` and `datetime`) actually correct?**
-  _`RawSignalEvent` has 319 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 294 inferred relationships involving `TelegramChannel` (e.g. with `FakeStreamInterrupted` and `FakeSource`) actually correct?**
-  _`TelegramChannel` has 294 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 266 inferred relationships involving `ExtractedSignal` (e.g. with `ExtractedSignal` and `datetime`) actually correct?**
-  _`ExtractedSignal` has 266 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `RawTelegramMessage` connect `Community 1` to `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 9`, `Community 10`, `Community 14`, `Community 17`, `Community 147`, `Community 20`, `Community 23`, `Community 24`, `Community 25`, `Community 26`, `Community 29`, `Community 33`, `Community 35`, `Community 38`, `Community 39`, `Community 48`, `Community 57`, `Community 59`, `Community 65`, `Community 67`, `Community 70`, `Community 71`, `Community 72`, `Community 75`, `Community 84`, `Community 85`, `Community 91`, `Community 99`, `Community 100`, `Community 102`, `Community 117`, `Community 122`, `Community 123`?**
+  _High betweenness centrality (0.104) - this node is a cross-community bridge._
+- **Are the 287 inferred relationships involving `RawTelegramMessage` (e.g. with `FakeStreamInterrupted` and `FakeTelegramAuth`) actually correct?**
+  _`RawTelegramMessage` has 287 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 189 inferred relationships involving `RawSignalEvent` (e.g. with `TelegramChannel` and `int`) actually correct?**
+  _`RawSignalEvent` has 189 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 176 inferred relationships involving `TelegramChannel` (e.g. with `FakeStreamInterrupted` and `FakeTelegramAuth`) actually correct?**
+  _`TelegramChannel` has 176 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 135 inferred relationships involving `ExtractedSignal` (e.g. with `int` and `datetime`) actually correct?**
+  _`ExtractedSignal` has 135 INFERRED edges - model-reasoned connections that need verification._

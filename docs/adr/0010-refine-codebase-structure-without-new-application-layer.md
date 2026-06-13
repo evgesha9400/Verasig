@@ -25,9 +25,18 @@ This keeps the repo aligned with the observer spec's local, one-image MVP while 
 
 - `foundation/` is documented as concrete external adapters plus DB/session setup, so it no longer overlaps ambiguously with `storage/`.
 - `storage/` remains a sibling persistence edge for SQLAlchemy ORM rows and repositories.
-- Protocols live in the pure `domain/protocols.py` home, with event contracts such as `TelegramDeliveryEvent` and `TelegramDeletionEvent` in pure domain modules.
+- Protocols live in focused pure port modules such as `domain/telegram_ports.py`, `domain/market_ports.py`, `domain/llm_ports.py`, and `domain/execution_ports.py`.
 - Concrete adapters import and implement Protocols, not define them beside heavy IO dependencies.
 - Foundation adapter filenames now name their concrete implementations: `telethon_source.py`, `bybit_market_data.py`, and `static_exchange.py`.
 - `services/` modules should be audited for naming clarity. Pure cores and orchestration wrappers may live in the same feature package, but the file names must disclose which role they play.
 - Any later full application split should be justified by concrete growth pressure, not by aesthetic layering.
 - The next implementation pass should be small and mechanical: finish the service-file naming audit and rename only where the current name hides purity or IO.
+
+## Status update
+
+The feature-ownership refactor completed after this ADR was written. The active
+shape is now `features/` for feature-owned routes, schemas, workflows, views,
+and repositories; `foundation/` for concrete adapters and runtime helpers;
+`shared/` for generic helpers; and `entrypoints/` for composition roots.
+The legacy `services/`, `api/routers`, `api/schemas`, and focused
+`storage/*_repository.py` wrapper surfaces are intentionally removed.
