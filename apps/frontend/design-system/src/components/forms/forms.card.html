@@ -1,0 +1,136 @@
+<!-- @dsCard group="Components" viewport="700x430" name="Forms — input, select, checkbox, switch" subtitle="Field controls with labels, hints and error states" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../../../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg-app);
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .lab {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin-bottom: 4px;
+      }
+    </style>
+    <script
+      crossorigin
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+    ></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+    <script src="../../../_ds_bundle.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { Input, Select, Checkbox, Switch } = window.VerasigDesignSystem_fd565b
+      const Link = () => (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
+          <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" />
+        </svg>
+      )
+      const Search = () => (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      )
+
+      function Demo() {
+        return (
+          <div className="cols">
+            <div className="stack">
+              <Input label="Provider name" placeholder="e.g. Coinbase" required />
+              <Input
+                label="Webhook endpoint"
+                mono
+                iconLeft={<Link />}
+                placeholder="https://hooks.verasig.io/…"
+              />
+              <Input
+                label="API key"
+                mono
+                error="Key has expired"
+                defaultValue="sk_live_8f2a…d41c"
+              />
+              <Input
+                iconLeft={<Search />}
+                placeholder="Search signals"
+                trailing={<span className="vrs-input__kbd">⌘K</span>}
+              />
+            </div>
+            <div className="stack">
+              <Select
+                label="Channel"
+                options={['Webhook', 'REST', 'gRPC', 'WebSocket']}
+              />
+              <Select
+                label="Quorum policy"
+                options={[
+                  { value: 'majority', label: 'Majority (≥ 50%)' },
+                  { value: 'super', label: 'Supermajority (≥ 66%)' },
+                  { value: 'unanimous', label: 'Unanimous' }
+                ]}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  marginTop: '4px'
+                }}
+              >
+                <Checkbox label="Hold on failed quorum" defaultChecked />
+                <Checkbox
+                  label="Notify on reject"
+                  description="Send a webhook when a signal is rejected."
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <Switch label="Auto-hold suspicious signals" defaultChecked />
+                <Switch label="WebSocket channel" />
+              </div>
+            </div>
+          </div>
+        )
+      }
+      ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
+    </script>
+  </body>
+</html>

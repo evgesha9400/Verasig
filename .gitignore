@@ -1,9 +1,9 @@
-# Secrets — NEVER commit (full Telegram account access lives here)
+# Secrets — NEVER commit (full Telegram account access lives in backend scope)
 .env
 .env.*
 # but templates ARE tracked (fresh clone: make env)
 !.env.example
-secrets/
+apps/backend/secrets/
 *.session
 *.session-journal
 
@@ -25,6 +25,8 @@ build/
 *.sqlite
 *.db
 data/
+!apps/frontend/design-system/src/components/data/
+!apps/frontend/design-system/src/components/data/**
 .DS_Store
 
 # Local tool state
