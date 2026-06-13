@@ -43,12 +43,12 @@ def _extracted_values(signal: ExtractedSignal) -> dict:
     }
 
 
-def _with_user_id(values: dict, user_id: UUID | None) -> dict:
+def _with_user_id(values: dict, user_id: UUID) -> dict:
     return {**values, "user_id": user_id}
 
 
 def insert_extracted_signals(
-    session: Session, signals: list[ExtractedSignal], user_id: UUID | None = None
+    session: Session, signals: list[ExtractedSignal], user_id: UUID
 ) -> int:
     if not signals:
         return 0
@@ -63,14 +63,12 @@ def insert_extracted_signals(
 
 
 def read_extracted_signals(
-    session: Session, channel_id: int, user_id: UUID | None = None
+    session: Session, channel_id: int, user_id: UUID
 ) -> list[ExtractedSignal]:
     rows = session.scalars(
         select(ExtractedSignalRow).where(
             ExtractedSignalRow.channel_id == channel_id,
-            ExtractedSignalRow.user_id.is_(None)
-            if user_id is None
-            else ExtractedSignalRow.user_id == user_id,
+            ExtractedSignalRow.user_id == user_id,
         )
     ).all()
     return [
@@ -108,7 +106,7 @@ def _unrecognized_values(item: UnrecognizedSignal) -> dict:
 
 
 def insert_unrecognized_signals(
-    session: Session, items: list[UnrecognizedSignal], user_id: UUID | None = None
+    session: Session, items: list[UnrecognizedSignal], user_id: UUID
 ) -> int:
     if not items:
         return 0
@@ -121,16 +119,14 @@ def insert_unrecognized_signals(
 
 
 def read_unrecognized_signals(
-    session: Session, channel_id: int, user_id: UUID | None = None
+    session: Session, channel_id: int, user_id: UUID
 ) -> list[UnrecognizedSignal]:
     rows = session.scalars(
         select(UnrecognizedSignalRow)
         .join(RawSignalEventRow, UnrecognizedSignalRow.event_id == RawSignalEventRow.id)
         .where(
             RawSignalEventRow.channel_id == channel_id,
-            UnrecognizedSignalRow.user_id.is_(None)
-            if user_id is None
-            else UnrecognizedSignalRow.user_id == user_id,
+            UnrecognizedSignalRow.user_id == user_id,
         )
     ).all()
     return [
@@ -146,7 +142,7 @@ def read_unrecognized_signals(
 
 
 def _parser_drift_values(
-    drift: ParserDriftWarning, fallback_signal_id: UUID, user_id: UUID | None
+    drift: ParserDriftWarning, fallback_signal_id: UUID, user_id: UUID
 ) -> dict:
     return {
         "id": drift.id,
@@ -169,20 +165,18 @@ def _excluded_except(statement, row_type, keep: set[str]) -> dict:
 
 
 def _delete_outcome_row(
-    session: Session, row_type, event_id: UUID, user_id: UUID | None
+    session: Session, row_type, event_id: UUID, user_id: UUID
 ) -> None:
     session.execute(
         delete(row_type).where(
             row_type.event_id == event_id,
-            row_type.user_id.is_(None)
-            if user_id is None
-            else row_type.user_id == user_id,
+            row_type.user_id == user_id,
         )
     )
 
 
 def _upsert_extracted_signal(
-    session: Session, signal: ExtractedSignal, user_id: UUID | None
+    session: Session, signal: ExtractedSignal, user_id: UUID
 ) -> UUID:
     statement = pg_insert(ExtractedSignalRow).values(
         _with_user_id(_extracted_values(signal), user_id)
@@ -197,7 +191,7 @@ def _upsert_extracted_signal(
 
 
 def _upsert_unrecognized_signal(
-    session: Session, item: UnrecognizedSignal, user_id: UUID | None
+    session: Session, item: UnrecognizedSignal, user_id: UUID
 ) -> None:
     statement = pg_insert(UnrecognizedSignalRow).values(
         _with_user_id(_unrecognized_values(item), user_id)
@@ -215,7 +209,7 @@ def _upsert_parser_drift(
     session: Session,
     drift: ParserDriftWarning,
     fallback_signal_id: UUID,
-    user_id: UUID | None,
+    user_id: UUID,
 ) -> None:
     statement = pg_insert(ParserDriftWarningRow).values(
         _parser_drift_values(drift, fallback_signal_id, user_id)
@@ -233,7 +227,7 @@ def _record_extracted(
     session: Session,
     signal: ExtractedSignal,
     drift_warnings: list,
-    user_id: UUID | None,
+    user_id: UUID,
 ) -> None:
     stored_id = _upsert_extracted_signal(session, signal, user_id)
     _delete_outcome_row(session, UnrecognizedSignalRow, signal.event_id, user_id)
@@ -244,16 +238,14 @@ def _record_extracted(
 
 
 def _record_unrecognized(
-    session: Session, item: UnrecognizedSignal, user_id: UUID | None
+    session: Session, item: UnrecognizedSignal, user_id: UUID
 ) -> None:
     _upsert_unrecognized_signal(session, item, user_id)
     _delete_outcome_row(session, ExtractedSignalRow, item.event_id, user_id)
     _delete_outcome_row(session, ParserDriftWarningRow, item.event_id, user_id)
 
 
-def record_outcome(
-    session: Session, outcome: ExtractOutcome, user_id: UUID | None = None
-) -> None:
+def record_outcome(session: Session, outcome: ExtractOutcome, user_id: UUID) -> None:
     """Recompute one event's projection: upsert the winner, drop the loser + drift."""
     if outcome.signal is not None:
         _record_extracted(session, outcome.signal, outcome.drift_warnings, user_id)

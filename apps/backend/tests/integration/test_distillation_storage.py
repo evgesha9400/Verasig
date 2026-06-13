@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from uuid import UUID, uuid4
 
+from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.drift import FilterDriftWarning, MissDiscoveredBy
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -9,6 +11,7 @@ from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import ExtractedSignal, Side
+from verasig.features.accounts import repository as account_repository
 from verasig.features.rules import drift_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
@@ -30,6 +33,27 @@ def _channel() -> TelegramChannel:
         is_private=False,
         first_seen_at=_instant(),
     )
+
+
+def _account() -> UserAccount:
+    return UserAccount(
+        id=uuid4(),
+        email=f"{uuid4()}@example.com",
+        password_hash="hash",
+        first_name="Ada",
+        last_name="Lovelace",
+        plan=Plan.OBSERVER,
+        pending_email=None,
+        cancel_at=None,
+        created_at=_instant(),
+    )
+
+
+def _seed_account(session_factory) -> UUID:
+    with session_factory() as session:
+        account = account_repository.insert_account(session, _account())
+        session.commit()
+        return account.id
 
 
 def _seed_channel_with_messages(session_factory, message_ids: list[int]) -> None:
@@ -79,9 +103,11 @@ def test_signal_events_persist_idempotently_and_read_back(session_factory):
 
 
 def test_filter_rule_upserts_and_reads_back(session_factory):
+    user_id = _seed_account(session_factory)
     _seed_channel_with_messages(session_factory, [1])
     rule = FilterRule(
         rule_id="7-filter-v1",
+        user_id=user_id,
         channel_id=7,
         include_patterns=[r"(?i)\blong\b"],
     )
@@ -89,16 +115,18 @@ def test_filter_rule_upserts_and_reads_back(session_factory):
         rule_repository.upsert_filter_rule(session, rule)
         session.commit()
     with session_factory() as session:
-        rules = rule_repository.read_filter_rules(session, 7)
+        rules = rule_repository.read_filter_rules(session, 7, user_id)
     assert len(rules) == 1
     assert rules[0].rule_id == "7-filter-v1"
     assert rules[0].include_patterns == [r"(?i)\blong\b"]
 
 
 def test_parser_rules_upsert_and_read_back_with_side_aliases(session_factory):
+    user_id = _seed_account(session_factory)
     _seed_channel_with_messages(session_factory, [1])
     rule = ParserRule(
         rule_id="7-parser-1-v1",
+        user_id=user_id,
         channel_id=7,
         patterns=[r"(?P<symbol>BTC)"],
         field_map={"symbol": "symbol"},
@@ -108,11 +136,12 @@ def test_parser_rules_upsert_and_read_back_with_side_aliases(session_factory):
         rule_repository.upsert_parser_rules(session, [rule])
         session.commit()
     with session_factory() as session:
-        rules = rule_repository.read_parser_rules(session, 7)
+        rules = rule_repository.read_parser_rules(session, 7, user_id)
     assert rules[0].side_aliases["long"] is Side.LONG
 
 
 def test_golden_labels_upsert_overwrites_and_round_trips_expected(session_factory):
+    user_id = _seed_account(session_factory)
     _seed_channel_with_messages(session_factory, [1])
     expected = ExtractedSignal(
         event_id=_event(1).id,
@@ -124,13 +153,22 @@ def test_golden_labels_upsert_overwrites_and_round_trips_expected(session_factor
     )
     with session_factory() as session:
         rule_repository.upsert_labels(
-            session, [GoldenLabel(channel_id=7, message_id=1, label=LabelKind.NOISE)]
+            session,
+            [
+                GoldenLabel(
+                    user_id=user_id,
+                    channel_id=7,
+                    message_id=1,
+                    label=LabelKind.NOISE,
+                )
+            ],
         )
         session.commit()
         rule_repository.upsert_labels(
             session,
             [
                 GoldenLabel(
+                    user_id=user_id,
                     channel_id=7,
                     message_id=1,
                     label=LabelKind.SIGNAL,
@@ -140,7 +178,7 @@ def test_golden_labels_upsert_overwrites_and_round_trips_expected(session_factor
         )
         session.commit()
     with session_factory() as session:
-        labels = rule_repository.read_labels(session, 7)
+        labels = rule_repository.read_labels(session, 7, user_id)
     assert len(labels) == 1  # re-label overwrote, not duplicated
     assert labels[0].is_signal is True
     assert labels[0].expected.symbol == "BTCUSDT"
@@ -148,6 +186,7 @@ def test_golden_labels_upsert_overwrites_and_round_trips_expected(session_factor
 
 
 def test_drift_warnings_persist_idempotently(session_factory):
+    user_id = _seed_account(session_factory)
     _seed_channel_with_messages(session_factory, [5])
     warning = FilterDriftWarning(
         channel_id=7,
@@ -155,7 +194,7 @@ def test_drift_warnings_persist_idempotently(session_factory):
         miss_discovered_by=MissDiscoveredBy.PARSER_BACKFILL,
     )
     with session_factory() as session:
-        first = drift_repository.insert_drift_warnings(session, [warning])
+        first = drift_repository.insert_drift_warnings(session, [warning], user_id)
         session.commit()
         again = drift_repository.insert_drift_warnings(
             session,
@@ -166,11 +205,12 @@ def test_drift_warnings_persist_idempotently(session_factory):
                     miss_discovered_by=MissDiscoveredBy.HUMAN_AUDIT,
                 )
             ],
+            user_id,
         )
         session.commit()
     assert (first, again) == (1, 0)  # one drift per missed (channel, message)
     with session_factory() as session:
-        warnings = drift_repository.read_drift_warnings(session, 7)
+        warnings = drift_repository.read_drift_warnings(session, 7, user_id)
     assert len(warnings) == 1
     assert warnings[0].miss_discovered_by is MissDiscoveredBy.PARSER_BACKFILL
 
@@ -184,6 +224,7 @@ def test_read_messages_returns_domain_messages(session_factory):
 
 
 def test_extracted_and_unrecognized_signals_persist(session_factory):
+    user_id = _seed_account(session_factory)
     _seed_channel_with_messages(session_factory, [1, 2])
     with session_factory() as session:
         event_repository.insert_signal_events(session, [_event(1), _event(2)])
@@ -197,9 +238,9 @@ def test_extracted_and_unrecognized_signals_persist(session_factory):
             side=Side.LONG,
             take_profits=[Decimal("67000")],
         )
-        outcome_repository.insert_extracted_signals(session, [signal])
+        outcome_repository.insert_extracted_signals(session, [signal], user_id)
         session.commit()
     with session_factory() as session:
-        stored = outcome_repository.read_extracted_signals(session, 7)
+        stored = outcome_repository.read_extracted_signals(session, 7, user_id)
     assert stored[0].symbol == "BTCUSDT"
     assert stored[0].take_profits == [Decimal("67000")]

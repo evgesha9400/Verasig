@@ -1,13 +1,16 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fakes import FakeExchange
 
+from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.drift import MissDiscoveredBy
 from verasig.domain.event import MaterializationPath
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
+from verasig.features.accounts import repository as account_repository
 from verasig.features.rules import drift_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
@@ -34,6 +37,7 @@ _SLANG_RULE = ParserRule(
     field_map={"symbol": "symbol", "side": "side"},
     side_aliases={"pump": "LONG", "dump": "SHORT"},
 )
+_USER_ID = UUID("30000000-0000-0000-0000-000000000001")
 
 
 def _instant() -> datetime:
@@ -42,6 +46,20 @@ def _instant() -> datetime:
 
 def _seed(session_factory, texts: dict[int, str]) -> None:
     with session_factory() as session:
+        account_repository.insert_account(
+            session,
+            UserAccount(
+                id=_USER_ID,
+                email="candidate@example.com",
+                password_hash="hash",
+                first_name="Ada",
+                last_name="Lovelace",
+                plan=Plan.OBSERVER,
+                pending_email=None,
+                cancel_at=None,
+                created_at=_instant(),
+            ),
+        )
         channel_repository.upsert_channel(
             session,
             TelegramChannel(
@@ -99,7 +117,10 @@ def test_derive_is_idempotent(session_factory):
 def test_derive_uses_distilled_filter_rule_over_seed(session_factory):
     _seed(session_factory, {9: "alpha leak incoming"})  # seed alone would miss this
     rule = FilterRule(
-        rule_id="7-filter-v1", channel_id=7, include_patterns=[r"(?i)alpha leak"]
+        rule_id="7-filter-v1",
+        user_id=_USER_ID,
+        channel_id=7,
+        include_patterns=[r"(?i)alpha leak"],
     )
     with session_factory() as session:
         rule_repository.upsert_filter_rule(session, rule)
@@ -118,14 +139,14 @@ def test_sweep_recovers_filter_miss_with_one_drift(session_factory):
     _seed(session_factory, _CORPUS)
     derive_candidates(session_factory, 7, FakeExchange({"BTC"}))  # candidates = {1}
     new_events, new_drift = sweep_advisory(
-        session_factory, 7, [_LONG_RULE, _SLANG_RULE]
+        session_factory, 7, [_LONG_RULE, _SLANG_RULE], _USER_ID
     )
     assert (new_events, new_drift) == (1, 1)  # only message 3 (a true miss)
     with session_factory() as session:
         events = {
             e.message_id: e for e in event_repository.read_signal_events(session, 7)
         }
-        warnings = drift_repository.read_drift_warnings(session, 7)
+        warnings = drift_repository.read_drift_warnings(session, 7, _USER_ID)
     assert events[3].materialized_by is MaterializationPath.PARSER_BACKFILL
     assert len(warnings) == 1
     assert warnings[0].message_id == 3
@@ -137,15 +158,15 @@ def test_sweep_does_not_drift_on_existing_candidate(session_factory):
     _seed(session_factory, _CORPUS)
     derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
     # message 1 is already a candidate AND parses via _LONG_RULE -> must NOT drift
-    sweep_advisory(session_factory, 7, [_LONG_RULE, _SLANG_RULE])
+    sweep_advisory(session_factory, 7, [_LONG_RULE, _SLANG_RULE], _USER_ID)
     with session_factory() as session:
-        warnings = drift_repository.read_drift_warnings(session, 7)
+        warnings = drift_repository.read_drift_warnings(session, 7, _USER_ID)
     assert all(w.message_id != 1 for w in warnings)
 
 
 def test_sweep_is_idempotent(session_factory):
     _seed(session_factory, _CORPUS)
     derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
-    sweep_advisory(session_factory, 7, [_SLANG_RULE])
-    again = sweep_advisory(session_factory, 7, [_SLANG_RULE])
+    sweep_advisory(session_factory, 7, [_SLANG_RULE], _USER_ID)
+    again = sweep_advisory(session_factory, 7, [_SLANG_RULE], _USER_ID)
     assert again == (0, 0)

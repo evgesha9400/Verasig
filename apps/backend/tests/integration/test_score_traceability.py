@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
@@ -18,6 +19,7 @@ from verasig.domain.signal import (
     Side,
     UnrecognizedSignal,
 )
+from verasig.features.accounts import repository as account_repository
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.sources import (
@@ -27,6 +29,7 @@ from verasig.features.sources import (
 )
 
 _CHANNEL_ID = 7
+_USER_ID = UUID("20000000-0000-0000-0000-000000999999")
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 
 
@@ -46,6 +49,20 @@ def _channel() -> TelegramChannel:
         is_private=False,
         subscriber_count=5000,
         first_seen_at=_BASE,
+    )
+
+
+def _account() -> UserAccount:
+    return UserAccount(
+        id=_USER_ID,
+        email="score@example.com",
+        password_hash="hash",
+        first_name="Ada",
+        last_name="Lovelace",
+        plan=Plan.OBSERVER,
+        pending_email=None,
+        cancel_at=None,
+        created_at=_BASE,
     )
 
 
@@ -115,6 +132,7 @@ def _seed_score_inputs(session_factory) -> None:
     event_a = _event(1, 1)
     event_b = _event(2, 2)
     with session_factory() as session:
+        account_repository.insert_account(session, _account())
         channel_repository.upsert_channel(session, _channel())
         message_repository.insert_messages(
             session,
@@ -125,9 +143,11 @@ def _seed_score_inputs(session_factory) -> None:
             ],
         )
         event_repository.insert_signal_events(session, [event_a, event_b])
-        outcome_repository.insert_extracted_signals(session, [_signal(3, event_a.id)])
+        outcome_repository.insert_extracted_signals(
+            session, [_signal(3, event_a.id)], _USER_ID
+        )
         outcome_repository.insert_unrecognized_signals(
-            session, [_unrecognized(4, event_b.id)]
+            session, [_unrecognized(4, event_b.id)], _USER_ID
         )
         deletion_repository.upsert_deletion_evidence(session, [_id_gap(5, 4)])
         session.commit()
@@ -138,9 +158,11 @@ def _score_from_repo(session_factory):
         channel = channel_repository.find_channel(session, "@pilot")
         messages = message_repository.read_messages(session, _CHANNEL_ID)
         events = event_repository.read_signal_events(session, _CHANNEL_ID)
-        signals = outcome_repository.read_extracted_signals(session, _CHANNEL_ID)
+        signals = outcome_repository.read_extracted_signals(
+            session, _CHANNEL_ID, _USER_ID
+        )
         unrecognized = outcome_repository.read_unrecognized_signals(
-            session, _CHANNEL_ID
+            session, _CHANNEL_ID, _USER_ID
         )
         deletions = deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
         message_count = message_repository.count_messages(session, _CHANNEL_ID)
@@ -160,9 +182,11 @@ def _stored_refs(session_factory) -> set[str]:
     with session_factory() as session:
         messages = message_repository.read_messages(session, _CHANNEL_ID)
         events = event_repository.read_signal_events(session, _CHANNEL_ID)
-        signals = outcome_repository.read_extracted_signals(session, _CHANNEL_ID)
+        signals = outcome_repository.read_extracted_signals(
+            session, _CHANNEL_ID, _USER_ID
+        )
         unrecognized = outcome_repository.read_unrecognized_signals(
-            session, _CHANNEL_ID
+            session, _CHANNEL_ID, _USER_ID
         )
         deletions = deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
         message_count = message_repository.count_messages(session, _CHANNEL_ID)

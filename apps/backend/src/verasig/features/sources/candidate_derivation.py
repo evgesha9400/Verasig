@@ -10,6 +10,7 @@ and commit per batch (spec §4.1: bounded, never the full history in RAM).
 """
 
 from collections.abc import Sequence
+from uuid import UUID
 
 from sqlalchemy.orm import sessionmaker
 
@@ -97,6 +98,7 @@ def sweep_advisory(
     session_factory: sessionmaker,
     channel_id: int,
     parser_rules: list[ParserRule],
+    user_id: UUID,
     *,
     batch_size: int = 200,
 ) -> tuple[int, int]:
@@ -111,7 +113,9 @@ def sweep_advisory(
         )
         with session_factory() as session:
             new_events += event_repository.insert_signal_events(session, events)
-            new_warnings += drift_repository.insert_drift_warnings(session, warnings)
+            new_warnings += drift_repository.insert_drift_warnings(
+                session, warnings, user_id
+            )
             session.commit()
     return new_events, new_warnings
 

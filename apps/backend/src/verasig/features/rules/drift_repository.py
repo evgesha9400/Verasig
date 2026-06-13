@@ -11,7 +11,7 @@ from verasig.storage.models import FilterDriftWarningRow, ParserDriftWarningRow
 
 
 def insert_drift_warnings(
-    session: Session, warnings: list[FilterDriftWarning], user_id: UUID | None = None
+    session: Session, warnings: list[FilterDriftWarning], user_id: UUID
 ) -> int:
     if not warnings:
         return 0
@@ -40,14 +40,12 @@ def insert_drift_warnings(
 
 
 def read_drift_warnings(
-    session: Session, channel_id: int, user_id: UUID | None = None
+    session: Session, channel_id: int, user_id: UUID
 ) -> list[FilterDriftWarning]:
     rows = session.scalars(
         select(FilterDriftWarningRow).where(
             FilterDriftWarningRow.channel_id == channel_id,
-            FilterDriftWarningRow.user_id.is_(None)
-            if user_id is None
-            else FilterDriftWarningRow.user_id == user_id,
+            FilterDriftWarningRow.user_id == user_id,
         )
     ).all()
     return [
@@ -66,7 +64,7 @@ def read_drift_warnings(
 
 
 def _parser_drift_values(
-    drift: ParserDriftWarning, fallback_signal_id: UUID, user_id: UUID | None
+    drift: ParserDriftWarning, fallback_signal_id: UUID, user_id: UUID
 ) -> dict:
     return {
         "id": drift.id,
@@ -81,14 +79,12 @@ def _parser_drift_values(
 
 
 def read_parser_drift_warnings(
-    session: Session, channel_id: int, user_id: UUID | None = None
+    session: Session, channel_id: int, user_id: UUID
 ) -> list[ParserDriftWarning]:
     rows = session.scalars(
         select(ParserDriftWarningRow).where(
             ParserDriftWarningRow.channel_id == channel_id,
-            ParserDriftWarningRow.user_id.is_(None)
-            if user_id is None
-            else ParserDriftWarningRow.user_id == user_id,
+            ParserDriftWarningRow.user_id == user_id,
         )
     ).all()
     return [
@@ -117,7 +113,7 @@ def _upsert_parser_drift(
     session: Session,
     drift: ParserDriftWarning,
     fallback_signal_id: UUID,
-    user_id: UUID | None = None,
+    user_id: UUID,
 ) -> None:
     statement = pg_insert(ParserDriftWarningRow).values(
         _parser_drift_values(drift, fallback_signal_id, user_id)

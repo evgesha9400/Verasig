@@ -54,3 +54,92 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     assert {"user_id"} <= columns_by_table["unrecognized_signal"]
     assert {"user_id"} <= columns_by_table["parser_drift_warning"]
     assert {"user_id"} <= columns_by_table["filter_drift_warning"]
+
+
+def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.upgrade(cfg, "head")
+
+    inspector = inspect(create_engine(pg_url, future=True))
+
+    required_user_tables = {
+        "golden_label",
+        "filter_rule",
+        "parser_rule",
+        "extracted_signal",
+        "unrecognized_signal",
+        "parser_drift_warning",
+        "filter_drift_warning",
+    }
+    nullable_user_tables = {
+        table
+        for table in required_user_tables
+        for column in inspector.get_columns(table)
+        if column["name"] == "user_id" and column["nullable"]
+    }
+    assert nullable_user_tables == set()
+
+    index_names = {
+        index["name"]
+        for table in (
+            "backtest_result",
+            "extracted_signal",
+            "unrecognized_signal",
+            "parser_rule",
+            "filter_rule",
+            "deleted_signal_evidence",
+            "parser_drift_warning",
+            "filter_drift_warning",
+        )
+        for index in inspector.get_indexes(table)
+    }
+    assert {
+        "ix_backtest_result_user_channel_completed",
+        "ix_extracted_signal_user_channel",
+        "ix_unrecognized_signal_user_event",
+        "ix_parser_rule_user_channel",
+        "ix_filter_rule_user_channel",
+        "ix_deleted_signal_evidence_channel",
+        "ix_parser_drift_warning_user_channel",
+        "ix_filter_drift_warning_user_channel",
+    } <= index_names
+
+    check_names = {
+        check["name"]
+        for table in (
+            "golden_label",
+            "extracted_signal",
+            "deleted_signal_evidence",
+            "chat_risk_config",
+        )
+        for check in inspector.get_check_constraints(table)
+    }
+    assert {
+        "ck_golden_label_label",
+        "ck_extracted_signal_side",
+        "ck_extracted_signal_event_type",
+        "ck_extracted_signal_extraction_method",
+        "ck_deleted_signal_evidence_confidence",
+        "ck_deleted_signal_evidence_method",
+        "ck_chat_risk_config_entry_mode",
+        "ck_chat_risk_config_weighting",
+        "ck_chat_risk_config_exit_source",
+    } <= check_names
+
+    foreign_key_names = {
+        foreign_key["name"]
+        for table in (
+            "raw_signal_event",
+            "golden_label",
+            "filter_drift_warning",
+            "lifecycle_link",
+        )
+        for foreign_key in inspector.get_foreign_keys(table)
+    }
+    assert {
+        "fk_raw_signal_event_message",
+        "fk_golden_label_message",
+        "fk_filter_drift_warning_message",
+        "fk_lifecycle_link_root_signal",
+    } <= foreign_key_names
