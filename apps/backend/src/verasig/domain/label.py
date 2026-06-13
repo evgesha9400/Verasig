@@ -1,17 +1,15 @@
 """Operator ground-truth label — the golden corpus (data-contracts.md §4).
 
-A `GoldenLabel` is the operator's verdict on one message: `is_signal`, plus the
+A `GoldenLabel` is the operator's verdict on one message: `label`, plus the
 `expected` `ExtractedSignal` fields when positive. The labeled set is the
-precision/recall oracle (filter recall on `is_signal`, parser precision on
-`expected`) and the provenance both rule kinds are distilled from.
+precision/recall oracle and the provenance both rule kinds are distilled from.
 """
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from verasig.domain.signal import ExtractedSignal
 
@@ -32,19 +30,9 @@ class GoldenLabel(BaseModel):
     channel_id: int
     message_id: int
     label: LabelKind
-    expected: ExtractedSignal | None = None  # expected fields when is_signal
+    expected: ExtractedSignal | None = None
     labeled_at: datetime = Field(default_factory=_now)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _accept_legacy_is_signal(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        if "label" in data or "is_signal" not in data:
-            return data
-        label = LabelKind.SIGNAL if data["is_signal"] else LabelKind.NOISE
-        return {**data, "label": label}
 
     @property
     def is_signal(self) -> bool:
-        return self.label is LabelKind.SIGNAL
+        return self.label == LabelKind.SIGNAL

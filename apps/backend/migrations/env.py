@@ -12,8 +12,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from verasig.config import Settings
-from verasig.foundation.db import Base
-from verasig.storage import models  # noqa: F401  (register tables on Base.metadata)
+from verasig.foundation.database.metadata import metadata as target_metadata
 
 config = context.config
 
@@ -22,8 +21,6 @@ if config.config_file_name is not None:
 
 if not config.get_main_option("sqlalchemy.url"):
     config.set_main_option("sqlalchemy.url", Settings().database_url)
-
-target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

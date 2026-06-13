@@ -18,8 +18,13 @@ from verasig.domain.signal import (
     Side,
     UnrecognizedSignal,
 )
-from verasig.services.scoring.scorecard import build_provider_score
-from verasig.storage import repositories as repo
+from verasig.features.provider_scores.scorecard import build_provider_score
+from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.sources import (
+    channel_repository,
+    deletion_repository,
+    message_repository,
+)
 
 _CHANNEL_ID = 7
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
@@ -110,8 +115,8 @@ def _seed_score_inputs(session_factory) -> None:
     event_a = _event(1, 1)
     event_b = _event(2, 2)
     with session_factory() as session:
-        repo.upsert_channel(session, _channel())
-        repo.insert_messages(
+        channel_repository.upsert_channel(session, _channel())
+        message_repository.insert_messages(
             session,
             [
                 _message(1, 0, views=1000, forwards=100),
@@ -119,22 +124,26 @@ def _seed_score_inputs(session_factory) -> None:
                 _message(3, 2, views=3000, forwards=300),
             ],
         )
-        repo.insert_signal_events(session, [event_a, event_b])
-        repo.insert_extracted_signals(session, [_signal(3, event_a.id)])
-        repo.insert_unrecognized_signals(session, [_unrecognized(4, event_b.id)])
-        repo.upsert_deletion_evidence(session, [_id_gap(5, 4)])
+        event_repository.insert_signal_events(session, [event_a, event_b])
+        outcome_repository.insert_extracted_signals(session, [_signal(3, event_a.id)])
+        outcome_repository.insert_unrecognized_signals(
+            session, [_unrecognized(4, event_b.id)]
+        )
+        deletion_repository.upsert_deletion_evidence(session, [_id_gap(5, 4)])
         session.commit()
 
 
 def _score_from_repo(session_factory):
     with session_factory() as session:
-        channel = repo.find_channel(session, "@pilot")
-        messages = repo.read_messages(session, _CHANNEL_ID)
-        events = repo.read_signal_events(session, _CHANNEL_ID)
-        signals = repo.read_extracted_signals(session, _CHANNEL_ID)
-        unrecognized = repo.read_unrecognized_signals(session, _CHANNEL_ID)
-        deletions = repo.read_deletion_evidence(session, _CHANNEL_ID)
-        message_count = repo.count_messages(session, _CHANNEL_ID)
+        channel = channel_repository.find_channel(session, "@pilot")
+        messages = message_repository.read_messages(session, _CHANNEL_ID)
+        events = event_repository.read_signal_events(session, _CHANNEL_ID)
+        signals = outcome_repository.read_extracted_signals(session, _CHANNEL_ID)
+        unrecognized = outcome_repository.read_unrecognized_signals(
+            session, _CHANNEL_ID
+        )
+        deletions = deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
+        message_count = message_repository.count_messages(session, _CHANNEL_ID)
     return build_provider_score(
         channel=channel,
         messages=messages,
@@ -149,12 +158,14 @@ def _score_from_repo(session_factory):
 
 def _stored_refs(session_factory) -> set[str]:
     with session_factory() as session:
-        messages = repo.read_messages(session, _CHANNEL_ID)
-        events = repo.read_signal_events(session, _CHANNEL_ID)
-        signals = repo.read_extracted_signals(session, _CHANNEL_ID)
-        unrecognized = repo.read_unrecognized_signals(session, _CHANNEL_ID)
-        deletions = repo.read_deletion_evidence(session, _CHANNEL_ID)
-        message_count = repo.count_messages(session, _CHANNEL_ID)
+        messages = message_repository.read_messages(session, _CHANNEL_ID)
+        events = event_repository.read_signal_events(session, _CHANNEL_ID)
+        signals = outcome_repository.read_extracted_signals(session, _CHANNEL_ID)
+        unrecognized = outcome_repository.read_unrecognized_signals(
+            session, _CHANNEL_ID
+        )
+        deletions = deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
+        message_count = message_repository.count_messages(session, _CHANNEL_ID)
     refs = {f"channel:{_CHANNEL_ID}"} if message_count == 3 else set()
     refs.update(f"message:{item.channel_id}/{item.message_id}" for item in messages)
     refs.update(f"event:{item.id.urn.removeprefix('urn:uuid:')}" for item in events)

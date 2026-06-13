@@ -10,8 +10,13 @@ from verasig.domain.telegram import (
     TelegramDeliveryEvent,
     TelegramLiveEvent,
 )
-from verasig.services.ingestion.live import ingest_live
-from verasig.storage import repositories as repo
+from verasig.features.signals import event_repository
+from verasig.features.sources import (
+    channel_repository,
+    deletion_repository,
+    message_repository,
+)
+from verasig.features.sources.live import ingest_live
 
 _CHANNEL_ID = 7
 _POSTED = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
@@ -74,15 +79,15 @@ def _deletion(message_id: int, detected_at: datetime) -> TelegramDeletionEvent:
 
 def _seed_channel(session_factory) -> None:
     with session_factory() as session:
-        repo.upsert_channel(session, _channel())
+        channel_repository.upsert_channel(session, _channel())
         session.commit()
 
 
 def _seed_captured_signal(session_factory, message: RawTelegramMessage) -> None:
     with session_factory() as session:
-        repo.upsert_channel(session, _channel())
-        repo.insert_messages(session, [message])
-        repo.insert_signal_events(
+        channel_repository.upsert_channel(session, _channel())
+        message_repository.insert_messages(session, [message])
+        event_repository.insert_signal_events(
             session,
             [
                 RawSignalEvent(
@@ -116,7 +121,7 @@ async def test_live_ingestion_persists_push_and_dedupes_later_poll(
     assert result.captured_by_mode == {DeliveryMode.PUSH: 1}
     assert source.requested_channel_ids == [[_CHANNEL_ID]]
     with session_factory() as session:
-        messages = repo.read_messages(session, _CHANNEL_ID)
+        messages = message_repository.read_messages(session, _CHANNEL_ID)
     assert [message.message_id for message in messages] == [10]
     assert messages[0].captured_at == push_at
 
@@ -136,7 +141,7 @@ async def test_live_ingestion_dedupes_catch_up_against_backfilled_row(
     assert result.duplicates == 1
     assert result.captured_by_mode == {}
     with session_factory() as session:
-        messages = repo.read_messages(session, _CHANNEL_ID)
+        messages = message_repository.read_messages(session, _CHANNEL_ID)
     assert len(messages) == 1
     assert messages[0].captured_at == captured_at
 
@@ -153,7 +158,7 @@ async def test_live_ingestion_persists_confirmed_delete_event_with_stored_text(
 
     assert result.deleted == 1
     with session_factory() as session:
-        evidence = repo.read_deletion_evidence(session, _CHANNEL_ID)
+        evidence = deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
     assert len(evidence) == 1
     assert evidence[0].confidence is DeletionConfidence.CONFIRMED
     assert evidence[0].method is DeletionMethod.LIVE_EVENT

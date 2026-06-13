@@ -16,8 +16,13 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import Side, TradeIntent
-from verasig.services.extraction.extract_service import ExtractService
-from verasig.storage import repositories as repo
+from verasig.features.rules import drift_repository
+from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals.extract_service import ExtractService
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
 
 _LONG_RULE = ParserRule(
     rule_id="r1",
@@ -42,7 +47,7 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
         materialized_by=MaterializationPath.SEED_HEURISTIC,
     )
     with session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -52,7 +57,7 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 first_seen_at=_instant(),
             ),
         )
-        repo.insert_messages(
+        message_repository.insert_messages(
             session,
             [
                 RawTelegramMessage(
@@ -66,14 +71,14 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 )
             ],
         )
-        repo.insert_signal_events(session, [event])
+        event_repository.insert_signal_events(session, [event])
         session.commit()
     return event
 
 
 def _record(session_factory, outcome) -> None:
     with session_factory() as session:
-        repo.record_outcome(session, outcome)
+        outcome_repository.record_outcome(session, outcome)
         session.commit()
 
 
@@ -82,7 +87,7 @@ def test_record_outcome_persists_extracted_and_reextract_is_idempotent(session_f
     _record(session_factory, ExtractService(rules=[_LONG_RULE]).extract(event))
     _record(session_factory, ExtractService(rules=[_LONG_RULE]).extract(event))
     with session_factory() as session:
-        stored = repo.read_extracted_signals(session, 7)
+        stored = outcome_repository.read_extracted_signals(session, 7)
     assert len(stored) == 1  # upsert on event_id, never duplicated
     assert stored[0].symbol == "BTCUSDT"
 
@@ -95,8 +100,8 @@ def test_record_outcome_persists_parser_drift_one_to_one(session_factory):
     )
     _record(session_factory, outcome)
     with session_factory() as session:
-        signals = repo.read_extracted_signals(session, 7)
-        drifts = repo.read_parser_drift_warnings(session, 7)
+        signals = outcome_repository.read_extracted_signals(session, 7)
+        drifts = drift_repository.read_parser_drift_warnings(session, 7)
     assert len(signals) == 1 and len(drifts) == 1  # exactly one drift per fallback hit
     assert drifts[0].event_id == event.id
     assert drifts[0].fallback_signal_id == signals[0].id  # stamped with the stored id
@@ -108,11 +113,11 @@ def test_record_outcome_reextract_keeps_pk_and_drift_stays_consistent(session_fa
     service = ExtractService(rules=[], fallback=FakeExtractor(returns=intent))
     _record(session_factory, service.extract(event))
     with session_factory() as session:
-        first_id = repo.read_extracted_signals(session, 7)[0].id
+        first_id = outcome_repository.read_extracted_signals(session, 7)[0].id
     _record(session_factory, service.extract(event))  # fresh signal id, same event
     with session_factory() as session:
-        signals = repo.read_extracted_signals(session, 7)
-        drifts = repo.read_parser_drift_warnings(session, 7)
+        signals = outcome_repository.read_extracted_signals(session, 7)
+        drifts = drift_repository.read_parser_drift_warnings(session, 7)
     assert len(signals) == 1 and signals[0].id == first_id  # original PK preserved
     assert drifts[0].fallback_signal_id == first_id  # drift re-stamped to stored id
 
@@ -123,12 +128,14 @@ def test_record_outcome_transition_unrecognized_to_extracted_drops_sibling(
     event = _seed_event(session_factory, "BTC long entry 65000")
     _record(session_factory, ExtractService(rules=[]).extract(event))  # no_match
     with session_factory() as session:
-        assert len(repo.read_unrecognized_signals(session, 7)) == 1
-        assert repo.read_extracted_signals(session, 7) == []
+        assert len(outcome_repository.read_unrecognized_signals(session, 7)) == 1
+        assert outcome_repository.read_extracted_signals(session, 7) == []
     _record(session_factory, ExtractService(rules=[_LONG_RULE]).extract(event))
     with session_factory() as session:
-        assert len(repo.read_extracted_signals(session, 7)) == 1
-        assert repo.read_unrecognized_signals(session, 7) == []  # stale sibling gone
+        assert len(outcome_repository.read_extracted_signals(session, 7)) == 1
+        assert (
+            outcome_repository.read_unrecognized_signals(session, 7) == []
+        )  # stale sibling gone
 
 
 def test_record_outcome_transition_extracted_to_unrecognized_clears_drift(
@@ -141,10 +148,14 @@ def test_record_outcome_transition_extracted_to_unrecognized_clears_drift(
         ExtractService(rules=[], fallback=FakeExtractor(returns=intent)).extract(event),
     )
     with session_factory() as session:
-        assert len(repo.read_extracted_signals(session, 7)) == 1
-        assert len(repo.read_parser_drift_warnings(session, 7)) == 1
+        assert len(outcome_repository.read_extracted_signals(session, 7)) == 1
+        assert len(drift_repository.read_parser_drift_warnings(session, 7)) == 1
     _record(session_factory, ExtractService(rules=[]).extract(event))  # now a miss
     with session_factory() as session:
-        assert len(repo.read_unrecognized_signals(session, 7)) == 1
-        assert repo.read_extracted_signals(session, 7) == []  # sibling gone
-        assert repo.read_parser_drift_warnings(session, 7) == []  # drift cleared
+        assert len(outcome_repository.read_unrecognized_signals(session, 7)) == 1
+        assert (
+            outcome_repository.read_extracted_signals(session, 7) == []
+        )  # sibling gone
+        assert (
+            drift_repository.read_parser_drift_warnings(session, 7) == []
+        )  # drift cleared

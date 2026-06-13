@@ -29,7 +29,7 @@ test: ## Run backend tests
 	uv run pytest
 
 test-unit: ## Run backend unit tests
-	uv run pytest tests/unit
+	uv run pytest tests/accounts tests/exchanges tests/foundation tests/provider_scores tests/risk tests/rules tests/signals tests/simulation tests/sources tests/telegram_links
 
 test-integration: ## Run backend integration tests
 	uv run pytest tests/integration
@@ -41,7 +41,7 @@ health: ## Check local API health
 	curl -fsS localhost:8000/health
 
 serve: ## Run the FastAPI server locally
-	uv run uvicorn verasig.api.app:create_app_from_env --factory --reload
+	uv run uvicorn verasig.entrypoints.api:create_app_from_env --factory --reload
 
 clean: ## Remove safe backend generated artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} +

@@ -2,7 +2,7 @@ import asyncio
 
 from fastapi import APIRouter
 
-from verasig.api.sse import sse_stream
+from verasig.foundation.http.sse import sse_stream
 
 
 def test_sse_streams_job_events(client, app):

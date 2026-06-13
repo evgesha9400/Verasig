@@ -47,6 +47,7 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
         )
     }
     assert {"user_id", "label"} <= columns_by_table["golden_label"]
+    assert "is_signal" not in columns_by_table["golden_label"]
     assert {"user_id", "display"} <= columns_by_table["filter_rule"]
     assert {"user_id"} <= columns_by_table["parser_rule"]
     assert {"user_id"} <= columns_by_table["extracted_signal"]

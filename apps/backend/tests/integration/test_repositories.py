@@ -7,16 +7,20 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import EntryMode, RiskConfig
-from verasig.storage import (
-    account_repository,
-    backtest_repository,
-    exchange_repository,
+from verasig.features.accounts import repository as account_repository
+from verasig.features.exchanges import repository as exchange_repository
+from verasig.features.risk import repository as risk_repository
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import (
     lifecycle_link_repository,
-    risk_repository,
-    telegram_link_repository,
-    user_channel_repository,
 )
-from verasig.storage import repositories as repo
+from verasig.features.simulation import repository as backtest_repository
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
+from verasig.features.sources import subscription_repository as user_channel_repository
+from verasig.features.telegram_links import repository as telegram_link_repository
 from verasig.storage.models import ChannelRow
 
 
@@ -61,41 +65,45 @@ def _account(email: str = "user@example.com") -> UserAccount:
 
 
 def test_insert_messages_dedups_on_conflict(db_session):
-    repo.upsert_channel(db_session, _channel())
+    channel_repository.upsert_channel(db_session, _channel())
     db_session.commit()
-    inserted_first = repo.insert_messages(db_session, [_message(1), _message(2)])
+    inserted_first = message_repository.insert_messages(
+        db_session, [_message(1), _message(2)]
+    )
     db_session.commit()
-    inserted_again = repo.insert_messages(db_session, [_message(2), _message(3)])
+    inserted_again = message_repository.insert_messages(
+        db_session, [_message(2), _message(3)]
+    )
     db_session.commit()
     assert inserted_first == 2
     assert inserted_again == 1
-    assert repo.count_messages(db_session, 1) == 3
+    assert message_repository.count_messages(db_session, 1) == 3
 
 
 def test_advance_cursor_is_monotonic(db_session):
-    repo.upsert_channel(db_session, _channel())
+    channel_repository.upsert_channel(db_session, _channel())
     db_session.commit()
-    repo.advance_cursor(db_session, 1, 50)
+    channel_repository.advance_cursor(db_session, 1, 50)
     db_session.commit()
-    repo.advance_cursor(db_session, 1, 30)
+    channel_repository.advance_cursor(db_session, 1, 30)
     db_session.commit()
-    assert repo.read_cursor(db_session, 1) == 50
+    assert channel_repository.read_cursor(db_session, 1) == 50
 
 
 def test_read_cursor_is_none_for_unknown_channel(db_session):
-    assert repo.read_cursor(db_session, 999) is None
+    assert channel_repository.read_cursor(db_session, 999) is None
 
 
 def test_upsert_channel_updates_metadata_but_preserves_first_seen_and_cursor(
     db_session,
 ):
-    repo.upsert_channel(db_session, _channel(subscriber_count=100))
+    channel_repository.upsert_channel(db_session, _channel(subscriber_count=100))
     db_session.commit()
-    repo.advance_cursor(db_session, 1, 42)
+    channel_repository.advance_cursor(db_session, 1, 42)
     db_session.commit()
 
     later = datetime(2027, 1, 1, tzinfo=timezone.utc)
-    repo.upsert_channel(
+    channel_repository.upsert_channel(
         db_session,
         _channel(title="Renamed", subscriber_count=200, first_seen_at=later),
     )
@@ -105,7 +113,7 @@ def test_upsert_channel_updates_metadata_but_preserves_first_seen_and_cursor(
     assert channel.title == "Renamed"
     assert channel.subscriber_count == 200
     assert channel.first_seen_at == _instant()
-    assert repo.read_cursor(db_session, 1) == 42
+    assert channel_repository.read_cursor(db_session, 1) == 42
 
 
 def test_account_repository_round_trips_profile_plan_and_email(db_session):
@@ -158,13 +166,13 @@ def test_telegram_link_repository_round_trips_pending_and_connected(db_session):
 
 def test_user_channel_repository_round_trips_and_cascades_user_scope(db_session):
     account = account_repository.insert_account(db_session, _account())
-    repo.upsert_channel(db_session, _channel())
+    channel_repository.upsert_channel(db_session, _channel())
     db_session.commit()
 
     subscription = user_channel_repository.subscribe(
         db_session, account.id, 1, _instant()
     )
-    repo.upsert_labels(
+    rule_repository.upsert_labels(
         db_session,
         [
             GoldenLabel(
@@ -189,12 +197,12 @@ def test_user_channel_repository_round_trips_and_cascades_user_scope(db_session)
     db_session.commit()
 
     assert user_channel_repository.read_subscription(db_session, account.id, 1) is None
-    assert repo.read_labels(db_session, 1, account.id) == []
+    assert rule_repository.read_labels(db_session, 1, account.id) == []
 
 
 def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session):
     account = account_repository.insert_account(db_session, _account())
-    repo.upsert_channel(db_session, _channel())
+    channel_repository.upsert_channel(db_session, _channel())
     db_session.commit()
 
     exchange = exchange_repository.upsert_connection(

@@ -5,9 +5,14 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
-from verasig.services.accounts.tokens import read_user_id
-from verasig.storage import repositories as repo
-from verasig.storage import user_channel_repository
+from verasig.features.accounts.tokens import read_user_id
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
+from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 
@@ -32,7 +37,7 @@ def _auth(token: str) -> dict:
 
 def _seed(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -54,8 +59,8 @@ def _seed(app, user_id: UUID) -> None:
             )
             for idx in range(1, 7)
         ]
-        repo.insert_messages(session, messages)
-        repo.insert_signal_events(
+        message_repository.insert_messages(session, messages)
+        event_repository.insert_signal_events(
             session,
             [
                 RawSignalEvent(
@@ -67,7 +72,7 @@ def _seed(app, user_id: UUID) -> None:
                 for message in messages
             ],
         )
-        repo.upsert_filter_rule(
+        rule_repository.upsert_filter_rule(
             session,
             FilterRule(
                 rule_id=f"{user_id}:7-filter-v1",

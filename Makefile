@@ -4,7 +4,6 @@ BACKEND_DIR := apps/backend
 BACKEND_ENV_FILE := $(BACKEND_DIR)/.env
 COMPOSE := docker compose --env-file $(BACKEND_ENV_FILE)
 FRONTEND_DIR := apps/frontend
-ARGS ?= --help
 
 .PHONY: help doctor env \
         install install-backend install-frontend \
@@ -12,10 +11,8 @@ ARGS ?= --help
         backend-format backend-format-check backend-lint backend-test \
         frontend-format frontend-format-check frontend-lint frontend-test frontend-build \
         dev-frontend \
-        db-up db-down migrate db-migrate health \
-        up down logs cli clean clean-all \
-        fe-install fe-dev fe-build fe-test fe-lint \
-        be-install be-test be-lint be-format
+        db-up db-down migrate health serve \
+        up down logs clean clean-all
 
 help: ## Show available root targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -102,22 +99,20 @@ db-down: env ## Stop Postgres
 migrate: ## Run database migrations
 	$(MAKE) -C $(BACKEND_DIR) migrate
 
-db-migrate: migrate ## Alias for migrate
-
-health: ## Check backend health through the local CLI
+health: ## Check local API health
 	$(MAKE) -C $(BACKEND_DIR) health
 
-up: env ## Start all services with rebuilds
-	$(COMPOSE) up --build
+serve: ## Run the backend API server locally
+	$(MAKE) -C $(BACKEND_DIR) serve
+
+up: env ## Start DB, migrations, backend API, and frontend
+	$(COMPOSE) up --build frontend
 
 down: env ## Stop and remove local services
 	$(COMPOSE) down
 
-logs: env ## Follow backend app logs
-	$(COMPOSE) logs -f app
-
-cli: ## Run backend CLI command, e.g. make cli ARGS="stats <channel>"
-	$(MAKE) -C $(BACKEND_DIR) cli ARGS="$(ARGS)"
+logs: env ## Follow local service logs
+	$(COMPOSE) logs -f
 
 # Cleanup
 
@@ -128,23 +123,3 @@ clean: ## Remove safe generated artifacts
 clean-all: ## Remove dependencies and local virtual environments
 	$(MAKE) -C $(FRONTEND_DIR) clean-all
 	$(MAKE) -C $(BACKEND_DIR) clean-all
-
-# Compatibility aliases
-
-fe-install: install-frontend ## Alias for install-frontend
-
-fe-dev: dev-frontend ## Alias for dev-frontend
-
-fe-build: frontend-build ## Alias for frontend-build
-
-fe-test: frontend-test ## Alias for frontend-test
-
-fe-lint: frontend-lint ## Alias for frontend-lint
-
-be-install: install-backend ## Alias for install-backend
-
-be-test: backend-test ## Alias for backend-test
-
-be-lint: backend-lint ## Alias for backend-lint
-
-be-format: backend-format ## Alias for backend-format

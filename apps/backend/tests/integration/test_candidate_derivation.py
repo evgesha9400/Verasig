@@ -8,12 +8,18 @@ from verasig.domain.event import MaterializationPath
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
-from verasig.foundation.static_exchange import StaticExchange
-from verasig.services.ingestion.candidate_derivation import (
+from verasig.features.rules import drift_repository
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
+from verasig.features.sources import (
+    channel_repository,
+    message_repository,
+)
+from verasig.features.sources.candidate_derivation import (
     derive_candidates,
     sweep_advisory,
 )
-from verasig.storage import repositories as repo
+from verasig.foundation.market_data.static_exchange import StaticExchange
 
 _LONG_RULE = ParserRule(
     rule_id="long",
@@ -36,7 +42,7 @@ def _instant() -> datetime:
 
 def _seed(session_factory, texts: dict[int, str]) -> None:
     with session_factory() as session:
-        repo.upsert_channel(
+        channel_repository.upsert_channel(
             session,
             TelegramChannel(
                 channel_id=7,
@@ -46,7 +52,7 @@ def _seed(session_factory, texts: dict[int, str]) -> None:
                 first_seen_at=_instant(),
             ),
         )
-        repo.insert_messages(
+        message_repository.insert_messages(
             session,
             [
                 RawTelegramMessage(
@@ -78,7 +84,7 @@ def test_derive_flags_signals_as_seed_heuristic_not_chatter(session_factory):
     created = derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
     assert created == 1
     with session_factory() as session:
-        events = repo.read_signal_events(session, 7)
+        events = event_repository.read_signal_events(session, 7)
     assert {e.message_id for e in events} == {1}
     assert events[0].materialized_by is MaterializationPath.SEED_HEURISTIC
 
@@ -96,14 +102,14 @@ def test_derive_uses_distilled_filter_rule_over_seed(session_factory):
         rule_id="7-filter-v1", channel_id=7, include_patterns=[r"(?i)alpha leak"]
     )
     with session_factory() as session:
-        repo.upsert_filter_rule(session, rule)
+        rule_repository.upsert_filter_rule(session, rule)
         session.commit()
     created = derive_candidates(
         session_factory, 7, StaticExchange(), filter_rules=[rule]
     )
     assert created == 1
     with session_factory() as session:
-        event = repo.read_signal_events(session, 7)[0]
+        event = event_repository.read_signal_events(session, 7)[0]
     assert event.materialized_by is MaterializationPath.FILTER_RULE
     assert event.filter_rule_id == "7-filter-v1"
 
@@ -116,8 +122,10 @@ def test_sweep_recovers_filter_miss_with_one_drift(session_factory):
     )
     assert (new_events, new_drift) == (1, 1)  # only message 3 (a true miss)
     with session_factory() as session:
-        events = {e.message_id: e for e in repo.read_signal_events(session, 7)}
-        warnings = repo.read_drift_warnings(session, 7)
+        events = {
+            e.message_id: e for e in event_repository.read_signal_events(session, 7)
+        }
+        warnings = drift_repository.read_drift_warnings(session, 7)
     assert events[3].materialized_by is MaterializationPath.PARSER_BACKFILL
     assert len(warnings) == 1
     assert warnings[0].message_id == 3
@@ -131,7 +139,7 @@ def test_sweep_does_not_drift_on_existing_candidate(session_factory):
     # message 1 is already a candidate AND parses via _LONG_RULE -> must NOT drift
     sweep_advisory(session_factory, 7, [_LONG_RULE, _SLANG_RULE])
     with session_factory() as session:
-        warnings = repo.read_drift_warnings(session, 7)
+        warnings = drift_repository.read_drift_warnings(session, 7)
     assert all(w.message_id != 1 for w in warnings)
 
 

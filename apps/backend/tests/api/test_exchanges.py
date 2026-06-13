@@ -1,8 +1,9 @@
 from uuid import UUID
 
 from verasig.domain.account import Plan
-from verasig.services.accounts.tokens import read_user_id
-from verasig.storage import account_repository, exchange_repository
+from verasig.features.accounts import repository as account_repository
+from verasig.features.accounts.tokens import read_user_id
+from verasig.features.exchanges import repository as exchange_repository
 
 SECRET = "s" * 32
 
@@ -15,7 +16,9 @@ class FakeVerifier:
     async def __call__(self, api_key: str, api_secret: str) -> None:
         self.calls.append((api_key, api_secret))
         if self.reject:
-            from verasig.foundation.bybit_account import KeyVerificationError
+            from verasig.foundation.market_data.bybit_account import (
+                KeyVerificationError,
+            )
 
             raise KeyVerificationError
 

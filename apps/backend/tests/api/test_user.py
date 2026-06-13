@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from verasig.services.accounts.tokens import issue_email_change_token, read_user_id
+from verasig.features.accounts.tokens import issue_email_change_token, read_user_id
 
 SECRET = "s" * 32
 

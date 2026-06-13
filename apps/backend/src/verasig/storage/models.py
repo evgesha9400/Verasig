@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from verasig.foundation.db import Base
+from verasig.foundation.database.session import Base
 
 
 class ChannelRow(Base):
@@ -227,7 +227,6 @@ class GoldenLabelRow(Base):
     )
     message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     label: Mapped[str] = mapped_column(String, nullable=False)
-    is_signal: Mapped[bool] = mapped_column(Boolean, nullable=False)
     expected: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     labeled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

@@ -1,1 +1,0 @@
-"""Read-model projection services."""
