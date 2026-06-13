@@ -100,7 +100,7 @@ def test_backfill_is_idempotent(pg_session, fake_source):
 - A single `evaluate(channel)` test loads `labels/<channel>.jsonl`, runs the full extract pipeline over `messages/<channel>.jsonl`, and asserts:
   - `precision >= 0.95` (quality gate).
   - `recall` is **computed and reported** (not gated below target; reported for larger-corpus validation).
-  - **filter recall `>= 0.95`** measured on `GoldenLabel.is_signal` — the candidate gate is advisory, so the denominator is `GoldenLabel`, **not** the candidate subset ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)).
+  - **filter recall `>= 0.95`** measured on signal `GoldenLabel.label`s — the candidate gate is advisory, so the denominator is `GoldenLabel`, **not** the candidate subset ([ADR 0005](../../adr/0005-distilled-filter-and-advisory-gate.md)).
 - Output: a small table (TP/FP/FN per field) written to test logs — feeds the scorecard's parser-confidence component.
 
 ## 6. Definition of Done

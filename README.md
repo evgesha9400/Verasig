@@ -4,21 +4,26 @@ Proof-first signal provider intelligence.
 
 ## Repo structure
 
-- `apps/backend/` — Python backend service (logic, migrations, CLI, tests).
+- `apps/backend/` — Python backend service (logic, migrations, API entrypoint, tests).
 - `apps/frontend/` — frontend workspace: unified web app, design system, and JS tooling.
 - `libs/contracts/` — shared API contract definitions (reserved for phase 2+).
 - `docs/` — architecture docs, domain language, product docs, and design references.
 - `graphify-out/` — canonical project graph outputs; cache/state files are ignored.
 
-## Backend (current behavior preserved)
+## Backend
+
+Backend source is feature-owned under `apps/backend/src/verasig/features/`.
+`domain/` keeps pure contracts and Protocol seams, while `foundation/` owns
+concrete adapters, database setup, HTTP helpers, LLM adapters, security, market
+data, and Telegram integration.
 
 - `cd apps/backend`
 - `uv sync`
 - `uv run pytest`
-- `uv run verasig health`
-- `uv run verasig migrate`
+- `uv run alembic upgrade head`
+- `uv run uvicorn verasig.entrypoints.api:create_app_from_env --factory --reload`
 
-Backend package remains `verasig` and CLI command remains `verasig`.
+Backend package remains `verasig`.
 
 ## Frontend
 
@@ -39,12 +44,26 @@ runtime:
 - `/signup` — public registration view.
 - `/app` — authenticated product shell.
 
-## Database migrations and app container
+Web source is organized as:
+
+- `web/src/app/` — entrypoint, routing, shell composition, and local session state.
+- `web/src/domain/` — UI-independent demo data and workflow constants.
+- `web/src/features/` — auth, marketing, product screens, sources, pipeline, signals, exchanges, and settings.
+- `design-system/src/` — reusable UI implementation; root `index.js`, `styles.css`, and `tokens/*` remain public entrypoints.
+
+## Local stack
 
 - `make env`
 - `make up`
+- open `http://localhost:5173`
+- check `http://localhost:8000/health`
+- stop with `make down`
 
-Compose uses `apps/backend/.env`, `apps/backend/Dockerfile`, and `apps/backend/alembic.ini`.
+Compose starts Postgres, runs migrations, starts the backend API, waits for API
+health, and then starts the Vite frontend.
+
+Compose uses `apps/backend/.env`, `apps/backend/Dockerfile`,
+`apps/backend/alembic.ini`, and the frontend workspace under `apps/frontend/`.
 
 ## Environment
 

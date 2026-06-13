@@ -2,9 +2,14 @@
 
 ## Layout
 
-- `src/`: Python package source (`verasig`).
+- `src/verasig/features/`: feature-owned backend routes, schemas, workflows, views, and repositories.
+- `src/verasig/domain/`: pure contracts, enums, value objects, and Protocol seams.
+- `src/verasig/foundation/`: concrete adapters, database/session setup, HTTP helpers, security, market data, LLM, Telegram, and job coordination.
+- `src/verasig/entrypoints/api.py`: FastAPI composition root.
+- `src/verasig/shared/`: generic helpers with no feature ownership.
+- `src/verasig/storage/models.py`: centralized SQLAlchemy row registry.
 - `migrations/`: Alembic migration scripts.
-- `tests/`: backend unit and integration tests.
+- `tests/`: backend tests mirrored by owner plus API and integration workflow tests.
 - `Dockerfile`: production container build.
 - `alembic.ini`: migration config.
 
@@ -14,9 +19,9 @@
 - `uv sync`
 - `uv run pytest`
 - `uv run alembic upgrade head`
-- `uv run uvicorn verasig.api.app:create_app_from_env --factory --reload`
+- `uv run uvicorn verasig.entrypoints.api:create_app_from_env --factory --reload`
 - `curl -fsS localhost:8000/health`
-- `cd ../.. && make up`
+- `cd ../.. && make up` starts Postgres, migrations, API, and frontend
 
 ## Environment
 
@@ -36,4 +41,4 @@
 | Exchanges/Risk/Backtest | `/exchanges`, `/chats/{id}/risk`, `/chats/{id}/backtest` |
 | Signals | `/signals`, `/signals/{id}`, `/signals/{id}/link-mod` |
 
-See `docs/rewrite/requirements.md` for the full contract.
+See `tests/api/` for executable API behavior.

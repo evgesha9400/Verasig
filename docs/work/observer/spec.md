@@ -170,7 +170,7 @@ verasig/
 
 ## 9. Acceptance Criteria
 
-- [ ] Fresh clone → `make env` → `docker compose --env-file apps/backend/.env up` brings up `db` + app on **any** Docker host.
+- [ ] Fresh clone → `make env` → `make up` brings up DB, migrations, API, and frontend on **any** Docker host.
 - [ ] `docker compose --env-file apps/backend/.env run --rm -it app login` completes interactive auth; session persists across restarts.
 - [ ] ≥3 pilot channels backfilled; **100%** of accessible messages captured, append-only, idempotent re-run = 0 dupes.
 - [ ] Backfill is **resumable** from a persisted cursor; a mid-run kill + restart resumes and **does not refetch** captured messages.

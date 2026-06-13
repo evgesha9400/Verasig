@@ -39,7 +39,7 @@
 
 ## work item 0: Foundation & skeleton
 
-**Outcome:** `make up` brings up Postgres + app; `app health` connects to the DB. pytest + ruff wired.
+**Outcome:** `make up` brings up Postgres, migrations, API, and frontend; API health connects to the DB. pytest + ruff wired.
 
 **Files:**
 - Create: `pyproject.toml`, `Dockerfile`, `docker-compose.yml`, `apps/backend/.env.example`, `.gitignore`, `alembic.ini`
@@ -248,19 +248,19 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Input:** `telegram_api_id`/`hash`/`phone` (env), interactive code/2FA (once).
 - **Output:** persisted `StringSession` (bare UTF-8 string at `session_path`); non-interactive client for all other commands.
 - **Decisive test (unit):** session-string round-trips (`save`→`load`); missing/empty session raises `SessionMissingError("run `login` first")`; absent creds raise `CredentialsMissingError`.
-- **Contract:** `TelegramSource` Protocol (`domain/protocols.py`, `data-contracts.md` §9) — Protocol-only stub here; `backfill_batches`/`live_events` are implemented in work items 2/10. work item 1's own seam is the session store + guarded client factory in `telegram_session.py`.
+- **Contract:** `TelegramSource` Protocol (`domain/telegram_ports.py`, `data-contracts.md` §9) — Protocol-only stub here; `backfill_batches`/`live_events` are implemented in work items 2/10. work item 1's own seam is the session store + guarded client factory in `telegram_session.py`.
 - **Acceptance:** `docker compose --env-file apps/backend/.env run --rm -it app login` completes once; `app whoami` then prints the account non-interactively across restarts.
 - **Note:** tests never authenticate against real Telegram — `login`/`whoami`'s live calls are verified outside automated tests; only load/persist/guard + the pure `format_account` formatter are unit-tested.
 
 **Resolved gaps (grill, 2026-06-03):**
-- **Seam (Q1):** ship `domain/protocols.py` (full async `TelegramSource` Protocol), `domain/telegram.py` (live event contracts), `foundation/telethon_source.py` (`TelethonSource` adapter), and `foundation/telegram_session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
+- **Seam (Q1):** ship `domain/telegram_ports.py` (full async `TelegramSource` Protocol), `domain/telegram.py` (live event contracts), `foundation/telegram/telethon_source.py` (`TelethonSource` adapter), and `foundation/telegram/session.py` (session store + guards + client factory + login). The §9 `TelegramSource` reference is forward-looking — work item 1 stubs the Protocol, does not implement its methods.
 - **Protocol types (Q2):** to type the stubbed Protocol, pull in **pure contracts only** — `domain/message.py` (`RawTelegramMessage` per §2 + `DeliveryMode` enum per §1) and `TelegramDeliveryEvent` (in `domain/telegram.py` per §9). NO ORM, NO migration, NO backfill logic (those stay in work item 2). `DeliveryMode` lives in `domain/message.py` (enum with its entity); foundation imports domain, never the reverse.
 - **login UX (Q3):** add `telegram_phone: str | None` to `Settings` + `.env(.example)`; `client.start(phone=settings.telegram_phone)` prompts for code + 2FA interactively. api_id/hash stay env-sourced.
 - **Creds absent (Q4):** `make_client` raises `CredentialsMissingError("set VERASIG_TELEGRAM_API_ID and VERASIG_TELEGRAM_API_HASH")` (creds-check **before** session-load) so work item-0 `health` keeps working with creds Optional.
 - **whoami (Q5):** one line incl. phone — `logged in as @handle · First Last · id=N · +phone`; missing username/last_name omitted gracefully. Pure `format_account(user) -> str` is table-tested with a stub; live `get_me()` is verified outside automated tests.
 
 **Files:**
-- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/domain/telegram.py`, `src/verasig/domain/protocols.py`, `src/verasig/foundation/telethon_source.py`, `src/verasig/foundation/telegram_session.py`
+- Create: `src/verasig/domain/__init__.py`, `src/verasig/domain/message.py`, `src/verasig/domain/telegram.py`, `src/verasig/domain/telegram_ports.py`, `src/verasig/foundation/telegram/telethon_source.py`, `src/verasig/foundation/telegram/session.py`
 - Edit: `src/verasig/config.py` (+`telegram_phone`), `src/verasig/cli.py` (+`login`, +`whoami`), `apps/backend/.env`, `apps/backend/.env.example`
 - Test: `tests/unit/test_domain_message.py`, `tests/unit/test_telegram_source.py`, `tests/unit/test_telegram_session.py`
 
@@ -291,8 +291,8 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
   - Test fixtures: synthetic anonymized `fixtures/messages/*.jsonl` driven by `FakeSource`; real `TelethonSource` (resolve + `iter_messages(reverse=True, min_id=cursor)` + flood-wait backoff) is verified outside automated tests.
 
 **Files:**
-- Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/storage/repositories.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
-- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telethon_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
+- Create: `src/verasig/domain/channel.py`, `src/verasig/storage/__init__.py`, `src/verasig/storage/models.py`, `src/verasig/features/<feature>/repository.py`, `src/verasig/services/__init__.py`, `src/verasig/services/ingestion/__init__.py`, `src/verasig/services/ingestion/backfill.py`, `migrations/versions/0002_*.py`
+- Edit: `src/verasig/config.py` (+`backfill_batch_size`), `src/verasig/foundation/telegram/telethon_source.py` (+`resolve_channel`, +`TelethonSource`), `src/verasig/cli.py` (+`migrate`, +`backfill`, +`stats`)
 - Note: added a `migrate` subcommand (`alembic upgrade head`) so the deployed container can create the work item-2 tables before `backfill` (`docker compose --env-file apps/backend/.env run --rm app migrate`).
 - Test: `tests/fixtures/messages/*.jsonl`, `tests/integration/test_backfill.py`, `tests/unit/test_fake_source.py` (+ Protocol conformance)
 
@@ -305,13 +305,13 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Input:** a channel's `RawTelegramMessage` corpus.
 - **Output:**
   - advisory `RawSignalEvent`s — first from a cheap **seed heuristic**, then from distilled `FilterRule`s;
-  - `FilterRule` (recall-first, from `is_signal`) + `ParserRule`s (precision-first, from `expected` fields), distilled from the golden corpus;
+  - `FilterRule` (recall-first, from signal labels) + `ParserRule`s (precision-first, from `expected` fields), distilled from the golden corpus;
   - `GoldenLabel`s (the golden corpus);
   - `FilterDriftWarning`s when a background parse / audit finds a signal the filter missed.
 - **Contracts:** `RawSignalEvent` (advisory, §2), `FilterRule`, `ParserRule`, `FilterDriftWarning`, `GoldenLabel` (§4); `RuleDistiller` Protocol (`distill_filter` + `distill_parsers`, §9).
 - **Seam / mechanism (ADR 0005):**
   - **Seed (cold start):** a pure, recall-first heuristic — candidate if the text holds an exchange-listed symbol/base coin (via an `Exchange` Protocol seam, e.g. a `Bybit` adapter + `FakeExchange` in tests), a directional keyword (EN+RU), or a trade-structure keyword/emoji. `matched_reasons: list[MatchReason]`; `candidate_text` = verbatim message text; media-only/blank → not a candidate.
-  - **Distillation:** operator labels `is_signal` (+ expected fields for positives); the external LLM distils a recall-first `FilterRule` and precision-first `ParserRule`s. Only operator-selected examples leave the machine (privacy §10); bulk text is scanned only by local deterministic rules.
+  - **Distillation:** operator assigns `label` (+ expected fields for positives); the external LLM distils a recall-first `FilterRule` and precision-first `ParserRule`s. Only operator-selected examples leave the machine (privacy §10); bulk text is scanned only by local deterministic rules.
   - **Advisory gate:** deterministic rules may run over all `RawTelegramMessage`s; a hit on a non-candidate **late-materializes** a `RawSignalEvent` (`materialized_by=PARSER_BACKFILL`) + emits a `FilterDriftWarning`.
 - **Operator review surface:** removed from current implementation. Future UI framework and workflow must be designed separately; no previous UI implementation remains.
 - **Runtime behaviour (advisory, not a wall):**
@@ -323,28 +323,28 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 - **Decisive tests:**
   - unit (pure, table-driven): seed filter — chatter→reject; directional/symbol/price→accept; `matched_reasons` recorded; recall-first over-include; `Exchange` symbols injected (offline).
   - unit (pure): `FilterRule`/`ParserRule` application is pure + table-driven against fixtures; `FakeDistiller(labels)` returns a `FilterRule` + `ParserRule`s.
-  - integration: labels + rules persist; **re-applying distilled rules reproduces the labels** (filter recall ≥ target on `is_signal`; parser ≥ target precision on `expected`); a planted filter miss emits exactly one `FilterDriftWarning`.
-- **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); both rule kinds produced; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on `is_signal`; parser precision/recall on `expected`), not the candidate subset.
+  - integration: labels + rules persist; **re-applying distilled rules reproduces the labels** (filter recall ≥ target on signal labels; parser ≥ target precision on `expected`); a planted filter miss emits exactly one `FilterDriftWarning`.
+- **Acceptance:** candidate **recall ≥ 0.95** of human-labeled signals on the labeled corpus (false positives acceptable — extraction filters them); both rule kinds produced; golden corpus saved. **Metric denominator = `GoldenLabel`** (filter recall on signal labels; parser precision/recall on `expected`), not the candidate subset.
 - **Note:** real external-LLM distillation sends only operator-selected examples to the real LLM. The seed filter + rule application are pure/offline and fixture-testable. A local `FilterGemma`/`ParserGemma` is outside current scope until a later product version (ADR 0005).
 
 **Resolved gaps (grill, 2026-06-04) — work items 3 + 4 execute as one pass:**
 
 - **Scope:** build seed filter + distillation backend (including real `ClaudeCliDistiller`) **and** all of work item 4 (deterministic extraction). Real-LLM interactions use operator-selected examples only; tests stay offline (FakeDistiller, canned `cli/distill_*.txt`, FakeExchange).
 - **3/4 boundary:** work item 4 absorbed wholesale — `ExtractedSignal`/`UnrecognizedSignal` + `Side`/`EntryType`/`SignalEventType`, `deterministic_parser.parse`, `ExtractService` (one-of; required symbol+side; `fallback=None` until work item 5), precision ≥ 0.95 harness.
-- **Exchange seam:** `domain/protocols.py` owns the `Exchange` Protocol (`is_listed`/`base_symbols`); `foundation/static_exchange.py` owns the bundled `StaticExchange` seed; `FakeExchange` lives in tests. Real `BybitExchange(httpx)` remains outside current scope until work item 9.
+- **Exchange seam:** `domain/market_ports.py` owns the `Exchange` Protocol (`is_listed`/`base_symbols`); `foundation/market_data/static_exchange.py` owns the bundled `StaticExchange` seed; `FakeExchange` lives in tests. Real `BybitExchange(httpx)` remains outside current scope until work item 9.
 - **Distiller output:** LLM emits JSON `{filter_rule, parser_rules}` (pattern content only); shared `parse_distiller_output` tolerantly extracts (bare or ```json-fenced) + Pydantic-validates; the adapter stamps `rule_id`/`version`/`created_at`/`distilled_from_label_ids` (provenance never hallucinated).
 - **MatchReason:** frozen 3-value enum kept — `DIRECTIONAL_KEYWORD` (long/short/buy/sell + RU), `SYMBOL_TOKEN` (Exchange-listed), `PRICE_SHAPED` (subsumes trade-structure keywords/emoji + price patterns).
 - **Persistence:** migration `0003` adds all 7 tables — `raw_signal_event`, `extracted_signal`, `unrecognized_signal`, `filter_rule`, `parser_rule`, `golden_label`, `filter_drift_warning`; list/map fields + `GoldenLabel.expected` as JSONB; conftest TRUNCATE extended.
-- **Fixtures:** synthetic anonymized `tests/fixtures/{messages,labels}/pilot.jsonl` (~50 msgs, EN+RU; signals / partials / chatter + ≥1 planted filter-miss). Oracle for filter-recall ≥ 0.95 (denominator = `GoldenLabel.is_signal`) + parser-precision ≥ 0.95 (`expected`).
+- **Fixtures:** synthetic anonymized `tests/fixtures/{messages,labels}/pilot.jsonl` (~50 msgs, EN+RU; signals / partials / chatter + ≥1 planted filter-miss). Oracle for filter-recall ≥ 0.95 (denominator = signal `GoldenLabel.label`s) + parser-precision ≥ 0.95 (`expected`).
 - **UI:** removed from this implementation; future framework TBD.
 - **CLI:** `candidates` (derive) · `extract` (candidates → signal/unrecognized) · `sweep` (advisory parse-all → late-materialize `PARSER_BACKFILL` + `FilterDriftWarning`).
 - **Decided inline (doc/precedent):** enums co-located with their entity (`DeliveryMode` precedent); `uuid4` / `datetime.now(tz=utc)` defaults (tests pass explicit instants); `candidate_text` = verbatim text; media-only/blank → non-candidate; late-materialization idempotent on `(channel_id, message_id)`.
 
 **Files (this pass):**
 - `domain/`: `event.py` `signal.py` `filter_rule.py` `parser_rule.py` `label.py` `drift.py`
-- `foundation/static_exchange.py`
-- `services/ingestion/candidate_filter.py` (seed + FilterRule apply + derivation + advisory sweep), `services/extraction/{deterministic_parser.py, extract_service.py}`, `services/distillation/rule_distiller.py`
-- `storage/models.py` (+7 rows), `storage/repositories.py`, `migrations/versions/0003_*.py`
+- `foundation/market_data/static_exchange.py`
+- `features/sources/candidate_filter.py` (seed + FilterRule apply + derivation + advisory sweep), `services/extraction/{deterministic_parser.py, extract_service.py}`, `features/rules/rule_distiller.py`
+- `storage/models.py` (+7 rows), `features/<feature>/repository.py`, `migrations/versions/0003_*.py`
 - `cli.py` (+`candidates`/`extract`/`sweep`), `config.py` (+`distiller_command`)
 - `tests/unit/*`, `tests/integration/*`, `tests/fixtures/{messages,labels,cli}/*`, `tests/fakes.py` (+`FakeExchange`, +`FakeDistiller`)
 
@@ -357,7 +357,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 **Outcome:** apply `ParserRule`s to a `RawSignalEvent`, producing exactly one of `{ExtractedSignal, UnrecognizedSignal}`, enforcing `symbol`+`side` required and side normalization.
 
 **Files:**
-- Create: `src/verasig/domain/signal.py`, `src/verasig/services/extraction/deterministic_parser.py`, `src/verasig/services/extraction/extract_service.py`
+- Create: `src/verasig/domain/signal.py`, `src/verasig/features/signals/deterministic_parser.py`, `src/verasig/features/signals/extract_service.py`
 - Test: `tests/unit/test_deterministic_parser.py`
 
 - [ ] **Step 1: Write the failing required-fields test**
@@ -365,7 +365,7 @@ git add -A && git commit -m "feat: foundation skeleton (compose, postgres, confi
 ```python
 # tests/unit/test_deterministic_parser.py
 from decimal import Decimal
-from verasig.services.extraction.deterministic_parser import parse
+from verasig.features.signals.deterministic_parser import parse
 from verasig.domain.parser_rule import ParserRule
 
 RULE = ParserRule(
@@ -428,7 +428,7 @@ class ExtractedSignal(BaseModel):
 - [ ] **Step 4: Minimal parser**
 
 ```python
-# src/verasig/services/extraction/deterministic_parser.py
+# src/verasig/features/signals/deterministic_parser.py
 import re
 from decimal import Decimal
 from verasig.domain.signal import ExtractedSignal, Side, EntryType
@@ -467,7 +467,7 @@ Run: `uv run pytest tests/unit/test_deterministic_parser.py -v` → PASS.
 
 ```python
 # tests/unit/test_extract_service.py
-from verasig.services.extraction.extract_service import ExtractService
+from verasig.features.signals.extract_service import ExtractService
 
 def test_yields_exactly_one_outcome():
     out = ExtractService(rules=[RULE], fallback=None).extract(event("BTC long entry 65000"))
@@ -482,10 +482,10 @@ def test_unparseable_yields_unrecognized():
 - [ ] **Step 7: Run, verify fail; then implement ExtractService (deterministic-only)**
 
 ```python
-# src/verasig/services/extraction/extract_service.py
+# src/verasig/features/signals/extract_service.py
 from dataclasses import dataclass
 from verasig.domain.signal import ExtractedSignal
-from verasig.services.extraction.deterministic_parser import parse
+from verasig.features.signals.deterministic_parser import parse
 
 @dataclass
 class ExtractOutcome:
@@ -525,7 +525,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 **Resolved gaps (grill, 2026-06-04) — see [ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md):**
 
 - **Shape/linkage split (root fix of the §3-vs-§9 collision):** new `TradeIntent` (provenance-free trade levels) + `ExtractedSignal(TradeIntent)` (linkage). Both extractors symmetric `text -> TradeIntent | None` (`parse(rule, candidate_text)`, `extract(candidate_text)`); `ExtractService._link(intent, event, method, rule_id)` is the single linkage site. Refactors the (absorbed) work item-4 deterministic parser + simplifies `evaluation.py` (drops its dummy event). The linkage assertion moves from the parser test to the service test.
-- **LLM output = exactly `TradeIntent`** (one task; no self-grading, no lifecycle classification). Shared tolerant `find_json_object` (new `services/json_extract.py`, shared with `rule_distiller`); `parse_extractor_output(stdout) -> TradeIntent | None` returns `None` on unparseable/missing symbol+side (a fallback miss, not a crash — unlike the distiller which raises). Fixtures: `cli/extract_pilot.txt` (success) + `cli/extract_miss.txt` (→ None).
+- **LLM output = exactly `TradeIntent`** (one task; no self-grading, no lifecycle classification). Shared tolerant `find_json_object` (new `shared/json_object.py`, shared with `rule_distiller`); `parse_extractor_output(stdout) -> TradeIntent | None` returns `None` on unparseable/missing symbol+side (a fallback miss, not a crash — unlike the distiller which raises). Fixtures: `cli/extract_pilot.txt` (success) + `cli/extract_miss.txt` (→ None).
 - **`parser_confidence` dropped** from the contract — redundant with `extraction_method`; work item 8 derives its parse-reliability component from the `extraction_method` distribution + unrecognized rate.
 - **Fallback ON by default**, disableable: `Settings.extractor_fallback_enabled: bool = True` (+ `.env`) and a per-run `extract --no-llm` flag; `Settings.extractor_command: str = "claude"`. The off-switch is for offline/free runs. CLI seam `_make_fallback_extractor` is monkeypatched in tests (FakeExtractor) — **no test touches the real CLI**.
 - **`ExtractService.extract(event)` wiring:** deterministic match → `_link(…, DETERMINISTIC, rule.rule_id)`, fallback not called; miss + no fallback → `UnrecognizedSignal(reason="no_match", attempted=[DETERMINISTIC])`; miss + fallback success → `_link(…, LLM_FALLBACK, None)` + one `ParserDriftWarning(deterministic_result="no_match", fallback_result="extracted", fallback_signal_id=…)`; miss + fallback fail (None) → `UnrecognizedSignal(reason="fallback_failed", attempted=[DETERMINISTIC, LLM_FALLBACK])`.
@@ -536,8 +536,8 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 **Files:**
 - `domain/signal.py` (+`TradeIntent`, `ExtractedSignal(TradeIntent)`, −`parser_confidence`), `domain/drift.py` (+`ParserDriftWarning`)
-- `services/extraction/llm_fallback.py` (new: `parse_extractor_output` + `ClaudeCliExtractor`; `LlmExtractor` Protocol lives in `domain/protocols.py`) + `services/json_extract.py` (new: shared `find_json_object`), `services/extraction/deterministic_parser.py` (→ `TradeIntent`), `services/extraction/extract_service.py` (wire fallback + `_link` + drift), `services/distillation/evaluation.py` (→ `TradeIntent`, drop dummy event), `services/ingestion/candidate_derivation.py` (`parse(rule, text)`)
-- `storage/models.py` (−`parser_confidence`, +`ParserDriftWarningRow`, +`UNIQUE`), `storage/repositories.py` (+`record_outcome`, +`read_parser_drift_warnings`), `migrations/versions/0003_*.py` (edit), `migrations/versions/0004_*.py` (new)
+- `features/signals/llm_fallback.py` (new: `parse_extractor_output` + `ClaudeCliExtractor`; `LlmExtractor` Protocol lives in `domain/llm_ports.py`) + `shared/json_object.py` (new: shared `find_json_object`), `features/signals/deterministic_parser.py` (→ `TradeIntent`), `features/signals/extract_service.py` (wire fallback + `_link` + drift), `features/rules/evaluation.py` (→ `TradeIntent`, drop dummy event), `features/sources/candidate_derivation.py` (`parse(rule, text)`)
+- `storage/models.py` (−`parser_confidence`, +`ParserDriftWarningRow`, +`UNIQUE`), `features/<feature>/repository.py` (+`record_outcome`, +`read_parser_drift_warnings`), `migrations/versions/0003_*.py` (edit), `migrations/versions/0004_*.py` (new)
 - `config.py` (+`extractor_fallback_enabled`, +`extractor_command`), `cli.py` (`extract --no-llm` + `_make_fallback_extractor` + `record_outcome` + drift count in output)
 - `tests/fakes.py` (+`FakeExtractor`), `tests/fixtures/cli/extract_pilot.txt` + `extract_miss.txt`, unit + integration tests; `tests/conftest.py` (TRUNCATE +`parser_drift_warning`)
 
@@ -562,7 +562,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 **Files (this pass):**
 - `domain/lifecycle.py` (`FoldStep`, `FoldedSignal`, `FOLD_VERSION`)
-- `services/lifecycle/__init__.py`, `services/lifecycle/fold.py` (pure fold + thread resolution), `services/lifecycle/patch.py` (pure lifecycle patch classifier: SL/BE/TP/add/reduce/close + multipliers + price, EN+RU)
+- `features/signals/__init__.py`, `features/signals/fold.py` (pure fold + thread resolution), `features/signals/patch.py` (pure lifecycle patch classifier: SL/BE/TP/add/reduce/close + multipliers + price, EN+RU)
 - `cli.py` (+`lifecycle`)
 - `tests/unit/test_lifecycle_patch.py`, `tests/unit/test_lifecycle_fold.py` (crafted threads), `tests/integration/test_cli_lifecycle.py`
 
@@ -588,9 +588,9 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 **Files (this pass):**
 - `domain/deletion.py` (`DeletionConfidence`, `DeletionMethod`, `DeletedSignalEvidence`)
-- `services/deletion/__init__.py`, `services/deletion/diff.py` (pure `detect_deletions`), `services/deletion/rescan.py` (gated re-fetch → detect → persist)
-- `domain/protocols.py` (+`live_message_ids` on `TelegramSource`), `foundation/telethon_source.py` (+`TelethonSource`)
-- `storage/models.py` (+`DeletedSignalEvidenceRow`), `storage/repositories.py` (+`upsert_deletion_evidence`, +`read_deletion_evidence`), `migrations/versions/0005_deletion_evidence.py`
+- `features/sources/__init__.py`, `features/sources/deletion_diff.py` (pure `detect_deletions`), `features/sources/deletion_rescan.py` (gated re-fetch → detect → persist)
+- `domain/telegram_ports.py` (+`live_message_ids` on `TelegramSource`), `foundation/telegram/telethon_source.py` (+`TelethonSource`)
+- `storage/models.py` (+`DeletedSignalEvidenceRow`), `features/<feature>/repository.py` (+`upsert_deletion_evidence`, +`read_deletion_evidence`), `migrations/versions/0005_deletion_evidence.py`
 - `cli.py` (+`rescan`, +`deletions`, +formatters)
 - `tests/fakes.py` (+`FakeSource.live_message_ids`), `tests/unit/test_deletion_diff.py`, `tests/integration/test_deletion_evidence.py`, `tests/integration/test_cli_deletions.py`, `tests/conftest.py` (TRUNCATE +`deleted_signal_evidence`)
 
@@ -626,7 +626,7 @@ git add -A && git commit -m "feat: deterministic extraction with required symbol
 
 - **Input:** `FoldedSignal`s + Bybit klines + `ExecutionPolicy`.
 - **Output:** `SimOutcome` per signal (R-multiple/MTM, MFE/MAE) → fills sim components of `ProviderScore`.
-- **Contracts:** `MarketData` + `ExecutionPolicy` Protocols in `domain/protocols.py`; adapters/policies: `BybitKlineClient` httpx + Fake, `ProviderStatedPolicy`.
+- **Contracts:** `MarketData` in `domain/market_ports.py` + `ExecutionPolicy` in `domain/execution_ports.py`; adapters/policies: `BybitKlineClient` httpx + Fake, `ProviderStatedPolicy`.
 - **Decisive tests (unit, canned klines):** market fill=next-candle open; limit never reached ⇒ `UNFILLED`; **same-candle stop+tp ⇒ stop-first (-1R)**; MFE/MAE; policy **injectable** (dummy `CustomRiskPolicy` proves the seam).
 - **Acceptance:** known signal + known klines ⇒ expected conservative R; scorecard shows simulated expectancy + drawdown with full explanation.
 

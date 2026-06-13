@@ -96,7 +96,7 @@ UnrecognizedSignal:                  # extraction produced nothing usable
 ## 4. Parser rules & drift
 
 ```python
-FilterRule:                          # declarative INCLUSION rule (recall-first); distilled from is_signal labels — ADR 0005
+FilterRule:                          # declarative INCLUSION rule (recall-first); distilled from signal labels — ADR 0005
     rule_id: str                     # stable id (PK)
     channel_id: int?                 # null = global / seed
     version: int
@@ -142,8 +142,8 @@ GoldenLabel:                         # operator ground truth from distillation
     id: uuid
     channel_id: int
     message_id: int
-    is_signal: bool
-    expected: ExtractedSignal?       # expected fields when is_signal
+    label: str                       # "signal" | "noise" | "modifier"
+    expected: ExtractedSignal?       # expected fields when label is "signal"
     labeled_at: datetime
 ```
 
@@ -261,11 +261,12 @@ Kline:
 ## 9. Service interfaces (the seams TDD tests inject fakes at)
 
 ```python
-# domain/protocols.py
+# domain/market_ports.py
 class MarketData(Protocol):
     def klines(self, symbol: str, start: datetime, end: datetime,
                interval: str = "1") -> list[Kline]: ...   # "1" = 1m
 
+# domain/llm_ports.py
 class LlmExtractor(Protocol):
     def extract(self, candidate_text: str) -> TradeIntent | None: ...   # text in, trade-shape out; service links
 # adapter: ClaudeCliExtractor(command="claude"|"codex", runner=...) (subprocess, runner-injectable); FakeExtractor (tests)
@@ -273,10 +274,11 @@ class LlmExtractor(Protocol):
 # both feed ExtractService._link, which stamps event_id/channel_id/extraction_method/rule_id
 
 class RuleDistiller(Protocol):
-    def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule: ...        # recall-first, from is_signal
+    def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule: ...        # recall-first, from signal labels
     def distill_parsers(self, labels: list[GoldenLabel]) -> list[ParserRule]: ...  # precision-first, from expected fields
 # adapter: ClaudeCliDistiller (distinct recall-first vs precision-first prompts); FakeDistiller (tests)
 
+# domain/execution_ports.py
 class ExecutionPolicy(Protocol):
     def simulate(self, folded: FoldedSignal, klines: list[Kline]) -> SimOutcome: ...
 # v0: ProviderStatedPolicy; future: CustomRiskPolicy
@@ -297,7 +299,7 @@ class TelegramDeletionEvent(BaseModel):  # live deletion notice for one message 
 
 TelegramLiveEvent = TelegramDeliveryEvent | TelegramDeletionEvent
 
-# domain/protocols.py
+# domain/telegram_ports.py
 class TelegramSource(Protocol):
     # resolve: @handle | bare handle | t.me link | numeric id | title:<exact joined dialog title>
     #          | non-username title → channel identity + metadata (work item 2)
@@ -309,7 +311,7 @@ class TelegramSource(Protocol):
     async def live_message_ids(self, channel_id: int) -> set[int]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
     def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramLiveEvent]: ...
-# adapter: foundation/telethon_source.py TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
+# adapter: foundation/telegram/telethon_source.py TelethonSource (resolve + push handler + bounded short-poll + dedupe); FakeSource (tests, fixture corpora)
 ```
 
 **Every external dependency (Telegram, LLM CLI, market data, Postgres) sits behind one of these Protocols** so unit tests run pure and offline; integration tests use ephemeral Postgres + recorded fixtures. No test ever calls the real CLI or real Telegram.

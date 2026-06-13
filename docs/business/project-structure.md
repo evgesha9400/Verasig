@@ -15,7 +15,6 @@ Verasig/
 |-- libs/
 |   `-- contracts/
 |-- graphify-out/
-|-- secrets/
 |-- docker-compose.yml
 |-- Makefile
 `-- README.md
@@ -23,12 +22,12 @@ Verasig/
 
 ## Root Ownership
 
-- `apps/backend/` owns backend runtime code, migrations, CLI, and tests.
+- `apps/backend/` owns backend runtime code, migrations, API entrypoints, and tests.
 - `apps/frontend/` owns all frontend code, frontend package management, and runtime design-system modules.
 - `docs/` owns product, architecture, domain, and implementation records.
 - `libs/contracts/` is reserved for shared backend/frontend payload contracts.
 - `graphify-out/` owns canonical graph outputs only.
-- `secrets/` is local runtime input and must stay ignored.
+- `apps/backend/secrets/` is local runtime input and must stay ignored.
 
 ## Backend
 
@@ -37,15 +36,26 @@ apps/backend/
 |-- src/
 |   `-- verasig/
 |       |-- domain/
-|       |-- services/
+|       |-- entrypoints/
+|       |-- features/
 |       |-- foundation/
+|       |-- shared/
 |       |-- storage/
-|       |-- cli.py
 |       `-- config.py
 |-- migrations/
 |-- tests/
-|   |-- unit/
+|   |-- accounts/
+|   |-- api/
+|   |-- exchanges/
+|   |-- foundation/
 |   |-- integration/
+|   |-- provider_scores/
+|   |-- risk/
+|   |-- rules/
+|   |-- signals/
+|   |-- simulation/
+|   |-- sources/
+|   |-- telegram_links/
 |   `-- fixtures/
 |-- Dockerfile
 |-- .dockerignore
@@ -60,16 +70,19 @@ apps/backend/
 ## Backend Module Rules
 
 - `domain/` owns pure contracts, enums, value objects, and Protocol seams.
-- `services/` owns feature logic and thin orchestration that changes with that logic.
-- `foundation/` owns concrete external adapters and runtime setup.
-- `storage/` owns SQLAlchemy rows and repository modules.
-- `cli.py` owns the Typer entrypoint and should stay thin over services.
+- `domain/*_ports.py` owns focused pure Protocol seams.
+- `features/` owns feature routes, schemas, workflows, views, and repositories.
+- `foundation/` owns concrete external adapters, database/session setup, HTTP helpers, security, market data, LLM, Telegram integration, and job coordination.
+- `shared/` owns generic parsing, number, and time helpers.
+- `storage/models.py` owns the centralized SQLAlchemy row registry.
+- `entrypoints/api.py` owns FastAPI composition and should stay thin over feature routes and foundation adapters.
 - `.env.example`, `.python-version`, and `pyproject.toml` are backend-owned runtime/tooling contracts.
 - `.env` is backend-local, gitignored, and copied from `.env.example` by `make env`.
 - `.dockerignore` must exclude `.env` from backend container build context.
 - No `application/` layer exists; ADR 0010 explicitly defers that split.
-- Pure modules use names such as `diff`, `fold`, `hygiene`, and `scorecard`.
-- IO orchestration modules use names such as `backfill`, `live`, `rescan`, and `extract_service`.
+- Feature packages use names such as `routes`, `schemas`, `workflow`, `repository`, `views`, and focused pure module names.
+- Legacy `api/`, `services/`, and focused `storage/*_repository.py` wrapper surfaces must not be recreated.
+- No backend tests live under `src/`.
 
 ## Frontend
 
@@ -77,18 +90,18 @@ apps/backend/
 apps/frontend/
 |-- web/
 |   |-- src/
+|   |   |-- app/
 |   |   |-- assets/
-|   |   |-- auth/
-|   |   |-- marketing/
-|   |   |-- product/
-|   |   |-- routes/
-|   |   `-- main.jsx
+|   |   |-- domain/
+|   |   `-- features/
 |   |-- index.html
 |   |-- package.json
 |   `-- vite.config.js
 |-- design-system/
-|   |-- components/
-|   |-- icons/
+|   |-- src/
+|   |   |-- components/
+|   |   |-- icons/
+|   |   `-- theme/
 |   |-- tokens/
 |   |-- index.js
 |   |-- package.json
@@ -103,14 +116,14 @@ apps/frontend/
 - `apps/frontend/package.json` owns frontend workspaces and frontend-only tooling.
 - `web/` owns the single Vite runtime for marketing, auth, and product routes.
 - `design-system/` owns reusable runtime UI modules and tokens.
-- `web/src/routes/` owns route constants and route-level auth decisions.
-- `web/src/marketing/` owns the public landing page.
-- `web/src/auth/` owns public login, registration, and prototype local auth state.
-- `web/src/product/` owns the authenticated product shell and product workflows.
-- `web/src/product/features/` owns user workflow screens grouped by product capability.
-- `web/src/product/layout/` owns shell-level navigation and page chrome.
-- `web/src/product/data/` owns prototype seed data until backend payload contracts exist.
-- `web/src/product/ProductApp.jsx` is the product composition root and should not absorb feature internals.
+- `web/src/app/` owns the entrypoint, route constants, route-level auth decisions, product composition root, shell layout, and local session state.
+- `web/src/domain/` owns UI-independent demo data and workflow constants.
+- `web/src/features/auth/` owns public login and registration views.
+- `web/src/features/marketing/` owns the public landing page.
+- `web/src/features/pipeline/` owns workflow step screens.
+- `web/src/features/sources/`, `signals/`, `exchanges/`, and `settings/` own product capability screens.
+- `design-system/src/` owns implementation files.
+- `design-system/index.js`, `styles.css`, and `tokens/*` are stable public package entrypoints.
 
 ## Contract Library
 
