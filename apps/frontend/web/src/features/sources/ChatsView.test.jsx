@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ChatsView } from './ChatsView.jsx'
 
@@ -57,5 +57,33 @@ describe('ChatsView', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /check gaps/i }))
 
     expect(onCheckGaps).toHaveBeenCalledWith(feed)
+  })
+
+  it('adds a Telegram feed by channel tag', async () => {
+    const onAddChat = vi.fn().mockResolvedValue()
+
+    render(
+      <ChatsView
+        chats={[]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onReanalyze={() => {}}
+        onRestart={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+        onAddChat={onAddChat}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText(/channel tag/i), {
+      target: { value: '@pilot' }
+    })
+    fireEvent.submit(screen.getByRole('button', { name: /add feed/i }).closest('form'))
+
+    await waitFor(() => {
+      expect(onAddChat).toHaveBeenCalledWith('@pilot')
+    })
   })
 })

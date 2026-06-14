@@ -1,8 +1,35 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppRoutes } from './AppRouter.jsx'
+
+const AUTH_TOKEN_KEY = 'vrs-auth-token-1'
+const backendUser = {
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  email: 'ada@example.com',
+  plan: 'observer',
+  pendingEmail: null,
+  cancelAt: null
+}
+const backendChat = {
+  id: '7',
+  name: 'Pilot Signals',
+  tag: '@pilot',
+  subscribers: 1234,
+  initials: 'PS',
+  tint: 'var(--viz-1)',
+  status: 'new',
+  fetched: 0,
+  lastDate: null,
+  score: null,
+  winRate: null,
+  pnl: null,
+  hasRisk: false,
+  historyGaps: false,
+  signalDeletion: false
+}
 
 function createTestStorage() {
   const entries = new Map()
@@ -36,6 +63,41 @@ function installTestStorage() {
   })
 }
 
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+function emptyResponse(status = 204) {
+  return new Response(null, { status })
+}
+
+function installFetch(routes = {}) {
+  globalThis.fetch = vi.fn((url, options = {}) => {
+    const method = options.method || 'GET'
+    const path = new URL(url).pathname
+    const route = routes[`${method} ${path}`]
+
+    if (!route) {
+      return Promise.reject(new Error(`Unexpected request: ${method} ${path}`))
+    }
+
+    return Promise.resolve(route(url, options))
+  })
+}
+
+function sourceRoutes({
+  telegram = { connected: false, phone: null },
+  chats = []
+} = {}) {
+  return {
+    'GET /telegram/status': () => jsonResponse(telegram),
+    'GET /chats': () => jsonResponse({ chats })
+  }
+}
+
 function renderRoute(initialPath) {
   return render(
     <MemoryRouter
@@ -49,6 +111,7 @@ function renderRoute(initialPath) {
 
 beforeEach(() => {
   installTestStorage()
+  installFetch()
 })
 
 describe('AppRoutes', () => {
@@ -87,20 +150,38 @@ describe('AppRoutes', () => {
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#8FB81E')
   })
 
-  it('navigates from login submit to the product shell', async () => {
+  it('navigates from backend login submit to the product shell', async () => {
+    installFetch({
+      'POST /auth/login': () =>
+        jsonResponse({ token: 'login-token', user: backendUser }),
+      ...sourceRoutes()
+    })
+
     renderRoute('/login')
     fireEvent.submit(screen.getByText('Log in').closest('form'))
+
     await waitFor(() => {
       expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
     })
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('login-token')
+    expect(screen.getByText('ada@example.com')).toBeTruthy()
   })
 
-  it('navigates from register submit to the product shell', async () => {
+  it('navigates from backend register submit to the product shell', async () => {
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      ...sourceRoutes()
+    })
+
     renderRoute('/signup')
     fireEvent.submit(screen.getByText('Create account').closest('form'))
+
     await waitFor(() => {
       expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
     })
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
+    expect(screen.getByText('ada@example.com')).toBeTruthy()
   })
 
   it('redirects unauthenticated app visits to login', async () => {
@@ -110,8 +191,74 @@ describe('AppRoutes', () => {
     })
   })
 
-  it('supports signup to product to logout to landing', async () => {
+  it('loads the product shell from a stored token and current backend user', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
+    installFetch({
+      'GET /auth/me': () => jsonResponse(backendUser),
+      ...sourceRoutes()
+    })
+
+    renderRoute('/app')
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
+    })
+    expect(screen.getByText('Ada Lovelace')).toBeTruthy()
+    expect(screen.getByText('ada@example.com')).toBeTruthy()
+  })
+
+  it('hydrates Telegram status and chats from the backend after session reload', async () => {
     const user = userEvent.setup()
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
+    installFetch({
+      'GET /auth/me': () => jsonResponse(backendUser),
+      ...sourceRoutes({
+        telegram: { connected: true, phone: '+44 •••• 8821' },
+        chats: [backendChat]
+      })
+    })
+
+    renderRoute('/app')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /telegram/i })).toBeTruthy()
+    })
+    await user.click(screen.getByRole('button', { name: /telegram/i }))
+
+    expect(await screen.findByText('Pilot Signals')).toBeTruthy()
+  })
+
+  it('clears an invalid stored token before redirecting to login', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'bad-token')
+    installFetch({
+      'GET /auth/me': () =>
+        jsonResponse(
+          {
+            error: {
+              code: 'AUTH_INVALID_TOKEN',
+              message: 'Invalid token'
+            }
+          },
+          401
+        )
+    })
+
+    renderRoute('/app')
+
+    await waitFor(() => {
+      expect(screen.getByText('Log in to Verasig')).toBeTruthy()
+    })
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull()
+  })
+
+  it('supports signup to product to backend logout to landing', async () => {
+    const user = userEvent.setup()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      'POST /auth/logout': () => emptyResponse(),
+      ...sourceRoutes()
+    })
     renderRoute('/')
 
     await user.click(screen.getAllByRole('link', { name: /sign up/i })[0])
@@ -128,6 +275,11 @@ describe('AppRoutes', () => {
       expect(screen.getByRole('heading', { level: 1 }).textContent).toContain(
         'Verify the signal'
       )
+    })
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull()
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer register-token' }
     })
   })
 })

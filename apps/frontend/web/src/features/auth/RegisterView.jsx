@@ -1,17 +1,49 @@
 import { useState } from 'react'
-import { Button, Input } from '@verasig/design-system'
+import { Banner, Button, Input } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
+
+function errorMessage(error) {
+  return error?.message || 'Account creation failed. Check your details and try again.'
+}
+
+function splitFullName(fullName) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  const firstName = parts[0] || ''
+  const lastName = parts.slice(1).join(' ') || firstName
+  return { firstName, lastName }
+}
 
 export function RegisterView({ onRegister, onLogin }) {
   const [name, setName] = useState('Mara Voss')
   const [email, setEmail] = useState('mara@northwave.io')
   const [password, setPassword] = useState('verasig-demo-2026')
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e) {
-    e.preventDefault()
-    onRegister()
+  async function submitRegistration() {
+    const { firstName, lastName } = splitFullName(name)
+    setError(null)
+    setSubmitting(true)
+
+    try {
+      await onRegister({
+        firstName,
+        lastName,
+        email: email.trim(),
+        password
+      })
+    } catch (caughtError) {
+      setError(errorMessage(caughtError))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    void submitRegistration()
   }
 
   return (
@@ -56,11 +88,17 @@ export function RegisterView({ onRegister, onLogin }) {
               placeholder="••••••••"
               hint="At least 10 characters."
             />
+            {error && (
+              <Banner tone="rejected" title="Account creation failed">
+                {error}
+              </Banner>
+            )}
             <Button
               type="submit"
               variant="primary"
               fullWidth
               size="lg"
+              loading={submitting}
               iconRight={<Icon name="arrowRight" size={16} />}
             >
               Create account

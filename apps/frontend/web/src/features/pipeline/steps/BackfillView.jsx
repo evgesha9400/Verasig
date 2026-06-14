@@ -2,15 +2,90 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
+function messageFromError(error) {
+  return error?.message || 'Backfill failed.'
+}
+
 /* Verasig prototype — backfill infinite loader */
-export function BackfillView({ chat, onCancel, onComplete }) {
+export function BackfillView({
+  chat,
+  onCancel = () => {},
+  onComplete = () => {},
+  onStart,
+  onStream,
+  onCancelBackfill
+}) {
   const [count, setCount] = useState(chat.fetched || 0)
   const [date, setDate] = useState(chat.lastDate || 'Jun 7, 2026')
   const [logLine, setLogLine] = useState('Opening MTProto session…')
   const countRef = useRef(chat.fetched || 0)
+  const handlersRef = useRef({
+    onCancel,
+    onCancelBackfill,
+    onComplete,
+    onStart,
+    onStream
+  })
 
-  // simulated, accelerating backfill that completes after a believable run
   useEffect(() => {
+    handlersRef.current = {
+      onCancel,
+      onCancelBackfill,
+      onComplete,
+      onStart,
+      onStream
+    }
+  }, [onCancel, onCancelBackfill, onComplete, onStart, onStream])
+
+  const hasBackendBackfill = !!onStart && !!onStream
+
+  useEffect(() => {
+    countRef.current = chat.fetched || 0
+    setCount(chat.fetched || 0)
+    setDate(chat.lastDate || 'Jun 7, 2026')
+    setLogLine('Opening MTProto session…')
+
+    if (hasBackendBackfill) {
+      let closed = false
+      let subscription = null
+
+      async function startBackendBackfill() {
+        try {
+          await handlersRef.current.onStart(chat.id)
+          if (closed) return
+          subscription = handlersRef.current.onStream(chat.id, {
+            onProgress: (progress) => {
+              const nextCount = progress.fetched ?? countRef.current
+              countRef.current = nextCount
+              setCount(nextCount)
+              if (progress.lastDate) setDate(progress.lastDate)
+              if (progress.phase) setLogLine(progress.phase)
+            },
+            onDone: (result) => {
+              const total = result.fetched ?? countRef.current
+              countRef.current = total
+              setCount(total)
+              setLogLine('Backfill complete · finalizing index')
+              handlersRef.current.onComplete(total)
+            },
+            onError: (error) => {
+              setLogLine(error?.message || 'Backfill stopped.')
+            }
+          })
+        } catch (error) {
+          if (!closed) setLogLine(messageFromError(error))
+        }
+      }
+
+      void startBackendBackfill()
+
+      return () => {
+        closed = true
+        subscription && subscription.close()
+      }
+    }
+
+    // Simulated, accelerating backfill that completes after a believable run.
     const TARGET = (chat.fetched || 0) + 9800 + Math.floor(Math.random() * 3000)
     let doneTimer = null
     const dates = [
@@ -44,7 +119,7 @@ export function BackfillView({ chat, onCancel, onComplete }) {
         clearInterval(tick)
         clearInterval(logTick)
         setLogLine('Backfill complete · finalizing index')
-        doneTimer = setTimeout(() => onComplete(TARGET), 900)
+        doneTimer = setTimeout(() => handlersRef.current.onComplete(TARGET), 900)
         return
       }
       setCount(countRef.current)
@@ -63,7 +138,18 @@ export function BackfillView({ chat, onCancel, onComplete }) {
       clearInterval(logTick)
       clearTimeout(doneTimer)
     }
-  }, [chat.fetched, onComplete])
+  }, [chat.fetched, chat.id, chat.lastDate, hasBackendBackfill])
+
+  async function cancelBackfill() {
+    try {
+      if (handlersRef.current.onCancelBackfill) {
+        await handlersRef.current.onCancelBackfill(chat.id)
+      }
+      handlersRef.current.onCancel(countRef.current, date)
+    } catch (error) {
+      setLogLine(messageFromError(error))
+    }
+  }
 
   return (
     <div className="vrs-backfill vrs-fade-in">
@@ -123,7 +209,7 @@ export function BackfillView({ chat, onCancel, onComplete }) {
       <Button
         variant="ghost"
         iconLeft={<Icon name="x" size={15} />}
-        onClick={() => onCancel(countRef.current, date)}
+        onClick={cancelBackfill}
       >
         Cancel backfill
       </Button>
