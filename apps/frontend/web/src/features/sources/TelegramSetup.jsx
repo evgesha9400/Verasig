@@ -198,8 +198,12 @@ export function TelegramSetup({
               )}
               <div className="vrs-help" style={{ textAlign: 'center' }}>
                 Demo: enter any 5 digits. Didn’t get it?{' '}
-                <span className="vrs-link">Resend code</span> ·{' '}
-                <span
+                <button type="button" className="vrs-link" onClick={sendCode}>
+                  Resend code
+                </button>{' '}
+                ·{' '}
+                <button
+                  type="button"
                   className="vrs-link"
                   onClick={() => {
                     setErr(null)
@@ -210,7 +214,7 @@ export function TelegramSetup({
                   }}
                 >
                   Change number
-                </span>
+                </button>
               </div>
               <div className="vrs-form__actions" style={{ justifyContent: 'center' }}>
                 <Button
