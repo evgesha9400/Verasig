@@ -5,7 +5,7 @@
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -174,10 +174,18 @@ class TelethonSource(TelegramSource):
             raw_payload=_json_safe(message.to_dict()),
         )
 
-    async def live_message_ids(self, channel_id: int) -> set[int]:
-        # full live id set for snapshot-diff
+    async def live_message_ids(
+        self, channel_id: int, on_progress: Callable[[int], None] | None = None
+    ) -> set[int]:
+        # full live id set for snapshot-diff; report the running count so a long
+        # re-fetch never goes silent to progress subscribers
         entity = self._read_entity(channel_id)
-        return {message.id async for message in self._client.iter_messages(entity)}
+        live_ids: set[int] = set()
+        async for message in self._client.iter_messages(entity):
+            live_ids.add(message.id)
+            if on_progress is not None:
+                on_progress(len(live_ids))
+        return live_ids
 
     def _remember_entity(self, entity: Any) -> None:
         channel_id = _entity_channel_id(entity)

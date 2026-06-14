@@ -60,6 +60,40 @@ describe('BackfillView', () => {
     })
   })
 
+  it('keeps the stream open when fetched/lastDate update mid-backfill', async () => {
+    const onStart = vi.fn().mockResolvedValue()
+    const close = vi.fn()
+    const onStream = vi.fn(() => ({ close }))
+    const noop = () => {}
+
+    const { rerender } = render(
+      <BackfillView
+        chat={chat}
+        onStart={onStart}
+        onStream={onStream}
+        onCancel={noop}
+        onComplete={noop}
+      />
+    )
+
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1))
+    expect(onStream).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <BackfillView
+        chat={{ ...chat, fetched: 5000, lastDate: 'Jun 1, 2026' }}
+        onStart={onStart}
+        onStream={onStream}
+        onCancel={noop}
+        onComplete={noop}
+      />
+    )
+
+    expect(close).not.toHaveBeenCalled()
+    expect(onStart).toHaveBeenCalledTimes(1)
+    expect(onStream).toHaveBeenCalledTimes(1)
+  })
+
   it('renders an empty oldest-date placeholder until the backend reports a date', () => {
     render(
       <BackfillView

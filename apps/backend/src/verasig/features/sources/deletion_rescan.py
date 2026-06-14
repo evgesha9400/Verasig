@@ -9,6 +9,7 @@ core (`detect_deletions`) wrapped in repo-driven orchestration; `live_message_id
 never runs against real Telegram in tests.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -44,10 +45,13 @@ def _utc_now() -> datetime:
 
 
 async def rescan(
-    source: TelegramSource, reference: str | int, session_factory: sessionmaker
+    source: TelegramSource,
+    reference: str | int,
+    session_factory: sessionmaker,
+    on_progress: Callable[[int], None] | None = None,
 ) -> RescanResult:
     channel_id = _resolve_channel_id(session_factory, reference)
-    live_ids = await source.live_message_ids(channel_id)
+    live_ids = await source.live_message_ids(channel_id, on_progress=on_progress)
     _guard_live_snapshot(live_ids, channel_id)
     evidence = _detect(session_factory, channel_id, live_ids)
     written = _persist(session_factory, evidence)

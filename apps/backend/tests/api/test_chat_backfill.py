@@ -185,6 +185,49 @@ def test_failed_backfill_can_retry_from_persisted_cursor(client, app):
     assert retried_list["lastDate"] == "Jun 1, 2026"
 
 
+def test_backfill_after_success_is_idempotent_and_does_not_restart(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    first = client.post("/chats/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        first_body = "".join(response.iter_text())
+    fetches_after_first = len(source.requested_afters)
+
+    second = client.post("/chats/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        second_body = "".join(response.iter_text())
+    listed = client.get("/chats", headers=_auth(token)).json()["chats"][0]
+
+    assert first.status_code == 202
+    assert "event: done" in first_body
+    assert second.status_code == 202
+    assert second.json()["jobId"] == first.json()["jobId"]
+    assert len(source.requested_afters) == fetches_after_first
+    assert "event: done" in second_body
+    assert listed["status"] == "backfilled"
+
+
+def test_backfill_rescan_emits_scan_progress_so_stream_is_not_silent(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/chats/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+
+    assert "event: done" in body
+    assert "scanned)" in body
+
+
 def test_backfill_progress_stream_reports_cumulative_count_and_oldest_date(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _many_messages(5), live_ids={1, 2, 3, 4, 5})

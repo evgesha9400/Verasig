@@ -122,8 +122,17 @@ class FakeSource:
             yielded += len(batch)
             yield batch
 
-    async def live_message_ids(self, _channel_id: int) -> set[int]:
-        return set(self.live_ids)  # canned live snapshot for rescan tests
+    async def live_message_ids(
+        self, _channel_id: int, on_progress: Callable[[int], None] | None = None
+    ) -> set[int]:
+        # canned live snapshot for rescan tests; reports the running count per id
+        # so progress-during-rescan assertions can observe a non-silent re-fetch
+        scanned = 0
+        for _message_id in sorted(self.live_ids):
+            scanned += 1
+            if on_progress is not None:
+                on_progress(scanned)
+        return set(self.live_ids)
 
     @staticmethod
     async def live_events(_channel_ids: list[int]):

@@ -193,7 +193,11 @@ export function BackfillView({
       clearInterval(logTick)
       clearTimeout(doneTimer)
     }
-  }, [chat.fetched, chat.id, chat.lastDate, hasBackendBackfill])
+    // Keyed on chat.id only: chat.fetched/chat.lastDate are seed values captured
+    // when the active chat changes. They keep updating as the backend streams
+    // progress, and re-running here would tear down the live stream mid-backfill.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.id, hasBackendBackfill])
 
   async function cancelBackfill() {
     try {

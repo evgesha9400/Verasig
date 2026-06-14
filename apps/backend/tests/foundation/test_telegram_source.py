@@ -309,6 +309,18 @@ async def test_numeric_channel_resolution_reuses_joined_dialog_entity_for_reads(
     assert client.iter_dialog_calls == 1
 
 
+async def test_live_message_ids_reports_scan_progress():
+    messages = [FakeTelethonMessage(message_id) for message_id in (10, 11, 12)]
+    client = FakeTelethonClient(messages_by_channel={7: messages})
+    source = TelethonSource(client)
+
+    scanned: list[int] = []
+    live_ids = await source.live_message_ids(7, on_progress=scanned.append)
+
+    assert live_ids == {10, 11, 12}
+    assert scanned == [1, 2, 3]
+
+
 async def test_resolve_channel_rejects_ambiguous_dialog_title():
     title = "Signals"
     client = FakeTelethonClient(
