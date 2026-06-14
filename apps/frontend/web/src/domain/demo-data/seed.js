@@ -9,7 +9,7 @@ export const CHATS = [
     subscribers: 48230,
     tint: 'var(--viz-2)',
     initials: 'AC',
-    status: 'new', // new | backfilling | cancelled | backfilled | analyzed
+    status: 'new', // new | backfilling | failed | cancelled | backfilled | analyzed
     fetched: 0,
     lastDate: null,
     score: null

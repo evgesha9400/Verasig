@@ -150,9 +150,20 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     fireToast('verified', 'Feed added', `${chat.name} is ready to backfill.`)
   }
 
-  function completeBackfill(total) {
-    onBackfillComplete(total)
+  function completeBackfill(result) {
+    onBackfillComplete(result)
     void refreshSources().catch(() => {})
+  }
+
+  function handleBackfillError(error) {
+    void refreshSources().catch(() => {})
+    setScreen('chats')
+    if (error?.status === 'cancelled') return
+    fireToast(
+      'rejected',
+      'Backfill failed',
+      error?.message || 'Retry when the source is available again.'
+    )
   }
 
   if (nav === 'signals') {
@@ -264,6 +275,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onCancelBackfill={(chatId) => cancelBackfill(authToken, chatId)}
           onCancel={onBackfillCancel}
           onComplete={completeBackfill}
+          onError={handleBackfillError}
         />
       )
     } else if (screen === 'label') {

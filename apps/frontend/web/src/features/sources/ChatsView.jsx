@@ -124,6 +124,12 @@ export function ChatsView({
           Paused
         </Badge>
       )
+    if (c.status === 'failed')
+      return (
+        <Badge tone="rejected" dot>
+          Failed
+        </Badge>
+      )
     if (c.status === 'backfilled')
       return (
         <Badge tone="info" dot>
@@ -201,13 +207,12 @@ export function ChatsView({
         </div>
       )
     }
-    if (c.status === 'cancelled') {
+    if (c.status === 'cancelled' || c.status === 'failed') {
       return (
         <div className="vrs-chat-right">
           <div className="vrs-chat-progress">
-            {fmtNum(c.fetched)} fetched
-            <br />
-            through {c.lastDate}
+            <span>{fmtNum(c.fetched)} fetched</span>
+            <span>{c.lastDate ? `through ${c.lastDate}` : 'no date yet'}</span>
           </div>
           <Button
             variant="primary"
@@ -292,9 +297,13 @@ export function ChatsView({
                 {c.name} {statusBadge(c)}
                 {c.historyGaps &&
                   !c.signalDeletion &&
-                  ['backfilled', 'analyzed', 'cancelled', 'verified'].includes(
-                    c.status
-                  ) && <FeedFlag kind="gaps" />}
+                  [
+                    'backfilled',
+                    'analyzed',
+                    'cancelled',
+                    'failed',
+                    'verified'
+                  ].includes(c.status) && <FeedFlag kind="gaps" />}
                 {c.signalDeletion && c.status === 'analyzed' && (
                   <FeedFlag
                     kind="scam"

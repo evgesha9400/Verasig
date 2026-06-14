@@ -10,7 +10,7 @@ export function SourcesView({
 }) {
   const analyzed = chats.filter((c) => c.status === 'analyzed').length
   const inProgress = chats.filter((c) =>
-    ['backfilling', 'cancelled', 'backfilled', 'labeling'].includes(c.status)
+    ['backfilling', 'cancelled', 'failed', 'backfilled', 'labeling'].includes(c.status)
   ).length
 
   return (

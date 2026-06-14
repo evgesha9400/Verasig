@@ -50,9 +50,27 @@ describe('BackfillView', () => {
     expect(screen.getByText('Reading channel history...')).toBeTruthy()
 
     act(() => {
-      streamHandlers.onDone({ fetched: 12 })
+      streamHandlers.onDone({ fetched: 12, lastDate: 'May 30, 2026' })
     })
 
-    expect(onComplete).toHaveBeenCalledWith(12)
+    expect(onComplete).toHaveBeenCalledWith({
+      fetched: 12,
+      lastDate: 'May 30, 2026',
+      status: 'succeeded'
+    })
+  })
+
+  it('renders an empty oldest-date placeholder until the backend reports a date', () => {
+    render(
+      <BackfillView
+        chat={chat}
+        onStart={vi.fn().mockResolvedValue()}
+        onStream={() => ({ close: vi.fn() })}
+        onCancel={() => {}}
+        onComplete={() => {}}
+      />
+    )
+
+    expect(screen.getByText('No messages yet')).toBeTruthy()
   })
 })
