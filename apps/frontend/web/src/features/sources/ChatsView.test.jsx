@@ -115,4 +115,37 @@ describe('ChatsView', () => {
     expect(await screen.findByText('Feed not added')).toBeTruthy()
     expect(screen.getByText('Cannot resolve Telegram channel reference.')).toBeTruthy()
   })
+
+  it('shows failed backfill progress and retry action', () => {
+    const failedFeed = {
+      ...feed,
+      status: 'failed',
+      fetched: 200,
+      lastDate: 'Jun 1, 2026',
+      signalDeletion: false
+    }
+    const onRetry = vi.fn()
+
+    render(
+      <ChatsView
+        chats={[failedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={onRetry}
+        onResume={() => {}}
+        onReanalyze={() => {}}
+        onRestart={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Failed')).toBeTruthy()
+    expect(screen.getByText('200 fetched')).toBeTruthy()
+    expect(screen.getByText('through Jun 1, 2026')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+
+    expect(onRetry).toHaveBeenCalledWith(failedFeed)
+  })
 })

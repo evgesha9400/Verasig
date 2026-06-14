@@ -272,11 +272,16 @@ export function useWorkflowState(authToken) {
     setScreen('exchange')
   }
 
-  function onBackfillComplete(total) {
+  function onBackfillComplete(result) {
+    const current = chats.find((chat) => chat.id === activeChatId)
+    const summary =
+      typeof result === 'number'
+        ? { fetched: result, lastDate: current?.lastDate || null }
+        : result || {}
     patchChat(activeChatId, {
       status: 'backfilled',
-      fetched: total,
-      lastDate: 'Nov 18, 2025'
+      fetched: summary.fetched ?? current?.fetched ?? 0,
+      lastDate: summary.lastDate ?? current?.lastDate ?? null
     })
     setScreen('label')
   }
@@ -285,7 +290,7 @@ export function useWorkflowState(authToken) {
     patchChat(activeChatId, {
       status: 'cancelled',
       fetched: count,
-      lastDate: date
+      lastDate: date || null
     })
     setScreen('chats')
     fireToast(

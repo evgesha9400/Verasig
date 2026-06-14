@@ -580,6 +580,9 @@
   gap: 14px;
 }
 .vrs-chat-progress {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
   font-family: var(--font-mono);
   font-size: var(--text-3xs);
   color: var(--text-faint);
