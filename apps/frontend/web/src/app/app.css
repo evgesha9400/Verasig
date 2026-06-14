@@ -551,13 +551,6 @@
     border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
 }
-.vrs-chat-row.is-clickable {
-  cursor: pointer;
-}
-.vrs-chat-row.is-clickable:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-}
 .vrs-chat-av {
   width: 44px;
   height: 44px;
