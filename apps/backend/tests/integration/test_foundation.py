@@ -8,7 +8,7 @@ def test_settings_load_from_env(monkeypatch):
     monkeypatch.setenv(
         "VERASIG_DATABASE_URL_OVERRIDE", "postgresql://u:p@db:5432/verasig"
     )
-    s = Settings()
+    s = Settings(_env_file=None)
     assert s.database_url.endswith("/verasig")
 
 
