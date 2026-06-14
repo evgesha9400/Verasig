@@ -137,4 +137,35 @@ describe('authApi', () => {
       message: 'Invalid email or password'
     })
   })
+
+  it('throws FastAPI validation details as field-level ApiError values', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          detail: [
+            {
+              type: 'string_too_short',
+              loc: ['body', 'password'],
+              msg: 'String should have at least 8 characters'
+            }
+          ]
+        },
+        422
+      )
+    )
+
+    const result = register({
+      firstName: 'Mara',
+      lastName: 'Voss',
+      email: 'mara@example.com',
+      password: 'short'
+    })
+
+    await expect(result).rejects.toBeInstanceOf(ApiError)
+    await expect(result).rejects.toMatchObject({
+      status: 422,
+      code: 'HTTP_422',
+      message: 'Password: String should have at least 8 characters'
+    })
+  })
 })

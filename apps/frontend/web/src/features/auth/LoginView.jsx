@@ -9,8 +9,8 @@ function errorMessage(error) {
 }
 
 export function LoginView({ onLogin, onRegister }) {
-  const [email, setEmail] = useState('mara@northwave.io')
-  const [password, setPassword] = useState('verasig-demo-2026')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -50,7 +50,9 @@ export function LoginView({ onLogin, onRegister }) {
           <form className="auth-form" onSubmit={handleSubmit}>
             <Input
               label="Email"
+              name="email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -59,7 +61,9 @@ export function LoginView({ onLogin, onRegister }) {
             />
             <Input
               label="Password"
+              name="password"
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -67,7 +71,7 @@ export function LoginView({ onLogin, onRegister }) {
               placeholder="••••••••"
             />
             <div className="auth-row">
-              <Checkbox label="Remember me" defaultChecked />
+              <Checkbox label="Remember me" />
               <a className="auth-forgot" href="#">
                 Forgot password?
               </a>

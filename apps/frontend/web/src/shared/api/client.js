@@ -56,8 +56,23 @@ async function readResponseBody(response) {
 function createErrorMessage(payload, fallback) {
   if (payload?.error?.message) return payload.error.message
   if (typeof payload?.detail === 'string') return payload.detail
+  if (Array.isArray(payload?.detail)) {
+    const validationError = payload.detail.find((item) => typeof item?.msg === 'string')
+    if (validationError) {
+      const field = validationError.loc
+        ?.filter((part) => part !== 'body')
+        .map((part) => String(part))
+        .join('.')
+      if (field) return `${createFieldLabel(field)}: ${validationError.msg}`
+      return validationError.msg
+    }
+  }
   if (typeof payload === 'string') return payload
   return fallback
+}
+
+function createFieldLabel(field) {
+  return field.charAt(0).toUpperCase() + field.slice(1)
 }
 
 function createErrorCode(payload, fallback) {

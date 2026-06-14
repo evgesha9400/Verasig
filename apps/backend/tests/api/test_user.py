@@ -37,6 +37,84 @@ def test_patch_user_name_persists(client):
     assert response.json()["lastName"] == "Hopper"
 
 
+def test_patch_user_name_accepts_partial_first_name(client):
+    registered = _register(client)
+
+    response = client.patch(
+        "/user",
+        headers=_auth(registered["token"]),
+        json={"firstName": "Grace"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["firstName"] == "Grace"
+    assert response.json()["lastName"] == "Lovelace"
+
+
+def test_patch_user_name_accepts_partial_last_name(client):
+    registered = _register(client)
+
+    response = client.patch(
+        "/user",
+        headers=_auth(registered["token"]),
+        json={"lastName": "Hopper"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["firstName"] == "Ada"
+    assert response.json()["lastName"] == "Hopper"
+
+
+def test_patch_user_name_rejects_invalid_first_name(client):
+    registered = _register(client)
+
+    response = client.patch(
+        "/user",
+        headers=_auth(registered["token"]),
+        json={"firstName": "Ada123", "lastName": "Lovelace"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_user_name_rejects_invalid_last_name(client):
+    registered = _register(client)
+
+    response = client.patch(
+        "/user",
+        headers=_auth(registered["token"]),
+        json={"firstName": "Ada", "lastName": "Lovelace!"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_user_name_rejects_equal_first_and_last_name(client):
+    registered = _register(client)
+
+    response = client.patch(
+        "/user",
+        headers=_auth(registered["token"]),
+        json={"firstName": "Lovelace", "lastName": "Lovelace"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_patch_user_name_stores_normalized_values(client):
+    registered = _register(client)
+
+    response = client.patch(
+        "/user",
+        headers=_auth(registered["token"]),
+        json={"firstName": "  Grace  ", "lastName": " Hopper   "},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["firstName"] == "Grace"
+    assert response.json()["lastName"] == "Hopper"
+
+
 def test_email_change_sets_pending_and_confirm_applies(client):
     registered = _register(client)
 

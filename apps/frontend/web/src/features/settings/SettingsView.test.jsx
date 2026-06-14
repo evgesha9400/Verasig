@@ -38,10 +38,10 @@ describe('SettingsView', () => {
       />
     )
     fireEvent.change(screen.getByLabelText(/first name/i), {
-      target: { value: 'Grace' }
+      target: { value: ' Grace ' }
     })
     fireEvent.change(screen.getByLabelText(/last name/i), {
-      target: { value: 'Hopper' }
+      target: { value: '   Hopper  ' }
     })
     fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0])
 
@@ -59,5 +59,63 @@ describe('SettingsView', () => {
         lastName: 'Hopper'
       })
     })
+  })
+
+  it('disables save when profile names are invalid', () => {
+    const onUpdateUser = vi.fn()
+    const onToast = vi.fn()
+
+    render(
+      <SettingsView
+        authToken="jwt-token"
+        user={user}
+        onUpdateUser={onUpdateUser}
+        onToast={onToast}
+      />
+    )
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: 'Ada123' }
+    })
+    fireEvent.change(screen.getByLabelText(/last name/i), {
+      target: { value: 'Lovelace' }
+    })
+
+    expect(screen.getAllByRole('button', { name: 'Save' })[0].disabled).toBe(true)
+    expect(onUpdateUser).not.toHaveBeenCalled()
+    expect(screen.getByText(/may contain only letters/)).toBeTruthy()
+  })
+
+  it('surfaces backend validation errors in the toast path', async () => {
+    const onUpdateUser = vi.fn()
+    const onToast = vi.fn()
+
+    fetch.mockResolvedValueOnce(
+      jsonResponse({ error: { message: 'Names are not valid' } }, 422)
+    )
+
+    render(
+      <SettingsView
+        authToken="jwt-token"
+        user={user}
+        onUpdateUser={onUpdateUser}
+        onToast={onToast}
+      />
+    )
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: 'Grace' }
+    })
+    fireEvent.change(screen.getByLabelText(/last name/i), {
+      target: { value: 'Hopper' }
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0])
+
+    await waitFor(() => {
+      expect(onUpdateUser).not.toHaveBeenCalled()
+    })
+    expect(onToast).toHaveBeenCalledWith(
+      'rejected',
+      'Account update failed',
+      'Names are not valid'
+    )
   })
 })

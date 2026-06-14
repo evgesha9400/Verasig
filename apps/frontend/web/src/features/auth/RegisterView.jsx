@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Banner, Button, Input } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import { splitFullName } from '../../shared/accountName.js'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
 
@@ -8,29 +9,26 @@ function errorMessage(error) {
   return error?.message || 'Account creation failed. Check your details and try again.'
 }
 
-function splitFullName(fullName) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean)
-  const firstName = parts[0] || ''
-  const lastName = parts.slice(1).join(' ') || firstName
-  return { firstName, lastName }
-}
-
 export function RegisterView({ onRegister, onLogin }) {
-  const [name, setName] = useState('Mara Voss')
-  const [email, setEmail] = useState('mara@northwave.io')
-  const [password, setPassword] = useState('verasig-demo-2026')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   async function submitRegistration() {
-    const { firstName, lastName } = splitFullName(name)
+    const parsed = splitFullName(name)
+    if (parsed.error) {
+      setError(parsed.error)
+      return
+    }
     setError(null)
     setSubmitting(true)
 
     try {
       await onRegister({
-        firstName,
-        lastName,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
         email: email.trim(),
         password
       })
@@ -41,6 +39,7 @@ export function RegisterView({ onRegister, onLogin }) {
     }
   }
 
+  const { error: fullNameError } = splitFullName(name)
   function handleSubmit(event) {
     event.preventDefault()
     void submitRegistration()
@@ -63,7 +62,10 @@ export function RegisterView({ onRegister, onLogin }) {
           <form className="auth-form" onSubmit={handleSubmit}>
             <Input
               label="Full name"
+              name="name"
+              autoComplete="name"
               required
+              error={fullNameError}
               value={name}
               onChange={(e) => setName(e.target.value)}
               iconLeft={<Icon name="users" size={16} />}
@@ -71,7 +73,9 @@ export function RegisterView({ onRegister, onLogin }) {
             />
             <Input
               label="Email"
+              name="email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -80,13 +84,16 @@ export function RegisterView({ onRegister, onLogin }) {
             />
             <Input
               label="Password"
+              name="password"
               type="password"
+              autoComplete="new-password"
+              minLength={8}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               iconLeft={<Icon name="lock" size={16} />}
               placeholder="••••••••"
-              hint="At least 10 characters."
+              hint="At least 8 characters."
             />
             {error && (
               <Banner tone="rejected" title="Account creation failed">
@@ -99,6 +106,7 @@ export function RegisterView({ onRegister, onLogin }) {
               fullWidth
               size="lg"
               loading={submitting}
+              disabled={!!fullNameError}
               iconRight={<Icon name="arrowRight" size={16} />}
             >
               Create account

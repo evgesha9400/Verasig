@@ -39,7 +39,12 @@ def patch_user(
     user: UserAccount = Depends(get_current_user),
 ) -> UserOut:
     with request.app.state.session_factory() as session:
-        updated = rename_account(session, user, payload.first_name, payload.last_name)
+        try:
+            updated = rename_account(
+                session, user, payload.first_name, payload.last_name
+            )
+        except ValueError as error:
+            raise ApiError(422, "INVALID_ACCOUNT_NAME", str(error)) from error
         session.commit()
     return user_out(updated)
 

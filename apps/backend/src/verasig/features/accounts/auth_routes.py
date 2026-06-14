@@ -36,6 +36,8 @@ def register(request: Request, payload: RegisterIn) -> AuthOut:
                 payload.email,
                 payload.password,
             )
+        except ValueError as error:
+            raise ApiError(422, "INVALID_ACCOUNT_NAME", str(error)) from error
         except EmailTakenError as error:
             raise ApiError(
                 409, "AUTH_EMAIL_TAKEN", "Email is already registered"
