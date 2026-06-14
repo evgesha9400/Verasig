@@ -8,6 +8,13 @@ class JobAlreadyRunningError(Exception):
     """Raised when a job key already has an active task."""
 
 
+class JobTerminalError(Exception):
+    def __init__(self, message: str, data: dict | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.data = data or {}
+
+
 @dataclass
 class JobChannel:
     subscribers: list[asyncio.Queue] = field(default_factory=list)
@@ -26,8 +33,10 @@ class JobPublisher:
     def done(self, data: dict) -> None:
         self._emit("done", data)
 
-    def error(self, message: str) -> None:
-        self._emit("error", {"message": message})
+    def error(self, message: str, data: dict | None = None) -> None:
+        payload = dict(data or {})
+        payload.setdefault("message", message)
+        self._emit("error", payload)
 
 
 class JobRegistry:
@@ -36,6 +45,10 @@ class JobRegistry:
 
     def has_job(self, key: str) -> bool:
         return key in self._channels
+
+    def is_running(self, key: str) -> bool:
+        channel = self._channels.get(key)
+        return bool(channel and channel.task and not channel.task.done())
 
     def channel(self, key: str) -> JobChannel:
         return self._channels[key]
@@ -71,6 +84,8 @@ class JobRegistry:
     ) -> None:
         try:
             publisher.done(await run(publisher))
+        except JobTerminalError as error:
+            publisher.error(error.message, error.data)
         except asyncio.CancelledError:
             publisher.error("cancelled")
             raise

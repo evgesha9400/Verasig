@@ -1,4 +1,3 @@
-import itertools
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -12,13 +11,14 @@ from verasig.features.accounts.plans import (
 from verasig.features.sources import (
     channel_repository,
 )
-from verasig.features.sources.backfill import backfill
-from verasig.features.sources.candidate_derivation import derive_candidates
+from verasig.features.sources.backfill_job_run import (
+    backfill_job_key,
+    present_progress,
+    progress_event_name,
+)
 from verasig.features.sources.chat_views import present_chats
-from verasig.features.sources.deletion_rescan import rescan
 from verasig.features.sources.schemas import ChatCreateIn
 from verasig.features.sources.subscription_repository import (
-    set_status,
     subscribe,
     unsubscribe,
 )
@@ -28,22 +28,10 @@ from verasig.foundation.http.auth_dependencies import (
     require_user_channel,
 )
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.http.sse import sse_stream
-from verasig.foundation.jobs.registry import JobAlreadyRunningError
-from verasig.foundation.market_data.static_exchange import StaticExchange
+from verasig.foundation.http.sse import sse_single_event, sse_stream
 from verasig.foundation.telegram.session import make_user_source
-from verasig.shared.time import format_long
 
 router = APIRouter(prefix="/chats")
-
-BACKFILL_PHASES = (
-    "Opening MTProto session…",
-    "Reading channel history…",
-    "Decrypting message batch…",
-    "Resolving media references…",
-    "Backfilling older window…",
-    "Indexing message bodies…",
-)
 
 
 def _resolve_source(request: Request, link):
@@ -59,43 +47,9 @@ def _resolve_source(request: Request, link):
     )
 
 
-def _job_key(user_id, channel_id: int, kind: str) -> str:
-    return f"{user_id}:{channel_id}:{kind}"
-
-
-async def _run_backfill(
-    publisher,
-    source,
-    user_id,
-    channel_id: int,
-    session_factory,
-    settings,
-) -> dict:
-    phases = itertools.cycle(BACKFILL_PHASES)
-
-    def on_batch(fetched: int, oldest) -> None:
-        publisher.progress(
-            {"fetched": fetched, "lastDate": format_long(oldest), "phase": next(phases)}
-        )
-
-    async with source:
-        result = await backfill(
-            source,
-            channel_id,
-            session_factory,
-            settings.backfill_batch_size,
-            on_batch=on_batch,
-        )
-        derive_candidates(session_factory, channel_id, StaticExchange())
-        await rescan(source, channel_id, session_factory)
-    with session_factory() as session:
-        set_status(session, user_id, channel_id, "backfilled")
-        session.commit()
-    return {"fetched": result.inserted}
-
-
 @router.get("")
 def list_chats(request: Request, user: UserAccount = Depends(get_current_user)) -> dict:
+    request.app.state.backfill_jobs.mark_inactive_backfilling_failed(user.id)
     with request.app.state.session_factory() as session:
         return {"chats": present_chats(session, user.id)}
 
@@ -145,31 +99,21 @@ async def start_backfill(
     chat_id: str,
     subscription=Depends(require_user_channel),
 ) -> dict:
-    if subscription.status == "backfilling":
-        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running")
-    with request.app.state.session_factory() as session:
-        link = read_link(session, subscription.user_id)
-        if link is None or link.status != "connected":
-            raise ApiError(409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected")
-        source = _resolve_source(request, link)
-        set_status(session, subscription.user_id, int(chat_id), "backfilling")
-        session.commit()
-    key = _job_key(subscription.user_id, int(chat_id), "backfill")
-    try:
-        request.app.state.jobs.start(
-            key,
-            lambda publisher: _run_backfill(
-                publisher,
-                source,
-                subscription.user_id,
-                int(chat_id),
-                request.app.state.session_factory,
-                request.app.state.settings,
-            ),
-        )
-    except JobAlreadyRunningError as error:
-        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
-    return {"jobId": key}
+    channel_id = int(chat_id)
+
+    def make_source():
+        with request.app.state.session_factory() as session:
+            link = read_link(session, subscription.user_id)
+            if link is None or link.status != "connected":
+                raise ApiError(
+                    409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected"
+                )
+            return _resolve_source(request, link)
+
+    run = request.app.state.backfill_jobs.start(
+        subscription.user_id, channel_id, make_source
+    )
+    return {"jobId": str(run.id)}
 
 
 @router.post("/{chat_id}/backfill/cancel", status_code=status.HTTP_204_NO_CONTENT)
@@ -178,12 +122,7 @@ def cancel_backfill(
     chat_id: str,
     subscription=Depends(require_user_channel),
 ) -> Response:
-    request.app.state.jobs.cancel(
-        _job_key(subscription.user_id, int(chat_id), "backfill")
-    )
-    with request.app.state.session_factory() as session:
-        set_status(session, subscription.user_id, int(chat_id), "cancelled")
-        session.commit()
+    request.app.state.backfill_jobs.cancel(subscription.user_id, int(chat_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -193,7 +132,16 @@ def backfill_progress(
     chat_id: str,
     subscription=Depends(require_user_channel),
 ):
-    key = _job_key(subscription.user_id, int(chat_id), "backfill")
-    if not request.app.state.jobs.has_job(key):
+    channel_id = int(chat_id)
+    request.app.state.backfill_jobs.mark_inactive_backfilling_failed(
+        subscription.user_id, channel_id
+    )
+    key = backfill_job_key(subscription.user_id, channel_id)
+    if request.app.state.jobs.has_job(key):
+        return sse_stream(request.app.state.jobs, key)
+    progress = request.app.state.backfill_jobs.read_progress(
+        subscription.user_id, channel_id
+    )
+    if progress is None:
         raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
-    return sse_stream(request.app.state.jobs, key)
+    return sse_single_event(progress_event_name(progress), present_progress(progress))

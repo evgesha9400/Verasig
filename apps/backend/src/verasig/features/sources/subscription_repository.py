@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.storage.models import (
+    BackfillJobRunRow,
     BacktestResultRow,
     ChatRiskConfigRow,
     ExtractedSignalRow,
@@ -54,6 +55,7 @@ def unsubscribe(session: Session, user_id: UUID, channel_id: int) -> None:
         UnrecognizedSignalRow,
         ChatRiskConfigRow,
         BacktestResultRow,
+        BackfillJobRunRow,
         LifecycleLinkRow,
     ):
         statement = delete(row_type).where(row_type.user_id == user_id)

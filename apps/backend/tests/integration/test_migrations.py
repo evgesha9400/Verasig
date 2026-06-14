@@ -28,6 +28,7 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
         "user_account",
         "user_telegram_link",
         "user_channel",
+        "backfill_job_run",
         "user_exchange_connection",
         "chat_risk_config",
         "backtest_result",
@@ -54,6 +55,23 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     assert {"user_id"} <= columns_by_table["unrecognized_signal"]
     assert {"user_id"} <= columns_by_table["parser_drift_warning"]
     assert {"user_id"} <= columns_by_table["filter_drift_warning"]
+
+    backfill_columns = {
+        column["name"] for column in inspector.get_columns("backfill_job_run")
+    }
+    assert {
+        "id",
+        "user_id",
+        "channel_id",
+        "status",
+        "started_at",
+        "finished_at",
+        "fetched_count",
+        "oldest_posted_at",
+        "cursor_message_id",
+        "error_code",
+        "error_message",
+    } <= backfill_columns
 
 
 def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
@@ -89,6 +107,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
             "parser_rule",
             "filter_rule",
             "deleted_signal_evidence",
+            "backfill_job_run",
             "parser_drift_warning",
             "filter_drift_warning",
         )
@@ -101,6 +120,8 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         "ix_parser_rule_user_channel",
         "ix_filter_rule_user_channel",
         "ix_deleted_signal_evidence_channel",
+        "ix_backfill_job_run_user_channel_started",
+        "ix_backfill_job_run_status",
         "ix_parser_drift_warning_user_channel",
         "ix_filter_drift_warning_user_channel",
     } <= index_names
@@ -111,6 +132,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
             "golden_label",
             "extracted_signal",
             "deleted_signal_evidence",
+            "backfill_job_run",
             "chat_risk_config",
         )
         for check in inspector.get_check_constraints(table)
@@ -122,6 +144,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         "ck_extracted_signal_extraction_method",
         "ck_deleted_signal_evidence_confidence",
         "ck_deleted_signal_evidence_method",
+        "ck_backfill_job_run_status",
         "ck_chat_risk_config_entry_mode",
         "ck_chat_risk_config_weighting",
         "ck_chat_risk_config_exit_source",

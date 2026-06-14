@@ -21,4 +21,5 @@ def app(session_factory, pg_url):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
