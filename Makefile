@@ -10,7 +10,7 @@ FRONTEND_DIR := apps/frontend
         check format format-check lint test build build-image \
         backend-format backend-format-check backend-lint backend-test \
         frontend-format frontend-format-check frontend-lint frontend-test frontend-build \
-        dev-frontend \
+        dev dev-frontend \
         db-up db-down migrate health serve \
         up down logs clean clean-all
 
@@ -85,13 +85,20 @@ build-image: env ## Build backend Docker image
 
 # Development
 
+dev: env db-up migrate ## DB in Docker; backend + frontend locally with hot reload
+	@echo "API -> http://localhost:8000   Web -> http://localhost:5173   (Ctrl-C stops both)"
+	@trap 'kill 0' INT TERM EXIT; \
+	$(MAKE) -C $(BACKEND_DIR) serve & \
+	$(MAKE) -C $(FRONTEND_DIR) dev & \
+	wait
+
 dev-frontend: ## Start unified frontend dev server
 	$(MAKE) -C $(FRONTEND_DIR) dev
 
 # Runtime and database
 
 db-up: env ## Start Postgres
-	$(COMPOSE) up -d db
+	$(COMPOSE) up -d --wait db
 
 db-down: env ## Stop Postgres
 	$(COMPOSE) stop db
