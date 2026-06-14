@@ -457,7 +457,17 @@
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--fw-medium);
-  color: var(--accent-text);
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.vrs-src-card__cta svg {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.vrs-card__interactive:hover .vrs-src-card__cta {
+  color: var(--text-body);
+}
+.vrs-card__interactive:hover .vrs-src-card__cta svg {
+  transform: translateX(3px);
 }
 .vrs-src-meta {
   display: flex;
