@@ -8,6 +8,7 @@ import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 
 from telethon import TelegramClient, events
 from telethon.tl.functions.channels import GetFullChannelRequest
@@ -68,6 +69,7 @@ class TelethonSource(TelegramSource):
     ) -> None:
         self._client = client
         self._poll_interval_seconds = poll_interval_seconds
+        self._entities_by_channel_id: dict[int, Any] = {}
 
     async def __aenter__(self) -> "TelethonSource":
         await self._client.connect()
@@ -79,6 +81,7 @@ class TelethonSource(TelegramSource):
     async def resolve_channel(self, reference: str | int) -> TelegramChannel:
         channel_reference = parse_channel_reference(reference)
         entity = await self._resolve_entity(channel_reference)
+        self._remember_entity(entity)
         full = await self._client(GetFullChannelRequest(entity))
         handle = getattr(entity, "username", None)
         return TelegramChannel(
@@ -99,11 +102,23 @@ class TelethonSource(TelegramSource):
         try:
             return await self._client.get_entity(reference.value)
         except (TypeError, ValueError) as error:
+            if reference.kind is ChannelReferenceKind.ID:
+                entity = await self._resolve_dialog_id_entity(int(reference.value))
+                if entity is not None:
+                    return entity
             raise ChannelReferenceResolutionError(
                 "Cannot resolve Telegram channel reference "
                 f"{reference.value!r}. Use @handle, t.me link, numeric id, "
                 "or title:<exact joined dialog title>."
             ) from error
+
+    async def _resolve_dialog_id_entity(self, channel_id: int) -> Any | None:
+        wanted = _normalize_chat_id(channel_id)
+        async for dialog in self._client.iter_dialogs():
+            entity = getattr(dialog, "entity", None)
+            if _entity_channel_id(entity) == wanted:
+                return entity
+        return None
 
     async def _resolve_title_entity(self, title: str):
         wanted = normalize_channel_title(title)
@@ -128,8 +143,9 @@ class TelethonSource(TelegramSource):
         self, channel_id: int, after_message_id: int | None, batch_size: int
     ) -> AsyncIterator[list[RawTelegramMessage]]:
         batch: list[RawTelegramMessage] = []
+        entity = self._read_entity(channel_id)
         messages = self._client.iter_messages(
-            channel_id, reverse=True, min_id=after_message_id or 0
+            entity, reverse=True, min_id=after_message_id or 0
         )
         async for message in messages:  # Telethon auto-sleeps short flood-waits
             batch.append(self._to_raw_message(channel_id, message))
@@ -160,7 +176,17 @@ class TelethonSource(TelegramSource):
 
     async def live_message_ids(self, channel_id: int) -> set[int]:
         # full live id set for snapshot-diff
-        return {message.id async for message in self._client.iter_messages(channel_id)}
+        entity = self._read_entity(channel_id)
+        return {message.id async for message in self._client.iter_messages(entity)}
+
+    def _remember_entity(self, entity: Any) -> None:
+        channel_id = _entity_channel_id(entity)
+        if channel_id is not None:
+            self._entities_by_channel_id[channel_id] = entity
+
+    def _read_entity(self, channel_id: int) -> Any:
+        normalized = _normalize_chat_id(channel_id)
+        return self._entities_by_channel_id.get(normalized, channel_id)
 
     async def live_events(
         self, channel_ids: list[int]
@@ -279,6 +305,10 @@ def _normalize_chat_id(value) -> int | None:
     if text.startswith("100") and len(text) > 3:
         return int(text[3:])
     return raw
+
+
+def _entity_channel_id(entity: Any) -> int | None:
+    return _normalize_chat_id(getattr(entity, "id", None))
 
 
 def _message_channel_id(event, message) -> int | None:
