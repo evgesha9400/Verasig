@@ -39,6 +39,10 @@ BACKFILL_PHASES = (
 
 SERVICE_INTERRUPTED = "SERVICE_INTERRUPTED"
 
+# Publish one deletion-scan progress event every this many live messages, so a
+# long re-fetch keeps the stream alive without flooding it with one event per id.
+RESCAN_PROGRESS_INTERVAL = 200
+
 
 class BackfillJobCoordinator:
     def __init__(
@@ -57,9 +61,9 @@ class BackfillJobCoordinator:
         channel_id: int,
         make_source: Callable[[], TelegramSource],
     ) -> BackfillJobRun:
-        running = self._read_attachable_run(user_id, channel_id)
-        if running is not None:
-            return running
+        idempotent = self._read_idempotent_run(user_id, channel_id)
+        if idempotent is not None:
+            return idempotent
 
         source = make_source()
         run = self._create_run(user_id, channel_id)
@@ -149,6 +153,28 @@ class BackfillJobCoordinator:
                 row.status = "failed"
             session.commit()
 
+    def _read_idempotent_run(
+        self, user_id: UUID, channel_id: int
+    ) -> BackfillJobRun | None:
+        """Run a duplicate POST should return instead of starting a new backfill.
+
+        A live RUNNING job is attached to; an already-SUCCEEDED backfill replays
+        its terminal. FAILED/CANCELLED runs fall through so a retry restarts from
+        the persisted cursor.
+        """
+        with self._session_factory() as session:
+            latest = backfill_job_repository.read_latest_run(
+                session, user_id, channel_id
+            )
+        if latest is None:
+            return None
+        if latest.status == BackfillJobStatus.SUCCEEDED:
+            return latest
+        key = backfill_job_key(user_id, channel_id)
+        if latest.status == BackfillJobStatus.RUNNING and self._jobs.has_job(key):
+            return latest
+        return None
+
     def _read_attachable_run(
         self, user_id: UUID, channel_id: int
     ) -> BackfillJobRun | None:
@@ -199,7 +225,12 @@ class BackfillJobCoordinator:
                 self._publish_progress(
                     publisher, run_id, "Checking deleted messages..."
                 )
-                await rescan(source, channel_id, self._session_factory)
+                await rescan(
+                    source,
+                    channel_id,
+                    self._session_factory,
+                    on_progress=self._rescan_progress_reporter(publisher, run_id),
+                )
         except asyncio.CancelledError as error:
             progress = self._finish_cancelled(run_id, user_id, channel_id)
             raise JobTerminalError("cancelled", present_progress(progress)) from error
@@ -217,6 +248,19 @@ class BackfillJobCoordinator:
     ) -> None:
         progress = self._refresh_progress(run_id, phase)
         publisher.progress(present_progress(progress))
+
+    def _rescan_progress_reporter(
+        self, publisher: JobPublisher, run_id: UUID
+    ) -> Callable[[int], None]:
+        def report(scanned: int) -> None:
+            if scanned % RESCAN_PROGRESS_INTERVAL == 0:
+                self._publish_progress(
+                    publisher,
+                    run_id,
+                    f"Checking deleted messages... ({scanned:,} scanned)",
+                )
+
+        return report
 
     def _refresh_progress(self, run_id: UUID, phase: str) -> BackfillProgress:
         with self._session_factory() as session:

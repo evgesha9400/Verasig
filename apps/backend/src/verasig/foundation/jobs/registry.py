@@ -107,3 +107,12 @@ class JobRegistry:
                     return
         finally:
             channel.subscribers.remove(queue)
+            self._evict_if_drained(key, channel)
+
+    def _evict_if_drained(self, key: str, channel: JobChannel) -> None:
+        # A finished channel with no subscribers left is spent: its terminal is
+        # durably persisted, so later reads are served from storage, not memory.
+        if channel.terminal is None or channel.subscribers:
+            return
+        if self._channels.get(key) is channel:
+            del self._channels[key]

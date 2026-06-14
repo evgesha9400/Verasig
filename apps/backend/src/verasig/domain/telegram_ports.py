@@ -1,6 +1,6 @@
 """Pure Telegram adapter seams."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -53,7 +53,9 @@ class TelegramSource(Protocol):
         self, channel_id: int, after_message_id: int | None, batch_size: int
     ) -> AsyncIterator[list[RawTelegramMessage]]: ...
 
-    async def live_message_ids(self, channel_id: int) -> set[int]: ...
+    async def live_message_ids(
+        self, channel_id: int, on_progress: Callable[[int], None] | None = None
+    ) -> set[int]: ...
 
     def live_events(
         self, channel_ids: list[int]

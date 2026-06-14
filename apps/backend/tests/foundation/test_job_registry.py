@@ -124,6 +124,20 @@ async def test_cancel_yields_cancelled_error_event():
 
 
 @pytest.mark.asyncio
+async def test_finished_job_is_evicted_after_last_subscriber_disconnects():
+    registry = JobRegistry()
+
+    async def run(publisher):
+        publisher.progress({"step": 1})
+        return {"ok": True}
+
+    registry.start("job", run)
+    await _collect(registry, "job")
+
+    assert registry.has_job("job") is False
+
+
+@pytest.mark.asyncio
 async def test_has_job_tracks_active_job_keys():
     registry = JobRegistry()
 
