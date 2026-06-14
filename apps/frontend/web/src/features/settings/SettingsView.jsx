@@ -1,19 +1,59 @@
 import { useState } from 'react'
 import { Card, Input, Button, Badge, Banner, Dialog } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import {
+  cancelSubscription,
+  changeEmail,
+  changeSubscription,
+  requestPasswordReset,
+  resumeSubscription as resumeSubscriptionRequest,
+  updateProfile
+} from '../../shared/api/userApi.js'
 
-export function SettingsView({ user, onUpdateUser, onToast }) {
+function errorMessage(error) {
+  return error?.message || 'Account update failed. Try again.'
+}
+
+export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
+  const [busy, setBusy] = useState(null)
+
+  function showError(error) {
+    onToast('rejected', 'Account update failed', errorMessage(error))
+  }
+
+  async function applyBackendUser(action, requestUser, announceSuccess) {
+    setBusy(action)
+
+    try {
+      const updated = await requestUser()
+      onUpdateUser(updated)
+      announceSuccess(updated)
+    } catch (caughtError) {
+      showError(caughtError)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   /* ---- profile ---- */
   const [first, setFirst] = useState(user.firstName)
   const [last, setLast] = useState(user.lastName)
   const profileDirty = first !== user.firstName || last !== user.lastName
   const profileValid = first.trim().length > 0 && last.trim().length > 0
   function saveProfile() {
-    onUpdateUser({ firstName: first.trim(), lastName: last.trim() })
-    onToast(
-      'verified',
-      'Profile updated',
-      `Your name is now ${first.trim()} ${last.trim()}.`
+    void applyBackendUser(
+      'profile',
+      () =>
+        updateProfile(authToken, {
+          firstName: first.trim(),
+          lastName: last.trim()
+        }),
+      (updated) =>
+        onToast(
+          'verified',
+          'Profile updated',
+          `Your name is now ${updated.firstName} ${updated.lastName}.`
+        )
     )
   }
 
@@ -23,11 +63,17 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
   const emailDirty =
     email.trim() !== user.email && email.trim() !== (user.pendingEmail || '')
   function saveEmail() {
-    onUpdateUser({ pendingEmail: email.trim() })
-    onToast(
-      'info',
-      'Verification sent',
-      `Check ${email.trim()} and click the link to confirm the change.`
+    void applyBackendUser(
+      'email',
+      () => changeEmail(authToken, email.trim()),
+      (updated) => {
+        setEmail(updated.pendingEmail || updated.email)
+        onToast(
+          'info',
+          'Verification sent',
+          `Check ${updated.pendingEmail} and click the link to confirm the change.`
+        )
+      }
     )
   }
   function cancelEmailChange() {
@@ -40,14 +86,19 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
   function sendReset() {
     if (resetState !== 'idle') return
     setResetState('sending')
-    setTimeout(() => {
-      setResetState('sent')
-      onToast(
-        'verified',
-        'Reset link sent',
-        `A password reset link is on its way to ${user.email}.`
-      )
-    }, 1200)
+    requestPasswordReset(authToken)
+      .then(() => {
+        setResetState('sent')
+        onToast(
+          'verified',
+          'Reset link sent',
+          `A password reset link is on its way to ${user.email}.`
+        )
+      })
+      .catch((caughtError) => {
+        setResetState('idle')
+        showError(caughtError)
+      })
   }
 
   /* ---- subscription ---- */
@@ -88,28 +139,40 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
   function confirmPlan() {
     const p = planTarget
     setPlanTarget(null)
-    onUpdateUser({ plan: p.id, cancelAt: null })
-    onToast(
-      'verified',
-      'Plan changed',
-      `You're on ${p.name} now. The difference is prorated on your next invoice.`
+    void applyBackendUser(
+      'subscription',
+      () => changeSubscription(authToken, p.id),
+      () =>
+        onToast(
+          'verified',
+          'Plan changed',
+          `You're on ${p.name} now. The difference is prorated on your next invoice.`
+        )
     )
   }
   function confirmCancel() {
     setCancelOpen(false)
-    onUpdateUser({ cancelAt: 'Jul 8, 2026' })
-    onToast(
-      'pending',
-      'Subscription cancelled',
-      `${current.name} stays active until Jul 8, 2026 — no further charges.`
+    void applyBackendUser(
+      'subscription',
+      () => cancelSubscription(authToken),
+      () =>
+        onToast(
+          'pending',
+          'Subscription cancelled',
+          `${current.name} stays active until the end of the billing period.`
+        )
     )
   }
   function resumeSubscription() {
-    onUpdateUser({ cancelAt: null })
-    onToast(
-      'verified',
-      'Subscription resumed',
-      `${current.name} will renew as usual on Jul 8, 2026.`
+    void applyBackendUser(
+      'subscription',
+      () => resumeSubscriptionRequest(authToken),
+      () =>
+        onToast(
+          'verified',
+          'Subscription resumed',
+          `${current.name} will renew as usual.`
+        )
     )
   }
 
@@ -132,6 +195,7 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
               style={{ marginLeft: 'auto' }}
               disabled={!profileDirty || !profileValid}
               onClick={saveProfile}
+              loading={busy === 'profile'}
             >
               Save
             </Button>
@@ -171,6 +235,7 @@ export function SettingsView({ user, onUpdateUser, onToast }) {
               style={{ marginLeft: 'auto' }}
               disabled={!emailDirty || !emailValid}
               onClick={saveEmail}
+              loading={busy === 'email'}
             >
               Save
             </Button>

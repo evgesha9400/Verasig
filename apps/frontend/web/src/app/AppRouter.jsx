@@ -1,30 +1,94 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LoginView } from '../features/auth/LoginView.jsx'
 import { RegisterView } from '../features/auth/RegisterView.jsx'
-import {
-  forgetAuthenticatedUser,
-  isAuthenticated,
-  rememberAuthenticatedUser
-} from './session.js'
+import { getCurrentUser, login, logout, register } from '../shared/api/authApi.js'
+import { forgetAuthToken, readAuthToken, rememberAuthToken } from './session.js'
 import Marketing from '../features/marketing/MarketingView.jsx'
 import { ProductApp } from './ProductApp.jsx'
 import { ROUTES } from './paths.js'
 
-export function AppRoutes() {
-  const [authenticated, setAuthenticated] = useState(isAuthenticated)
-  const navigate = useNavigate()
+function createInitialSession() {
+  const token = readAuthToken()
 
-  function authenticateAndOpenProduct() {
-    rememberAuthenticatedUser()
-    setAuthenticated(true)
+  if (!token) {
+    return { status: 'anonymous', token: null, user: null }
+  }
+
+  return { status: 'checking', token, user: null }
+}
+
+function SessionBoot() {
+  return (
+    <div className="auth-wrap">
+      <main className="auth-main">
+        <div className="auth-form-wrap" role="status">
+          Checking session...
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export function AppRoutes() {
+  const [session, setSession] = useState(createInitialSession)
+  const navigate = useNavigate()
+  const authenticated = session.status === 'authenticated'
+  const checkingSession = session.status === 'checking'
+
+  useEffect(() => {
+    if (session.status !== 'checking' || !session.token) return undefined
+
+    let active = true
+
+    getCurrentUser(session.token)
+      .then((user) => {
+        if (!active) return
+        setSession({ status: 'authenticated', token: session.token, user })
+      })
+      .catch(() => {
+        if (!active) return
+        forgetAuthToken()
+        setSession({ status: 'anonymous', token: null, user: null })
+      })
+
+    return () => {
+      active = false
+    }
+  }, [session.status, session.token])
+
+  async function authenticateAndOpenProduct(credentials) {
+    const authSession = await login(credentials)
+    rememberAuthToken(authSession.token)
+    setSession({
+      status: 'authenticated',
+      token: authSession.token,
+      user: authSession.user
+    })
+    navigate(ROUTES.app, { replace: true })
+  }
+
+  async function registerAndOpenProduct(account) {
+    const authSession = await register(account)
+    rememberAuthToken(authSession.token)
+    setSession({
+      status: 'authenticated',
+      token: authSession.token,
+      user: authSession.user
+    })
     navigate(ROUTES.app, { replace: true })
   }
 
   function clearSessionAndOpenMarketing() {
-    forgetAuthenticatedUser()
+    const token = session.token
+    forgetAuthToken()
     navigate(ROUTES.marketing, { replace: true })
-    setTimeout(() => setAuthenticated(false), 0)
+    setTimeout(() => {
+      setSession({ status: 'anonymous', token: null, user: null })
+    }, 0)
+    if (token) {
+      void logout(token).catch(() => {})
+    }
   }
 
   function openLogin() {
@@ -44,7 +108,9 @@ export function AppRoutes() {
       <Route
         path={ROUTES.login}
         element={
-          authenticated ? (
+          checkingSession ? (
+            <SessionBoot />
+          ) : authenticated ? (
             <Navigate to={ROUTES.app} replace />
           ) : (
             <LoginView onLogin={authenticateAndOpenProduct} onRegister={openSignup} />
@@ -54,18 +120,26 @@ export function AppRoutes() {
       <Route
         path={ROUTES.signup}
         element={
-          authenticated ? (
+          checkingSession ? (
+            <SessionBoot />
+          ) : authenticated ? (
             <Navigate to={ROUTES.app} replace />
           ) : (
-            <RegisterView onRegister={authenticateAndOpenProduct} onLogin={openLogin} />
+            <RegisterView onRegister={registerAndOpenProduct} onLogin={openLogin} />
           )
         }
       />
       <Route
         path={`${ROUTES.app}/*`}
         element={
-          authenticated ? (
-            <ProductApp onLogout={clearSessionAndOpenMarketing} />
+          checkingSession ? (
+            <SessionBoot />
+          ) : authenticated ? (
+            <ProductApp
+              authToken={session.token}
+              user={session.user}
+              onLogout={clearSessionAndOpenMarketing}
+            />
           ) : (
             <Navigate to={ROUTES.login} replace />
           )

@@ -24,10 +24,19 @@ import { BacktestView } from '../features/pipeline/steps/BacktestView.jsx'
 import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
 import { SettingsView } from '../features/settings/SettingsView.jsx'
 import { useWorkflowState } from './workflow/useWorkflowState.js'
+import {
+  connectTelegram as connectTelegramApi,
+  verifyTelegram
+} from '../shared/api/telegramApi.js'
+import {
+  cancelBackfill,
+  createChat,
+  startBackfill as startBackfillJob,
+  streamBackfillProgress
+} from '../shared/api/chatsApi.js'
 import { MESSAGES } from '../domain/demo-data/seed.js'
 import './app.css'
 
-const USER_KEY = 'vrs-user-1'
 const USER_DEFAULTS = {
   firstName: 'Mara',
   lastName: 'Voss',
@@ -36,27 +45,23 @@ const USER_DEFAULTS = {
   pendingEmail: null,
   cancelAt: null
 }
-function loadUser() {
-  try {
-    return { ...USER_DEFAULTS, ...(JSON.parse(localStorage.getItem(USER_KEY)) || {}) }
-  } catch {
-    return { ...USER_DEFAULTS }
-  }
+
+function mergeUserDefaults(user) {
+  return { ...USER_DEFAULTS, ...(user || {}) }
 }
 
-export function ProductApp({ onLogout }) {
+export function ProductApp({ authToken, user: sessionUser, onLogout }) {
   const [theme, setTheme] = useTheme()
 
-  const [user, setUser] = useState(loadUser())
+  const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
+
+  useEffect(() => {
+    setUser(mergeUserDefaults(sessionUser))
+  }, [sessionUser])
+
   function updateUser(patch) {
     setUser((current) => {
-      const next = { ...current, ...patch }
-      try {
-        localStorage.setItem(USER_KEY, JSON.stringify(next))
-      } catch {
-        /* ignore */
-      }
-      return next
+      return { ...current, ...patch }
     })
   }
 
@@ -103,9 +108,11 @@ export function ProductApp({ onLogout }) {
     exitToSources,
     connectBybit,
     disconnectBybit,
-    connectTelegram,
+    connectTelegram: markTelegramConnected,
+    refreshSources,
+    upsertChat,
     setBackTarget
-  } = useWorkflowState()
+  } = useWorkflowState(authToken)
 
   useEffect(() => {
     const root = document.documentElement
@@ -137,6 +144,17 @@ export function ProductApp({ onLogout }) {
   let body = null
   let actions = null
 
+  async function addTelegramChat(tag) {
+    const chat = await createChat(authToken, tag)
+    upsertChat(chat)
+    fireToast('verified', 'Feed added', `${chat.name} is ready to backfill.`)
+  }
+
+  function completeBackfill(total) {
+    onBackfillComplete(total)
+    void refreshSources().catch(() => {})
+  }
+
   if (nav === 'signals') {
     title = 'Signals'
     subtitle = 'Signals extracted from your analyzed feeds'
@@ -167,6 +185,7 @@ export function ProductApp({ onLogout }) {
     onExit = () => restoreNav()
     body = (
       <SettingsView
+        authToken={authToken}
         user={user}
         onUpdateUser={updateUser}
         onToast={(...toastProps) => fireToast(...toastProps)}
@@ -189,7 +208,12 @@ export function ProductApp({ onLogout }) {
     breadcrumb = 'Sources'
     onExit = exitToSources
     body = (
-      <TelegramSetup onConnected={() => connectTelegram()} onCancel={exitToSources} />
+      <TelegramSetup
+        onConnect={(credentials) => connectTelegramApi(authToken, credentials)}
+        onVerify={(code) => verifyTelegram(authToken, code)}
+        onConnected={() => markTelegramConnected()}
+        onCancel={exitToSources}
+      />
     )
   } else if (screen === 'chats') {
     title = 'Telegram'
@@ -207,6 +231,7 @@ export function ProductApp({ onLogout }) {
         onViewDeleted={goToDeletedSignals}
         onCheckGaps={checkGaps}
         onBacktest={backtestFeed}
+        onAddChat={addTelegramChat}
       />
     )
   } else if (isWorkflow && activeChat) {
@@ -232,8 +257,13 @@ export function ProductApp({ onLogout }) {
       body = (
         <BackfillView
           chat={activeChat}
+          onStart={(chatId) => startBackfillJob(authToken, chatId)}
+          onStream={(chatId, handlers) =>
+            streamBackfillProgress(authToken, chatId, handlers)
+          }
+          onCancelBackfill={(chatId) => cancelBackfill(authToken, chatId)}
           onCancel={onBackfillCancel}
-          onComplete={onBackfillComplete}
+          onComplete={completeBackfill}
         />
       )
     } else if (screen === 'label') {
@@ -316,9 +346,19 @@ export function ProductApp({ onLogout }) {
     actions = (
       <IconButton
         label="Refresh feeds"
-        onClick={() =>
-          fireToast('info', 'Refreshed', 'Feed list synced with Telegram.')
-        }
+        onClick={() => {
+          void refreshSources()
+            .then(() => {
+              fireToast('info', 'Refreshed', 'Feed list synced with Telegram.')
+            })
+            .catch((error) => {
+              fireToast(
+                'rejected',
+                'Refresh failed',
+                error?.message || 'Could not sync Telegram feeds.'
+              )
+            })
+        }}
       >
         <Icon name="refresh" size={16} />
       </IconButton>

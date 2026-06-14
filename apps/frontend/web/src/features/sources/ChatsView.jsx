@@ -1,8 +1,11 @@
 /* Verasig prototype — Telegram chat list */
+import { useState } from 'react'
 import {
   Badge,
+  Banner,
   Button,
   IconButton,
+  Input,
   Menu,
   MenuItem,
   Popover
@@ -23,8 +26,30 @@ export function ChatsView({
   onRestart,
   onViewDeleted,
   onCheckGaps,
-  onBacktest
+  onBacktest,
+  onAddChat
 }) {
+  const [tag, setTag] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function addChat(event) {
+    event.preventDefault()
+    if (!onAddChat || !tag.trim()) return
+
+    setAdding(true)
+    setError(null)
+
+    try {
+      await onAddChat(tag.trim())
+      setTag('')
+    } catch (caughtError) {
+      setError(caughtError?.message || 'Could not add this Telegram feed.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
   function FeedFlag({ kind, onLink }) {
     if (kind === 'gaps') {
       return (
@@ -240,6 +265,32 @@ export function ChatsView({
         <span className="vrs-sec-t">Feeds from Telegram</span>
         <span className="vrs-sec-c">{chats.length} available</span>
       </div>
+      {onAddChat && (
+        <form className="vrs-form__actions" onSubmit={addChat}>
+          <Input
+            label="Channel tag"
+            mono
+            value={tag}
+            onChange={(event) => setTag(event.target.value)}
+            placeholder="@pilot"
+            disabled={adding}
+          />
+          <Button
+            type="submit"
+            variant="primary"
+            loading={adding}
+            disabled={!tag.trim()}
+            iconLeft={<Icon name="plus" size={14} />}
+          >
+            Add feed
+          </Button>
+        </form>
+      )}
+      {error && (
+        <Banner tone="rejected" title="Feed not added">
+          {error}
+        </Banner>
+      )}
       <div className="vrs-stack-sm">
         {chats.map((c) => (
           <div

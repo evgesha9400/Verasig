@@ -1,16 +1,38 @@
 import { useState } from 'react'
-import { Button, Input, Checkbox } from '@verasig/design-system'
+import { Banner, Button, Input, Checkbox } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
 
+function errorMessage(error) {
+  return error?.message || 'Login failed. Check your details and try again.'
+}
+
 export function LoginView({ onLogin, onRegister }) {
   const [email, setEmail] = useState('mara@northwave.io')
   const [password, setPassword] = useState('verasig-demo-2026')
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e) {
-    e.preventDefault()
-    onLogin()
+  async function submitLogin() {
+    setError(null)
+    setSubmitting(true)
+
+    try {
+      await onLogin({
+        email: email.trim(),
+        password
+      })
+    } catch (caughtError) {
+      setError(errorMessage(caughtError))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    void submitLogin()
   }
 
   return (
@@ -50,11 +72,17 @@ export function LoginView({ onLogin, onRegister }) {
                 Forgot password?
               </a>
             </div>
+            {error && (
+              <Banner tone="rejected" title="Login failed">
+                {error}
+              </Banner>
+            )}
             <Button
               type="submit"
               variant="primary"
               fullWidth
               size="lg"
+              loading={submitting}
               iconRight={<Icon name="arrowRight" size={16} />}
             >
               Log in

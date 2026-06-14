@@ -3,7 +3,18 @@ import { useState } from 'react'
 import { Input, Button, Banner, OTPInput } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
-export function TelegramSetup({ onConnected, onCancel }) {
+async function noop() {}
+
+function errorMessage(error) {
+  return error?.message || 'Telegram connection failed. Try again.'
+}
+
+export function TelegramSetup({
+  onConnected,
+  onCancel,
+  onConnect = noop,
+  onVerify = noop
+}) {
   const [phase, setPhase] = useState('creds') // creds | sending | code | verifying
   // Prototype: pre-filled with valid demo credentials so the flow is walkable without real Telegram keys.
   const [apiId, setApiId] = useState('2040315')
@@ -17,23 +28,39 @@ export function TelegramSetup({ onConnected, onCancel }) {
     apiHash.trim().length >= 16 &&
     /^\+?[0-9\s]{8,}$/.test(phone.trim())
 
-  function sendCode() {
+  async function sendCode() {
     if (!credsValid) {
       setErr('Check your API ID, API Hash and phone number.')
       return
     }
     setErr(null)
     setPhase('sending')
-    setTimeout(() => {
+
+    try {
+      await onConnect({
+        apiId: Number(apiId.trim()),
+        apiHash: apiHash.trim(),
+        phone: phone.trim()
+      })
       setPhase('code')
-    }, 1400)
+    } catch (error) {
+      setErr(errorMessage(error))
+      setPhase('creds')
+    }
   }
 
   const codeComplete = code.length === 5
-  function verify() {
+  async function verify() {
     if (!codeComplete) return
     setPhase('verifying')
-    setTimeout(() => onConnected(), 1500)
+
+    try {
+      await onVerify(code)
+      await onConnected()
+    } catch (error) {
+      setErr(errorMessage(error))
+      setPhase('code')
+    }
   }
 
   return (
