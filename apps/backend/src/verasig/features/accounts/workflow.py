@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from verasig.domain.account import Plan, UserAccount
+from verasig.features.accounts.name_validation import validate_account_name_pair
 from verasig.features.accounts.passwords import check_password, hash_password
 from verasig.features.accounts.repository import (
     apply_pending_email,
@@ -42,12 +43,15 @@ def register_account(
     normalized = normalize_email(email)
     if find_by_email(session, normalized) is not None:
         raise EmailTakenError(normalized)
+    normalized_first_name, normalized_last_name = validate_account_name_pair(
+        first_name, last_name
+    )
     account = UserAccount(
         id=uuid4(),
         email=normalized,
         password_hash=hash_password(password),
-        first_name=first_name,
-        last_name=last_name,
+        first_name=normalized_first_name,
+        last_name=normalized_last_name,
         plan=Plan.OBSERVER,
         pending_email=None,
         cancel_at=None,
@@ -71,7 +75,16 @@ def rename_account(
     first_name: str | None = None,
     last_name: str | None = None,
 ) -> UserAccount:
-    return update_profile(session, account.id, first_name, last_name)
+    if first_name is None and last_name is None:
+        return account
+    normalized_first_name = account.first_name if first_name is None else first_name
+    normalized_last_name = account.last_name if last_name is None else last_name
+    normalized_first_name, normalized_last_name = validate_account_name_pair(
+        normalized_first_name, normalized_last_name
+    )
+    return update_profile(
+        session, account.id, normalized_first_name, normalized_last_name
+    )
 
 
 def request_email_change(

@@ -8,6 +8,18 @@ describe('LoginView', () => {
     expect(screen.getByText('Log in to Verasig')).toBeTruthy()
   })
 
+  it('renders empty fields with browser login hints', () => {
+    render(<LoginView onLogin={() => {}} onRegister={() => {}} />)
+
+    expect(screen.getByLabelText(/email/i).value).toBe('')
+    expect(screen.getByLabelText(/email/i).getAttribute('autocomplete')).toBe('email')
+    expect(screen.getByLabelText(/password/i).value).toBe('')
+    expect(screen.getByLabelText(/password/i).getAttribute('autocomplete')).toBe(
+      'current-password'
+    )
+    expect(screen.getByRole('checkbox', { name: /remember me/i }).checked).toBe(false)
+  })
+
   it('calls onLogin with the typed credentials when form is submitted', async () => {
     const onLogin = vi.fn().mockResolvedValue()
     render(<LoginView onLogin={onLogin} onRegister={() => {}} />)

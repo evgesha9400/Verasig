@@ -175,6 +175,15 @@ describe('AppRoutes', () => {
     })
 
     renderRoute('/signup')
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: 'Ada Lovelace' }
+    })
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'ada@example.com' }
+    })
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'correct horse battery staple' }
+    })
     fireEvent.submit(screen.getByText('Create account').closest('form'))
 
     await waitFor(() => {
@@ -262,6 +271,15 @@ describe('AppRoutes', () => {
     renderRoute('/')
 
     await user.click(screen.getAllByRole('link', { name: /sign up/i })[0])
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: 'Ada Lovelace' }
+    })
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'ada@example.com' }
+    })
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'correct horse battery staple' }
+    })
     fireEvent.submit(screen.getByText('Create account').closest('form'))
 
     await waitFor(() => {

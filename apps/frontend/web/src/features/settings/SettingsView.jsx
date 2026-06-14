@@ -9,6 +9,7 @@ import {
   resumeSubscription as resumeSubscriptionRequest,
   updateProfile
 } from '../../shared/api/userApi.js'
+import { normalizeAccountName, validateAccountName } from '../../shared/accountName.js'
 
 function errorMessage(error) {
   return error?.message || 'Account update failed. Try again.'
@@ -38,15 +39,27 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
   /* ---- profile ---- */
   const [first, setFirst] = useState(user.firstName)
   const [last, setLast] = useState(user.lastName)
-  const profileDirty = first !== user.firstName || last !== user.lastName
-  const profileValid = first.trim().length > 0 && last.trim().length > 0
+  const normalizedFirst = normalizeAccountName(first)
+  const normalizedLast = normalizeAccountName(last)
+  const userFirst = normalizeAccountName(user.firstName)
+  const userLast = normalizeAccountName(user.lastName)
+  const firstNameError = validateAccountName(normalizedFirst, 'First name')
+  const lastNameError = validateAccountName(normalizedLast, 'Last name')
+  const sameNameError =
+    normalizedFirst &&
+    normalizedLast &&
+    normalizedFirst.toLowerCase() === normalizedLast.toLowerCase()
+      ? 'First and last name must be different.'
+      : null
+  const profileDirty = normalizedFirst !== userFirst || normalizedLast !== userLast
+  const profileValid = !firstNameError && !lastNameError && !sameNameError
   function saveProfile() {
     void applyBackendUser(
       'profile',
       () =>
         updateProfile(authToken, {
-          firstName: first.trim(),
-          lastName: last.trim()
+          firstName: normalizedFirst,
+          lastName: normalizedLast
         }),
       (updated) =>
         onToast(
@@ -209,12 +222,14 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
               value={first}
               onChange={(e) => setFirst(e.target.value)}
               required
+              error={firstNameError || sameNameError}
             />
             <Input
               label="Last name"
               value={last}
               onChange={(e) => setLast(e.target.value)}
               required
+              error={lastNameError || sameNameError}
             />
           </div>
         </div>
