@@ -78,15 +78,16 @@ async def _run_backfill(
             {"fetched": fetched, "lastDate": format_long(oldest), "phase": next(phases)}
         )
 
-    result = await backfill(
-        source,
-        channel_id,
-        session_factory,
-        settings.backfill_batch_size,
-        on_batch=on_batch,
-    )
-    derive_candidates(session_factory, channel_id, StaticExchange())
-    await rescan(source, channel_id, session_factory)
+    async with source:
+        result = await backfill(
+            source,
+            channel_id,
+            session_factory,
+            settings.backfill_batch_size,
+            on_batch=on_batch,
+        )
+        derive_candidates(session_factory, channel_id, StaticExchange())
+        await rescan(source, channel_id, session_factory)
     with session_factory() as session:
         set_status(session, user_id, channel_id, "backfilled")
         session.commit()
@@ -115,7 +116,8 @@ async def create_chat(
             raise ApiError(409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected")
         source = _resolve_source(request, link)
         try:
-            channel = await source.resolve_channel(payload.tag)
+            async with source:
+                channel = await source.resolve_channel(payload.tag)
         except ChannelReferenceResolutionError as error:
             raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
         channel_repository.upsert_channel(session, channel)

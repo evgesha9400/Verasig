@@ -69,6 +69,13 @@ class TelethonSource(TelegramSource):
         self._client = client
         self._poll_interval_seconds = poll_interval_seconds
 
+    async def __aenter__(self) -> "TelethonSource":
+        await self._client.connect()
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self._client.disconnect()
+
     async def resolve_channel(self, reference: str | int) -> TelegramChannel:
         channel_reference = parse_channel_reference(reference)
         entity = await self._resolve_entity(channel_reference)
