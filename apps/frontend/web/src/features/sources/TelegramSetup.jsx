@@ -16,11 +16,12 @@ export function TelegramSetup({
   onVerify = noop
 }) {
   const [phase, setPhase] = useState('creds') // creds | sending | code | verifying
-  // Prototype: pre-filled with valid demo credentials so the flow is walkable without real Telegram keys.
-  const [apiId, setApiId] = useState('2040315')
-  const [apiHash, setApiHash] = useState('a1b2c3d4e5f6079a8b7c6d5e4f30219a')
-  const [phone, setPhone] = useState('+44 7700 900142')
+  const [apiId, setApiId] = useState('')
+  const [apiHash, setApiHash] = useState('')
+  const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
+  const [twoFactorPassword, setTwoFactorPassword] = useState('')
+  const [needsPassword, setNeedsPassword] = useState(false)
   const [err, setErr] = useState(null)
 
   const credsValid =
@@ -42,6 +43,8 @@ export function TelegramSetup({
         apiHash: apiHash.trim(),
         phone: phone.trim()
       })
+      setNeedsPassword(false)
+      setTwoFactorPassword('')
       setPhase('code')
     } catch (error) {
       setErr(errorMessage(error))
@@ -55,10 +58,19 @@ export function TelegramSetup({
     setPhase('verifying')
 
     try {
-      await onVerify(code)
+      if (needsPassword) {
+        await onVerify(code, twoFactorPassword)
+      } else {
+        await onVerify(code)
+      }
       await onConnected()
     } catch (error) {
-      setErr(errorMessage(error))
+      if (error?.code === 'TELEGRAM_TWO_FACTOR_REQUIRED') {
+        setNeedsPassword(true)
+        setErr('Two-factor password required. Enter your Telegram password.')
+      } else {
+        setErr(errorMessage(error))
+      }
       setPhase('code')
     }
   }
@@ -126,10 +138,16 @@ export function TelegramSetup({
               />
               <div className="vrs-help">
                 Get your credentials from{' '}
-                <span className="vrs-link">
-                  my.telegram.org → API development tools
-                </span>
-                . We request a login code, never your password.
+                <a
+                  className="vrs-link"
+                  href="https://core.telegram.org/api/obtaining_api_id"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  core.telegram.org/api/obtaining_api_id
+                </a>
+                . We request a login code to start; two-step password is requested only
+                if your account uses it.
               </div>
               <div className="vrs-form__actions">
                 <Button variant="ghost" onClick={onCancel}>
@@ -167,10 +185,30 @@ export function TelegramSetup({
                 disabled={phase === 'verifying'}
                 className="vrs-code"
               />
+              {needsPassword && (
+                <Input
+                  label="Telegram password"
+                  type="password"
+                  placeholder="Telegram two-factor password"
+                  value={twoFactorPassword}
+                  onChange={(e) => setTwoFactorPassword(e.target.value)}
+                  disabled={phase === 'verifying'}
+                  required={needsPassword}
+                />
+              )}
               <div className="vrs-help" style={{ textAlign: 'center' }}>
                 Demo: enter any 5 digits. Didn’t get it?{' '}
                 <span className="vrs-link">Resend code</span> ·{' '}
-                <span className="vrs-link" onClick={() => setPhase('creds')}>
+                <span
+                  className="vrs-link"
+                  onClick={() => {
+                    setErr(null)
+                    setNeedsPassword(false)
+                    setTwoFactorPassword('')
+                    setCode('')
+                    setPhase('creds')
+                  }}
+                >
                   Change number
                 </span>
               </div>
@@ -178,7 +216,10 @@ export function TelegramSetup({
                 <Button
                   variant="primary"
                   size="lg"
-                  disabled={!codeComplete && phase !== 'verifying'}
+                  disabled={
+                    (!codeComplete || (needsPassword && !twoFactorPassword)) &&
+                    phase !== 'verifying'
+                  }
                   loading={phase === 'verifying'}
                   onClick={verify}
                   iconLeft={

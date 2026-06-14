@@ -64,4 +64,22 @@ describe('telegramApi', () => {
       body: JSON.stringify({ code: '12345' })
     })
   })
+
+  it('verifies a Telegram login code with optional two-factor password', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ connected: true }))
+
+    await verifyTelegram('jwt-token', '12345', 'two-factor-password')
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/telegram/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({
+        code: '12345',
+        password: 'two-factor-password'
+      })
+    })
+  })
 })

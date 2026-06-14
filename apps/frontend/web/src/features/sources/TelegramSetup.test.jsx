@@ -3,8 +3,21 @@ import { describe, expect, it, vi } from 'vitest'
 import { TelegramSetup } from './TelegramSetup.jsx'
 
 describe('TelegramSetup', () => {
+  function fillCredentials() {
+    fireEvent.change(screen.getByLabelText('API ID'), {
+      target: { value: '2040315' }
+    })
+    fireEvent.change(screen.getByLabelText('API Hash'), {
+      target: { value: 'a1b2c3d4e5f6079a8b7c6d5e4f30219a' }
+    })
+    fireEvent.change(screen.getByLabelText('Phone number'), {
+      target: { value: '+44 7700 900142' }
+    })
+  }
+
   it('captures login code digits through the shared OTP input', async () => {
     render(<TelegramSetup onConnected={() => {}} onCancel={() => {}} />)
+    fillCredentials()
 
     fireEvent.click(screen.getByRole('button', { name: /send login code/i }))
 
@@ -25,6 +38,7 @@ describe('TelegramSetup', () => {
   it('connects after any five digits are entered', async () => {
     const onConnected = vi.fn()
     render(<TelegramSetup onConnected={onConnected} onCancel={() => {}} />)
+    fillCredentials()
 
     fireEvent.click(screen.getByRole('button', { name: /send login code/i }))
 
@@ -41,5 +55,53 @@ describe('TelegramSetup', () => {
     fireEvent.click(screen.getByRole('button', { name: /verify & connect/i }))
 
     await waitFor(() => expect(onConnected).toHaveBeenCalledOnce(), { timeout: 1800 })
+  })
+
+  it('requests Telegram two-factor password when the server asks for it', async () => {
+    const onVerify = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Two-factor password required'), {
+          code: 'TELEGRAM_TWO_FACTOR_REQUIRED'
+        })
+      )
+      .mockResolvedValueOnce()
+    const onConnected = vi.fn()
+
+    render(
+      <TelegramSetup
+        onConnected={onConnected}
+        onCancel={() => {}}
+        onVerify={onVerify}
+      />
+    )
+    fillCredentials()
+
+    fireEvent.click(screen.getByRole('button', { name: /send login code/i }))
+
+    await waitFor(() => expect(screen.getByLabelText('Digit 1')).toBeTruthy(), {
+      timeout: 1800
+    })
+
+    for (let i = 1; i <= 5; i += 1) {
+      fireEvent.change(screen.getByLabelText(`Digit ${i}`), {
+        target: { value: String(i) }
+      })
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: /verify & connect/i }))
+
+    await waitFor(() => expect(screen.getByLabelText('Telegram password')).toBeTruthy())
+
+    fireEvent.change(screen.getByLabelText('Telegram password'), {
+      target: { value: 'two-factor-password' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: /verify & connect/i }))
+
+    await waitFor(() => expect(onConnected).toHaveBeenCalledOnce())
+
+    expect(onVerify).toHaveBeenCalledTimes(2)
+    expect(onVerify).toHaveBeenNthCalledWith(1, '12345')
+    expect(onVerify).toHaveBeenNthCalledWith(2, '12345', 'two-factor-password')
   })
 })

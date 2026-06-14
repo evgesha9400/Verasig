@@ -210,7 +210,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     body = (
       <TelegramSetup
         onConnect={(credentials) => connectTelegramApi(authToken, credentials)}
-        onVerify={(code) => verifyTelegram(authToken, code)}
+        onVerify={(code, password) => verifyTelegram(authToken, code, password)}
         onConnected={() => markTelegramConnected()}
         onCancel={exitToSources}
       />

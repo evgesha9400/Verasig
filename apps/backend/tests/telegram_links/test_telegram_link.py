@@ -7,7 +7,11 @@ import pytest
 from fakes import FakeTelegramAuth
 
 from verasig.domain.account import Plan, UserAccount
-from verasig.domain.telegram_ports import CodeInvalidError
+from verasig.domain.telegram_ports import (
+    CodeInvalidError,
+    TwoFactorPasswordInvalidError,
+    TwoFactorUnsupportedError,
+)
 from verasig.features.accounts import repository as account_repository
 from verasig.features.telegram_links import repository as telegram_link_repository
 from verasig.features.telegram_links.workflow import connect, status, verify
@@ -66,7 +70,7 @@ async def test_verify_flips_to_connected_and_stores_final_session(db_session):
         db_session, account.id, 123, "api-secret", "+441234568821", auth, cipher
     )
 
-    await verify(db_session, account.id, "12345", auth, cipher)
+    await verify(db_session, account.id, "12345", auth, cipher, None)
     db_session.commit()
     link = telegram_link_repository.read_link(db_session, account.id)
 
@@ -87,7 +91,56 @@ async def test_wrong_code_surfaces_error_and_stays_pending(db_session):
     )
 
     with pytest.raises(CodeInvalidError):
-        await verify(db_session, account.id, "00000", auth, cipher)
+        await verify(db_session, account.id, "00000", auth, cipher, None)
+
+    assert (
+        telegram_link_repository.read_link(db_session, account.id).status == "pending"
+    )
+
+
+@pytest.mark.asyncio
+async def test_verify_requires_two_factor_password_when_enabled(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    auth = FakeTelegramAuth(
+        final_session="final-secret",
+        requires_password=True,
+        valid_password="two-factor-password",
+    )
+    cipher = _cipher()
+    await connect(
+        db_session, account.id, 123, "api-secret", "+441234568821", auth, cipher
+    )
+
+    with pytest.raises(TwoFactorUnsupportedError):
+        await verify(db_session, account.id, "12345", auth, cipher, None)
+
+    await verify(db_session, account.id, "12345", auth, cipher, "two-factor-password")
+    db_session.commit()
+    link = telegram_link_repository.read_link(db_session, account.id)
+
+    assert link.status == "connected"
+    assert (
+        cipher.decrypt(link.session_string_encrypted, f"{account.id}:telegram_link")
+        == "final-secret"
+    )
+
+
+@pytest.mark.asyncio
+async def test_verify_reports_invalid_two_factor_password(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    auth = FakeTelegramAuth(
+        requires_password=True,
+        valid_password="two-factor-password",
+    )
+    cipher = _cipher()
+    await connect(
+        db_session, account.id, 123, "api-secret", "+441234568821", auth, cipher
+    )
+
+    with pytest.raises(TwoFactorPasswordInvalidError):
+        await verify(
+            db_session, account.id, "12345", auth, cipher, "incorrect-password"
+        )
 
     assert (
         telegram_link_repository.read_link(db_session, account.id).status == "pending"

@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from verasig.domain.account import UserAccount
-from verasig.domain.telegram_ports import CodeInvalidError
+from verasig.domain.telegram_ports import (
+    CodeInvalidError,
+    TwoFactorPasswordInvalidError,
+    TwoFactorUnsupportedError,
+)
 from verasig.features.telegram_links.schemas import (
     TelegramConnectIn,
     TelegramStatusOut,
@@ -56,10 +60,19 @@ async def verify_telegram(
                 payload.code,
                 request.app.state.telegram_auth,
                 request.app.state.secret_cipher,
+                payload.password,
             )
         except CodeInvalidError as error:
             raise ApiError(
                 400, "TELEGRAM_CODE_INVALID", "Invalid Telegram code"
+            ) from error
+        except TwoFactorPasswordInvalidError as error:
+            raise ApiError(
+                400, "TELEGRAM_PASSWORD_INVALID", "Invalid Telegram password"
+            ) from error
+        except TwoFactorUnsupportedError as error:
+            raise ApiError(
+                400, "TELEGRAM_TWO_FACTOR_REQUIRED", "Two-factor password required"
             ) from error
         except TelegramLinkMissingError as error:
             raise ApiError(

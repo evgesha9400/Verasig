@@ -12,10 +12,10 @@ export function connectTelegram(token, credentials) {
   })
 }
 
-export function verifyTelegram(token, code) {
+export function verifyTelegram(token, code, password) {
   return requestJson('/telegram/verify', {
     method: 'POST',
     token,
-    body: { code }
+    body: { code, password }
   })
 }

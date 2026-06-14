@@ -9,6 +9,7 @@ class TelegramConnectIn(CamelModel):
 
 class TelegramVerifyIn(CamelModel):
     code: str
+    password: str | None = None
 
 
 class TelegramStatusOut(CamelModel):
