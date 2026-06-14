@@ -509,6 +509,14 @@
 .vrs-link {
   color: var(--link);
   cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.vrs-link:hover {
+  color: var(--link-hover);
 }
 
 /* ---- Code entry ---- */
