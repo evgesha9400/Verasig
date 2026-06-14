@@ -205,7 +205,6 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
             <Button
               variant="primary"
               size="sm"
-              style={{ marginLeft: 'auto' }}
               disabled={!profileDirty || !profileValid}
               onClick={saveProfile}
               loading={busy === 'profile'}
@@ -247,7 +246,6 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
             <Button
               variant="primary"
               size="sm"
-              style={{ marginLeft: 'auto' }}
               disabled={!emailDirty || !emailValid}
               onClick={saveEmail}
               loading={busy === 'email'}
@@ -318,7 +316,6 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
             <Button
               variant="secondary"
               size="sm"
-              style={{ marginLeft: 'auto' }}
               loading={resetState === 'sending'}
               disabled={resetState === 'sent'}
               onClick={sendReset}
@@ -368,12 +365,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
                 Cancelling keeps {current.name} active until the end of the billing
                 period.
               </span>
-              <Button
-                variant="danger"
-                size="sm"
-                style={{ marginLeft: 'auto' }}
-                onClick={() => setCancelOpen(true)}
-              >
+              <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
                 Cancel subscription
               </Button>
             </>

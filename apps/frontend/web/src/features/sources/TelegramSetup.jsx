@@ -1,6 +1,6 @@
 /* Verasig prototype — Telegram connect flow: credentials -> verification code */
 import { useState } from 'react'
-import { Input, Button, Banner, OTPInput } from '@verasig/design-system'
+import { Input, Button, Banner, OTPInput, TextLink } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
 async function noop() {}
@@ -138,14 +138,13 @@ export function TelegramSetup({
               />
               <div className="vrs-help">
                 Get your credentials from{' '}
-                <a
-                  className="vrs-link"
+                <TextLink
                   href="https://core.telegram.org/api/obtaining_api_id"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   core.telegram.org/api/obtaining_api_id
-                </a>
+                </TextLink>
                 . We request a login code to start; two-step password is requested only
                 if your account uses it.
               </div>
@@ -198,13 +197,8 @@ export function TelegramSetup({
               )}
               <div className="vrs-help" style={{ textAlign: 'center' }}>
                 Demo: enter any 5 digits. Didn’t get it?{' '}
-                <button type="button" className="vrs-link" onClick={sendCode}>
-                  Resend code
-                </button>{' '}
-                ·{' '}
-                <button
-                  type="button"
-                  className="vrs-link"
+                <TextLink onClick={sendCode}>Resend code</TextLink> ·{' '}
+                <TextLink
                   onClick={() => {
                     setErr(null)
                     setNeedsPassword(false)
@@ -214,7 +208,7 @@ export function TelegramSetup({
                   }}
                 >
                   Change number
-                </button>
+                </TextLink>
               </div>
               <div className="vrs-form__actions" style={{ justifyContent: 'center' }}>
                 <Button

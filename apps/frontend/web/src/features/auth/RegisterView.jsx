@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Banner, Button, Input } from '@verasig/design-system'
+import { Banner, Button, Input, TextLink } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { splitFullName } from '../../shared/accountName.js'
 import { BrandPanel } from './BrandPanel.jsx'
@@ -118,9 +118,9 @@ export function RegisterView({ onRegister, onLogin }) {
           </p>
           <div className="auth-switch">
             Already have an account?{' '}
-            <button type="button" className="auth-link" onClick={onLogin}>
+            <TextLink tone="accent" onClick={onLogin}>
               Log in
-            </button>
+            </TextLink>
           </div>
         </div>
       </main>

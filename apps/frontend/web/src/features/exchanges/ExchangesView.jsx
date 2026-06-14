@@ -77,17 +77,7 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
               </div>
             </div>
           ) : (
-            <div
-              className="vrs-src-card"
-              style={{
-                borderStyle: 'dashed',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                minHeight: 168,
-                color: 'var(--text-faint)'
-              }}
-            >
+            <div className="vrs-src-card vrs-src-card--empty">
               <div className="vrs-src-card__desc" style={{ flex: 'none' }}>
                 No exchanges connected yet.
                 <br />

@@ -9,6 +9,7 @@ describe('design-system barrel', () => {
     'Badge',
     'Button',
     'IconButton',
+    'TextLink',
     'Tabs',
     'Tag',
     'Card',
@@ -60,6 +61,25 @@ describe('design-system interaction contracts', () => {
     expect(document.getElementById('vrs-iconbtn-css').textContent).toContain(
       'var(--focus-ring)'
     )
+  })
+
+  it('TextLink renders <a> with href and <button> as a real action', () => {
+    const onClick = vi.fn()
+    render(
+      <>
+        <DS.TextLink href="https://example.com">Docs</DS.TextLink>
+        <DS.TextLink onClick={onClick}>Resend</DS.TextLink>
+      </>
+    )
+
+    expect(screen.getByRole('link', { name: 'Docs' }).getAttribute('href')).toBe(
+      'https://example.com'
+    )
+
+    const button = screen.getByRole('button', { name: 'Resend' })
+    expect(button.getAttribute('type')).toBe('button')
+    fireEvent.click(button)
+    expect(onClick).toHaveBeenCalledOnce()
   })
 
   it('ThemeToggle renders radio options and calls onChange', () => {

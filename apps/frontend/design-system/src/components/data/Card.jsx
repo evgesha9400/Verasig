@@ -19,7 +19,7 @@ const CSS = `
 .vrs-card__title { font-family: var(--font-display); font-size: var(--text-md); font-weight: var(--fw-semibold); color: var(--text-strong); }
 .vrs-card__sub { font-family: var(--font-sans); font-size: var(--text-2xs); color: var(--text-muted); margin-top: 1px; }
 .vrs-card__head-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.vrs-card__foot { padding: 12px var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 10px; }
+.vrs-card__foot { padding: 12px var(--space-5); border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 `
 if (typeof document !== 'undefined' && !document.getElementById('vrs-card-css')) {
   const s = document.createElement('style')
