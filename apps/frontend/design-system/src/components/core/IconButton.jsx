@@ -9,12 +9,11 @@ const CSS = `
               background-image var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out),
               border-color var(--dur-fast) var(--ease-out),
-              transform var(--dur-instant) var(--ease-out),
               box-shadow var(--dur-fast) var(--ease-out);
 }
 .vrs-iconbtn svg { width: 18px; height: 18px; display: block; }
 .vrs-iconbtn:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-strong); }
-.vrs-iconbtn:active:not(:disabled) { transform: translateY(1px); background: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.25); }
+.vrs-iconbtn:active:not(:disabled) { background: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.25); }
 .vrs-iconbtn:focus-visible { outline: none; box-shadow: var(--focus-ring), 0 0 18px var(--signal-glow); }
 .vrs-iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
 .vrs-iconbtn__sz-sm { --_s: 30px; }
@@ -28,10 +27,10 @@ const CSS = `
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 1px 1.5px rgba(0,0,0,0.3);
 }
 .vrs-iconbtn__solid:hover:not(:disabled) { color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 48%, var(--border-strong)); background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface-hover) 90%, #fff), var(--surface-hover)); }
-.vrs-iconbtn__solid:active:not(:disabled) { transform: translateY(1px); background-image: none; background-color: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+.vrs-iconbtn__solid:active:not(:disabled) { background-image: none; background-color: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
 .vrs-iconbtn__accent { background: var(--accent-quiet); color: var(--accent-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
 .vrs-iconbtn__accent:hover:not(:disabled) { color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 14px var(--signal-glow); }
-.vrs-iconbtn__accent:active:not(:disabled) { transform: translateY(1px); }
+.vrs-iconbtn__accent:active:not(:disabled) { background-color: var(--accent-quiet); }
 `
 if (typeof document !== 'undefined' && !document.getElementById('vrs-iconbtn-css')) {
   const s = document.createElement('style')

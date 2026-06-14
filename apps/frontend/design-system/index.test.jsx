@@ -63,6 +63,24 @@ describe('design-system interaction contracts', () => {
     )
   })
 
+  it('keeps pressed buttons stationary so pointer-up still registers clicks', () => {
+    render(
+      <>
+        <DS.Button>Back</DS.Button>
+        <DS.IconButton label="Refresh">
+          <Icon name="refresh" />
+        </DS.IconButton>
+      </>
+    )
+
+    expect(document.getElementById('vrs-button-css').textContent).not.toContain(
+      'transform: translateY(1px)'
+    )
+    expect(document.getElementById('vrs-iconbtn-css').textContent).not.toContain(
+      'transform: translateY(1px)'
+    )
+  })
+
   it('TextLink renders <a> with href and <button> as a real action', () => {
     const onClick = vi.fn()
     render(

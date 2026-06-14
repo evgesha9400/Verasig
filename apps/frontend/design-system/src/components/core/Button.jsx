@@ -13,7 +13,6 @@ const CSS = `
               background-image var(--dur-fast) var(--ease-out),
               border-color var(--dur-fast) var(--ease-out),
               color var(--dur-fast) var(--ease-out),
-              transform var(--dur-instant) var(--ease-out),
               box-shadow var(--dur-fast) var(--ease-out);
 }
 .vrs-btn:focus-visible { outline: none; box-shadow: var(--focus-ring), 0 0 18px var(--signal-glow); }
@@ -43,7 +42,6 @@ const CSS = `
 }
 .vrs-btn__primary:active:not(:disabled) {
   background-image: none; background-color: var(--accent-press);
-  transform: translateY(1px);
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12);
 }
 
@@ -59,12 +57,12 @@ const CSS = `
   background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface-hover) 90%, #fff), var(--surface-hover));
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), 0 0 12px -2px var(--signal-glow), 0 2px 8px -4px rgba(0,0,0,0.5);
 }
-.vrs-btn__secondary:active:not(:disabled) { transform: translateY(1px); background-image: none; background-color: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+.vrs-btn__secondary:active:not(:disabled) { background-image: none; background-color: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
 
 /* ---- Ghost: quiet until touched ---- */
 .vrs-btn__ghost { background: transparent; color: var(--text-body); }
 .vrs-btn__ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-strong); }
-.vrs-btn__ghost:active:not(:disabled) { transform: translateY(1px); background: var(--surface-card); }
+.vrs-btn__ghost:active:not(:disabled) { background: var(--surface-card); }
 
 /* ---- Danger: armed ---- */
 .vrs-btn__danger {
@@ -73,7 +71,7 @@ const CSS = `
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 .vrs-btn__danger:hover:not(:disabled) { background: var(--rejected-bg); border-color: color-mix(in srgb, var(--rejected-500) 62%, transparent); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--rejected-500) 40%, transparent); }
-.vrs-btn__danger:active:not(:disabled) { transform: translateY(1px); background: color-mix(in srgb, var(--rejected-500) 18%, transparent); }
+.vrs-btn__danger:active:not(:disabled) { background: color-mix(in srgb, var(--rejected-500) 18%, transparent); }
 
 .vrs-btn__full { width: 100%; }
 .vrs-btn__spin { width: 1em; height: 1em; border-radius: 50%;
