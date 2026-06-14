@@ -63,21 +63,26 @@ The whole card/row is the button. The "Open →" is a muted hint, not a control.
 
 ## Conformance map
 
-Current state of the surfaces in the audit. Use as the remediation backlog.
+State of every audited surface after the consistency sweep. ✅ = conforms to the rules above.
 
-| Page | Element | Now | Rule | Status |
-|---|---|---|---|---|
-| Exchanges | Configure | `Button primary` | Primary | ✅ |
-| Exchanges | Disconnect | `Button danger` | Danger | ✅ |
-| Exchanges | Connected card | `.vrs-src-card.is-clickable` hover, **no `onClick`** | Action surface (no `is-clickable`) | ❌ remove `is-clickable` (false affordance) |
-| Sources | Connect | `Button primary` | Primary | ✅ |
-| Sources | Connected card | `InteractiveCard`, whole-card click | Navigable | ✅ surface |
-| Sources | "Open →" | lime `--accent-text` text, no hover | Navigable hint = muted text | ❌ recolor to `--text-muted`, animate arrow |
-| Signals | Go to sources | `Button secondary` | Secondary | ✅ |
-| Signals | Signal rows | row `<button>`, grey hover | Navigable | ✅ (migrate to shared row primitive over time) |
-| Feeds | Feed rows | row `onClick` **and** inner `Button primary` | Navigable **or** action, never both | ❌ drop row-level `onClick`; keep inner buttons |
-| Topbar | Back | hand-rolled `.vrs-crumb`, grey | Ghost button + chevron | ❌ replace with `Button variant="ghost" size="sm"` |
-| Topbar | Refresh | `IconButton` ghost, grey | Icon-utility | ✅ |
+| Page | Element | Rule | Status |
+|---|---|---|---|
+| Exchanges | Configure | Primary | ✅ |
+| Exchanges | Disconnect | Danger | ✅ |
+| Exchanges | Connected card | Action surface (no `is-clickable`) | ✅ removed dead clickable + CSS |
+| Sources | Connect | Primary | ✅ |
+| Sources | Connected card | Navigable (whole card) | ✅ |
+| Sources | "Open →" | Navigable hint = muted text + hover arrow | ✅ recolored to `--text-muted` |
+| Signals | Go to sources | Secondary | ✅ |
+| Signals | Signal rows | Navigable (whole-row `<button>` + chevron) | ✅ |
+| Feeds | Feed rows | Action rows (no row `onClick`) | ✅ buttons kept; `analyzed` got an explicit Results button |
+| Telegram setup | Resend code / Change number | Link-styled `<button>` (`.vrs-link`) | ✅ converted from clickable spans |
+| Settings | Save / Resend / Cancel / plan CTAs | Primary / secondary / ghost / danger | ✅ |
+| Pipeline | step buttons, swipe controls, choices | Button / IconButton / Radio / Interactive cards | ✅ |
+| Marketing | Sign up / Log in CTAs | Primary + secondary | ✅ |
+| Auth | Log in / Create account | Primary (submit) + lime link (switch) | ✅ `.auth-link` now styled |
+| Topbar | Back | Ghost button + chevron | ✅ replaced `.vrs-crumb` |
+| Topbar | Refresh | Icon-utility | ✅ |
 
 ## Anti-patterns (banned)
 
