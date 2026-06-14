@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from verasig.domain.account import UserAccount
+from verasig.domain.channel_reference import ChannelReferenceResolutionError
 from verasig.features.accounts.plans import (
     PlanSourceLimitExceeded,
     require_source_capacity,
@@ -113,7 +114,10 @@ async def create_chat(
         if link is None or link.status != "connected":
             raise ApiError(409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected")
         source = _resolve_source(request, link)
-        channel = await source.resolve_channel(payload.tag)
+        try:
+            channel = await source.resolve_channel(payload.tag)
+        except ChannelReferenceResolutionError as error:
+            raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
         channel_repository.upsert_channel(session, channel)
         subscribe(session, user.id, channel.channel_id, datetime.now(tz=UTC))
         session.commit()

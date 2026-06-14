@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fakes import FakeSource, FakeTelegramAuth
 
 from verasig.domain.channel import TelegramChannel
+from verasig.domain.channel_reference import ChannelReferenceResolutionError
 
 
 def _register(client, email: str = "ada@example.com") -> str:
@@ -74,6 +75,22 @@ def test_post_chat_subscribes_via_user_source(client, app):
     assert created.status_code == 201
     assert created.json()["id"] == "7"
     assert listed.json()["chats"][0]["name"] == "Pilot Signals"
+
+
+def test_post_chat_unresolvable_channel_returns_404(client, app):
+    token = _register(client)
+    _connect_telegram(client, app, token)
+    app.state.telegram_source_factory = lambda _link: FakeSource(
+        _channel(),
+        [],
+        resolve_error=ChannelReferenceResolutionError("no such channel"),
+    )
+
+    response = client.post("/chats", headers=_auth(token), json={"tag": "@ghost"})
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "CHANNEL_NOT_FOUND"
+    assert response.json()["error"]["message"] == "no such channel"
 
 
 def test_post_chat_requires_telegram_link(client):
