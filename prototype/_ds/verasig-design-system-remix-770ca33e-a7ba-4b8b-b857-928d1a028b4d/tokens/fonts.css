@@ -1,0 +1,12 @@
+/* ============================================================
+   Verasig — Webfonts
+   Loaded via Google Fonts CDN. To self-host / ship offline,
+   replace these @imports with local @font-face + woff2 binaries.
+   - Space Grotesk : display / headlines (the "signal" voice)
+   - Geist         : UI + body
+   - Geist Mono    : signal IDs, metrics, data, code
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap");
