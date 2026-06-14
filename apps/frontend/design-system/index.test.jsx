@@ -149,4 +149,15 @@ describe('design-system interaction contracts', () => {
     fireEvent.change(screen.getByLabelText('Digit 1'), { target: { value: '7' } })
     expect(onChange).toHaveBeenCalledWith('7')
   })
+
+  it('OTPInput pastes a code using the configured length', () => {
+    const onChange = vi.fn()
+    render(<DS.OTPInput length={6} value="" onChange={onChange} />)
+
+    fireEvent.paste(screen.getByLabelText('Digit 1'), {
+      clipboardData: { getData: () => '123456' }
+    })
+
+    expect(onChange).toHaveBeenLastCalledWith('123456')
+  })
 })
