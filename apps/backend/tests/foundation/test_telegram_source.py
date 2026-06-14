@@ -283,6 +283,32 @@ async def test_resolve_channel_uses_dialog_title_path_for_non_username_title():
     assert client.iter_dialog_calls == 1
 
 
+async def test_numeric_channel_resolution_reuses_joined_dialog_entity_for_reads():
+    entity = _entity(
+        entity_id=2358686814,
+        title="Private Signals",
+        username=None,
+    )
+    message = FakeTelethonMessage(11)
+    client = FakeTelethonClient(
+        messages_by_channel={entity: [message]},
+        dialogs=[_dialog(entity)],
+    )
+    source = TelethonSource(client)
+
+    channel = await source.resolve_channel(2358686814)
+    batches = [batch async for batch in source.backfill_batches(2358686814, None, 200)]
+    live_ids = await source.live_message_ids(2358686814)
+
+    assert channel.channel_id == 2358686814
+    assert channel.title == "Private Signals"
+    assert channel.handle is None
+    assert batches[0][0].message_id == 11
+    assert live_ids == {11}
+    assert client.get_entity_calls == [2358686814]
+    assert client.iter_dialog_calls == 1
+
+
 async def test_resolve_channel_rejects_ambiguous_dialog_title():
     title = "Signals"
     client = FakeTelethonClient(
