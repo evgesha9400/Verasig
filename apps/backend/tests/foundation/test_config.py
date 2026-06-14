@@ -2,6 +2,25 @@ import pytest
 
 from verasig.config import Settings, SettingsError
 
+CONFIG_ENV_KEYS = (
+    "VERASIG_DATABASE_URL_OVERRIDE",
+    "VERASIG_DB_HOST",
+    "VERASIG_DB_PORT",
+    "VERASIG_DB_NAME",
+    "VERASIG_DB_USER",
+    "VERASIG_DB_PASSWORD",
+    "VERASIG_BACKFILL_BATCH_SIZE",
+    "VERASIG_ENV",
+    "VERASIG_JWT_SECRET",
+    "VERASIG_SECRET_KEYS",
+)
+
+
+@pytest.fixture(autouse=True)
+def isolate_settings_environment(monkeypatch):
+    for key in CONFIG_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
 
 def test_database_url_defaults_to_localhost_parts():
     assert (
@@ -18,8 +37,28 @@ def test_database_url_assembles_from_db_env(monkeypatch):
     monkeypatch.setenv("VERASIG_DB_PASSWORD", "secret")
 
     assert (
-        Settings().database_url
+        Settings(_env_file=None).database_url
         == "postgresql+psycopg://observer:secret@db:6543/signals"
+    )
+
+
+def test_database_url_loads_from_explicit_env_file(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "VERASIG_DB_HOST=file-db",
+                "VERASIG_DB_PORT=6543",
+                "VERASIG_DB_NAME=signals",
+                "VERASIG_DB_USER=observer",
+                "VERASIG_DB_PASSWORD=secret",
+            ]
+        )
+    )
+
+    assert (
+        Settings(_env_file=env_file).database_url
+        == "postgresql+psycopg://observer:secret@file-db:6543/signals"
     )
 
 
@@ -28,7 +67,7 @@ def test_database_url_override_takes_precedence(monkeypatch):
     monkeypatch.setenv("VERASIG_DATABASE_URL_OVERRIDE", override)
     monkeypatch.setenv("VERASIG_DB_HOST", "db")
 
-    assert Settings().database_url == override
+    assert Settings(_env_file=None).database_url == override
 
 
 def test_database_url_escapes_user_password_and_database_name(monkeypatch):
@@ -37,7 +76,7 @@ def test_database_url_escapes_user_password_and_database_name(monkeypatch):
     monkeypatch.setenv("VERASIG_DB_NAME", "vera sig")
 
     assert (
-        Settings().database_url
+        Settings(_env_file=None).database_url
         == "postgresql+psycopg://u%40name:p%40ss%2Fword@localhost:5432/vera%20sig"
     )
 
@@ -48,7 +87,7 @@ def test_backfill_batch_size_defaults_to_200():
 
 def test_backfill_batch_size_loads_from_env(monkeypatch):
     monkeypatch.setenv("VERASIG_BACKFILL_BATCH_SIZE", "50")
-    assert Settings().backfill_batch_size == 50
+    assert Settings(_env_file=None).backfill_batch_size == 50
 
 
 def test_settings_carry_api_secrets(monkeypatch):
