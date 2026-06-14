@@ -83,16 +83,20 @@ class FakeSource:
         live_ids: set[int] | None = None,
         fail_after_batch: int | None = None,
         before_batch: Callable[[int, int], None] | None = None,
+        resolve_error: Exception | None = None,
     ) -> None:
         self.channel = channel
         self.messages = sorted(messages, key=lambda message: message.message_id)
         self.live_ids = set() if live_ids is None else set(live_ids)
         self.fail_after_batch = fail_after_batch
         self.before_batch = before_batch
+        self.resolve_error = resolve_error
         self.requested_afters: list[int | None] = []
         self.yielded_ids: list[int] = []
 
     async def resolve_channel(self, _reference: str | int) -> TelegramChannel:
+        if self.resolve_error is not None:
+            raise self.resolve_error
         return self.channel
 
     async def backfill_batches(

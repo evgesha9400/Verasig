@@ -86,4 +86,33 @@ describe('ChatsView', () => {
       expect(onAddChat).toHaveBeenCalledWith('@pilot')
     })
   })
+
+  it('shows the failure reason when adding a feed is rejected', async () => {
+    const onAddChat = vi
+      .fn()
+      .mockRejectedValue(new Error('Cannot resolve Telegram channel reference.'))
+
+    render(
+      <ChatsView
+        chats={[]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onReanalyze={() => {}}
+        onRestart={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+        onAddChat={onAddChat}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText(/channel tag/i), {
+      target: { value: '@ghost' }
+    })
+    fireEvent.submit(screen.getByRole('button', { name: /add feed/i }).closest('form'))
+
+    expect(await screen.findByText('Feed not added')).toBeTruthy()
+    expect(screen.getByText('Cannot resolve Telegram channel reference.')).toBeTruthy()
+  })
 })
