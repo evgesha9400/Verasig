@@ -97,10 +97,7 @@ export function ChatsView({
           variant="ghost"
           size="sm"
           iconLeft={<Icon name="externalLink" size={12} />}
-          onClick={(e) => {
-            e.stopPropagation()
-            onLink && onLink()
-          }}
+          onClick={() => onLink && onLink()}
         >
           View deleted signals
         </Button>
@@ -176,10 +173,7 @@ export function ChatsView({
             variant="primary"
             size="sm"
             iconLeft={<Icon name="chart" size={14} />}
-            onClick={(e) => {
-              e.stopPropagation()
-              onBacktest && onBacktest(c)
-            }}
+            onClick={() => onBacktest && onBacktest(c)}
           >
             Backtest
           </Button>
@@ -195,6 +189,14 @@ export function ChatsView({
             <span className="vrs-score__v">{scam ? 0 : c.score}</span>
             <span className="vrs-score__l">Quality</span>
           </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            iconLeft={<Icon name="chart" size={14} />}
+            onClick={() => onResume(c)}
+          >
+            Results
+          </Button>
           {optionsMenu(c)}
         </div>
       )
@@ -211,10 +213,7 @@ export function ChatsView({
             variant="primary"
             size="sm"
             iconLeft={<Icon name="refresh" size={14} />}
-            onClick={(e) => {
-              e.stopPropagation()
-              onRetry(c)
-            }}
+            onClick={() => onRetry(c)}
           >
             Retry
           </Button>
@@ -229,10 +228,7 @@ export function ChatsView({
             variant="primary"
             size="sm"
             iconRight={<Icon name="arrowRight" size={14} />}
-            onClick={(e) => {
-              e.stopPropagation()
-              onResume(c)
-            }}
+            onClick={() => onResume(c)}
           >
             Continue
           </Button>
@@ -245,19 +241,13 @@ export function ChatsView({
           variant="secondary"
           size="sm"
           iconLeft={<Icon name="download" size={14} />}
-          onClick={(e) => {
-            e.stopPropagation()
-            onStartBackfill(c)
-          }}
+          onClick={() => onStartBackfill(c)}
         >
           Start backfill
         </Button>
       </div>
     )
   }
-
-  const clickable = (c) =>
-    c.status === 'analyzed' || c.status === 'backfilled' || c.status === 'verified'
 
   return (
     <div className="vrs-page">
@@ -293,16 +283,7 @@ export function ChatsView({
       )}
       <div className="vrs-stack-sm">
         {chats.map((c) => (
-          <div
-            key={c.id}
-            className={`vrs-chat-row ${clickable(c) ? 'is-clickable' : ''}`}
-            onClick={
-              clickable(c)
-                ? () =>
-                    c.status === 'verified' ? onBacktest && onBacktest(c) : onResume(c)
-                : undefined
-            }
-          >
+          <div key={c.id} className="vrs-chat-row">
             <span className="vrs-chat-av" style={{ background: c.tint }}>
               {c.initials}
             </span>
