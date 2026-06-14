@@ -94,6 +94,12 @@ class FakeSource:
         self.requested_afters: list[int | None] = []
         self.yielded_ids: list[int] = []
 
+    async def __aenter__(self) -> "FakeSource":
+        return self
+
+    async def __aexit__(self, *_exc_info: object) -> None:
+        return None
+
     async def resolve_channel(self, _reference: str | int) -> TelegramChannel:
         if self.resolve_error is not None:
             raise self.resolve_error

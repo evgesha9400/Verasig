@@ -137,6 +137,17 @@ class FakeTelethonClient:
         self.get_entity_calls = []
         self.iter_calls = []
         self.iter_dialog_calls = 0
+        self.connect_calls = 0
+        self.disconnect_calls = 0
+        self.connected = False
+
+    async def connect(self) -> None:
+        self.connect_calls += 1
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.disconnect_calls += 1
+        self.connected = False
 
     def add_event_handler(self, callback, event) -> None:
         self.handlers.append((callback, event))
@@ -223,6 +234,34 @@ async def test_resolve_channel_uses_canonical_handle_directly():
     assert channel.subscriber_count == 1234
     assert client.get_entity_calls == ["@pilot"]
     assert client.iter_dialog_calls == 0
+
+
+async def test_source_context_manager_connects_then_disconnects():
+    entity = _entity(entity_id=7, username="pilot")
+    client = FakeTelethonClient(entities_by_reference={"@pilot": entity})
+    source = TelethonSource(client)
+
+    async with source:
+        connected_during_use = client.connected
+        channel = await source.resolve_channel("@pilot")
+
+    assert connected_during_use is True
+    assert channel.channel_id == 7
+    assert client.connect_calls == 1
+    assert client.disconnect_calls == 1
+    assert client.connected is False
+
+
+async def test_source_disconnects_even_when_resolve_fails():
+    client = FakeTelethonClient(entities_by_reference={})
+    source = TelethonSource(client)
+
+    with pytest.raises(ChannelReferenceResolutionError):
+        async with source:
+            await source.resolve_channel("@missing")
+
+    assert client.disconnect_calls == 1
+    assert client.connected is False
 
 
 async def test_resolve_channel_uses_dialog_title_path_for_non_username_title():
