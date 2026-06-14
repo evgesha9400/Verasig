@@ -10,6 +10,8 @@ x-backend-service: &backend-service
 services:
   db:
     image: postgres:16
+    ports:
+      - "${VERASIG_DB_PORT:-5432}:5432"     # exposed to host for local backend/CLI
     environment:
       POSTGRES_USER: ${VERASIG_DB_USER:-verasig}
       POSTGRES_PASSWORD: ${VERASIG_DB_PASSWORD:-verasig}
