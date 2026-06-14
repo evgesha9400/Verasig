@@ -14,3 +14,10 @@ def sse_stream(registry: JobRegistry, key: str) -> EventSourceResponse:
             yield {"event": event, "data": json.dumps(data)}
 
     return EventSourceResponse(events())
+
+
+def sse_single_event(event: str, data: dict) -> EventSourceResponse:
+    async def events():
+        yield {"event": event, "data": json.dumps(data)}
+
+    return EventSourceResponse(events())

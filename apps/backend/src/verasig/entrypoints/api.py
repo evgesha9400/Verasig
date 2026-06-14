@@ -17,6 +17,7 @@ from verasig.features.rules.rule_distiller import AnthropicDistiller
 from verasig.features.signals import routes as signal_routes
 from verasig.features.simulation import routes as simulation_routes
 from verasig.features.sources import routes as source_routes
+from verasig.features.sources.backfill_job_coordinator import BackfillJobCoordinator
 from verasig.features.telegram_links import routes as telegram_link_routes
 from verasig.foundation.database.session import make_session_factory
 from verasig.foundation.http import health_routes
@@ -58,6 +59,12 @@ def create_app(
         settings.database_url
     )
     app.state.jobs = JobRegistry()
+    app.state.backfill_jobs = BackfillJobCoordinator(
+        app.state.session_factory,
+        app.state.jobs,
+        settings.backfill_batch_size,
+    )
+    app.state.backfill_jobs.mark_interrupted_runs_failed()
     app.state.secret_cipher = SecretCipher.from_spec(settings.secret_key_spec())
     app.state.telegram_auth = telegram_session
     app.state.exchange_verifier = verify_api_keys

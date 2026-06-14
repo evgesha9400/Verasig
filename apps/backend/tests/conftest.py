@@ -38,6 +38,7 @@ _ALL_TABLES = ", ".join(
         "user_account",
         "user_telegram_link",
         "user_channel",
+        "backfill_job_run",
         "user_exchange_connection",
         "chat_risk_config",
         "backtest_result",

@@ -413,7 +413,7 @@ class UserChannelRow(Base):
     __table_args__ = (
         CheckConstraint(
             "status IN ('new', 'backfilling', 'backfilled', 'verified', "
-            "'analyzed', 'cancelled')",
+            "'analyzed', 'cancelled', 'failed')",
             name="ck_user_channel_status",
         ),
     )
@@ -427,6 +427,45 @@ class UserChannelRow(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="new")
     verify_attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class BackfillJobRunRow(Base):
+    __tablename__ = "backfill_job_run"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'succeeded', 'failed', 'cancelled')",
+            name="ck_backfill_job_run_status",
+        ),
+        Index(
+            "ix_backfill_job_run_user_channel_started",
+            "user_id",
+            "channel_id",
+            "started_at",
+        ),
+        Index("ix_backfill_job_run_status", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id"), nullable=False
+    )
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("telegram_channel.channel_id"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    fetched_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    oldest_posted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cursor_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class UserExchangeConnectionRow(Base):
