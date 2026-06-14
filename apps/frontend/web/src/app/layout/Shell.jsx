@@ -1,5 +1,6 @@
 import {
   Avatar,
+  Button,
   Menu,
   MenuItem,
   MenuSeparator,
@@ -147,10 +148,15 @@ export function Shell({
         <header className="vrs-top">
           <div className="vrs-top__titles">
             {breadcrumb && (
-              <button className="vrs-crumb" onClick={onExit}>
-                <Icon name="chevronLeft" size={13} />
-                <span>{breadcrumb}</span>
-              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="vrs-backbtn"
+                iconLeft={<Icon name="chevronLeft" size={14} />}
+                onClick={onExit}
+              >
+                {breadcrumb}
+              </Button>
             )}
             <div className="vrs-top__title">{title}</div>
             {subtitle && <div className="vrs-top__sub">{subtitle}</div>}
