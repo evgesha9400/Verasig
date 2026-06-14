@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Execution Step — Adaptive Display Logic</title>
+    <link
+      rel="stylesheet"
+      href="_ds/verasig-design-system-remix-770ca33e-a7ba-4b8b-b857-928d1a028b4d/tokens/fonts.css"
+    />
+    <link
+      rel="stylesheet"
+      href="_ds/verasig-design-system-remix-770ca33e-a7ba-4b8b-b857-928d1a028b4d/tokens/colors.css"
+    />
+    <link
+      rel="stylesheet"
+      href="_ds/verasig-design-system-remix-770ca33e-a7ba-4b8b-b857-928d1a028b4d/tokens/typography.css"
+    />
+    <link
+      rel="stylesheet"
+      href="_ds/verasig-design-system-remix-770ca33e-a7ba-4b8b-b857-928d1a028b4d/tokens/spacing.css"
+    />
+    <link
+      rel="stylesheet"
+      href="_ds/verasig-design-system-remix-770ca33e-a7ba-4b8b-b857-928d1a028b4d/tokens/effects.css"
+    />
+    <link
+      rel="stylesheet"
+      href="_ds/verasig-design-system-remix-770ca33e-a7ba-4b8b-b857-928d1a028b4d/tokens/base.css"
+    />
+    <style>
+      html {
+        background: var(--bg-app);
+      }
+      body {
+        margin: 0;
+        color: var(--text-strong);
+        font-family: var(--font-sans);
+      }
+      .doc {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 56px 32px 96px;
+      }
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-size: 34px;
+        letter-spacing: -0.025em;
+        margin: 10px 0 14px;
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-size: 21px;
+        letter-spacing: -0.02em;
+        margin: 52px 0 6px;
+      }
+      h2 .mono {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--text-faint);
+        letter-spacing: 0.06em;
+        margin-right: 10px;
+      }
+      p,
+      li {
+        font-size: 14.5px;
+        line-height: 1.65;
+        color: var(--text-muted);
+        text-wrap: pretty;
+      }
+      p strong,
+      li strong {
+        color: var(--text-strong);
+        font-weight: 600;
+      }
+      .lede {
+        font-size: 16px;
+      }
+
+      .principles {
+        display: grid;
+        gap: 0;
+        margin: 28px 0 0;
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        background: var(--surface-card);
+      }
+      .principle {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 14px;
+        padding: 16px 18px;
+        align-items: baseline;
+      }
+      .principle + .principle {
+        border-top: 1px solid var(--border-subtle);
+      }
+      .principle .n {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--accent);
+      }
+      .principle p {
+        margin: 0;
+      }
+
+      /* decision tree */
+      .tree {
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        background: var(--surface-card);
+        padding: 20px 22px;
+        margin-top: 14px;
+      }
+      .q {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-strong);
+        margin: 0 0 4px;
+      }
+      .q .qm {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--azure-500, #5197ff);
+        flex: none;
+      }
+      .branches {
+        margin: 6px 0 2px 5px;
+        padding-left: 18px;
+        border-left: 1px solid var(--border-default);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .branch {
+        position: relative;
+      }
+      .branch::before {
+        content: "";
+        position: absolute;
+        left: -18px;
+        top: 10px;
+        width: 12px;
+        height: 1px;
+        background: var(--border-default);
+      }
+      .ans {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: var(--radius-xs);
+        margin-right: 8px;
+      }
+      .ans--yes {
+        color: var(--verified-500);
+        background: color-mix(in srgb, var(--verified-500) 14%, transparent);
+      }
+      .ans--no {
+        color: var(--rejected-500);
+        background: color-mix(in srgb, var(--rejected-500) 14%, transparent);
+      }
+      .outcome {
+        font-size: 14px;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+      .outcome strong {
+        color: var(--text-strong);
+      }
+      .outcome .ui {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-strong);
+        background: var(--surface-sunken);
+        border: 1px solid var(--border-subtle);
+        border-radius: 6px;
+        padding: 1px 7px;
+        white-space: nowrap;
+      }
+      .outcome .quiet {
+        font-style: italic;
+      }
+      .sub {
+        margin-top: 8px;
+      }
+
+      /* matrix table */
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 14px;
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+      th {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        text-align: left;
+        padding: 10px 14px;
+        background: var(--surface-sunken);
+        border-bottom: 1px solid var(--border-default);
+      }
+      td {
+        font-size: 13.5px;
+        color: var(--text-muted);
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--border-subtle);
+        vertical-align: top;
+        line-height: 1.55;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      td.shape {
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        color: var(--text-strong);
+        white-space: nowrap;
+      }
+      .dim-label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        padding-top: 18px;
+      }
+      td.dim-cell {
+        background: var(--surface-card);
+      }
+
+      .callout {
+        border: 1px solid
+          color-mix(in srgb, var(--azure-500, #5197ff) 30%, transparent);
+        background: color-mix(
+          in srgb,
+          var(--azure-500, #5197ff) 7%,
+          transparent
+        );
+        border-radius: var(--radius-lg);
+        padding: 16px 20px;
+        margin-top: 16px;
+      }
+      .callout p {
+        margin: 0;
+      }
+      ul {
+        padding-left: 20px;
+        margin: 10px 0;
+      }
+      li {
+        margin: 6px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <div class="eyebrow">Execution step · design note</div>
+      <h1>Adapt to what the feed actually posts</h1>
+      <p class="lede">
+        The Execution step currently shows every control to every user —
+        including controls that are meaningless for their feed. This note
+        defines exactly what renders when, and why the combinatorics never
+        explode.
+      </p>
+
+      <div class="principles">
+        <div class="principle">
+          <span class="n">P1</span>
+          <p>
+            <strong>Two layers, never confused.</strong> The backfilled corpus
+            (all parsed signals from this feed) decides what the step
+            <strong>shows</strong> — once, per feed. Each individual signal
+            decides what the engine <strong>does</strong> — at execution time. A
+            feed is heterogeneous: 64% ranges and 36% single prices can coexist,
+            so showing the ladder control is a corpus decision, not a signal
+            decision.
+          </p>
+        </div>
+        <div class="principle">
+          <span class="n">P2</span>
+          <p>
+            <strong>Three independent dimensions.</strong> Entry shape (none /
+            single price / range) × target count (0 / 1 / many) × stop (present
+            / absent) = 18 signal shapes. But the dimensions don't interact:
+            entry handling never depends on how many targets exist. So the UI
+            needs three small adapters, not eighteen branches.
+          </p>
+        </div>
+        <div class="principle">
+          <span class="n">P3</span>
+          <p>
+            <strong>The skeleton stays put.</strong> 01 · Size → 02 · Entry → 03
+            · Exit always render, in that order. A section with nothing to
+            configure collapses to a one-line statement of fact — it never
+            disappears. The step stays learnable across feeds, and the preview
+            ties keep working.
+          </p>
+        </div>
+      </div>
+
+      <h2><span class="mono">01</span>Position size — no tree</h2>
+      <p>
+        Sizing depends on your account, never on signal shape.
+        <strong>Always rendered, always identical.</strong>
+      </p>
+
+      <h2><span class="mono">02</span>Entry — what renders</h2>
+      <div class="tree">
+        <div class="q">
+          <span class="qm">Q</span>Does any backfilled signal post an entry
+          range?
+        </div>
+        <div class="branches">
+          <div class="branch">
+            <span class="ans ans--no">No</span>
+            <span class="outcome"
+              >No controls. One line:
+              <span class="quiet"
+                >“This feed posts single entry prices — orders are placed at the
+                posted price.”</span
+              ></span
+            >
+          </div>
+          <div class="branch">
+            <span class="ans ans--yes">Yes</span>
+            <span class="outcome"
+              >Render
+              <span class="ui">First touch / Midpoint / Ladder</span> with the
+              corpus stat:
+              <span class="quiet"
+                >“64% of this feed’s signals post a range.”</span
+              ></span
+            >
+            <div class="branches sub">
+              <div class="branch">
+                <span class="ans ans--yes">Mixed feed</span>
+                <span class="outcome"
+                  >Add:
+                  <span class="quiet"
+                    >“Single-price signals fill at the posted price — this
+                    setting doesn’t affect them.”</span
+                  ></span
+                >
+              </div>
+              <div class="branch">
+                <span class="ans ans--yes">“Enter now” signals exist</span>
+                <span class="outcome"
+                  >Add:
+                  <span class="quiet"
+                    >“Signals without a price fill at market.”</span
+                  ></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2><span class="mono">03</span>Exit — what renders</h2>
+      <div class="tree">
+        <div class="q">
+          <span class="qm">Q</span>Does any backfilled signal post a stop or a
+          target?
+        </div>
+        <div class="branches">
+          <div class="branch">
+            <span class="ans ans--no">No</span>
+            <span class="outcome"
+              >No source toggle —
+              <span class="ui">My own stop &amp; target</span> is the only mode
+              (today’s “no risk management detected” case).</span
+            >
+          </div>
+          <div class="branch">
+            <span class="ans ans--yes">Yes</span>
+            <span class="outcome"
+              >Render the source toggle. When
+              <strong>“Signal’s stops &amp; targets”</strong> is selected, each
+              sub-control has its own gate:</span
+            >
+            <div class="branches sub">
+              <div class="branch">
+                <div class="q">
+                  <span class="qm">Q</span>Do all signals post both a stop and ≥
+                  1 target?
+                </div>
+                <div class="branches">
+                  <div class="branch">
+                    <span class="ans ans--yes">Yes</span
+                    ><span class="outcome"
+                      >Hide missing-handling entirely — there is nothing to fall
+                      back from.</span
+                    >
+                  </div>
+                  <div class="branch">
+                    <span class="ans ans--no">No</span
+                    ><span class="outcome"
+                      >Render
+                      <span class="ui">Apply a fallback / Skip the signal</span>
+                      with the stat:
+                      <span class="quiet"
+                        >“8% of signals omit a stop or target.”</span
+                      ></span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="branch">
+                <div class="q">
+                  <span class="qm">Q</span>Does any signal post more than one
+                  target?
+                </div>
+                <div class="branches">
+                  <div class="branch">
+                    <span class="ans ans--no">No</span
+                    ><span class="outcome"
+                      >Hide allocation <em>and</em> break-even toggle. One line:
+                      <span class="quiet"
+                        >“Signals post a single target — the full position
+                        closes there.”</span
+                      ></span
+                    >
+                  </div>
+                  <div class="branch">
+                    <span class="ans ans--yes">Yes</span
+                    ><span class="outcome"
+                      >Render
+                      <span class="ui"
+                        >Equal split / Front-heavy / TP1 only</span
+                      >
+                      with the stat.
+                      <div class="branches sub">
+                        <div class="branch">
+                          <span class="ans ans--yes">Allocation = TP1 only</span
+                          ><span class="outcome"
+                            >Hide the break-even toggle — TP1 closes 100%, there
+                            is no position left to protect.</span
+                          >
+                        </div>
+                      </div></span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="branch">
+                <span class="ans ans--yes">Always</span>
+                <span class="outcome"
+                  >Render <span class="ui">Follow the author’s updates</span> —
+                  authors post updates regardless of signal shape.</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h2>The engine matrix — what a config does to each signal</h2>
+      <p>
+        Because the dimensions are independent, eighteen shapes reduce to seven
+        rules. Whatever combination a signal arrives in, the engine applies one
+        rule per dimension:
+      </p>
+      <table>
+        <tbody>
+          <tr>
+            <td class="dim-cell dim-label" colspan="2">Entry dimension</td>
+          </tr>
+          <tr>
+            <td class="shape">Range posted</td>
+            <td>
+              Entry mode applies exactly as configured — first touch, midpoint,
+              or ladder across the range.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">Single price posted</td>
+            <td>
+              One limit order at the posted price. Entry mode is bypassed, not
+              misapplied.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">No price (“enter now”)</td>
+            <td>Market fill on verification.</td>
+          </tr>
+          <tr>
+            <td class="dim-cell dim-label" colspan="2">Target dimension</td>
+          </tr>
+          <tr>
+            <td class="shape">Multiple targets</td>
+            <td>
+              Allocation applies as configured — equal, front-heavy, or TP1
+              only.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">One target</td>
+            <td>
+              100% closes there. Allocation is bypassed; break-even is moot.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">No target</td>
+            <td>
+              Missing-handling decides: fallback take-profit (anchored on your
+              average fill) or skip.
+            </td>
+          </tr>
+          <tr>
+            <td class="dim-cell dim-label" colspan="2">Stop dimension</td>
+          </tr>
+          <tr>
+            <td class="shape">No stop</td>
+            <td>
+              Missing-handling decides: fallback stop-loss (anchored on your
+              average fill) or skip.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Worked combinations</h2>
+      <p>The cases you asked about, traced through the matrix:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Signal arrives as</th>
+            <th>Engine behavior</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="shape">Range · 1 TP · SL</td>
+            <td>
+              Ladder fills across the range as configured. The single target
+              takes 100% — your allocation setting is simply bypassed.
+              Break-even is moot.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">Single price · 3 TPs · SL</td>
+            <td>
+              One fill at the posted price — your entry mode is bypassed.
+              Allocation splits across the three targets as configured;
+              break-even applies after TP1.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">Range · 3 TPs · no SL</td>
+            <td>
+              Ladder + allocation apply normally. The stop comes from your
+              fallback (anchored on average fill) — or the signal is skipped,
+              per your missing-handling choice.
+            </td>
+          </tr>
+          <tr>
+            <td class="shape">“Enter now” · 0 TPs · no SL</td>
+            <td>
+              The degenerate case: market fill, then everything comes from
+              fallbacks — or, more likely, you’ve set this feed to skip such
+              signals.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Where the combinations should actually live: the preview</h2>
+      <div class="callout">
+        <p>
+          Mixed feeds mean no single sample signal can demonstrate the config.
+          Instead of explaining combinatorics in copy, the
+          <strong
+            >plan preview should let you page through 2–3 representative signals
+            from the backfill</strong
+          >
+          — e.g. <span class="ui">Range · 3 TPs</span> ·
+          <span class="ui">Single · 1 TP</span> ·
+          <span class="ui">No stop</span> — each rendered through your current
+          config. The user <em>sees</em> that the ladder collapses to one fill,
+          that one target takes 100%, that the fallback stop appears. One
+          chip-switcher, zero paragraphs.
+        </p>
+      </div>
+
+      <h2>Open questions</h2>
+      <ul>
+        <li>
+          <strong>Thresholds.</strong> If only 2% of signals post ranges, the
+          control still governs those 2% — I'd show it whenever the count is
+          non-zero, with the stat making rarity visible. Agree?
+        </li>
+        <li>
+          <strong>Hide vs. disable.</strong> The tree hides irrelevant controls
+          (with a statement of fact in their place). Disabling instead would
+          advertise capabilities the feed can't use — noise, in my view.
+        </li>
+        <li>
+          <strong>Corpus drift.</strong> If a feed starts posting ranges after
+          configuration, the step should resurface the entry controls on next
+          visit (defaulting to first-touch, the no-op-est option) — and possibly
+          notify.
+        </li>
+      </ul>
+    </div>
+  </body>
+</html>

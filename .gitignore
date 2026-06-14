@@ -28,6 +28,9 @@ data/
 !apps/frontend/design-system/src/components/data/
 !apps/frontend/design-system/src/components/data/**
 .DS_Store
+prototype/.thumbnail
+prototype/screenshots/
+prototype/uploads/
 
 # Local tool state
 .impeccable/live/
