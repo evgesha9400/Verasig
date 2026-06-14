@@ -1,5 +1,12 @@
 import { useState } from 'react'
-import { Button, Input, Banner, Badge, RadioCard } from '@verasig/design-system'
+import {
+  Button,
+  Input,
+  Banner,
+  Badge,
+  RadioCard,
+  TextLink
+} from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { EXCHANGES } from '../../../domain/demo-data/seed.js'
 
@@ -124,16 +131,15 @@ export function ExchangeView({ onConnected, bybitConnected }) {
                     </div>
                   </div>
                   {dConnected && d.status === 'available' && !isReconfig && (
-                    <button
-                      type="button"
-                      className="vrs-link vrs-opt__action"
+                    <TextLink
+                      className="vrs-opt__action"
                       onClick={(e) => {
                         e.stopPropagation()
                         startReconfigure(d.id)
                       }}
                     >
                       Reconfigure
-                    </button>
+                    </TextLink>
                   )}
                 </div>
                 {dOpen && (

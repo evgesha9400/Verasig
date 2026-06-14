@@ -384,6 +384,14 @@
 .vrs-src-card.is-soon {
   opacity: 0.62;
 }
+.vrs-src-card--empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 168px;
+  border-style: dashed;
+  text-align: center;
+  color: var(--text-faint);
+}
 .vrs-src-card__top {
   display: flex;
   align-items: center;
@@ -506,18 +514,6 @@
   line-height: var(--lh-body);
 }
 .vrs-help a,
-.vrs-link {
-  color: var(--link);
-  cursor: pointer;
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  transition: color var(--dur-fast) var(--ease-out);
-}
-.vrs-link:hover {
-  color: var(--link-hover);
-}
 
 /* ---- Code entry ---- */
 .vrs-code {
@@ -1353,12 +1349,7 @@ button.vrs-pipe__step:active {
 .vrs-opt__action {
   margin-left: auto;
   align-self: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-sans);
   font-size: var(--text-sm);
-  padding: 4px 2px;
 }
 .vrs-opt__head {
   display: flex;

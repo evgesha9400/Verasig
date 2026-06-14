@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Banner, Button, Input, Checkbox } from '@verasig/design-system'
+import { Banner, Button, Input, Checkbox, TextLink } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
@@ -72,9 +72,9 @@ export function LoginView({ onLogin, onRegister }) {
             />
             <div className="auth-row">
               <Checkbox label="Remember me" />
-              <a className="auth-forgot" href="#">
+              <TextLink href="#" className="auth-forgot">
                 Forgot password?
-              </a>
+              </TextLink>
             </div>
             {error && (
               <Banner tone="rejected" title="Login failed">
@@ -94,9 +94,9 @@ export function LoginView({ onLogin, onRegister }) {
           </form>
           <div className="auth-switch">
             New to Verasig?{' '}
-            <button type="button" className="auth-link" onClick={onRegister}>
+            <TextLink tone="accent" onClick={onRegister}>
               Create an account
-            </button>
+            </TextLink>
           </div>
         </div>
       </main>
