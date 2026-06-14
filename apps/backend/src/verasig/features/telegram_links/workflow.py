@@ -49,6 +49,7 @@ async def verify(
     code: str,
     auth: TelegramAuth,
     cipher: SecretCipher,
+    password: str | None = None,
 ) -> UserTelegramLinkRow:
     link = telegram_link_repository.read_link(session, user_id)
     if (
@@ -67,6 +68,7 @@ async def verify(
             link.phone,
             code,
             link.phone_code_hash,
+            password,
         )
     except CodeInvalidError:
         raise

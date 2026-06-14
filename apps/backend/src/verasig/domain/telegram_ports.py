@@ -20,7 +20,11 @@ class CodeInvalidError(Exception):
 
 
 class TwoFactorUnsupportedError(Exception):
-    """Telegram account requires 2FA, which v1 does not support."""
+    """Telegram account requires a two-factor password to continue."""
+
+
+class TwoFactorPasswordInvalidError(Exception):
+    """Telegram rejected the two-factor password."""
 
 
 @runtime_checkable
@@ -37,6 +41,7 @@ class TelegramAuth(Protocol):
         phone: str,
         code: str,
         phone_code_hash: str,
+        password: str | None = None,
     ) -> str: ...
 
 

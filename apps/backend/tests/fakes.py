@@ -11,7 +11,12 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import TradeIntent
-from verasig.domain.telegram_ports import CodeInvalidError, PendingCode
+from verasig.domain.telegram_ports import (
+    CodeInvalidError,
+    PendingCode,
+    TwoFactorPasswordInvalidError,
+    TwoFactorUnsupportedError,
+)
 from verasig.features.rules.rule_distiller import parse_distiller_output
 from verasig.foundation.market_data.static_exchange import normalize_base_symbol
 
@@ -28,13 +33,17 @@ class FakeTelegramAuth:
         pending_session: str = "pending-session",
         final_session: str = "final-session",
         phone_code_hash: str = "phone-code-hash",
+        requires_password: bool = False,
+        valid_password: str = "two-factor-password",
     ) -> None:
         self.valid_code = valid_code
         self.pending_session = pending_session
         self.final_session = final_session
         self.phone_code_hash = phone_code_hash
+        self.requires_password = requires_password
+        self.valid_password = valid_password
         self.sent_codes: list[tuple[int, str, str]] = []
-        self.sign_ins: list[tuple[str, int, str, str, str, str]] = []
+        self.sign_ins: list[tuple[str, int, str, str, str, str, str | None]] = []
 
     async def send_code(self, api_id: int, api_hash: str, phone: str) -> PendingCode:
         self.sent_codes.append((api_id, api_hash, phone))
@@ -51,12 +60,17 @@ class FakeTelegramAuth:
         phone: str,
         code: str,
         phone_code_hash: str,
+        password: str | None = None,
     ) -> str:
         self.sign_ins.append(
-            (session_string, api_id, api_hash, phone, code, phone_code_hash)
+            (session_string, api_id, api_hash, phone, code, phone_code_hash, password)
         )
         if code != self.valid_code:
             raise CodeInvalidError()
+        if self.requires_password and password is None:
+            raise TwoFactorUnsupportedError()
+        if self.requires_password and password != self.valid_password:
+            raise TwoFactorPasswordInvalidError()
         return self.final_session
 
 

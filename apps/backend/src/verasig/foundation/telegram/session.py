@@ -1,13 +1,18 @@
 """Per-user Telethon auth and source factory."""
 
 from telethon import TelegramClient
-from telethon.errors import PhoneCodeInvalidError, SessionPasswordNeededError
+from telethon.errors import (
+    PasswordHashInvalidError,
+    PhoneCodeInvalidError,
+    SessionPasswordNeededError,
+)
 from telethon.sessions import StringSession
 
 from verasig.domain.telegram_ports import (
     CodeInvalidError,
     PendingCode,
     TelegramSource,
+    TwoFactorPasswordInvalidError,
     TwoFactorUnsupportedError,
 )
 from verasig.foundation.telegram.telethon_source import TelethonSource
@@ -33,6 +38,7 @@ async def sign_in(
     phone: str,
     code: str,
     phone_code_hash: str,
+    password: str | None = None,
 ) -> str:
     client = TelegramClient(StringSession(session_string), api_id, api_hash)
     await client.connect()
@@ -42,7 +48,12 @@ async def sign_in(
         except PhoneCodeInvalidError as error:
             raise CodeInvalidError() from error
         except SessionPasswordNeededError as error:
-            raise TwoFactorUnsupportedError() from error
+            if password is None:
+                raise TwoFactorUnsupportedError() from error
+            try:
+                await client.sign_in(password=password)
+            except PasswordHashInvalidError as error:
+                raise TwoFactorPasswordInvalidError() from error
         return client.session.save()
     finally:
         await client.disconnect()
