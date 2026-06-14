@@ -70,14 +70,18 @@ export function Input({
   return (
     <div className="vrs-field">
       {label && (
-        <label className="vrs-field__label" htmlFor={fieldId}>
-          {label}
-          {required && <span className="vrs-field__req">*</span>}
-        </label>
+        <div className="vrs-field__label">
+          <label htmlFor={fieldId}>{label}</label>
+          {required && (
+            <span aria-hidden="true" className="vrs-field__req">
+              *
+            </span>
+          )}
+        </div>
       )}
       <div className={boxCls}>
         {iconLeft && <span className="vrs-input__icon">{iconLeft}</span>}
-        <input id={fieldId} disabled={disabled} {...rest} />
+        <input id={fieldId} disabled={disabled} required={required} {...rest} />
         {trailing}
       </div>
       {(error || hint) && (

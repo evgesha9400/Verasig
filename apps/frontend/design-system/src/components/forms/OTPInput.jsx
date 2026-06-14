@@ -90,6 +90,23 @@ export function OTPInput({
     if (digits[0] && index < length - 1) focusIndex(index + 1)
   }
 
+  function onPaste(index, event) {
+    const paste = event.clipboardData?.getData('text') || ''
+    const pastedDigits = paste
+      .replace(/\D/g, '')
+      .slice(0, length - index)
+      .split('')
+    if (pastedDigits.length === 0) return
+
+    event.preventDefault()
+    const next = [...chars]
+    pastedDigits.forEach((digit, offset) => {
+      next[index + offset] = digit
+    })
+    emit(next)
+    focusIndex(Math.min(index + pastedDigits.length, length - 1))
+  }
+
   function onKeyDown(index, event) {
     if (event.key !== 'Backspace' || chars[index]) return
     if (index === 0) return
@@ -118,6 +135,7 @@ export function OTPInput({
           value={digit}
           onChange={(event) => setDigit(index, event.target.value)}
           onKeyDown={(event) => onKeyDown(index, event)}
+          onPaste={(event) => onPaste(index, event)}
         />
       ))}
     </div>
