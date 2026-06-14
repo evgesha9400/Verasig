@@ -402,13 +402,6 @@
     border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
 }
-.vrs-src-card.is-clickable {
-  cursor: pointer;
-}
-.vrs-src-card.is-clickable:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
-}
 .vrs-src-card.is-soon {
   opacity: 0.62;
 }

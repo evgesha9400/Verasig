@@ -53,7 +53,7 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
         </div>
         <div className="vrs-src-grid" style={{ marginTop: 12 }}>
           {bybitConnected ? (
-            <div className="vrs-src-card is-clickable">
+            <div className="vrs-src-card">
               <div className="vrs-src-card__top">
                 <ByLogo />
                 <div style={{ flex: 1 }}>
