@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button, IconButton } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import { MessageCard } from '../../../shared/components/MessageCard.jsx'
 
 /* Verasig — Label step: Tinder-style signal / non-signal classification.
    Labeling is BINARY on purpose: a reply that is a signal is, by definition, an
@@ -11,73 +12,36 @@ import { Icon } from '@verasig/design-system'
    Data is backend-owned: the deck is the unlabeled candidate messages from
    GET /chats/{id}/messages; each swipe persists with POST .../label; the rail
    counts are seeded from GET /chats/{id}/labels and bumped locally. */
-function MsgMedia({ kind }) {
-  const map = {
-    chart: ['chart', 'Chart screenshot'],
-    image: ['image', 'Image'],
-    doc: ['doc', 'Document']
-  }
-  const [icon, label] = map[kind] || ['image', 'Attachment']
-  return (
-    <div className="vrs-card-msg__media">
-      <Icon name={icon} />
-      <span>{label}</span>
-    </div>
-  )
-}
-
-function MessageCard({ msg, label, dragX = 0, isTop, style }) {
-  const rot = dragX / 22
-  const cls = `vrs-card-msg ${label === 'signal' ? 'is-signal' : ''} ${label === 'noise' ? 'is-noise' : ''} ${isTop ? 'vrs-card-msg--top' : ''}`
-  const tStyle = isTop
-    ? { transform: `translateX(${dragX}px) rotate(${rot}deg)`, ...style }
-    : style
-  return (
-    <div className={cls} style={tStyle}>
-      {isTop && (
-        <>
-          <span
-            className="vrs-card-stamp signal"
-            style={{ opacity: Math.max(0, Math.min(1, dragX / 90)) }}
-          >
-            Signal
-          </span>
-          <span
-            className="vrs-card-stamp noise"
-            style={{ opacity: Math.max(0, Math.min(1, -dragX / 90)) }}
-          >
-            Noise
-          </span>
-        </>
+function LabelCard({ msg, label, dragX = 0, isTop, style }) {
+  const head = (
+    <>
+      <span className="vrs-card-msg__av" style={{ background: 'var(--viz-2)' }}>
+        {(msg.author || 'AC').slice(0, 2).toUpperCase()}
+      </span>
+      <span className="vrs-card-msg__who">{msg.author || 'Apex'}</span>
+      {msg.replyTo && (
+        <span className="vrs-autolink">
+          <Icon name="reply" size={11} /> reply
+        </span>
       )}
-      <div className="vrs-card-msg__head">
-        <span className="vrs-card-msg__av" style={{ background: 'var(--viz-2)' }}>
-          {(msg.author || 'AC').slice(0, 2).toUpperCase()}
-        </span>
-        <span className="vrs-card-msg__who">{msg.author || 'Apex'}</span>
-        {msg.replyTo && (
-          <span className="vrs-autolink">
-            <Icon name="reply" size={11} /> reply
-          </span>
-        )}
-        <span className="vrs-card-msg__time">
-          {msg.date} · {msg.time}
-        </span>
-      </div>
-      <div className="vrs-card-msg__body">
-        {msg.replyTo && (
-          <div className="vrs-card-reply">
-            <Icon name="reply" size={12} />
-            <span className="vrs-card-reply__body">
-              <span className="vrs-card-reply__who">{msg.replyTo.author}</span>
-              <span className="vrs-card-reply__txt">{msg.replyTo.text}</span>
-            </span>
-          </div>
-        )}
-        <div className="vrs-card-msg__text">{msg.text}</div>
-        {msg.media && <MsgMedia kind={msg.media} />}
-      </div>
-    </div>
+      <span className="vrs-card-msg__time">
+        {msg.date} · {msg.time}
+      </span>
+    </>
+  )
+  return (
+    <MessageCard
+      text={msg.text}
+      replyTo={msg.replyTo}
+      media={msg.media}
+      tone={label}
+      isTop={isTop}
+      dragX={dragX}
+      style={style}
+      stampPositive="Signal"
+      stampNegative="Noise"
+      head={head}
+    />
   )
 }
 
@@ -296,7 +260,7 @@ export function LabelView({
     return (
       <>
         {next1 && (
-          <MessageCard
+          <LabelCard
             key={'bg' + next1.id}
             msg={next1}
             label={labels[next1.id]}
@@ -304,7 +268,7 @@ export function LabelView({
             style={{ transform: 'scale(0.95) translateY(14px)', opacity: 0.6 }}
           />
         )}
-        <MessageCard
+        <LabelCard
           key={current.id}
           msg={current}
           label={labels[current.id]}
