@@ -50,7 +50,9 @@ describe('VerifyView', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
         act(() => vi.advanceTimersByTime(320))
       }
-      fireEvent.click(screen.getByRole('button', { name: /Finish verification/i }))
+      fireEvent.click(
+        screen.getByRole('button', { name: /Finish verification|Refine rules/i })
+      )
       await waitFor(() => expect(onSubmit).toHaveBeenCalled())
       expect(onSubmit.mock.calls[0][0]).toBe('7')
       expect(onSubmit.mock.calls[0][1]).toHaveLength(6)
@@ -72,7 +74,10 @@ describe('VerifyView', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Correct' }))
         act(() => vi.advanceTimersByTime(320))
       }
-      fireEvent.click(screen.getByRole('button', { name: /Finish verification/i }))
+      fireEvent.click(
+        screen.getByRole('button', { name: /Finish verification|Refine rules/i })
+      )
+      expect(await screen.findByText(/flagged as wrong/i)).toBeTruthy()
       fireEvent.click(await screen.findByRole('button', { name: /Back to labelling/i }))
       expect(onLoop).toHaveBeenCalled()
     } finally {

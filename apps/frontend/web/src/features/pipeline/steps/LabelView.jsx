@@ -216,7 +216,7 @@ export function LabelView({
   }, [commit, goPrev, goNext])
 
   function onPointerDown(e) {
-    if (idx >= total || flying) return
+    if (!current || flying) return
     dragRef.current = { active: true, startX: e.clientX }
     e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId)
   }
