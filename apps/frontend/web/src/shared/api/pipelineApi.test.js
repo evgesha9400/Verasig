@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getLabelCounts,
   getRules,
+  getVerifySamples,
   listMessages,
   recordLabel,
   startDistill,
-  streamDistillProgress
+  streamDistillProgress,
+  submitVerify
 } from './pipelineApi.js'
 
 function jsonResponse(body, status = 200) {
@@ -115,5 +117,38 @@ describe('pipelineApi — distill', () => {
     expect(FakeEventSource.last.url).toBe(
       'http://localhost:8000/chats/7/distill/progress?token=jwt-token'
     )
+  })
+})
+
+describe('pipelineApi — verify', () => {
+  it('gets verification samples', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({ attempt: 1, samples: [{ id: '1', predicted: 'signal' }] })
+    )
+
+    const body = await getVerifySamples('jwt-token', '7')
+
+    expect(body.attempt).toBe(1)
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/verify/samples', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
+  it('submits verdicts', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ passed: true, misclassified: [] }))
+    const verdicts = [{ messageId: '1', verdict: 'correct' }]
+
+    const body = await submitVerify('jwt-token', '7', verdicts)
+
+    expect(body.passed).toBe(true)
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({ verdicts })
+    })
   })
 })
