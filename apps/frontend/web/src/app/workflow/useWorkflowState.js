@@ -246,7 +246,7 @@ export function useWorkflowState(authToken) {
 
   function backtestFeed(chat) {
     setActiveChatId(chat.id)
-    setScreen('exchange')
+    setScreen('backtest')
   }
 
   function onBackfillComplete(result) {
