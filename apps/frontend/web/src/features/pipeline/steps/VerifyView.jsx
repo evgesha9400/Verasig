@@ -28,7 +28,7 @@ function VerifyCard({ item, dragX = 0, isTop, style }) {
     ? { transform: `translateX(${dragX}px) rotate(${rot}deg)`, ...style }
     : style
   const isSignal = item.predicted === 'signal'
-  const cls = `vrs-card-msg ${isSignal ? 'is-signal' : 'is-noise'}`
+  const cls = `vrs-card-msg ${isSignal ? 'is-signal' : 'is-noise'} ${isTop ? 'vrs-card-msg--top' : ''}`
   return (
     <div className={cls} style={tStyle}>
       {isTop && (
@@ -401,17 +401,19 @@ export function VerifyView({
   return (
     <div className="vrs-label">
       <div className="vrs-deck">
-        <div
-          className="vrs-deck__stage"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{
-            cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
-          }}
-        >
-          {renderStage()}
+        <div className="vrs-deck__viewport">
+          <div
+            className="vrs-deck__stage"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            style={{
+              cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
+            }}
+          >
+            {renderStage()}
+          </div>
         </div>
 
         <div className="vrs-swipe-controls">

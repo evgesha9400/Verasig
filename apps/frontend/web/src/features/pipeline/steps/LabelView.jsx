@@ -28,7 +28,7 @@ function MsgMedia({ kind }) {
 
 function MessageCard({ msg, label, dragX = 0, isTop, style }) {
   const rot = dragX / 22
-  const cls = `vrs-card-msg ${label === 'signal' ? 'is-signal' : ''} ${label === 'noise' ? 'is-noise' : ''}`
+  const cls = `vrs-card-msg ${label === 'signal' ? 'is-signal' : ''} ${label === 'noise' ? 'is-noise' : ''} ${isTop ? 'vrs-card-msg--top' : ''}`
   const tStyle = isTop
     ? { transform: `translateX(${dragX}px) rotate(${rot}deg)`, ...style }
     : style
@@ -328,17 +328,19 @@ export function LabelView({
   return (
     <div className="vrs-label">
       <div className="vrs-deck">
-        <div
-          className="vrs-deck__stage"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{
-            cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
-          }}
-        >
-          {renderStage()}
+        <div className="vrs-deck__viewport">
+          <div
+            className="vrs-deck__stage"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            style={{
+              cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
+            }}
+          >
+            {renderStage()}
+          </div>
         </div>
 
         <div className="vrs-swipe-controls">
