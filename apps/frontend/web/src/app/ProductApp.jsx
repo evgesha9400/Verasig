@@ -18,9 +18,7 @@ import { BackfillView } from '../features/pipeline/steps/BackfillView.jsx'
 import { LabelView } from '../features/pipeline/steps/LabelView.jsx'
 import { DistillView } from '../features/pipeline/steps/DistillView.jsx'
 import { VerifyView } from '../features/pipeline/steps/VerifyView.jsx'
-import { ExchangeView } from '../features/pipeline/steps/ExchangeView.jsx'
-import { ExecutionView } from '../features/pipeline/steps/ExecutionView.jsx'
-import { BacktestView } from '../features/pipeline/steps/BacktestView.jsx'
+import { PaidFeaturePlaceholder } from '../features/pipeline/steps/PaidFeaturePlaceholder.jsx'
 import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
 import { SettingsView } from '../features/settings/SettingsView.jsx'
 import { useWorkflowState } from './workflow/useWorkflowState.js'
@@ -103,7 +101,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,
-    onBacktestComplete,
     requestStepBack,
     confirmStepBack,
     openSettings,
@@ -331,35 +328,20 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onError={(tone, title, msg) => fireToast(tone, title, msg)}
         />
       )
-    } else if (screen === 'exchange') {
+    } else if (
+      screen === 'exchange' ||
+      screen === 'risk' ||
+      screen === 'backtest' ||
+      screen === 'backtest-result'
+    ) {
+      const featureName = screen === 'exchange' ? 'Exchange routing' : 'Backtesting'
       body = (
-        <ExchangeView
-          bybitConnected={bybitConnected}
-          onConnected={() => {
-            connectBybit()
-            setScreen('risk')
+        <PaidFeaturePlaceholder
+          feature={featureName}
+          onDone={() => {
+            void refreshSources().catch(() => {})
+            exitToChats()
           }}
-        />
-      )
-    } else if (screen === 'risk') {
-      body = (
-        <ExecutionView
-          layout="flow"
-          controls="segmented"
-          hasRisk={true}
-          onRun={() => setScreen('backtest')}
-        />
-      )
-    } else if (screen === 'backtest') {
-      body = (
-        <BacktestView chat={activeChat} onComplete={(sd) => onBacktestComplete(sd)} />
-      )
-    } else if (screen === 'backtest-result') {
-      body = (
-        <BacktestView
-          chat={activeChat}
-          skipRun={true}
-          onComplete={() => setScreen('chats')}
         />
       )
     }
