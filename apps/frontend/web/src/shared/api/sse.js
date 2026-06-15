@@ -2,7 +2,11 @@ import { createApiUrl } from './client.js'
 
 function parseEventData(event) {
   if (!event.data) return {}
-  return JSON.parse(event.data)
+  try {
+    return JSON.parse(event.data)
+  } catch {
+    return {}
+  }
 }
 
 function progressUrl(token, path) {

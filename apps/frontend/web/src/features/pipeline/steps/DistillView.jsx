@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
@@ -60,58 +60,75 @@ export function DistillView({
   const [step, setStep] = useState(0)
   const [rules, setRules] = useState([])
 
-  // No start-once ref: mirror BackfillView. In React StrictMode the effect runs
-  // twice; the first run's cleanup sets closed=true (so it never subscribes) and
-  // the second run re-POSTs. A duplicate POST returns 409, which we tolerate and
-  // stream the already-running job. In production the effect runs once.
+  const handlersRef = useRef({
+    onStartDistill,
+    onStreamProgress,
+    onGetRules,
+    onError
+  })
+
+  useEffect(() => {
+    handlersRef.current = { onStartDistill, onStreamProgress, onGetRules, onError }
+  }, [onStartDistill, onStreamProgress, onGetRules, onError])
+
   useEffect(() => {
     let closed = false
     let subscription = null
 
-    function loadRules() {
-      return Promise.resolve(onGetRules(chatId)).then((result) => {
-        if (closed) return
-        setRules(result.rules || [])
-        setPhase('done')
-      })
+    function showRules(compiled) {
+      if (closed) return
+      setRules(compiled)
+      setPhase('done')
     }
 
-    function fail() {
+    function fail(message) {
       if (closed) return
       setPhase('error')
-      onError &&
-        onError('rejected', 'Distillation failed', 'The distill job did not complete.')
+      handlersRef.current.onError &&
+        handlersRef.current.onError(
+          'rejected',
+          'Distillation failed',
+          message || 'The distill job did not complete.'
+        )
+    }
+
+    // Read the durable ruleset. An empty ruleset means the job did not really
+    // produce rules, so treat it as a failure rather than a "0 rules" success.
+    function loadRules(failMessage) {
+      Promise.resolve(handlersRef.current.onGetRules(chatId))
+        .then((result) => {
+          const compiled = result.rules || []
+          if (compiled.length === 0) fail(failMessage)
+          else showRules(compiled)
+        })
+        .catch(() => fail(failMessage))
     }
 
     async function run() {
       try {
-        await onStartDistill(chatId)
+        await handlersRef.current.onStartDistill(chatId)
       } catch (error) {
-        // A duplicated start (StrictMode / resume) is fine — stream the running job.
+        // A duplicated start (StrictMode / resume) returns 409 — stream the
+        // already-running job. Any other start failure is fatal.
         if (error?.status !== 409) {
-          if (!closed) {
-            setPhase('error')
-            onError &&
-              onError('rejected', 'Distillation failed', error?.message || 'Try again.')
-          }
+          fail(error?.message)
           return
         }
       }
       if (closed) return
-      subscription = onStreamProgress(chatId, {
+      subscription = handlersRef.current.onStreamProgress(chatId, {
         onProgress: (progress) => {
           if (!progress.phase) return
           const index = DISTILL_STEPS.indexOf(progress.phase)
           if (index >= 0) setStep(index + 1)
         },
-        // On done OR on a stream error, read the durable ruleset. The job may have
-        // finished and been evicted before we connected (distill has no replay),
-        // so reading /rules is the source of truth; only fail if that read fails.
-        onDone: () => {
-          loadRules().catch(fail)
-        },
-        onError: () => {
-          loadRules().catch(fail)
+        onDone: () => loadRules('The distill job did not complete.'),
+        onError: (payload) => {
+          // A named backend error event carries a message → real job failure.
+          // A bare connection error ({}) may just mean the finished job was
+          // evicted before we connected, so recover from the durable ruleset.
+          if (payload && payload.message) fail(payload.message)
+          else loadRules('The distill job did not complete.')
         }
       })
     }
@@ -122,7 +139,7 @@ export function DistillView({
       closed = true
       subscription && subscription.close()
     }
-  }, [chatId, onStartDistill, onStreamProgress, onGetRules, onError])
+  }, [chatId])
 
   if (phase === 'thinking') {
     return (
