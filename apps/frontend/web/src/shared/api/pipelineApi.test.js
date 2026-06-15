@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  getLabelCounts,
-  listMessages,
-  recordLabel
-} from './pipelineApi.js'
+import { getLabelCounts, listMessages, recordLabel } from './pipelineApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
