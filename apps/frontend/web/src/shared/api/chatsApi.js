@@ -1,4 +1,5 @@
-import { createApiUrl, requestJson } from './client.js'
+import { requestJson } from './client.js'
+import { streamJobProgress } from './sse.js'
 
 export function listChats(token) {
   return requestJson('/chats', { token })
@@ -33,33 +34,6 @@ export function cancelBackfill(token, chatId) {
   })
 }
 
-function parseEventData(event) {
-  if (!event.data) return {}
-  return JSON.parse(event.data)
-}
-
-function createProgressUrl(token, chatId) {
-  const url = new URL(createApiUrl(`/chats/${chatId}/backfill/progress`))
-  url.searchParams.set('token', token)
-  return url.toString()
-}
-
 export function streamBackfillProgress(token, chatId, handlers = {}) {
-  const source = new EventSource(createProgressUrl(token, chatId))
-
-  source.addEventListener('progress', (event) => {
-    handlers.onProgress && handlers.onProgress(parseEventData(event))
-  })
-  source.addEventListener('done', (event) => {
-    handlers.onDone && handlers.onDone(parseEventData(event))
-    source.close()
-  })
-  source.addEventListener('error', (event) => {
-    handlers.onError && handlers.onError(parseEventData(event))
-    source.close()
-  })
-
-  return {
-    close: () => source.close()
-  }
+  return streamJobProgress(token, `/chats/${chatId}/backfill/progress`, handlers)
 }
