@@ -1,7 +1,7 @@
 import { requestJson } from './client.js'
 
 export function listMessages(token, chatId, limit) {
-  const query = limit ? `?limit=${limit}` : ''
+  const query = typeof limit === 'number' ? `?limit=${limit}` : ''
   return requestJson(`/chats/${chatId}/messages${query}`, { token })
 }
 
