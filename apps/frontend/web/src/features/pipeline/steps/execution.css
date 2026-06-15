@@ -49,7 +49,7 @@
     box-shadow 120ms var(--ease-out);
 }
 .is-hot .vx-num {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
   box-shadow: var(--glow-soft);
 }
@@ -313,5 +313,5 @@
   background: none;
 }
 .vrs-ladder__stats .vx-tie.is-tied .vrs-ladder__statval {
-  color: var(--accent);
+  color: var(--accent-text);
 }
