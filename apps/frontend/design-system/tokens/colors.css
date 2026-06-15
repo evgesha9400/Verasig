@@ -116,26 +116,26 @@
   --border-subtle: rgba(12, 18, 26, 0.07);
   --border-default: rgba(12, 18, 26, 0.12);
   --border-strong: rgba(12, 18, 26, 0.2);
-  --border-focus: var(--signal-600);
+  --border-focus: var(--azure-500);
 
-  /* Accent — darken for legibility on light surfaces */
-  --accent: var(--signal-600);
-  --accent-hover: var(--signal-500);
-  --accent-press: var(--signal-700);
-  --accent-quiet: rgba(143, 184, 30, 0.15);
-  --accent-text: var(--signal-700);
+  /* Accent — azure on light surfaces (dark theme keeps the lime signal) */
+  --accent: var(--azure-500);
+  --accent-hover: var(--azure-400);
+  --accent-press: var(--azure-600);
+  --accent-quiet: rgba(81, 151, 255, 0.12);
+  --accent-text: var(--azure-600);
 
   --link: var(--azure-600);
   --link-hover: var(--azure-500);
 
-  --signal-glow: rgba(143, 184, 30, 0.22);
+  --signal-glow: rgba(81, 151, 255, 0.28);
 
   /* Semantic backgrounds get a touch more saturation on white */
-  --verified-bg: rgba(143, 184, 30, 0.15);
+  --verified-bg: rgba(81, 151, 255, 0.15);
   --pending-bg: rgba(214, 150, 20, 0.14);
   --rejected-bg: rgba(220, 60, 48, 0.1);
   --info-bg: rgba(47, 111, 224, 0.1);
   --pending-500: #c98a12;
   --rejected-500: #e0463a;
-  --verified-500: #6e9415;
+  --verified-500: var(--azure-500);
 }

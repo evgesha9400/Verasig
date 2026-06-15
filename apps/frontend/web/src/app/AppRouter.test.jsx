@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { AppRoutes } from './AppRouter.jsx'
+import AppRouter, { AppRoutes } from './AppRouter.jsx'
 
 const AUTH_TOKEN_KEY = 'vrs-auth-token-1'
+const THEME_STORAGE_KEY = 'vrs-theme-1'
 const backendUser = {
   firstName: 'Ada',
   lastName: 'Lovelace',
@@ -112,6 +113,8 @@ function renderRoute(initialPath) {
 beforeEach(() => {
   installTestStorage()
   installFetch()
+  document.documentElement.removeAttribute('data-theme')
+  document.documentElement.removeAttribute('style')
 })
 
 describe('AppRoutes', () => {
@@ -147,7 +150,20 @@ describe('AppRoutes', () => {
     await user.click(screen.getByRole('radio', { name: 'Light' }))
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#8FB81E')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#5197FF')
+  })
+
+  it('applies the stored theme on auth pages that never call useTheme', async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, 'light')
+    window.history.pushState({}, '', '/login')
+
+    render(<AppRouter />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Log in to Verasig')).toBeTruthy()
+    })
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#5197FF')
   })
 
   it('navigates from backend login submit to the product shell', async () => {

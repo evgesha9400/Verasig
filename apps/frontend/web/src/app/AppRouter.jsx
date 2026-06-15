@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { ThemeProvider } from '@verasig/design-system'
 import { LoginView } from '../features/auth/LoginView.jsx'
 import { RegisterView } from '../features/auth/RegisterView.jsx'
 import { getCurrentUser, login, logout, register } from '../shared/api/authApi.js'
@@ -152,8 +153,10 @@ export function AppRoutes() {
 
 export default function AppRouter() {
   return (
-    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      <AppRoutes />
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <AppRoutes />
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
