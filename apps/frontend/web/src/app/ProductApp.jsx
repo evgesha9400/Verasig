@@ -334,7 +334,14 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       screen === 'backtest' ||
       screen === 'backtest-result'
     ) {
-      const featureName = screen === 'exchange' ? 'Exchange routing' : 'Backtesting'
+      const featureName =
+        screen === 'exchange'
+          ? 'Exchange routing'
+          : screen === 'risk'
+            ? 'Execution'
+            : 'Backtesting'
+      title = featureName
+      subtitle = `${activeChat.name} · Available on a higher plan`
       body = (
         <PaidFeaturePlaceholder
           feature={featureName}
