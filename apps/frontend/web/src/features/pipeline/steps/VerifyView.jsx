@@ -100,6 +100,9 @@ export function VerifyView({
     let active = true
     setItems(null)
     setLoadError(false)
+    setMarks({})
+    setResult(null)
+    setSubmitting(false)
     Promise.resolve(handlersRef.current.onGetSamples(chatId))
       .then((body) => {
         if (!active) return
@@ -202,7 +205,7 @@ export function VerifyView({
   }, [commit, goPrev, goNext, result])
 
   function onPointerDown(e) {
-    if (idx >= total || flying) return
+    if (!current || flying) return
     dragRef.current = { active: true, startX: e.clientX }
     e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId)
   }
