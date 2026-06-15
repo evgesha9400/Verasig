@@ -1251,17 +1251,6 @@ button.vrs-pipe__step:active {
 .vrs-next-option.is-primary > svg:last-child {
   color: var(--accent-text);
 }
-.vrs-next-tag {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent-text);
-  background: var(--accent-quiet);
-  padding: 2px 7px;
-  border-radius: var(--radius-pill, 999px);
-}
-
 /* ---- Distill rules ---- */
 .vrs-rules {
   display: flex;
@@ -1690,16 +1679,6 @@ button.vrs-pipe__step:active {
   border: 0;
   margin: 4px 0;
 }
-.vrs-soon-tag {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--pending-500);
-  border: 1px solid color-mix(in srgb, var(--pending-500) 40%, transparent);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-}
 .vrs-stack-sm {
   display: flex;
   flex-direction: column;
@@ -1959,31 +1938,6 @@ button.vrs-pipe__step:active {
 }
 
 /* profit / loss result chip on tested signals */
-.vrs-pnl {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  font-weight: var(--fw-semibold);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  padding: 2px 7px 2px 4px;
-  border-radius: var(--radius-pill);
-  white-space: nowrap;
-  line-height: 1;
-}
-.vrs-pnl svg {
-  flex: none;
-}
-.vrs-pnl--profit {
-  color: var(--verified-500);
-  background: color-mix(in srgb, var(--verified-500) 14%, transparent);
-}
-.vrs-pnl--loss {
-  color: var(--rejected-500);
-  background: color-mix(in srgb, var(--rejected-500) 14%, transparent);
-}
 .vrs-sigrow__time {
   font-family: var(--font-mono);
   font-size: var(--text-3xs);
