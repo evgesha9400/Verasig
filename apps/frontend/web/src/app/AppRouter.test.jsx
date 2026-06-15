@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
+import { ThemeProvider } from '@verasig/design-system'
 import AppRouter, { AppRoutes } from './AppRouter.jsx'
 
 const AUTH_TOKEN_KEY = 'vrs-auth-token-1'
@@ -100,13 +101,18 @@ function sourceRoutes({
 }
 
 function renderRoute(initialPath) {
+  // AppRoutes consumes useTheme, so it must mount under a ThemeProvider exactly
+  // as it does in production (AppRouter wraps it). Rendering it bare would now
+  // throw — the competing-fallback footgun useTheme used to hide.
   return render(
-    <MemoryRouter
-      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-      initialEntries={[initialPath]}
-    >
-      <AppRoutes />
-    </MemoryRouter>
+    <ThemeProvider>
+      <MemoryRouter
+        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+        initialEntries={[initialPath]}
+      >
+        <AppRoutes />
+      </MemoryRouter>
+    </ThemeProvider>
   )
 }
 

@@ -4,9 +4,29 @@ const { useState, useEffect, useRef } = React;
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {}; /*EDITMODE-END*/
 
 // Theme drives the brand signal color: dark = lime trace, light = azure.
+// Mirrors design-system ThemeProvider.THEMES exactly so the prototype stays an
+// accurate source of truth: accent-text is the readable foreground (light keeps
+// the darker azure #2F6FE0, not the low-contrast hover), quiet is a 0.12 tint
+// and glow a separate 0.28 — they are distinct tokens, not one shared value.
 const THEME_ACCENTS = {
-  dark: ["#B9EE2E", "#CBF457", "#8FB81E", "rgba(185,238,46,0.28)"],
-  light: ["#5197FF", "#82B6FF", "#2F6FE0", "rgba(81,151,255,0.30)"],
+  dark: {
+    accent: "#B9EE2E",
+    hover: "#CBF457",
+    press: "#8FB81E",
+    text: "#CBF457",
+    quiet: "rgba(185,238,46,0.12)",
+    glow: "rgba(185,238,46,0.28)",
+    verified: "#B9EE2E",
+  },
+  light: {
+    accent: "#5197FF",
+    hover: "#82B6FF",
+    press: "#2F6FE0",
+    text: "#2F6FE0",
+    quiet: "rgba(81,151,255,0.12)",
+    glow: "rgba(81,151,255,0.28)",
+    verified: "#5197FF",
+  },
 };
 const THEME_KEY = "vrs-theme-1";
 function loadTheme() {
@@ -151,16 +171,17 @@ function App() {
   // apply tweaks
   useEffect(() => {
     const root = document.documentElement;
-    const [a, hover, press, quiet] = THEME_ACCENTS[theme] || THEME_ACCENTS.dark;
-    root.style.setProperty("--accent", a);
-    root.style.setProperty("--accent-hover", hover);
-    root.style.setProperty("--accent-press", press);
-    root.style.setProperty("--accent-text", hover);
-    root.style.setProperty("--accent-quiet", quiet);
-    root.style.setProperty("--signal-500", a);
-    root.style.setProperty("--signal-400", hover);
-    root.style.setProperty("--signal-glow", quiet);
-    root.style.setProperty("--verified-500", a);
+    const t = THEME_ACCENTS[theme] || THEME_ACCENTS.dark;
+    root.style.setProperty("--accent", t.accent);
+    root.style.setProperty("--accent-hover", t.hover);
+    root.style.setProperty("--accent-press", t.press);
+    root.style.setProperty("--accent-text", t.text);
+    root.style.setProperty("--accent-quiet", t.quiet);
+    root.style.setProperty("--signal-500", t.accent);
+    root.style.setProperty("--signal-400", t.hover);
+    root.style.setProperty("--signal-600", t.press);
+    root.style.setProperty("--signal-glow", t.glow);
+    root.style.setProperty("--verified-500", t.verified);
     root.setAttribute("data-density", "regular");
     root.setAttribute("data-theme", theme);
     root.setAttribute("data-wide", "center");

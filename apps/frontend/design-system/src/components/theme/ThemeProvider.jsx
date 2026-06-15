@@ -99,19 +99,8 @@ export function ThemeProvider({ initialTheme, children }) {
 
 export function useTheme() {
   const context = useContext(ThemeContext)
-  const [theme, setThemeState] = useState(readStoredTheme)
-
-  const setTheme = useCallback((nextTheme) => {
-    if (nextTheme !== 'light' && nextTheme !== 'dark') return
-    setThemeState(nextTheme)
-  }, [])
-
-  useEffect(() => {
-    if (context) return
-    applyTheme(theme)
-    writeStoredTheme(theme)
-  }, [context, theme])
-
-  const fallback = useMemo(() => [theme, setTheme], [theme, setTheme])
-  return context || fallback
+  if (!context) {
+    throw new Error('useTheme must be used within a <ThemeProvider>')
+  }
+  return context
 }

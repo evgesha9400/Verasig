@@ -31,9 +31,11 @@
   --signal-glow: rgba(185, 238, 46, 0.28);
 
   /* ---- Support : Azure (links, info, data-viz) ---- */
+  --azure-700: #1f4fa8;
   --azure-600: #2f6fe0;
   --azure-500: #5197ff;
   --azure-400: #82b6ff;
+  --azure-300: #aecdff;
 
   /* ---- Semantic hues ---- */
   --verified-500: #b9ee2e; /* verified == brand signal */
@@ -129,6 +131,15 @@
   --link-hover: var(--azure-500);
 
   --signal-glow: rgba(81, 151, 255, 0.28);
+
+  /* Repoint the brand ramp to azure so direct --signal-* users (and any
+     no-JS / pre-hydration render) match the azure accent, not :root lime.
+     Mirrors the inline overrides in ThemeProvider.applyTheme. */
+  --signal-300: var(--azure-300);
+  --signal-400: var(--azure-400);
+  --signal-500: var(--azure-500);
+  --signal-600: var(--azure-600);
+  --signal-700: var(--azure-700);
 
   /* Semantic backgrounds get a touch more saturation on white */
   --verified-bg: rgba(81, 151, 255, 0.15);

@@ -23,7 +23,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(70% 90% at 80% -10%, rgba(185, 238, 46, 0.14), transparent 55%),
+    radial-gradient(70% 90% at 80% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
     radial-gradient(70% 90% at 0% 110%, rgba(81, 151, 255, 0.08), transparent 55%);
   pointer-events: none;
 }
