@@ -1,74 +1,38 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Badge, Button, IconButton, InteractiveCard } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import { MessageCard } from '../../../shared/components/MessageCard.jsx'
 
 /* Verasig — Verify step: confirm the ruleset's classifications on a fresh sample.
    Samples and their predictions come from GET /chats/{id}/verify/samples; the
    verdicts POST to /chats/{id}/verify, and the BACKEND decides pass/fail. */
 const VERIFY_MIN = 6
 
-function VerifyMedia({ kind }) {
-  const map = {
-    chart: ['chart', 'Chart screenshot'],
-    image: ['image', 'Image'],
-    doc: ['doc', 'Document']
-  }
-  const [icon, label] = map[kind] || ['image', 'Attachment']
-  return (
-    <div className="vrs-card-msg__media">
-      <Icon name={icon} />
-      <span>{label}</span>
-    </div>
-  )
-}
-
 function VerifyCard({ item, dragX = 0, isTop, style }) {
-  const rot = dragX / 22
-  const tStyle = isTop
-    ? { transform: `translateX(${dragX}px) rotate(${rot}deg)`, ...style }
-    : style
   const isSignal = item.predicted === 'signal'
-  const cls = `vrs-card-msg ${isSignal ? 'is-signal' : 'is-noise'} ${isTop ? 'vrs-card-msg--top' : ''}`
+  const head = (
+    <>
+      <Badge tone={isSignal ? 'verified' : 'rejected'} dot>
+        {isSignal ? 'Classified: Signal' : 'Classified: Non-signal'}
+      </Badge>
+      <span className="vrs-card-msg__time" style={{ marginLeft: 'auto' }}>
+        auto · rule match
+      </span>
+    </>
+  )
   return (
-    <div className={cls} style={tStyle}>
-      {isTop && (
-        <>
-          <span
-            className="vrs-card-stamp signal"
-            style={{ opacity: Math.max(0, Math.min(1, dragX / 90)) }}
-          >
-            Correct
-          </span>
-          <span
-            className="vrs-card-stamp noise"
-            style={{ opacity: Math.max(0, Math.min(1, -dragX / 90)) }}
-          >
-            Wrong
-          </span>
-        </>
-      )}
-      <div className="vrs-card-msg__head">
-        <Badge tone={isSignal ? 'verified' : 'rejected'} dot>
-          {isSignal ? 'Classified: Signal' : 'Classified: Non-signal'}
-        </Badge>
-        <span className="vrs-card-msg__time" style={{ marginLeft: 'auto' }}>
-          auto · rule match
-        </span>
-      </div>
-      <div className="vrs-card-msg__body">
-        {item.replyTo && (
-          <div className="vrs-card-reply">
-            <Icon name="reply" size={12} />
-            <span className="vrs-card-reply__body">
-              <span className="vrs-card-reply__who">{item.replyTo.author}</span>
-              <span className="vrs-card-reply__txt">{item.replyTo.text}</span>
-            </span>
-          </div>
-        )}
-        <div className="vrs-card-msg__text">{item.text}</div>
-        {item.media && <VerifyMedia kind={item.media} />}
-      </div>
-    </div>
+    <MessageCard
+      text={item.text}
+      replyTo={item.replyTo}
+      media={item.media}
+      tone={isSignal ? 'signal' : 'noise'}
+      isTop={isTop}
+      dragX={dragX}
+      style={style}
+      stampPositive="Correct"
+      stampNegative="Wrong"
+      head={head}
+    />
   )
 }
 
