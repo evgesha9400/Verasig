@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
-import { DISTILLED_RULES } from '../../../domain/demo-data/seed.js'
 
-/* Verasig prototype — Distill step: AI generates filtering rules */
+/* Verasig — Distill step: backend distills filtering rules from the labels.
+   POST /distill starts the job; SSE streams the five phases; GET /rules returns
+   the compiled ruleset (match is already a 0–100 percentage). */
 function ThinkOrb() {
   return (
     <svg className="vrs-think__orb" viewBox="0 0 86 86" fill="none">
@@ -38,6 +39,7 @@ function ThinkOrb() {
   )
 }
 
+/* Must match the backend DISTILL_PHASES strings exactly (distill_routes.py). */
 const DISTILL_STEPS = [
   'Reading your labelled signals',
   'Extracting structure & tickers',
@@ -46,19 +48,81 @@ const DISTILL_STEPS = [
   'Compiling filter ruleset'
 ]
 
-export function DistillView({ onComplete }) {
-  const [phase, setPhase] = useState('thinking')
+export function DistillView({
+  chatId,
+  onStartDistill,
+  onStreamProgress,
+  onGetRules,
+  onComplete,
+  onError
+}) {
+  const [phase, setPhase] = useState('thinking') // 'thinking' | 'done' | 'error'
   const [step, setStep] = useState(0)
+  const [rules, setRules] = useState([])
 
+  // No start-once ref: mirror BackfillView. In React StrictMode the effect runs
+  // twice; the first run's cleanup sets closed=true (so it never subscribes) and
+  // the second run re-POSTs. A duplicate POST returns 409, which we tolerate and
+  // stream the already-running job. In production the effect runs once.
   useEffect(() => {
-    if (phase !== 'thinking') return
-    if (step < DISTILL_STEPS.length) {
-      const t = setTimeout(() => setStep(step + 1), 720)
-      return () => clearTimeout(t)
+    let closed = false
+    let subscription = null
+
+    function loadRules() {
+      return Promise.resolve(onGetRules(chatId)).then((result) => {
+        if (closed) return
+        setRules(result.rules || [])
+        setPhase('done')
+      })
     }
-    const t = setTimeout(() => setPhase('done'), 500)
-    return () => clearTimeout(t)
-  }, [phase, step])
+
+    function fail() {
+      if (closed) return
+      setPhase('error')
+      onError &&
+        onError('rejected', 'Distillation failed', 'The distill job did not complete.')
+    }
+
+    async function run() {
+      try {
+        await onStartDistill(chatId)
+      } catch (error) {
+        // A duplicated start (StrictMode / resume) is fine — stream the running job.
+        if (error?.status !== 409) {
+          if (!closed) {
+            setPhase('error')
+            onError &&
+              onError('rejected', 'Distillation failed', error?.message || 'Try again.')
+          }
+          return
+        }
+      }
+      if (closed) return
+      subscription = onStreamProgress(chatId, {
+        onProgress: (progress) => {
+          if (!progress.phase) return
+          const index = DISTILL_STEPS.indexOf(progress.phase)
+          if (index >= 0) setStep(index + 1)
+        },
+        // On done OR on a stream error, read the durable ruleset. The job may have
+        // finished and been evicted before we connected (distill has no replay),
+        // so reading /rules is the source of truth; only fail if that read fails.
+        onDone: () => {
+          loadRules().catch(fail)
+        },
+        onError: () => {
+          loadRules().catch(fail)
+        }
+      })
+    }
+
+    void run()
+
+    return () => {
+      closed = true
+      subscription && subscription.close()
+    }
+  }, [chatId, onStartDistill, onStreamProgress, onGetRules, onError])
 
   if (phase === 'thinking') {
     return (
@@ -105,6 +169,31 @@ export function DistillView({ onComplete }) {
     )
   }
 
+  if (phase === 'error') {
+    return (
+      <div className="vrs-think vrs-fade-in" style={{ maxWidth: 520 }}>
+        <span
+          className="vrs-rule__ic"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 14,
+            background: 'var(--rejected-bg)',
+            color: 'var(--rejected-500)'
+          }}
+        >
+          <Icon name="alert" size={26} />
+        </span>
+        <div>
+          <div className="vrs-think__title">Distillation didn&apos;t complete</div>
+          <div className="vrs-think__sub">
+            Something interrupted the distill job. Go back and try again.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="vrs-page vrs-fade-in" style={{ maxWidth: 720 }}>
       <div className="vrs-setup__hero" style={{ alignItems: 'flex-start' }}>
@@ -116,7 +205,7 @@ export function DistillView({ onComplete }) {
         </span>
         <div>
           <div className="vrs-setup__title" style={{ fontSize: 'var(--text-xl)' }}>
-            5 rules distilled
+            {rules.length} rule{rules.length === 1 ? '' : 's'} distilled
           </div>
           <div className="vrs-setup__sub">
             These rules now classify the rest of the feed history. Verify a random
@@ -126,7 +215,7 @@ export function DistillView({ onComplete }) {
       </div>
 
       <div className="vrs-rules">
-        {DISTILLED_RULES.map((r, i) => (
+        {rules.map((r, i) => (
           <div
             key={r.id}
             className="vrs-rule vrs-fade-in"
@@ -139,7 +228,7 @@ export function DistillView({ onComplete }) {
               <div className="vrs-rule__lbl">{r.label}</div>
               <div className="vrs-rule__detail">{r.detail}</div>
             </div>
-            <span className="vrs-rule__match">{Math.round(r.match * 100)}%</span>
+            <span className="vrs-rule__match">{Math.round(r.match)}%</span>
           </div>
         ))}
       </div>
