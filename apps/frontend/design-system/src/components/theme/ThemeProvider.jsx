@@ -20,13 +20,13 @@ const THEMES = {
     verified: '#B9EE2E'
   },
   light: {
-    accent: '#8FB81E',
-    hover: '#B9EE2E',
-    press: '#5A7A10',
-    text: '#5A7A10',
-    quiet: 'rgba(143,184,30,0.15)',
-    glow: 'rgba(143,184,30,0.22)',
-    verified: '#6E9415'
+    accent: '#5197FF',
+    hover: '#82B6FF',
+    press: '#2F6FE0',
+    text: '#2F6FE0',
+    quiet: 'rgba(81,151,255,0.12)',
+    glow: 'rgba(81,151,255,0.28)',
+    verified: '#5197FF'
   }
 }
 
@@ -63,8 +63,8 @@ function applyTheme(theme) {
   root.style.setProperty('--accent-text', tokens.text)
   root.style.setProperty('--accent-quiet', tokens.quiet)
   root.style.setProperty('--signal-400', tokens.hover)
-  root.style.setProperty('--signal-500', '#B9EE2E')
-  root.style.setProperty('--signal-600', '#8FB81E')
+  root.style.setProperty('--signal-500', tokens.accent)
+  root.style.setProperty('--signal-600', tokens.press)
   root.style.setProperty('--signal-glow', tokens.glow)
   root.style.setProperty('--verified-500', tokens.verified)
 }
