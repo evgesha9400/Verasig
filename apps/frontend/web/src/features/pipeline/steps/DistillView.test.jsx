@@ -15,6 +15,7 @@ function renderView(overrides = {}) {
     ]
   })
   const onComplete = vi.fn()
+  const onError = vi.fn()
   render(
     <DistillView
       chatId="7"
@@ -22,6 +23,7 @@ function renderView(overrides = {}) {
       onStreamProgress={onStreamProgress}
       onGetRules={onGetRules}
       onComplete={onComplete}
+      onError={onError}
       {...overrides}
     />
   )
@@ -30,6 +32,7 @@ function renderView(overrides = {}) {
     onStreamProgress,
     onGetRules,
     onComplete,
+    onError,
     getHandlers: () => streamHandlers
   }
 }
@@ -64,5 +67,28 @@ describe('DistillView', () => {
     })
     await waitFor(() => expect(onGetRules).toHaveBeenCalledWith('7'))
     expect(await screen.findByText('Has a directional verb')).toBeTruthy()
+  })
+
+  it('shows error screen on a named backend error event without calling onGetRules', async () => {
+    const { getHandlers, onGetRules } = renderView()
+    await waitFor(() => expect(getHandlers()).toBeTruthy())
+    await act(async () => {
+      getHandlers().onError({ message: 'job exploded' })
+      await Promise.resolve()
+    })
+    expect(await screen.findByText("Distillation didn't complete")).toBeTruthy()
+    expect(onGetRules).not.toHaveBeenCalled()
+  })
+
+  it('shows error screen when onGetRules resolves an empty ruleset', async () => {
+    const { getHandlers } = renderView({
+      onGetRules: vi.fn().mockResolvedValue({ rules: [] })
+    })
+    await waitFor(() => expect(getHandlers()).toBeTruthy())
+    await act(async () => {
+      getHandlers().onDone()
+      await Promise.resolve()
+    })
+    expect(await screen.findByText("Distillation didn't complete")).toBeTruthy()
   })
 })
