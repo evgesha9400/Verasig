@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Badge, Button, Dialog, Input, Banner } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import { SourceCard } from '../../shared/components/SourceCard.jsx'
 import { EXCHANGES } from '../../domain/demo-data/seed.js'
 
 export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
@@ -33,7 +34,7 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
       onConnect && onConnect()
     }, 1700)
   }
-  const ByLogo = () => (
+  const byLogo = (
     <span
       className="vrs-src-logo"
       style={{
@@ -53,37 +54,38 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
         </div>
         <div className="vrs-src-grid" style={{ marginTop: 12 }}>
           {bybitConnected ? (
-            <div className="vrs-src-card">
-              <div className="vrs-src-card__top">
-                <ByLogo />
-                <div style={{ flex: 1 }}>
-                  <div className="vrs-src-card__name">{bybit.name}</div>
-                  <div className="vrs-src-card__kind">{bybit.kind}</div>
-                </div>
+            <SourceCard
+              logo={byLogo}
+              name={bybit.name}
+              kind={bybit.kind}
+              badge={
                 <Badge tone="verified" dot>
                   Connected
                 </Badge>
-              </div>
-              <div className="vrs-src-card__desc">
-                Trade-only API key linked. Verified signals route here in real time.
-              </div>
-              <div className="vrs-src-card__foot">
-                <span className="vrs-src-meta">
+              }
+              desc="Trade-only API key linked. Verified signals route here in real time."
+              meta={
+                <>
                   <Icon name="key" size={13} /> {bybit.account}
-                </span>
+                </>
+              }
+              action={
                 <Button variant="danger" size="sm" onClick={() => setConfirmOpen(true)}>
                   Disconnect
                 </Button>
-              </div>
-            </div>
+              }
+            />
           ) : (
-            <div className="vrs-src-card vrs-src-card--empty">
-              <div className="vrs-src-card__desc" style={{ flex: 'none' }}>
-                No exchanges connected yet.
-                <br />
-                Configure {bybit.name} below to route signals.
-              </div>
-            </div>
+            <SourceCard
+              empty
+              desc={
+                <>
+                  No exchanges connected yet.
+                  <br />
+                  Configure {bybit.name} below to route signals.
+                </>
+              }
+            />
           )}
         </div>
       </div>
@@ -95,18 +97,29 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
         </div>
         <div className="vrs-src-grid" style={{ marginTop: 12 }}>
           {!bybitConnected && (
-            <div
-              className="vrs-src-card"
+            <SourceCard
+              logo={byLogo}
+              name={bybit.name}
+              kind={bybit.kind}
+              badge={configuring ? <Badge tone="pending">Not configured</Badge> : null}
               style={configuring ? { gridColumn: '1 / -1', maxWidth: 520 } : undefined}
+              desc="Route verified signals to Bybit for execution. Uses a trade-only API key — Verasig never withdraws funds."
+              meta={
+                <>
+                  <Icon name="clock" size={13} /> ~1 min setup
+                </>
+              }
+              action={
+                <Button
+                  variant="primary"
+                  size="sm"
+                  iconLeft={<Icon name="plus" size={14} />}
+                  onClick={startConfigure}
+                >
+                  Configure
+                </Button>
+              }
             >
-              <div className="vrs-src-card__top">
-                <ByLogo />
-                <div style={{ flex: 1 }}>
-                  <div className="vrs-src-card__name">{bybit.name}</div>
-                  <div className="vrs-src-card__kind">{bybit.kind}</div>
-                </div>
-                {configuring && <Badge tone="pending">Not configured</Badge>}
-              </div>
               {configuring ? (
                 <div
                   className="vrs-opt__config"
@@ -165,28 +178,8 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="vrs-src-card__desc">
-                    Route verified signals to Bybit for execution. Uses a trade-only API
-                    key — Verasig never withdraws funds.
-                  </div>
-                  <div className="vrs-src-card__foot">
-                    <span className="vrs-src-meta">
-                      <Icon name="clock" size={13} /> ~1 min setup
-                    </span>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      iconLeft={<Icon name="plus" size={14} />}
-                      onClick={startConfigure}
-                    >
-                      Configure
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
+              ) : undefined}
+            </SourceCard>
           )}
         </div>
       </div>
