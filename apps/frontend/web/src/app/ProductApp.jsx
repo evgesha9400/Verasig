@@ -34,7 +34,7 @@ import {
   startBackfill as startBackfillJob,
   streamBackfillProgress
 } from '../shared/api/chatsApi.js'
-import { MESSAGES } from '../domain/demo-data/seed.js'
+import { getLabelCounts, listMessages, recordLabel } from '../shared/api/pipelineApi.js'
 import './app.css'
 
 const USER_DEFAULTS = {
@@ -72,9 +72,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     telegramConnected,
     chats,
     activeChat,
-    labels,
-    signalCount,
-    noiseCount,
     verifyAttempt,
     setVerifyAttempt,
     setScreen,
@@ -98,7 +95,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     onBackfillComplete,
     onBackfillCancel,
     onBacktestComplete,
-    setLabel,
     requestStepBack,
     confirmStepBack,
     openSettings,
@@ -281,12 +277,14 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     } else if (screen === 'label') {
       body = (
         <LabelView
-          messages={MESSAGES}
-          labels={labels}
-          onLabel={setLabel}
-          signalCount={signalCount}
-          noiseCount={noiseCount}
+          chatId={activeChat.id}
+          onListMessages={(chatId) => listMessages(authToken, chatId)}
+          onGetCounts={(chatId) => getLabelCounts(authToken, chatId)}
+          onRecordLabel={(chatId, msgId, label) =>
+            recordLabel(authToken, chatId, msgId, label)
+          }
           onDistill={() => setScreen('distill')}
+          onError={(tone, title, msg) => fireToast(tone, title, msg)}
           key={`label-${verifyAttempt}`}
         />
       )

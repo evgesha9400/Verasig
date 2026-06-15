@@ -71,7 +71,6 @@ export function useWorkflowState(authToken) {
     saved ? mergeChatFlags(saved.chats) : authToken ? [] : CHATS
   )
   const [activeChatId, setActiveChatId] = useState(saved ? saved.activeChatId : null)
-  const [labelsByChat, setLabelsByChat] = useState(saved ? saved.labelsByChat : {})
   const [verifyAttempt, setVerifyAttempt] = useState(saved ? saved.verifyAttempt : 1)
   const [bybitConnected, setBybitConnected] = useState(
     saved ? saved.bybitConnected : false
@@ -97,7 +96,6 @@ export function useWorkflowState(authToken) {
         telegramConnected,
         chats,
         activeChatId,
-        labelsByChat,
         verifyAttempt,
         bybitConnected
       })
@@ -108,7 +106,6 @@ export function useWorkflowState(authToken) {
     telegramConnected,
     chats,
     activeChatId,
-    labelsByChat,
     verifyAttempt,
     bybitConnected
   ])
@@ -148,11 +145,6 @@ export function useWorkflowState(authToken) {
   }, [authToken, fireToast])
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) || null
-  const labels = (activeChatId && labelsByChat[activeChatId]) || {}
-  const signalCount = Object.values(labels).filter(
-    (value) => value === 'signal' || value === 'modifier'
-  ).length
-  const noiseCount = Object.values(labels).filter((value) => value === 'noise').length
 
   function clearToast() {
     setToast(null)
@@ -174,16 +166,6 @@ export function useWorkflowState(authToken) {
       }
       return [...currentChats, chat]
     })
-  }
-
-  function setLabel(msgId, label) {
-    setLabelsByChat((current) => ({
-      ...current,
-      [activeChatId]: {
-        ...(current[activeChatId] || {}),
-        [msgId]: label
-      }
-    }))
   }
 
   function goToDeletedSignals(chat) {
@@ -225,11 +207,6 @@ export function useWorkflowState(authToken) {
       score: null,
       winRate: null,
       pnl: null
-    })
-    setLabelsByChat((current) => {
-      const next = { ...current }
-      delete next[chat.id]
-      return next
     })
     fireToast('rejected', 'Feed reset', `${chat.name} backfill and labels deleted.`)
   }
@@ -398,7 +375,6 @@ export function useWorkflowState(authToken) {
     telegramConnected,
     chats,
     activeChatId,
-    labelsByChat,
     verifyAttempt,
     setVerifyAttempt,
     bybitConnected,
@@ -406,9 +382,6 @@ export function useWorkflowState(authToken) {
     backTarget,
     signalsPreset,
     activeChat,
-    labels,
-    signalCount,
-    noiseCount,
     isWorkflow: WORKFLOW_SCREENS.has(screen),
     pipelineStep: PIPELINE_SCREEN_BY_SCREEN[screen] || null,
 
@@ -423,7 +396,6 @@ export function useWorkflowState(authToken) {
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,
-    setLabel,
     onBacktestComplete,
     requestStepBack,
     confirmStepBack,
