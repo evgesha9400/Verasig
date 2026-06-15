@@ -37,10 +37,12 @@ import {
 import {
   getLabelCounts,
   getRules,
+  getVerifySamples,
   listMessages,
   recordLabel,
   startDistill,
-  streamDistillProgress
+  streamDistillProgress,
+  submitVerify
 } from '../shared/api/pipelineApi.js'
 import './app.css'
 
@@ -312,7 +314,9 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       body = (
         <VerifyView
           key={`verify-${verifyAttempt}`}
-          attempt={verifyAttempt}
+          chatId={activeChat.id}
+          onGetSamples={(chatId) => getVerifySamples(authToken, chatId)}
+          onSubmit={(chatId, verdicts) => submitVerify(authToken, chatId, verdicts)}
           onPass={() => setScreen('exchange')}
           onStop={stopAfterVerify}
           onLoop={() => {
@@ -324,6 +328,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
               "Label a few more, then we'll re-verify."
             )
           }}
+          onError={(tone, title, msg) => fireToast(tone, title, msg)}
         />
       )
     } else if (screen === 'exchange') {

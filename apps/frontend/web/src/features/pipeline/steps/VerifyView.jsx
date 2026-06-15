@@ -121,7 +121,6 @@ export function VerifyView({
     }
     // Keyed on chatId only: handlers are accessed via handlersRef so fresh
     // closures from parent re-renders do not restart the load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId])
 
   const total = items ? items.length : 0
@@ -250,7 +249,7 @@ export function VerifyView({
               </span>
               <span className="vrs-next-option__d">
                 Save the verified source. You can route it to an exchange and backtest
-                later, from the feed's options.
+                later, from the feed&rsquo;s options.
               </span>
             </span>
             <Icon name="arrowRight" size={18} />
