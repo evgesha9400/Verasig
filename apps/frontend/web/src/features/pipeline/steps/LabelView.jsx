@@ -90,17 +90,27 @@ export function LabelView({
   onError
 }) {
   const [messages, setMessages] = useState(null) // null while loading
+  const [loadError, setLoadError] = useState(false)
   const [baseCounts, setBaseCounts] = useState({ signalCount: 0, noiseCount: 0 })
   const [labels, setLabels] = useState({}) // session map: msgId -> 'signal' | 'noise'
   const [idx, setIdx] = useState(0)
   const [dragX, setDragX] = useState(0)
   const [flying, setFlying] = useState(null) // {dir, label}
   const dragRef = useRef({ active: false, startX: 0 })
+  const handlersRef = useRef({ onListMessages, onGetCounts, onRecordLabel, onError })
+
+  useEffect(() => {
+    handlersRef.current = { onListMessages, onGetCounts, onRecordLabel, onError }
+  }, [onListMessages, onGetCounts, onRecordLabel, onError])
 
   useEffect(() => {
     let active = true
     setMessages(null)
-    Promise.all([onListMessages(chatId), onGetCounts(chatId)])
+    setLoadError(false)
+    Promise.all([
+      handlersRef.current.onListMessages(chatId),
+      handlersRef.current.onGetCounts(chatId)
+    ])
       .then(([messagesResult, counts]) => {
         if (!active) return
         setMessages(messagesResult.messages || [])
@@ -113,14 +123,20 @@ export function LabelView({
       })
       .catch((error) => {
         if (!active) return
-        setMessages([])
-        onError &&
-          onError('rejected', 'Could not load messages', error?.message || 'Try again.')
+        setLoadError(true)
+        handlersRef.current.onError &&
+          handlersRef.current.onError(
+            'rejected',
+            'Could not load messages',
+            error?.message || 'Try again.'
+          )
       })
     return () => {
       active = false
     }
-  }, [chatId, onListMessages, onGetCounts, onError])
+    // Keyed on chatId only: handlers are accessed via handlersRef so fresh
+    // closures from parent re-renders do not restart the load.
+  }, [chatId])
 
   const total = messages ? messages.length : 0
   const localSignal = Object.values(labels).filter((value) => value === 'signal').length
@@ -141,15 +157,21 @@ export function LabelView({
       const previous = labels[message.id]
       setFlying({ dir, label })
       setLabels((current) => ({ ...current, [message.id]: label }))
-      Promise.resolve(onRecordLabel(chatId, message.id, label)).catch((error) => {
+      Promise.resolve(
+        handlersRef.current.onRecordLabel(chatId, message.id, label)
+      ).catch((error) => {
         setLabels((current) => {
           const next = { ...current }
           if (previous === undefined) delete next[message.id]
           else next[message.id] = previous
           return next
         })
-        onError &&
-          onError('rejected', 'Label not saved', error?.message || 'Try again.')
+        handlersRef.current.onError &&
+          handlersRef.current.onError(
+            'rejected',
+            'Label not saved',
+            error?.message || 'Try again.'
+          )
       })
       setTimeout(() => {
         setFlying(null)
@@ -157,7 +179,7 @@ export function LabelView({
         setIdx((i) => Math.min(total, i + 1))
       }, 300)
     },
-    [messages, idx, total, flying, labels, chatId, onRecordLabel, onError]
+    [messages, idx, total, flying, labels, chatId]
   )
 
   const goPrev = useCallback(() => {
@@ -210,11 +232,11 @@ export function LabelView({
     else setDragX(0)
   }
 
-  const loading = messages === null
-  const empty = !loading && total === 0
-  const atEnd = !loading && !empty && idx >= total
-  const current = !loading && !empty && !atEnd ? messages[idx] : null
-  const next1 = !loading && !empty && !atEnd ? messages[idx + 1] : null
+  const loading = messages === null && !loadError
+  const empty = !loading && !loadError && total === 0
+  const atEnd = !loading && !loadError && !empty && idx >= total
+  const current = !loading && !loadError && !empty && !atEnd ? messages[idx] : null
+  const next1 = !loading && !loadError && !empty && !atEnd ? messages[idx + 1] : null
 
   function renderStage() {
     if (loading) {
@@ -222,6 +244,21 @@ export function LabelView({
         <div className="vrs-card-bg" style={STAGE_CENTER}>
           <span className="vrs-dot-pulse" />
           <div className="vrs-rail__note">Loading messages…</div>
+        </div>
+      )
+    }
+    if (loadError) {
+      return (
+        <div className="vrs-card-bg" style={STAGE_CENTER}>
+          <span className="vrs-rule__ic" style={{ width: 40, height: 40 }}>
+            <Icon name="alert" size={20} />
+          </span>
+          <div className="vrs-bf-title" style={{ fontSize: 'var(--text-lg)' }}>
+            Couldn&rsquo;t load messages
+          </div>
+          <div className="vrs-rail__note" style={{ maxWidth: '26ch' }}>
+            Something went wrong. Go back and try again.
+          </div>
         </div>
       )
     }
@@ -311,7 +348,7 @@ export function LabelView({
             className="vrs-swipe-key vrs-swipe-key--no"
             label="Non-signal"
             onClick={() => commit('noise')}
-            disabled={atEnd || loading || empty}
+            disabled={atEnd || loading || empty || loadError}
             title="Non-signal (←)"
           >
             <Icon name="x" size={22} />
@@ -332,7 +369,7 @@ export function LabelView({
               className="vrs-swipe-key vrs-swipe-key--nav"
               label="Next"
               onClick={goNext}
-              disabled={atEnd || loading || empty}
+              disabled={atEnd || loading || empty || loadError}
               title="Next (↓)"
             >
               <Icon name="arrowDown" size={18} />
@@ -344,7 +381,7 @@ export function LabelView({
             className="vrs-swipe-key vrs-swipe-key--yes"
             label="Signal"
             onClick={() => commit('signal')}
-            disabled={atEnd || loading || empty}
+            disabled={atEnd || loading || empty || loadError}
             title="Signal (→)"
           >
             <Icon name="check" size={22} />

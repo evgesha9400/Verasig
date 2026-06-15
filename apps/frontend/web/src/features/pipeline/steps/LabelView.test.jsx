@@ -83,6 +83,24 @@ describe('LabelView', () => {
     renderView({ onRecordLabel, onError })
     await screen.findByText('LONG BTC')
     fireEvent.click(screen.getByRole('button', { name: 'Signal' }))
-    await waitFor(() => expect(onError).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(
+        'rejected',
+        expect.any(String),
+        expect.any(String)
+      )
+    )
+  })
+
+  it('shows a load-error card when onListMessages rejects', async () => {
+    const onListMessages = vi.fn().mockRejectedValue(new Error('network error'))
+    const onError = vi.fn()
+    renderView({ onListMessages, onError })
+    expect(await screen.findByText('Couldn’t load messages')).toBeTruthy()
+    expect(onError).toHaveBeenCalledWith(
+      'rejected',
+      expect.any(String),
+      expect.any(String)
+    )
   })
 })
