@@ -34,7 +34,14 @@ import {
   startBackfill as startBackfillJob,
   streamBackfillProgress
 } from '../shared/api/chatsApi.js'
-import { getLabelCounts, listMessages, recordLabel } from '../shared/api/pipelineApi.js'
+import {
+  getLabelCounts,
+  getRules,
+  listMessages,
+  recordLabel,
+  startDistill,
+  streamDistillProgress
+} from '../shared/api/pipelineApi.js'
 import './app.css'
 
 const USER_DEFAULTS = {
@@ -289,7 +296,18 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         />
       )
     } else if (screen === 'distill') {
-      body = <DistillView onComplete={() => setScreen('verify')} />
+      body = (
+        <DistillView
+          chatId={activeChat.id}
+          onStartDistill={(chatId) => startDistill(authToken, chatId)}
+          onStreamProgress={(chatId, handlers) =>
+            streamDistillProgress(authToken, chatId, handlers)
+          }
+          onGetRules={(chatId) => getRules(authToken, chatId)}
+          onComplete={() => setScreen('verify')}
+          onError={(tone, title, msg) => fireToast(tone, title, msg)}
+        />
+      )
     } else if (screen === 'verify') {
       body = (
         <VerifyView
