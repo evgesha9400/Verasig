@@ -29,3 +29,15 @@ export function streamDistillProgress(token, chatId, handlers = {}) {
 export function getRules(token, chatId) {
   return requestJson(`/chats/${chatId}/rules`, { token })
 }
+
+export function getVerifySamples(token, chatId) {
+  return requestJson(`/chats/${chatId}/verify/samples`, { token })
+}
+
+export function submitVerify(token, chatId, verdicts) {
+  return requestJson(`/chats/${chatId}/verify`, {
+    method: 'POST',
+    token,
+    body: { verdicts }
+  })
+}
