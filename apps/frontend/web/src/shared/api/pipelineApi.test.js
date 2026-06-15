@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getLabelCounts, listMessages, recordLabel } from './pipelineApi.js'
+import {
+  getLabelCounts,
+  getRules,
+  listMessages,
+  recordLabel,
+  startDistill,
+  streamDistillProgress
+} from './pipelineApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -55,5 +62,58 @@ describe('pipelineApi — label', () => {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
+  })
+})
+
+describe('pipelineApi — distill', () => {
+  it('starts a distill job', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'u:7:distill' }, 202))
+
+    const body = await startDistill('jwt-token', '7')
+
+    expect(body.jobId).toBe('u:7:distill')
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/distill', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
+  it('reads compiled rules', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({
+        rules: [{ id: 'r:0', label: 'has verb', detail: '…', match: 94 }]
+      })
+    )
+
+    const body = await getRules('jwt-token', '7')
+
+    expect(body.rules[0].match).toBe(94)
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/rules', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
+  it('streams distill progress via the shared helper', () => {
+    class FakeEventSource {
+      constructor(url) {
+        this.url = url
+        this.listeners = {}
+        FakeEventSource.last = this
+      }
+      addEventListener(type, listener) {
+        this.listeners[type] = listener
+      }
+      close() {
+        this.closed = true
+      }
+    }
+    globalThis.EventSource = FakeEventSource
+
+    streamDistillProgress('jwt-token', '7', {})
+
+    expect(FakeEventSource.last.url).toBe(
+      'http://localhost:8000/chats/7/distill/progress?token=jwt-token'
+    )
   })
 })
