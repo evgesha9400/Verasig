@@ -5,7 +5,8 @@ import {
   Banner,
   Badge,
   RadioCard,
-  TextLink
+  TextLink,
+  Pill
 } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { EXCHANGES } from '../../../domain/demo-data/seed.js'
@@ -111,7 +112,7 @@ export function ExchangeView({ onConnected, bybitConnected }) {
                     <div className="vrs-opt__title">
                       {d.name}
                       {d.status === 'soon' && (
-                        <span className="vrs-soon-tag">Soon</span>
+                        <Pill tone="pending" variant="outline" size="xs">Soon</Pill>
                       )}
                       {dConnected && (
                         <Badge tone="verified" dot>

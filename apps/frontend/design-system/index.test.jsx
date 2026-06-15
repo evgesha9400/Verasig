@@ -12,6 +12,7 @@ describe('design-system barrel', () => {
     'TextLink',
     'Tabs',
     'Tag',
+    'Pill',
     'Card',
     'ConfidenceBar',
     'MetricStat',

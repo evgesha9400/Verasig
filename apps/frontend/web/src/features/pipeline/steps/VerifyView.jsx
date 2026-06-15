@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Badge, Button, IconButton, InteractiveCard } from '@verasig/design-system'
+import { Badge, Button, IconButton, InteractiveCard, Pill } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { MessageCard } from '../../../shared/components/MessageCard.jsx'
 
@@ -212,7 +212,7 @@ export function VerifyView({
             <span className="vrs-next-option__body">
               <span className="vrs-next-option__t">
                 Keep it verified
-                <span className="vrs-next-tag">Recommended</span>
+                <Pill tone="accent">Recommended</Pill>
               </span>
               <span className="vrs-next-option__d">
                 Save the verified source. You can route it to an exchange and backtest

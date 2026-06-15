@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Select, Tabs, Badge, Button, Icon } from '@verasig/design-system'
+import { Select, Tabs, Badge, Button, Icon, Pill } from '@verasig/design-system'
 import {
   SIGNALS,
   SOURCES,
@@ -348,13 +348,13 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                           Tested
                         </Badge>
                         {s.outcome && (
-                          <span className={`vrs-pnl vrs-pnl--${s.outcome}`}>
+                          <Pill tone={s.outcome} numeric>
                             <Icon
                               name={s.outcome === 'profit' ? 'arrowUp' : 'arrowDown'}
                               size={11}
                             />
                             {s.pnl}
-                          </span>
+                          </Pill>
                         )}
                       </>
                     )}
@@ -546,8 +546,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                               </span>
                               <span className="vrs-tl__lbl">
                                 Closed by author
-                                <span
-                                  className={`vrs-pnl vrs-pnl--${s.outcome}`}
+                                <Pill tone={s.outcome} numeric
                                   style={{ marginLeft: 8 }}
                                 >
                                   <Icon
@@ -557,7 +556,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                                     size={11}
                                   />
                                   {s.pnl}
-                                </span>
+                                </Pill>
                               </span>
                             </div>
                           )}
@@ -573,8 +572,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                                 {s.outcome === 'profit'
                                   ? 'Closed on backtest'
                                   : 'Closed at stop'}
-                                <span
-                                  className={`vrs-pnl vrs-pnl--${s.outcome}`}
+                                <Pill tone={s.outcome} numeric
                                   style={{ marginLeft: 8 }}
                                 >
                                   <Icon
@@ -584,7 +582,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                                     size={11}
                                   />
                                   {s.pnl}
-                                </span>
+                                </Pill>
                               </span>
                             </div>
                           )}
@@ -596,13 +594,13 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
 
                       {tested && !deleted && s.outcome && mods.length === 0 && (
                         <div className={`vrs-sig-result vrs-sig-result--${s.outcome}`}>
-                          <span className={`vrs-pnl vrs-pnl--${s.outcome}`}>
+                          <Pill tone={s.outcome} numeric>
                             <Icon
                               name={s.outcome === 'profit' ? 'arrowUp' : 'arrowDown'}
                               size={11}
                             />
                             {s.pnl}
-                          </span>
+                          </Pill>
                           <span>
                             {s.outcome === 'profit'
                               ? 'Closed in profit on backtest.'
