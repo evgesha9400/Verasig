@@ -2,11 +2,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button, IconButton } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
-/* Verasig prototype — Label step: Tinder-style signal / non-signal classification.
+/* Verasig — Label step: Tinder-style signal / non-signal classification.
    Labeling is BINARY on purpose: a reply that is a signal is, by definition, an
    update (close / average / move stop) to the signal it quotes — Verasig derives
    that from the reply link, the user doesn't label it separately. The reply
-   context is shown on the card; the parsed action gets confirmed at Verify. */
+   context is shown on the card; the parsed action gets confirmed at Verify.
+
+   Data is backend-owned: the deck is the unlabeled candidate messages from
+   GET /chats/{id}/messages; each swipe persists with POST .../label; the rail
+   counts are seeded from GET /chats/{id}/labels and bumped locally. */
 function MsgMedia({ kind }) {
   const map = {
     chart: ['chart', 'Chart screenshot'],
@@ -78,43 +82,82 @@ function MessageCard({ msg, label, dragX = 0, isTop, style }) {
 }
 
 export function LabelView({
-  messages,
-  labels,
-  onLabel,
-  signalCount,
-  noiseCount,
-  onDistill
+  chatId,
+  onListMessages,
+  onGetCounts,
+  onRecordLabel,
+  onDistill,
+  onError
 }) {
-  const [idx, setIdx] = useState(() => {
-    const firstUnlabeled = messages.findIndex((m) => !labels[m.id])
-    return firstUnlabeled === -1 ? messages.length : firstUnlabeled
-  })
+  const [messages, setMessages] = useState(null) // null while loading
+  const [baseCounts, setBaseCounts] = useState({ signalCount: 0, noiseCount: 0 })
+  const [labels, setLabels] = useState({}) // session map: msgId -> 'signal' | 'noise'
+  const [idx, setIdx] = useState(0)
   const [dragX, setDragX] = useState(0)
   const [flying, setFlying] = useState(null) // {dir, label}
   const dragRef = useRef({ active: false, startX: 0 })
 
-  const total = messages.length
-  const labeledCount = signalCount + noiseCount
+  useEffect(() => {
+    let active = true
+    setMessages(null)
+    Promise.all([onListMessages(chatId), onGetCounts(chatId)])
+      .then(([messagesResult, counts]) => {
+        if (!active) return
+        setMessages(messagesResult.messages || [])
+        setBaseCounts({
+          signalCount: counts.signalCount || 0,
+          noiseCount: counts.noiseCount || 0
+        })
+        setLabels({})
+        setIdx(0)
+      })
+      .catch((error) => {
+        if (!active) return
+        setMessages([])
+        onError &&
+          onError('rejected', 'Could not load messages', error?.message || 'Try again.')
+      })
+    return () => {
+      active = false
+    }
+  }, [chatId, onListMessages, onGetCounts, onError])
+
+  const total = messages ? messages.length : 0
+  const localSignal = Object.values(labels).filter((value) => value === 'signal').length
+  const localNoise = Object.values(labels).filter((value) => value === 'noise').length
+  const signalCount = baseCounts.signalCount + localSignal
+  const noiseCount = baseCounts.noiseCount + localNoise
+  const labeledCount = localSignal + localNoise
   const canDistill = signalCount >= 5
-  // Replies the user marked as signals — Verasig will treat these as updates
-  // to the signal they quote (close / average / move stop), not new positions.
-  const updateCount = messages.filter(
-    (m) => m.replyTo && (labels[m.id] === 'signal' || labels[m.id] === 'modifier')
+  const updateCount = (messages || []).filter(
+    (m) => m.replyTo && labels[m.id] === 'signal'
   ).length
 
   const commit = useCallback(
     (label) => {
-      if (idx >= total || flying) return
+      if (!messages || idx >= total || flying) return
+      const message = messages[idx]
       const dir = label === 'signal' ? 1 : -1
+      const previous = labels[message.id]
       setFlying({ dir, label })
-      onLabel(messages[idx].id, label)
+      setLabels((current) => ({ ...current, [message.id]: label }))
+      Promise.resolve(onRecordLabel(chatId, message.id, label)).catch((error) => {
+        setLabels((current) => {
+          const next = { ...current }
+          if (previous === undefined) delete next[message.id]
+          else next[message.id] = previous
+          return next
+        })
+        onError &&
+          onError('rejected', 'Label not saved', error?.message || 'Try again.')
+      })
       setTimeout(() => {
         setFlying(null)
         setDragX(0)
         setIdx((i) => Math.min(total, i + 1))
       }, 300)
     },
-    [idx, total, flying, messages, onLabel]
+    [messages, idx, total, flying, labels, chatId, onRecordLabel, onError]
   )
 
   const goPrev = useCallback(() => {
@@ -130,7 +173,6 @@ export function LabelView({
     }
   }, [idx, total, flying])
 
-  // keyboard
   useEffect(() => {
     function onKey(e) {
       if (e.key === 'ArrowRight') {
@@ -151,7 +193,6 @@ export function LabelView({
     return () => window.removeEventListener('keydown', onKey)
   }, [commit, goPrev, goNext])
 
-  // pointer drag
   function onPointerDown(e) {
     if (idx >= total || flying) return
     dragRef.current = { active: true, startX: e.clientX }
@@ -169,9 +210,83 @@ export function LabelView({
     else setDragX(0)
   }
 
-  const atEnd = idx >= total
-  const current = !atEnd ? messages[idx] : null
-  const next1 = !atEnd ? messages[idx + 1] : null
+  const loading = messages === null
+  const empty = !loading && total === 0
+  const atEnd = !loading && !empty && idx >= total
+  const current = !loading && !empty && !atEnd ? messages[idx] : null
+  const next1 = !loading && !empty && !atEnd ? messages[idx + 1] : null
+
+  function renderStage() {
+    if (loading) {
+      return (
+        <div className="vrs-card-bg" style={STAGE_CENTER}>
+          <span className="vrs-dot-pulse" />
+          <div className="vrs-rail__note">Loading messages…</div>
+        </div>
+      )
+    }
+    if (empty) {
+      return (
+        <div className="vrs-card-bg" style={STAGE_CENTER}>
+          <span className="vrs-rule__ic" style={{ width: 40, height: 40 }}>
+            <Icon name="signals" size={20} />
+          </span>
+          <div className="vrs-bf-title" style={{ fontSize: 'var(--text-lg)' }}>
+            No messages to label
+          </div>
+          <div className="vrs-rail__note" style={{ maxWidth: '26ch' }}>
+            This feed has no candidate signals to review yet.
+          </div>
+        </div>
+      )
+    }
+    if (atEnd) {
+      return (
+        <div className="vrs-card-bg" style={STAGE_CENTER}>
+          <span className="vrs-rule__ic" style={{ width: 40, height: 40 }}>
+            <Icon name="check" size={20} />
+          </span>
+          <div className="vrs-bf-title" style={{ fontSize: 'var(--text-lg)' }}>
+            Sample reviewed
+          </div>
+          <div className="vrs-rail__note" style={{ maxWidth: '26ch' }}>
+            {labeledCount} of {total} labelled. Press <kbd className="vrs-kbd">↑</kbd>{' '}
+            to revisit, or distill rules from your signals.
+          </div>
+        </div>
+      )
+    }
+    return (
+      <>
+        {next1 && (
+          <MessageCard
+            key={'bg' + next1.id}
+            msg={next1}
+            label={labels[next1.id]}
+            isTop={false}
+            style={{ transform: 'scale(0.95) translateY(14px)', opacity: 0.6 }}
+          />
+        )}
+        <MessageCard
+          key={current.id}
+          msg={current}
+          label={labels[current.id]}
+          isTop={true}
+          dragX={flying ? flying.dir * 600 : dragX}
+          style={
+            flying
+              ? {
+                  transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+                  transform: `translateX(${flying.dir * 600}px) rotate(${flying.dir * 18}deg)`
+                }
+              : dragRef.current.active
+                ? {}
+                : { transition: 'transform 0.25s var(--ease-out)' }
+          }
+        />
+      </>
+    )
+  }
 
   return (
     <div className="vrs-label">
@@ -186,61 +301,7 @@ export function LabelView({
             cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
           }}
         >
-          {atEnd ? (
-            <div
-              className="vrs-card-bg"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 12,
-                textAlign: 'center',
-                padding: 30
-              }}
-            >
-              <span className="vrs-rule__ic" style={{ width: 40, height: 40 }}>
-                <Icon name="check" size={20} />
-              </span>
-              <div className="vrs-bf-title" style={{ fontSize: 'var(--text-lg)' }}>
-                Sample reviewed
-              </div>
-              <div className="vrs-rail__note" style={{ maxWidth: '26ch' }}>
-                {labeledCount} of {total} labelled. Press{' '}
-                <kbd className="vrs-kbd">↑</kbd> to revisit, or distill rules from your
-                signals.
-              </div>
-            </div>
-          ) : (
-            <>
-              {next1 && (
-                <MessageCard
-                  key={'bg' + next1.id}
-                  msg={next1}
-                  label={labels[next1.id]}
-                  isTop={false}
-                  style={{ transform: 'scale(0.95) translateY(14px)', opacity: 0.6 }}
-                />
-              )}
-              <MessageCard
-                key={current.id}
-                msg={current}
-                label={labels[current.id]}
-                isTop={true}
-                dragX={flying ? flying.dir * 600 : dragX}
-                style={
-                  flying
-                    ? {
-                        transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
-                        transform: `translateX(${flying.dir * 600}px) rotate(${flying.dir * 18}deg)`
-                      }
-                    : dragRef.current.active
-                      ? {}
-                      : { transition: 'transform 0.25s var(--ease-out)' }
-                }
-              />
-            </>
-          )}
+          {renderStage()}
         </div>
 
         <div className="vrs-swipe-controls">
@@ -250,7 +311,7 @@ export function LabelView({
             className="vrs-swipe-key vrs-swipe-key--no"
             label="Non-signal"
             onClick={() => commit('noise')}
-            disabled={atEnd}
+            disabled={atEnd || loading || empty}
             title="Non-signal (←)"
           >
             <Icon name="x" size={22} />
@@ -271,7 +332,7 @@ export function LabelView({
               className="vrs-swipe-key vrs-swipe-key--nav"
               label="Next"
               onClick={goNext}
-              disabled={atEnd}
+              disabled={atEnd || loading || empty}
               title="Next (↓)"
             >
               <Icon name="arrowDown" size={18} />
@@ -283,7 +344,7 @@ export function LabelView({
             className="vrs-swipe-key vrs-swipe-key--yes"
             label="Signal"
             onClick={() => commit('signal')}
-            disabled={atEnd}
+            disabled={atEnd || loading || empty}
             title="Signal (→)"
           >
             <Icon name="check" size={22} />
@@ -333,7 +394,7 @@ export function LabelView({
             </span>
           </div>
           <div className="vrs-mini-track">
-            <span style={{ width: `${(labeledCount / total) * 100}%` }} />
+            <span style={{ width: `${total ? (labeledCount / total) * 100 : 0}%` }} />
           </div>
         </div>
 
@@ -371,4 +432,14 @@ export function LabelView({
       </div>
     </div>
   )
+}
+
+const STAGE_CENTER = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+  textAlign: 'center',
+  padding: 30
 }
