@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Badge, Button, Dialog, Input, Banner, Switch } from '@verasig/design-system'
+import { Badge, Button, Dialog, Input, Banner } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { EXCHANGES } from '../../domain/demo-data/seed.js'
 
@@ -144,10 +144,6 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
                     required
                     type="password"
                   />
-                  <div className="vrs-row-between" style={{ padding: '0 2px' }}>
-                    <Switch label="Use testnet first" />
-                    <span className="vrs-help">Recommended for the first run.</span>
-                  </div>
                   <div className="vrs-row-between">
                     <Button
                       variant="ghost"
