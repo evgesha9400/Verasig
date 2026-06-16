@@ -12,12 +12,13 @@ from verasig.features.sources import (
     channel_repository,
 )
 from verasig.features.sources.backfill_job_run import (
+    BackfillMode,
     backfill_job_key,
     present_progress,
     progress_event_name,
 )
 from verasig.features.sources.chat_views import present_chats
-from verasig.features.sources.schemas import ChatCreateIn
+from verasig.features.sources.schemas import BackfillStartIn, ChatCreateIn
 from verasig.features.sources.subscription_repository import (
     subscribe,
     unsubscribe,
@@ -97,9 +98,11 @@ def delete_chat(
 async def start_backfill(
     request: Request,
     chat_id: str,
+    payload: BackfillStartIn | None = None,
     subscription=Depends(require_user_channel),
 ) -> dict:
     channel_id = int(chat_id)
+    mode = payload.mode if payload else BackfillMode.RESUME
 
     def make_source():
         with request.app.state.session_factory() as session:
@@ -111,7 +114,7 @@ async def start_backfill(
             return _resolve_source(request, link)
 
     run = request.app.state.backfill_jobs.start(
-        subscription.user_id, channel_id, make_source
+        subscription.user_id, channel_id, make_source, mode
     )
     return {"jobId": str(run.id)}
 

@@ -13,6 +13,12 @@ class BackfillJobStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class BackfillMode(StrEnum):
+    RESUME = "resume"
+    REFRESH = "refresh"
+    FULL = "full"
+
+
 @dataclass(frozen=True)
 class BackfillJobRun:
     id: UUID

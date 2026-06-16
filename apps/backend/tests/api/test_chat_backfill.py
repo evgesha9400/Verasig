@@ -213,6 +213,86 @@ def test_backfill_after_success_is_idempotent_and_does_not_restart(client, app):
     assert listed["status"] == "backfilled"
 
 
+def test_refresh_backfill_starts_new_run_and_resumes_from_cursor(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    first = client.post("/chats/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    grown = FakeSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+    app.state.telegram_source_factory = lambda _link: grown
+    refreshed = client.post(
+        "/chats/7/backfill", headers=_auth(token), json={"mode": "refresh"}
+    )
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        refreshed_body = "".join(response.iter_text())
+    listed = client.get("/chats", headers=_auth(token)).json()["chats"][0]
+
+    assert refreshed.status_code == 202
+    assert refreshed.json()["jobId"] != first.json()["jobId"]
+    assert grown.requested_afters[0] == 3
+    assert all(message_id > 3 for message_id in grown.yielded_ids)
+    assert "event: done" in refreshed_body
+    assert listed["status"] == "backfilled"
+    assert listed["fetched"] == 5
+
+
+def test_full_backfill_resets_cursor_and_refetches_all(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    first = client.post("/chats/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    refetch = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    app.state.telegram_source_factory = lambda _link: refetch
+    full = client.post("/chats/7/backfill", headers=_auth(token), json={"mode": "full"})
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        full_body = "".join(response.iter_text())
+    listed = client.get("/chats", headers=_auth(token)).json()["chats"][0]
+
+    assert full.status_code == 202
+    assert full.json()["jobId"] != first.json()["jobId"]
+    assert refetch.requested_afters[0] is None
+    assert sorted(refetch.yielded_ids) == [1, 2, 3]
+    assert "event: done" in full_body
+    assert listed["status"] == "backfilled"
+    assert listed["fetched"] == 3
+
+
+def test_full_backfill_while_running_attaches_without_starting_second_job(client, app):
+    token = _register(client)
+    source = SlowSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    first = client.post("/chats/7/backfill", headers=_auth(token))
+    attached = client.post(
+        "/chats/7/backfill", headers=_auth(token), json={"mode": "full"}
+    )
+    client.post("/chats/7/backfill/cancel", headers=_auth(token))
+    with client.stream(
+        "GET", "/chats/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    assert first.status_code == 202
+    assert attached.status_code == 202
+    assert attached.json()["jobId"] == first.json()["jobId"]
+
+
 def test_backfill_rescan_emits_scan_progress_so_stream_is_not_silent(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))

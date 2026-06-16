@@ -8,11 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.telegram_ports import TelegramSource
-from verasig.features.sources import backfill_job_repository, subscription_repository
+from verasig.features.sources import (
+    backfill_job_repository,
+    channel_repository,
+    subscription_repository,
+)
 from verasig.features.sources.backfill import backfill
 from verasig.features.sources.backfill_job_run import (
     BackfillJobRun,
     BackfillJobStatus,
+    BackfillMode,
     BackfillProgress,
     backfill_job_key,
     present_progress,
@@ -60,10 +65,14 @@ class BackfillJobCoordinator:
         user_id: UUID,
         channel_id: int,
         make_source: Callable[[], TelegramSource],
+        mode: BackfillMode = BackfillMode.RESUME,
     ) -> BackfillJobRun:
-        idempotent = self._read_idempotent_run(user_id, channel_id)
+        idempotent = self._read_idempotent_run(user_id, channel_id, mode)
         if idempotent is not None:
             return idempotent
+
+        if mode is BackfillMode.FULL:
+            self._reset_cursor(channel_id)
 
         source = make_source()
         run = self._create_run(user_id, channel_id)
@@ -154,13 +163,14 @@ class BackfillJobCoordinator:
             session.commit()
 
     def _read_idempotent_run(
-        self, user_id: UUID, channel_id: int
+        self, user_id: UUID, channel_id: int, mode: BackfillMode
     ) -> BackfillJobRun | None:
         """Run a duplicate POST should return instead of starting a new backfill.
 
-        A live RUNNING job is attached to; an already-SUCCEEDED backfill replays
-        its terminal. FAILED/CANCELLED runs fall through so a retry restarts from
-        the persisted cursor.
+        A live RUNNING job is always attached to, so a rebackfill never spawns a
+        second job or resets the cursor mid-run. A RESUME after success replays the
+        terminal; REFRESH/FULL fall through to start a fresh run. FAILED/CANCELLED
+        runs fall through so a retry restarts from the persisted cursor.
         """
         with self._session_factory() as session:
             latest = backfill_job_repository.read_latest_run(
@@ -168,12 +178,17 @@ class BackfillJobCoordinator:
             )
         if latest is None:
             return None
-        if latest.status == BackfillJobStatus.SUCCEEDED:
-            return latest
         key = backfill_job_key(user_id, channel_id)
         if latest.status == BackfillJobStatus.RUNNING and self._jobs.has_job(key):
             return latest
+        if latest.status == BackfillJobStatus.SUCCEEDED and mode is BackfillMode.RESUME:
+            return latest
         return None
+
+    def _reset_cursor(self, channel_id: int) -> None:
+        with self._session_factory() as session:
+            channel_repository.reset_cursor(session, channel_id)
+            session.commit()
 
     def _read_attachable_run(
         self, user_id: UUID, channel_id: int

@@ -36,6 +36,12 @@ def advance_cursor(session: Session, channel_id: int, through_message_id: int) -
         channel.captured_through_message_id = through_message_id
 
 
+def reset_cursor(session: Session, channel_id: int) -> None:
+    channel = session.get(ChannelRow, channel_id)
+    if channel is not None:
+        channel.captured_through_message_id = None
+
+
 def read_cursor(session: Session, channel_id: int) -> int | None:
     channel = session.get(ChannelRow, channel_id)
     return channel.captured_through_message_id if channel else None
