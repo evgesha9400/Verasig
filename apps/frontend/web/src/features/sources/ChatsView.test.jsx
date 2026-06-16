@@ -61,6 +61,32 @@ describe('ChatsView', () => {
     expect(onCheckGaps).toHaveBeenCalledWith(feed)
   })
 
+  it('disables Check gaps until label and verify are complete', () => {
+    const backfilledFeed = { ...feed, status: 'backfilled', signalDeletion: false }
+
+    render(
+      <ChatsView
+        chats={[backfilledFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+
+    expect(screen.getByRole('menuitem', { name: /check gaps/i }).disabled).toBe(true)
+    expect(screen.getByRole('menuitem', { name: /fetch new signals/i }).disabled).toBe(
+      false
+    )
+  })
+
   it('confirms before removing a feed', async () => {
     const onRemove = vi.fn()
 

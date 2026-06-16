@@ -182,6 +182,9 @@ export function ChatsView({
   function optionsMenu(c) {
     const busy = c.status === 'backfilling'
     const started = c.status !== 'new' && c.status !== 'backfilling'
+    // Gaps only become meaningful once rules classify signals, i.e. after the
+    // user has completed label + verify (status verified or analyzed).
+    const reviewed = c.status === 'verified' || c.status === 'analyzed'
     return (
       <Menu
         trigger={
@@ -206,7 +209,7 @@ export function ChatsView({
         </MenuItem>
         <MenuItem
           iconLeft={<Icon name="search" size={15} />}
-          disabled={busy || !started}
+          disabled={busy || !reviewed}
           onClick={() => onCheckGaps && onCheckGaps(c)}
         >
           Check gaps
