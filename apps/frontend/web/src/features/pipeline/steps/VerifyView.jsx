@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Badge, Button, IconButton, InteractiveCard, Pill } from '@verasig/design-system'
+import {
+  Badge,
+  Button,
+  IconButton,
+  InteractiveCard,
+  Pill
+} from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { MessageCard } from '../../../shared/components/MessageCard.jsx'
 
@@ -373,7 +379,11 @@ export function VerifyView({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             style={{
-              cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
+              cursor: current
+                ? dragRef.current.active
+                  ? 'grabbing'
+                  : 'grab'
+                : 'default'
             }}
           >
             {renderStage()}
