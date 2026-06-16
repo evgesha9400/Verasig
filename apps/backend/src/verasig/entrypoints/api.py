@@ -22,6 +22,7 @@ from verasig.features.telegram_links import routes as telegram_link_routes
 from verasig.foundation.database.session import make_session_factory
 from verasig.foundation.http import health_routes
 from verasig.foundation.http.access_logging import (
+    configure_app_logging,
     install_health_check_access_log_filter,
 )
 from verasig.foundation.http.errors import ApiError, api_error_handler
@@ -52,6 +53,7 @@ def create_app(
     settings: Settings, session_factory: sessionmaker | None = None
 ) -> FastAPI:
     install_health_check_access_log_filter()
+    configure_app_logging()
     app = FastAPI(title="Verasig API")
     app.state.settings = settings
     app.state.jwt_secret = settings.jwt_secret_spec()

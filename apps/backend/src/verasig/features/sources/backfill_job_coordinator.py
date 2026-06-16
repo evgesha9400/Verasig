@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID
@@ -32,6 +33,8 @@ from verasig.foundation.jobs.registry import (
 )
 from verasig.foundation.market_data.static_exchange import StaticExchange
 from verasig.storage.models import UserChannelRow
+
+logger = logging.getLogger(__name__)
 
 BACKFILL_PHASES = (
     "Opening MTProto session...",
@@ -67,8 +70,17 @@ class BackfillJobCoordinator:
         make_source: Callable[[], TelegramSource],
         mode: BackfillMode = BackfillMode.RESUME,
     ) -> BackfillJobRun:
+        logger.info("backfill.start requested: channel=%s mode=%s", channel_id, mode)
         idempotent = self._read_idempotent_run(user_id, channel_id, mode)
         if idempotent is not None:
+            logger.info(
+                "backfill.start short-circuit: channel=%s mode=%s reused run=%s "
+                "status=%s (no new job started)",
+                channel_id,
+                mode,
+                idempotent.id,
+                idempotent.status,
+            )
             return idempotent
 
         if mode is BackfillMode.FULL:
@@ -77,6 +89,12 @@ class BackfillJobCoordinator:
         source = make_source()
         run = self._create_run(user_id, channel_id)
         key = backfill_job_key(user_id, channel_id)
+        logger.info(
+            "backfill.start new run: channel=%s mode=%s run=%s",
+            channel_id,
+            mode,
+            run.id,
+        )
         try:
             self._jobs.start(
                 key,
@@ -187,8 +205,16 @@ class BackfillJobCoordinator:
 
     def _reset_cursor(self, channel_id: int) -> None:
         with self._session_factory() as session:
+            previous = channel_repository.read_cursor(session, channel_id)
             channel_repository.reset_cursor(session, channel_id)
             session.commit()
+        logger.info(
+            "backfill.full reset cursor: channel=%s previous_cursor=%s -> None "
+            "(next stream refetches from the start; raw rows are upserted by PK, "
+            "not deleted)",
+            channel_id,
+            previous,
+        )
 
     def _read_attachable_run(
         self, user_id: UUID, channel_id: int
@@ -228,23 +254,53 @@ class BackfillJobCoordinator:
 
         try:
             async with source:
-                await backfill(
+                logger.info(
+                    "backfill.run stream begin: run=%s channel=%s", run_id, channel_id
+                )
+                result = await backfill(
                     source,
                     channel_id,
                     self._session_factory,
                     self._batch_size,
                     on_batch=on_batch,
                 )
+                logger.info(
+                    "backfill.run stream done: run=%s channel=%s inserted=%s cursor=%s",
+                    run_id,
+                    channel_id,
+                    result.inserted,
+                    result.captured_through_message_id,
+                )
                 self._publish_progress(publisher, run_id, "Indexing message bodies...")
+                logger.info(
+                    "backfill.run derive_candidates begin: channel=%s", channel_id
+                )
                 derive_candidates(self._session_factory, channel_id, StaticExchange())
+                logger.info(
+                    "backfill.run derive_candidates done: channel=%s", channel_id
+                )
                 self._publish_progress(
                     publisher, run_id, "Checking deleted messages..."
                 )
-                await rescan(
+                logger.info(
+                    "backfill.run rescan begin: channel=%s (fetches the FULL live "
+                    "message-id set from Telegram regardless of how little was "
+                    "backfilled — this is the slow step)",
+                    channel_id,
+                )
+                rescan_result = await rescan(
                     source,
                     channel_id,
                     self._session_factory,
                     on_progress=self._rescan_progress_reporter(publisher, run_id),
+                )
+                logger.info(
+                    "backfill.run rescan done: channel=%s confirmed=%s suspected=%s "
+                    "written=%s",
+                    channel_id,
+                    rescan_result.confirmed,
+                    rescan_result.suspected,
+                    rescan_result.written,
                 )
         except asyncio.CancelledError as error:
             progress = self._finish_cancelled(run_id, user_id, channel_id)

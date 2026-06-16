@@ -6,6 +6,7 @@ mid-stream loses at most the in-flight batch and a restart resumes from the
 persisted cursor without refetching captured ids. Only one batch is ever held.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,8 @@ from verasig.features.sources import (
     channel_repository,
     message_repository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -35,12 +38,24 @@ async def backfill(
     on_batch: Callable[[int, datetime], None] | None = None,
 ) -> BackfillResult:
     channel_id, cursor = await _register_channel(source, reference, session_factory)
+    logger.info(
+        "backfill stream: channel=%s resuming after_message_id=%s "
+        "(None means from the beginning)",
+        channel_id,
+        cursor,
+    )
     inserted = 0
     async for batch in source.backfill_batches(channel_id, cursor, batch_size):
         inserted += _persist_batch(session_factory, channel_id, batch)
         if on_batch and batch:
             on_batch(inserted, min(message.posted_at for message in batch))
     final_cursor = _read_cursor(session_factory, channel_id)
+    logger.info(
+        "backfill stream complete: channel=%s inserted=%s final_cursor=%s",
+        channel_id,
+        inserted,
+        final_cursor,
+    )
     return BackfillResult(channel_id, inserted, final_cursor)
 
 

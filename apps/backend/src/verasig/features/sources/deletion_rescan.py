@@ -9,6 +9,7 @@ core (`detect_deletions`) wrapped in repo-driven orchestration; `live_message_id
 never runs against real Telegram in tests.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -26,6 +27,8 @@ from verasig.features.sources import (
     message_repository,
 )
 from verasig.features.sources.deletion_diff import detect_deletions
+
+logger = logging.getLogger(__name__)
 
 
 class RescanAborted(RuntimeError):
@@ -51,7 +54,17 @@ async def rescan(
     on_progress: Callable[[int], None] | None = None,
 ) -> RescanResult:
     channel_id = _resolve_channel_id(session_factory, reference)
+    logger.info(
+        "rescan.live_message_ids begin: channel=%s (walking the full live channel "
+        "via the source — may take a while for large channels)",
+        channel_id,
+    )
     live_ids = await source.live_message_ids(channel_id, on_progress=on_progress)
+    logger.info(
+        "rescan.live_message_ids done: channel=%s live_count=%s",
+        channel_id,
+        len(live_ids),
+    )
     _guard_live_snapshot(live_ids, channel_id)
     evidence = _detect(session_factory, channel_id, live_ids)
     written = _persist(session_factory, evidence)

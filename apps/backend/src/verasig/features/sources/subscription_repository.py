@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from uuid import UUID
 
@@ -21,6 +22,8 @@ from verasig.storage.models import (
     UserChannelRow,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def subscribe(
     session: Session, user_id: UUID, channel_id: int, added_at: datetime
@@ -42,9 +45,16 @@ def subscribe(
 
 
 def unsubscribe(session: Session, user_id: UUID, channel_id: int) -> None:
+    logger.info(
+        "unsubscribe start: user=%s channel=%s (deletes user-scoped derived rows; "
+        "RETAINS raw_telegram_message and the channel backfill cursor)",
+        user_id,
+        channel_id,
+    )
     event_ids = select(RawSignalEventRow.id).where(
         RawSignalEventRow.channel_id == channel_id
     )
+    deleted: dict[str, int] = {}
     for row_type in (
         GoldenLabelRow,
         FilterRuleRow,
@@ -63,12 +73,20 @@ def unsubscribe(session: Session, user_id: UUID, channel_id: int) -> None:
             statement = statement.where(row_type.channel_id == channel_id)
         if row_type is UnrecognizedSignalRow:
             statement = statement.where(row_type.event_id.in_(event_ids))
-        session.execute(statement)
+        deleted[row_type.__tablename__] = session.execute(statement).rowcount
     session.execute(
         delete(UserChannelRow).where(
             UserChannelRow.user_id == user_id,
             UserChannelRow.channel_id == channel_id,
         )
+    )
+    logger.info(
+        "unsubscribe done: user=%s channel=%s deleted_rows=%s; raw messages and "
+        "cursor left intact, so re-adding this channel resumes backfill from the "
+        "persisted cursor rather than refetching history",
+        user_id,
+        channel_id,
+        {table: count for table, count in deleted.items() if count},
     )
 
 
