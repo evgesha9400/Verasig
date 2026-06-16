@@ -546,7 +546,9 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                               </span>
                               <span className="vrs-tl__lbl">
                                 Closed by author
-                                <Pill tone={s.outcome} numeric
+                                <Pill
+                                  tone={s.outcome}
+                                  numeric
                                   style={{ marginLeft: 8 }}
                                 >
                                   <Icon
@@ -572,7 +574,9 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                                 {s.outcome === 'profit'
                                   ? 'Closed on backtest'
                                   : 'Closed at stop'}
-                                <Pill tone={s.outcome} numeric
+                                <Pill
+                                  tone={s.outcome}
+                                  numeric
                                   style={{ marginLeft: 8 }}
                                 >
                                   <Icon

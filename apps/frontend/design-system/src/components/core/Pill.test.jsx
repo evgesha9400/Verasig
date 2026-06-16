@@ -13,9 +13,13 @@ describe('Pill', () => {
 
   it('applies tone, variant, size and numeric modifiers', () => {
     expect(classOf(<Pill tone="accent">x</Pill>)).toContain('vrs-pill__accent')
-    expect(classOf(<Pill tone="pending" variant="outline">x</Pill>)).toContain(
-      'vrs-pill__outline'
-    )
+    expect(
+      classOf(
+        <Pill tone="pending" variant="outline">
+          x
+        </Pill>
+      )
+    ).toContain('vrs-pill__outline')
     expect(classOf(<Pill size="xs">x</Pill>)).toContain('vrs-pill__xs')
     expect(classOf(<Pill numeric>x</Pill>)).toContain('vrs-pill__num')
   })

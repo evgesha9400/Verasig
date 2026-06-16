@@ -86,7 +86,11 @@ describe('chatsApi', () => {
 
     expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/chats/7/backfill', {
       method: 'POST',
-      headers: { Authorization: 'Bearer jwt-token' }
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({ mode: 'resume' })
     })
     expect(fetch).toHaveBeenNthCalledWith(
       2,
@@ -96,6 +100,21 @@ describe('chatsApi', () => {
         headers: { Authorization: 'Bearer jwt-token' }
       }
     )
+  })
+
+  it('starts a re-backfill in the requested mode', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:backfill' }, 202))
+
+    await startBackfill('jwt-token', '7', 'full')
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/backfill', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({ mode: 'full' })
+    })
   })
 
   it('streams backfill progress with the token in the query string', () => {

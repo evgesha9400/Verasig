@@ -20,10 +20,11 @@ export function deleteChat(token, chatId) {
   })
 }
 
-export function startBackfill(token, chatId) {
+export function startBackfill(token, chatId, mode = 'resume') {
   return requestJson(`/chats/${chatId}/backfill`, {
     method: 'POST',
-    token
+    token,
+    body: { mode }
   })
 }
 

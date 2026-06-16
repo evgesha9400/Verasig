@@ -29,6 +29,7 @@ import {
 import {
   cancelBackfill,
   createChat,
+  deleteChat,
   startBackfill as startBackfillJob,
   streamBackfillProgress
 } from '../shared/api/chatsApi.js'
@@ -88,14 +89,16 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     fireToast,
     backTarget,
     signalsPreset,
+    backfillMode,
     isWorkflow,
     pipelineStep,
     goToDeletedSignals,
     startBackfill,
     retryBackfill,
     resumeChat,
-    reanalyze,
-    restartChat,
+    fetchNewSignals,
+    refetchFullHistory,
+    removeChat,
     checkGaps,
     stopAfterVerify,
     backtestFeed,
@@ -150,6 +153,20 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     const chat = await createChat(authToken, tag)
     upsertChat(chat)
     fireToast('verified', 'Feed added', `${chat.name} is ready to backfill.`)
+  }
+
+  async function removeFeed(chat) {
+    try {
+      await deleteChat(authToken, chat.id)
+      removeChat(chat.id)
+      fireToast('info', 'Feed removed', `${chat.name} was removed from your feeds.`)
+    } catch (error) {
+      fireToast(
+        'rejected',
+        'Could not remove feed',
+        error?.message || 'Try again in a moment.'
+      )
+    }
   }
 
   function completeBackfill(result) {
@@ -239,8 +256,9 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onStartBackfill={startBackfill}
         onRetry={retryBackfill}
         onResume={resumeChat}
-        onReanalyze={reanalyze}
-        onRestart={restartChat}
+        onFetchNew={fetchNewSignals}
+        onRefetchFull={refetchFullHistory}
+        onRemove={removeFeed}
         onViewDeleted={goToDeletedSignals}
         onCheckGaps={checkGaps}
         onBacktest={backtestFeed}
@@ -270,7 +288,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       body = (
         <BackfillView
           chat={activeChat}
-          onStart={(chatId) => startBackfillJob(authToken, chatId)}
+          onStart={(chatId) => startBackfillJob(authToken, chatId, backfillMode)}
           onStream={(chatId, handlers) =>
             streamBackfillProgress(authToken, chatId, handlers)
           }

@@ -23,8 +23,9 @@ describe('ChatsView', () => {
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
-        onReanalyze={() => {}}
-        onRestart={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
         onBacktest={() => {}}
@@ -45,8 +46,9 @@ describe('ChatsView', () => {
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
-        onReanalyze={() => {}}
-        onRestart={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={onCheckGaps}
         onBacktest={() => {}}
@@ -59,6 +61,61 @@ describe('ChatsView', () => {
     expect(onCheckGaps).toHaveBeenCalledWith(feed)
   })
 
+  it('confirms before removing a feed', async () => {
+    const onRemove = vi.fn()
+
+    render(
+      <ChatsView
+        chats={[feed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={onRemove}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /remove feed/i }))
+
+    expect(onRemove).not.toHaveBeenCalled()
+    expect(await screen.findByText('Remove this feed?')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove feed' }))
+
+    expect(onRemove).toHaveBeenCalledWith(feed)
+  })
+
+  it('confirms before fetching new signals', async () => {
+    const onFetchNew = vi.fn()
+
+    render(
+      <ChatsView
+        chats={[feed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={onFetchNew}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /fetch new signals/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch new' }))
+
+    expect(onFetchNew).toHaveBeenCalledWith(feed)
+  })
+
   it('adds a Telegram feed by channel tag', async () => {
     const onAddChat = vi.fn().mockResolvedValue()
 
@@ -68,8 +125,9 @@ describe('ChatsView', () => {
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
-        onReanalyze={() => {}}
-        onRestart={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
         onBacktest={() => {}}
@@ -98,8 +156,9 @@ describe('ChatsView', () => {
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
-        onReanalyze={() => {}}
-        onRestart={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
         onBacktest={() => {}}
@@ -132,8 +191,9 @@ describe('ChatsView', () => {
         onStartBackfill={() => {}}
         onRetry={onRetry}
         onResume={() => {}}
-        onReanalyze={() => {}}
-        onRestart={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
         onBacktest={() => {}}

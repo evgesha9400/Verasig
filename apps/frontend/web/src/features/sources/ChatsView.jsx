@@ -4,13 +4,42 @@ import {
   Badge,
   Banner,
   Button,
+  Dialog,
   IconButton,
   Input,
   Menu,
   MenuItem,
+  MenuSeparator,
   Popover
 } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+
+const CONFIRM_COPY = {
+  fetchNew: {
+    title: 'Fetch new signals?',
+    confirmLabel: 'Fetch new',
+    variant: 'primary',
+    icon: 'refresh',
+    body: (chat) =>
+      `Pull messages posted since the last backfill of ${chat.name}. Existing labels and rules are kept.`
+  },
+  refetchFull: {
+    title: 'Re-fetch full history?',
+    confirmLabel: 'Re-fetch all',
+    variant: 'primary',
+    icon: 'download',
+    body: (chat) =>
+      `Re-pull the entire history of ${chat.name} from the start. This can take a while; existing labels and rules are kept.`
+  },
+  remove: {
+    title: 'Remove this feed?',
+    confirmLabel: 'Remove feed',
+    variant: 'danger',
+    icon: 'alert',
+    body: (chat) =>
+      `${chat.name}, its labels, rules and score will be removed from your feeds. You can add it again later by its handle.`
+  }
+}
 
 function fmtNum(n) {
   if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K'
@@ -22,8 +51,9 @@ export function ChatsView({
   onStartBackfill,
   onRetry,
   onResume,
-  onReanalyze,
-  onRestart,
+  onFetchNew,
+  onRefetchFull,
+  onRemove,
   onViewDeleted,
   onCheckGaps,
   onBacktest,
@@ -32,6 +62,16 @@ export function ChatsView({
   const [tag, setTag] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState(null)
+  const [confirm, setConfirm] = useState(null)
+
+  function runConfirm() {
+    if (!confirm) return
+    const { kind, chat } = confirm
+    setConfirm(null)
+    if (kind === 'fetchNew') onFetchNew(chat)
+    else if (kind === 'refetchFull') onRefetchFull(chat)
+    else if (kind === 'remove') onRemove(chat)
+  }
 
   async function addChat(event) {
     event.preventDefault()
@@ -140,6 +180,8 @@ export function ChatsView({
   }
 
   function optionsMenu(c) {
+    const busy = c.status === 'backfilling'
+    const started = c.status !== 'new' && c.status !== 'backfilling'
     return (
       <Menu
         trigger={
@@ -150,22 +192,33 @@ export function ChatsView({
       >
         <MenuItem
           iconLeft={<Icon name="refresh" size={15} />}
-          onClick={() => onReanalyze(c)}
+          disabled={busy || !started}
+          onClick={() => setConfirm({ kind: 'fetchNew', chat: c })}
         >
-          Backfill new signals
+          Fetch new signals
+        </MenuItem>
+        <MenuItem
+          iconLeft={<Icon name="download" size={15} />}
+          disabled={busy || !started}
+          onClick={() => setConfirm({ kind: 'refetchFull', chat: c })}
+        >
+          Re-fetch full history
         </MenuItem>
         <MenuItem
           iconLeft={<Icon name="search" size={15} />}
+          disabled={busy || !started}
           onClick={() => onCheckGaps && onCheckGaps(c)}
         >
           Check gaps
         </MenuItem>
+        <MenuSeparator />
         <MenuItem
           tone="danger"
           iconLeft={<Icon name="trash" size={15} />}
-          onClick={() => onRestart(c)}
+          disabled={busy}
+          onClick={() => setConfirm({ kind: 'remove', chat: c })}
         >
-          Delete & restart
+          Remove feed
         </MenuItem>
       </Menu>
     )
@@ -222,6 +275,7 @@ export function ChatsView({
           >
             Retry
           </Button>
+          {optionsMenu(c)}
         </div>
       )
     }
@@ -237,6 +291,7 @@ export function ChatsView({
           >
             Continue
           </Button>
+          {optionsMenu(c)}
         </div>
       )
     }
@@ -250,6 +305,7 @@ export function ChatsView({
         >
           Start backfill
         </Button>
+        {optionsMenu(c)}
       </div>
     )
   }
@@ -336,6 +392,30 @@ export function ChatsView({
           </div>
         ))}
       </div>
+      {confirm && (
+        <Dialog
+          open
+          onClose={() => setConfirm(null)}
+          title={CONFIRM_COPY[confirm.kind].title}
+          icon={<Icon name={CONFIRM_COPY[confirm.kind].icon} size={19} />}
+          footer={
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant={CONFIRM_COPY[confirm.kind].variant}
+                size="sm"
+                onClick={runConfirm}
+              >
+                {CONFIRM_COPY[confirm.kind].confirmLabel}
+              </Button>
+            </>
+          }
+        >
+          {CONFIRM_COPY[confirm.kind].body(confirm.chat)}
+        </Dialog>
+      )}
     </div>
   )
 }

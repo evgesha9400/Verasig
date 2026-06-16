@@ -300,7 +300,11 @@ export function LabelView({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             style={{
-              cursor: current ? (dragRef.current.active ? 'grabbing' : 'grab') : 'default'
+              cursor: current
+                ? dragRef.current.active
+                  ? 'grabbing'
+                  : 'grab'
+                : 'default'
             }}
           >
             {renderStage()}

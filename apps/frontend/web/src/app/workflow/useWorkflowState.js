@@ -78,6 +78,7 @@ export function useWorkflowState(authToken) {
   const [toast, setToast] = useState(null)
   const [backTarget, setBackTarget] = useState(null)
   const [signalsPreset, setSignalsPreset] = useState(null)
+  const [backfillMode, setBackfillMode] = useState('resume')
 
   const prevNavRef = useRef('sources')
 
@@ -174,12 +175,14 @@ export function useWorkflowState(authToken) {
   }
 
   function startBackfill(chat) {
+    setBackfillMode('resume')
     setActiveChatId(chat.id)
     patchChat(chat.id, { status: 'backfilling' })
     setScreen('backfill')
   }
 
   function retryBackfill(chat) {
+    setBackfillMode('resume')
     setActiveChatId(chat.id)
     patchChat(chat.id, { status: 'backfilling' })
     setScreen('backfill')
@@ -192,23 +195,32 @@ export function useWorkflowState(authToken) {
     else setScreen('label')
   }
 
-  function reanalyze(chat) {
+  function fetchNewSignals(chat) {
+    setBackfillMode('refresh')
     setActiveChatId(chat.id)
     patchChat(chat.id, { status: 'backfilling' })
     setScreen('backfill')
-    fireToast('info', 'Re-backfilling', `Fetching new signals from ${chat.name}.`)
+    fireToast('info', 'Fetching new signals', `Pulling new messages from ${chat.name}.`)
   }
 
-  function restartChat(chat) {
-    patchChat(chat.id, {
-      status: 'new',
-      fetched: 0,
-      lastDate: null,
-      score: null,
-      winRate: null,
-      pnl: null
-    })
-    fireToast('rejected', 'Feed reset', `${chat.name} backfill and labels deleted.`)
+  function refetchFullHistory(chat) {
+    setBackfillMode('full')
+    setActiveChatId(chat.id)
+    patchChat(chat.id, { status: 'backfilling' })
+    setScreen('backfill')
+    fireToast(
+      'info',
+      'Re-fetching history',
+      `Re-pulling the full history of ${chat.name}.`
+    )
+  }
+
+  function removeChat(id) {
+    setChats((currentChats) => currentChats.filter((chat) => chat.id !== id))
+    if (activeChatId === id) {
+      setActiveChatId(null)
+      setScreen('chats')
+    }
   }
 
   function checkGaps(chat) {
@@ -260,6 +272,7 @@ export function useWorkflowState(authToken) {
       fetched: summary.fetched ?? current?.fetched ?? 0,
       lastDate: summary.lastDate ?? current?.lastDate ?? null
     })
+    setBackfillMode('resume')
     setScreen('label')
   }
 
@@ -381,6 +394,7 @@ export function useWorkflowState(authToken) {
     toast,
     backTarget,
     signalsPreset,
+    backfillMode,
     activeChat,
     isWorkflow: WORKFLOW_SCREENS.has(screen),
     pipelineStep: PIPELINE_SCREEN_BY_SCREEN[screen] || null,
@@ -389,8 +403,9 @@ export function useWorkflowState(authToken) {
     startBackfill,
     retryBackfill,
     resumeChat,
-    reanalyze,
-    restartChat,
+    fetchNewSignals,
+    refetchFullHistory,
+    removeChat,
     checkGaps,
     stopAfterVerify,
     backtestFeed,
