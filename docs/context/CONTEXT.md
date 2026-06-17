@@ -6,12 +6,22 @@ Proof-first signal-provider verification. This context covers ingesting Telegram
 
 ### Sources & capture
 
+The capture layer is **user-owned and provider-agnostic**. A user connects a **Source** (a provider account — Telegram is the only one today) and follows **Feed**s through it; a feed's captured messages are **raw_message**s. Everything a user captures is keyed by `user_id`, so deleting a feed — or the source above it — removes that user's capture and derived rows, and a re-add starts clean from a NULL cursor. "Telegram" lives only in the single adapter and in opaque `config`/`metadata`, never in a table or column name; provider ids are stored generically as `external_id` / `external_message_id`. In code the Telegram adapter still speaks the domain objects below (`TelegramChannel`, `RawTelegramMessage`); the **repository layer is the only place that translates** them to that generic storage. See [ADR 0012](../adr/0012-user-owned-generic-source-feed-model.md).
+
+**Source**:
+A user's connection to a signal provider — Telegram today (`name` is constrained to it). Holds connection `status` (`pending` → `connected`) and an encrypted `config` (the provider secrets). A user has at most one source per provider; deleting it cascades every feed beneath it.
+_Avoid_: account, integration, channel.
+
+**Feed**:
+A stream a user follows through a `Source` — **user-owned**, keyed by `user_id` + the provider stream id. Collapses what used to be a shared channel record plus a separate membership row into one entity that also carries the backfill cursor and provider `metadata` (handle, private flag, subscriber count). The API and UI call this a **feed**; in code its resolved form is a `TelegramChannel`.
+_Avoid_: subscription, chat, channel cache.
+
 **TelegramChannel**:
-A monitored Telegram public or private channel that a provider posts signals to. Identified by its Telegram channel id.
-_Avoid_: group, chat, feed.
+The Telegram adapter's domain view of a `Feed` — a monitored public or private channel a provider posts signals to, identified by its Telegram channel id. Persisted as a user-owned `feed` row (`external_id`); the in-code object keeps `channel_id`.
+_Avoid_: group, chat.
 
 **RawTelegramMessage**:
-One captured message exactly as received, stored immutably and append-only. The 100%-capture layer. Carries provenance, text, sender, timestamps, `reply_to`, and media-present flags.
+One captured message exactly as received, stored immutably and append-only. The 100%-capture layer. Carries provenance, text, sender, timestamps, `reply_to`, and media-present flags. Persisted user-owned as a `raw_message` row (`external_id` / `external_message_id`).
 _Avoid_: message record, raw event (that is something else — see below).
 
 **RawSignalEvent**:
@@ -117,6 +127,7 @@ Maximum favorable / adverse excursion over a signal's simulated life. MAE drives
 ## Flagged ambiguities
 
 - **Signal**: ambiguous in older docs (raw vs parsed). Resolved: the canonical parsed object is `ExtractedSignal`; raw capture is `RawTelegramMessage`. The bare word "Signal" is retired.
+- **chat vs feed vs channel**: the user-followed stream is a `Feed` (the API/UI term + the storage row); its in-code domain object is `TelegramChannel` (keeps `channel_id`); a `Source` is the connection above it. "chat" is retired from the wire — the old `/chats` API is now `/feeds`.
 - **`signals` vs `failure_signal`**: `signals` always means trade signals; `failure_signal` (operational failure indication) is out of Verasig's scope.
 - **"Demo outcome" (value-proposition.md)**: there is no demo execution. "Outcome" means `Simulated outcome` from historical klines.
 - **"Local-only"**: means everything runs in Docker via `docker compose` on any machine with Docker — not "no servers." A Postgres container is in scope.
