@@ -323,7 +323,7 @@ def test_backfill_progress_stream_reports_cumulative_count_and_oldest_date(clien
     assert '"status": "running"' in body
     assert '"fetched": 5' in body
     assert '"lastDate": "Jun 1, 2026"' in body
-    assert '"cursorMessageId": 5' in body
+    assert '"cursorExternalMessageId": 5' in body
 
 
 def test_stale_backfilling_subscription_is_reconciled_to_failed(client, app):

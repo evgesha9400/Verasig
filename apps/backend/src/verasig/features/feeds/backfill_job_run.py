@@ -60,7 +60,7 @@ def present_progress(progress: BackfillProgress) -> dict:
             if progress.oldest_posted_at
             else None
         ),
-        "cursorMessageId": progress.cursor_message_id,
+        "cursorExternalMessageId": progress.cursor_message_id,
     }
     if progress.message:
         payload["message"] = progress.message
