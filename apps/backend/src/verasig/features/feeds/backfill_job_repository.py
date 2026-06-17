@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from verasig.features.sources.backfill_job_run import (
+from verasig.features.feeds.backfill_job_run import (
     BackfillJobRun,
     BackfillJobStatus,
 )

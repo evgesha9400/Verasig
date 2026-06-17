@@ -11,14 +11,14 @@ from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.views import present_signals
 from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
-    feed_repository,
-    message_repository,
-)
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _USER_ID = UUID("60000000-0000-0000-0000-000000000001")

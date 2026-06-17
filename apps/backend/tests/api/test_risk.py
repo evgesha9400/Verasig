@@ -7,8 +7,8 @@ from seed import insert_source
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.risk_config import EntryMode, ExitSource, RiskConfig, Weighting
 from verasig.features.accounts.tokens import read_user_id
+from verasig.features.feeds import feed_repository
 from verasig.features.risk import repository as risk_repository
-from verasig.features.sources import feed_repository
 
 SECRET = "s" * 32
 

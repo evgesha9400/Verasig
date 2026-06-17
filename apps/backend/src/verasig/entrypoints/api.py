@@ -7,6 +7,8 @@ from sqlalchemy.orm import sessionmaker
 from verasig.config import Settings
 from verasig.features.accounts import auth_routes, user_routes
 from verasig.features.exchanges import routes as exchange_routes
+from verasig.features.feeds import routes as feed_routes
+from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
 from verasig.features.risk import routes as risk_routes
 from verasig.features.rules import (
     distill_routes,
@@ -17,8 +19,6 @@ from verasig.features.rules.rule_distiller import AnthropicDistiller
 from verasig.features.signals import routes as signal_routes
 from verasig.features.simulation import routes as simulation_routes
 from verasig.features.sources import routes as source_routes
-from verasig.features.sources.backfill_job_coordinator import BackfillJobCoordinator
-from verasig.features.telegram_links import routes as telegram_link_routes
 from verasig.foundation.database.session import make_session_factory
 from verasig.foundation.http import health_routes
 from verasig.foundation.http.access_logging import (
@@ -37,9 +37,9 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     health_routes.router,
     auth_routes.router,
     user_routes.router,
-    telegram_link_routes.router,
-    exchange_routes.router,
     source_routes.router,
+    exchange_routes.router,
+    feed_routes.router,
     simulation_routes.router,
     label_routes.router,
     distill_routes.router,

@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import LabelKind
+from verasig.features.feeds.candidate_filter import apply_filter_rule
 from verasig.features.rules.repository import read_filter_rules
-from verasig.features.sources.candidate_filter import apply_filter_rule
 from verasig.storage.models import GoldenLabelRow, RawMessageRow
 
 

@@ -13,13 +13,13 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
-from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
+from verasig.features.feeds import (
     deletion_repository,
     feed_repository,
     message_repository,
 )
-from verasig.features.sources.feed_views import present_feeds
+from verasig.features.feeds.feed_views import present_feeds
+from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_long, format_short, format_time
 
 

@@ -12,14 +12,14 @@ from verasig.domain.parser_rule import ParserRule
 from verasig.domain.risk_config import RiskConfig
 from verasig.domain.simulation import Kline
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.backtesting import run_backtest
-from verasig.features.sources import (
-    feed_repository,
-    message_repository,
-)
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _NOW = _BASE + timedelta(minutes=2)

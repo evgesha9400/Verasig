@@ -12,6 +12,11 @@ from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
 from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
+from verasig.features.feeds import (
+    deletion_repository,
+    feed_repository,
+    message_repository,
+)
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
 from verasig.features.rules import repository as rule_repository
@@ -20,11 +25,6 @@ from verasig.features.signals.extract_service import ExtractService
 from verasig.features.signals.fold import fold
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
-from verasig.features.sources import (
-    deletion_repository,
-    feed_repository,
-    message_repository,
-)
 
 
 @dataclass(frozen=True)

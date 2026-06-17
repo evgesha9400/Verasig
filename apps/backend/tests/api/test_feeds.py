@@ -141,11 +141,11 @@ def test_delete_feed_purges_feed_and_masks_foreign_user(client, app):
 def test_delete_source_cascades_feeds_and_capture(client, app):
     from verasig.domain.message import RawTelegramMessage
     from verasig.features.accounts.tokens import read_user_id
-    from verasig.features.sources import (
+    from verasig.features.feeds import (
         feed_repository,
         message_repository,
-        source_repository,
     )
+    from verasig.features.sources import source_repository
 
     token = _register(client)
     _connect_telegram(client, app, token)

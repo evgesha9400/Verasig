@@ -22,13 +22,13 @@ from verasig.domain.signal import (
     UnrecognizedSignal,
 )
 from verasig.features.accounts import repository as account_repository
-from verasig.features.provider_scores.scorecard import build_provider_score
-from verasig.features.signals import event_repository, outcome_repository
-from verasig.features.sources import (
+from verasig.features.feeds import (
     deletion_repository,
     feed_repository,
     message_repository,
 )
+from verasig.features.provider_scores.scorecard import build_provider_score
+from verasig.features.signals import event_repository, outcome_repository
 
 _CHANNEL_ID = 7
 _USER_ID = UUID("20000000-0000-0000-0000-000000999999")

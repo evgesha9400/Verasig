@@ -1,10 +1,21 @@
-from verasig.features.sources.backfill_job_run import BackfillMode
 from verasig.foundation.http.schemas import CamelModel
 
 
-class FeedCreateIn(CamelModel):
-    tag: str
+class TelegramConnectIn(CamelModel):
+    api_id: int
+    api_hash: str
+    phone: str
 
 
-class BackfillStartIn(CamelModel):
-    mode: BackfillMode = BackfillMode.RESUME
+class TelegramVerifyIn(CamelModel):
+    code: str
+    password: str | None = None
+
+
+class TelegramStatusOut(CamelModel):
+    connected: bool
+    phone: str | None
+
+
+class TelegramVerifyOut(CamelModel):
+    connected: bool

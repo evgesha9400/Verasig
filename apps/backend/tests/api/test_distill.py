@@ -9,12 +9,12 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
-from verasig.features.rules import repository as rule_repository
-from verasig.features.signals import event_repository
-from verasig.features.sources import (
+from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
 
 SECRET = "s" * 32
 

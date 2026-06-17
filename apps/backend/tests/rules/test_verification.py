@@ -10,6 +10,10 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import drift_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.rules.verification import (
@@ -18,10 +22,6 @@ from verasig.features.rules.verification import (
     verification_samples,
 )
 from verasig.features.signals import event_repository
-from verasig.features.sources import (
-    feed_repository,
-    message_repository,
-)
 
 
 def _instant() -> datetime:

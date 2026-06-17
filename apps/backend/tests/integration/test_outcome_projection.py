@@ -20,13 +20,13 @@ from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import Side, TradeIntent
 from verasig.features.accounts import repository as account_repository
-from verasig.features.rules import drift_repository
-from verasig.features.signals import event_repository, outcome_repository
-from verasig.features.signals.extract_service import ExtractService
-from verasig.features.sources import (
+from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.rules import drift_repository
+from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals.extract_service import ExtractService
 
 _LONG_RULE = ParserRule(
     rule_id="r1",

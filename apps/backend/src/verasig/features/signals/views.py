@@ -9,6 +9,11 @@ from verasig.domain.label import LabelKind
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
+from verasig.features.feeds import (
+    deletion_repository,
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
     event_repository,
@@ -18,11 +23,6 @@ from verasig.features.signals import (
 from verasig.features.signals.fold import fold
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
-    deletion_repository,
-    feed_repository,
-    message_repository,
-)
 from verasig.shared.time import format_short, format_time
 
 OBSERVER_SIGNAL_LIMIT = 200

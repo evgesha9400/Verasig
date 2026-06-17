@@ -14,7 +14,7 @@ from verasig.domain.telegram_ports import (
 )
 from verasig.features.accounts import repository as account_repository
 from verasig.features.sources import source_repository
-from verasig.features.telegram_links.workflow import connect, status, verify
+from verasig.features.sources.telegram_adapter import connect, status, verify
 from verasig.foundation.security.secrets import SecretCipher
 
 

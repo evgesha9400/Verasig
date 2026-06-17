@@ -9,12 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.telegram_ports import TelegramSource
-from verasig.features.sources import (
+from verasig.features.feeds import (
     backfill_job_repository,
     feed_repository,
 )
-from verasig.features.sources.backfill import backfill
-from verasig.features.sources.backfill_job_run import (
+from verasig.features.feeds.backfill import backfill
+from verasig.features.feeds.backfill_job_run import (
     BackfillJobRun,
     BackfillJobStatus,
     BackfillMode,
@@ -22,8 +22,8 @@ from verasig.features.sources.backfill_job_run import (
     backfill_job_key,
     present_progress,
 )
-from verasig.features.sources.candidate_derivation import derive_candidates
-from verasig.features.sources.deletion_rescan import rescan
+from verasig.features.feeds.candidate_derivation import derive_candidates
+from verasig.features.feeds.deletion_rescan import rescan
 from verasig.foundation.jobs.registry import (
     JobAlreadyRunningError,
     JobPublisher,

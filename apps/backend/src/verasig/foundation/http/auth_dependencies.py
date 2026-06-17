@@ -5,7 +5,7 @@ from fastapi import Depends, Header, Query, Request
 from verasig.domain.account import UserAccount
 from verasig.features.accounts.repository import find_by_id
 from verasig.features.accounts.tokens import TokenInvalidError, read_user_id
-from verasig.features.sources import feed_repository
+from verasig.features.feeds import feed_repository
 from verasig.foundation.http.errors import ApiError
 from verasig.storage.models import FeedRow
 

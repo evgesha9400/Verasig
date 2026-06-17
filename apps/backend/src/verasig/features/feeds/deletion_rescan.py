@@ -22,12 +22,12 @@ from verasig.domain.deletion import (
     DeletionConfidence,
 )
 from verasig.domain.telegram_ports import TelegramSource
-from verasig.features.sources import (
+from verasig.features.feeds import (
     deletion_repository,
     feed_repository,
     message_repository,
 )
-from verasig.features.sources.deletion_diff import detect_deletions
+from verasig.features.feeds.deletion_diff import detect_deletions
 
 logger = logging.getLogger(__name__)
 

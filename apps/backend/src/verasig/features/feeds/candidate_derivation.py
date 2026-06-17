@@ -21,11 +21,11 @@ from verasig.domain.filter_rule import FilterRule
 from verasig.domain.market_ports import Exchange
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
+from verasig.features.feeds import message_repository
+from verasig.features.feeds.candidate_filter import apply_filter_rule, seed_candidate
 from verasig.features.rules import drift_repository
 from verasig.features.signals import event_repository
 from verasig.features.signals.deterministic_parser import parse
-from verasig.features.sources import message_repository
-from verasig.features.sources.candidate_filter import apply_filter_rule, seed_candidate
 
 
 def _filter_event(

@@ -10,13 +10,13 @@ from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.features.accounts.tokens import read_user_id
-from verasig.features.rules import repository as rule_repository
-from verasig.features.signals import event_repository, outcome_repository
-from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
+from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.simulation import repository as backtest_repository
 
 SECRET = "s" * 32
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)

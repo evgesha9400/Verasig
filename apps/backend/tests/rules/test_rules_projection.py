@@ -9,12 +9,12 @@ from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
-from verasig.features.rules import repository as rule_repository
-from verasig.features.rules.views import present_rules
-from verasig.features.sources import (
+from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.rules import repository as rule_repository
+from verasig.features.rules.views import present_rules
 
 
 def _instant() -> datetime:

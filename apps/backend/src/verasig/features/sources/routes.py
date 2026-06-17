@@ -1,142 +1,90 @@
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from verasig.domain.account import UserAccount
-from verasig.domain.channel_reference import ChannelReferenceResolutionError
-from verasig.features.accounts.plans import (
-    PlanSourceLimitExceeded,
-    require_source_capacity,
+from verasig.domain.telegram_ports import (
+    CodeInvalidError,
+    TwoFactorPasswordInvalidError,
+    TwoFactorUnsupportedError,
 )
-from verasig.features.sources import (
-    feed_repository,
+from verasig.features.sources.schemas import (
+    TelegramConnectIn,
+    TelegramStatusOut,
+    TelegramVerifyIn,
+    TelegramVerifyOut,
 )
-from verasig.features.sources.backfill_job_run import (
-    BackfillMode,
-    backfill_job_key,
-    present_progress,
-    progress_event_name,
+from verasig.features.sources.telegram_adapter import (
+    TelegramLinkMissingError,
+    connect,
+    verify,
 )
-from verasig.features.sources.feed_views import present_feeds
-from verasig.features.sources.schemas import BackfillStartIn, FeedCreateIn
-from verasig.features.telegram_links.workflow import read_connection
-from verasig.foundation.http.auth_dependencies import (
-    get_current_user,
-    require_feed,
+from verasig.features.sources.telegram_adapter import (
+    status as read_status,
 )
+from verasig.foundation.http.auth_dependencies import get_current_user
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.http.sse import sse_single_event, sse_stream
-from verasig.foundation.telegram.session import make_user_source
 
-router = APIRouter(prefix="/feeds")
+router = APIRouter(prefix="/telegram")
 
 
-def _resolve_source(request: Request, connection):
-    factory = getattr(request.app.state, "telegram_source_factory", None)
-    if factory is not None:
-        return factory(connection)
-    return make_user_source(
-        connection.config["session_string"],
-        connection.config["api_id"],
-        connection.config["api_hash"],
-    )
-
-
-def _require_connected_source(request: Request, session, user_id):
-    connection = read_connection(session, user_id, request.app.state.secret_cipher)
-    if connection is None or connection.status != "connected":
-        raise ApiError(409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected")
-    return _resolve_source(request, connection)
-
-
-@router.get("")
-def list_feeds(request: Request, user: UserAccount = Depends(get_current_user)) -> dict:
-    request.app.state.backfill_jobs.mark_inactive_backfilling_failed(user.id)
-    with request.app.state.session_factory() as session:
-        return {"feeds": present_feeds(session, user.id)}
-
-
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def create_feed(
+@router.post("/connect", status_code=status.HTTP_202_ACCEPTED)
+async def connect_telegram(
     request: Request,
-    payload: FeedCreateIn,
+    payload: TelegramConnectIn,
     user: UserAccount = Depends(get_current_user),
-) -> dict:
-    with request.app.state.session_factory() as session:
-        try:
-            require_source_capacity(user, session)
-        except PlanSourceLimitExceeded as error:
-            raise ApiError(403, "PLAN_LIMIT_SOURCES", "Source limit reached") from error
-        source = _require_connected_source(request, session, user.id)
-        try:
-            async with source:
-                channel = await source.resolve_channel(payload.tag)
-        except ChannelReferenceResolutionError as error:
-            raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
-        feed_repository.create_feed(session, user.id, channel, datetime.now(tz=UTC))
-        session.commit()
-        feeds = present_feeds(session, user.id)
-    return next(feed for feed in feeds if feed["id"] == str(channel.channel_id))
-
-
-@router.delete("/{external_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_feed(
-    request: Request,
-    external_id: str,
-    _subscription=Depends(require_feed),
 ) -> Response:
     with request.app.state.session_factory() as session:
-        feed_repository.delete_feed(session, _subscription.user_id, int(external_id))
+        await connect(
+            session,
+            user.id,
+            payload.api_id,
+            payload.api_hash,
+            payload.phone,
+            request.app.state.telegram_auth,
+            request.app.state.secret_cipher,
+        )
         session.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
-@router.post("/{external_id}/backfill", status_code=status.HTTP_202_ACCEPTED)
-async def start_backfill(
+@router.post("/verify")
+async def verify_telegram(
     request: Request,
-    external_id: str,
-    payload: BackfillStartIn | None = None,
-    subscription=Depends(require_feed),
-) -> dict:
-    channel_id = int(external_id)
-    mode = payload.mode if payload else BackfillMode.RESUME
+    payload: TelegramVerifyIn,
+    user: UserAccount = Depends(get_current_user),
+) -> TelegramVerifyOut:
+    with request.app.state.session_factory() as session:
+        try:
+            await verify(
+                session,
+                user.id,
+                payload.code,
+                request.app.state.telegram_auth,
+                request.app.state.secret_cipher,
+                payload.password,
+            )
+        except CodeInvalidError as error:
+            raise ApiError(
+                400, "TELEGRAM_CODE_INVALID", "Invalid Telegram code"
+            ) from error
+        except TwoFactorPasswordInvalidError as error:
+            raise ApiError(
+                400, "TELEGRAM_PASSWORD_INVALID", "Invalid Telegram password"
+            ) from error
+        except TwoFactorUnsupportedError as error:
+            raise ApiError(
+                400, "TELEGRAM_TWO_FACTOR_REQUIRED", "Two-factor password required"
+            ) from error
+        except TelegramLinkMissingError as error:
+            raise ApiError(
+                409, "TELEGRAM_NOT_PENDING", "Telegram link is not pending"
+            ) from error
+        session.commit()
+    return TelegramVerifyOut(connected=True)
 
-    def make_source():
-        with request.app.state.session_factory() as session:
-            return _require_connected_source(request, session, subscription.user_id)
 
-    run = request.app.state.backfill_jobs.start(
-        subscription.user_id, channel_id, make_source, mode
-    )
-    return {"jobId": str(run.id)}
-
-
-@router.post("/{external_id}/backfill/cancel", status_code=status.HTTP_204_NO_CONTENT)
-def cancel_backfill(
-    request: Request,
-    external_id: str,
-    subscription=Depends(require_feed),
-) -> Response:
-    request.app.state.backfill_jobs.cancel(subscription.user_id, int(external_id))
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.get("/{external_id}/backfill/progress")
-def backfill_progress(
-    request: Request,
-    external_id: str,
-    subscription=Depends(require_feed),
-):
-    channel_id = int(external_id)
-    request.app.state.backfill_jobs.mark_inactive_backfilling_failed(
-        subscription.user_id, channel_id
-    )
-    key = backfill_job_key(subscription.user_id, channel_id)
-    if request.app.state.jobs.has_job(key):
-        return sse_stream(request.app.state.jobs, key)
-    progress = request.app.state.backfill_jobs.read_progress(
-        subscription.user_id, channel_id
-    )
-    if progress is None:
-        raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
-    return sse_single_event(progress_event_name(progress), present_progress(progress))
+@router.get("/status")
+def telegram_status(
+    request: Request, user: UserAccount = Depends(get_current_user)
+) -> TelegramStatusOut:
+    with request.app.state.session_factory() as session:
+        return TelegramStatusOut(**read_status(session, user.id))

@@ -9,16 +9,16 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules.labeling import (
     label_counts,
     labeling_sample,
     record_label,
 )
 from verasig.features.signals import event_repository
-from verasig.features.sources import (
-    feed_repository,
-    message_repository,
-)
 
 
 def _instant(day: int = 1) -> datetime:

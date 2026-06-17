@@ -6,8 +6,8 @@ from seed import insert_source
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.features.accounts import repository as account_repository
-from verasig.features.sources import backfill_job_repository, feed_repository
-from verasig.features.sources.backfill_job_coordinator import BackfillJobCoordinator
+from verasig.features.feeds import backfill_job_repository, feed_repository
+from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
 from verasig.foundation.jobs.registry import JobRegistry
 
 

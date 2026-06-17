@@ -12,17 +12,17 @@ from verasig.domain.filter_rule import FilterRule
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.features.accounts import repository as account_repository
-from verasig.features.rules import drift_repository
-from verasig.features.rules import repository as rule_repository
-from verasig.features.signals import event_repository
-from verasig.features.sources import (
+from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.sources.candidate_derivation import (
+from verasig.features.feeds.candidate_derivation import (
     derive_candidates,
     sweep_advisory,
 )
+from verasig.features.rules import drift_repository
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
 from verasig.foundation.market_data.static_exchange import StaticExchange
 
 _LONG_RULE = ParserRule(

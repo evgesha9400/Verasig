@@ -10,7 +10,7 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.features.sources import deletion_repository
+from verasig.features.feeds import deletion_repository
 
 _CHANNEL_ID = 7
 _USER_ID = UUID("80000000-0000-0000-0000-000000000001")

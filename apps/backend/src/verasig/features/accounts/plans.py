@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from verasig.domain.account import Plan, UserAccount
-from verasig.features.sources import feed_repository
+from verasig.features.feeds import feed_repository
 
 
 class PlanSourceLimitExceeded(Exception):

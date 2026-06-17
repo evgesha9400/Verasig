@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.telegram_ports import TelegramSource
-from verasig.features.sources import feed_repository, message_repository
+from verasig.features.feeds import feed_repository, message_repository
 
 logger = logging.getLogger(__name__)
 

@@ -333,7 +333,7 @@ def test_stale_backfilling_subscription_is_reconciled_to_failed(client, app):
 
     with app.state.session_factory() as session:
         from verasig.features.accounts.tokens import read_user_id
-        from verasig.features.sources.feed_repository import set_status
+        from verasig.features.feeds.feed_repository import set_status
 
         user_id = read_user_id(token, app.state.jwt_secret)
         set_status(session, user_id, 7, "backfilling")
@@ -370,7 +370,7 @@ def test_backfill_progress_reports_missing_job_as_404(client, app):
 
 def test_readd_after_delete_refetches_from_zero(client, app):
     from verasig.features.accounts.tokens import read_user_id
-    from verasig.features.sources import feed_repository, message_repository
+    from verasig.features.feeds import feed_repository, message_repository
 
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})

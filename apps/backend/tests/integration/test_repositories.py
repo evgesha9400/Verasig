@@ -13,6 +13,10 @@ from verasig.domain.risk_config import EntryMode, RiskConfig
 from verasig.domain.signal import ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
 from verasig.features.exchanges import repository as exchange_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.risk import repository as risk_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
@@ -21,11 +25,7 @@ from verasig.features.signals import (
     outcome_repository,
 )
 from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
-    feed_repository,
-    message_repository,
-    source_repository,
-)
+from verasig.features.sources import source_repository
 from verasig.storage.models import FeedRow
 
 

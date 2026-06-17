@@ -5,7 +5,7 @@ from fakes import FakeExchange
 
 from verasig.domain.event import MatchReason, MaterializationPath
 from verasig.domain.message import RawTelegramMessage
-from verasig.features.sources.candidate_filter import seed_candidate
+from verasig.features.feeds.candidate_filter import seed_candidate
 
 D = MatchReason.DIRECTIONAL_KEYWORD
 S = MatchReason.SYMBOL_TOKEN

@@ -9,11 +9,11 @@ from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
-from verasig.features.sources import (
+from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.sources.backfill import backfill
+from verasig.features.feeds.backfill import backfill
 
 
 def _instant() -> datetime:

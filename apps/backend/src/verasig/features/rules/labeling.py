@@ -5,12 +5,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from verasig.domain.label import GoldenLabel, LabelKind
-from verasig.features.rules.repository import upsert_labels
-from verasig.features.sources import feed_repository
-from verasig.features.sources.message_views import (
+from verasig.features.feeds import feed_repository
+from verasig.features.feeds.message_views import (
     project_message,
     read_replies_by_message_id,
 )
+from verasig.features.rules.repository import upsert_labels
 from verasig.storage.models import (
     GoldenLabelRow,
     RawMessageRow,

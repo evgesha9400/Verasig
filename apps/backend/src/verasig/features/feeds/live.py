@@ -23,7 +23,7 @@ from verasig.domain.telegram import (
     TelegramLiveEvent,
 )
 from verasig.domain.telegram_ports import TelegramSource
-from verasig.features.sources import (
+from verasig.features.feeds import (
     deletion_repository,
     message_repository,
 )
