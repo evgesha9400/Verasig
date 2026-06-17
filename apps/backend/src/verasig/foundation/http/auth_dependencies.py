@@ -50,6 +50,6 @@ def require_user_channel(
     with request.app.state.session_factory() as session:
         subscription = feed_repository.read_feed(session, user.id, int(chat_id))
         if subscription is None:
-            raise ApiError(404, "CHAT_NOT_FOUND", "Chat not found")
+            raise ApiError(404, "FEED_NOT_FOUND", "Feed not found")
         session.expunge(subscription)
         return subscription

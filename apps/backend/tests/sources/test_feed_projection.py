@@ -19,7 +19,7 @@ from verasig.features.sources import (
     feed_repository,
     message_repository,
 )
-from verasig.features.sources.chat_views import present_chats
+from verasig.features.sources.feed_views import present_feeds
 from verasig.shared.time import format_long, format_short, format_time
 
 
@@ -49,7 +49,7 @@ def test_date_formatters():
     assert format_time(instant) == "14:32"
 
 
-def test_chat_summary_derives_counts_flags_score_and_display(db_session):
+def test_feed_summary_derives_counts_flags_score_and_display(db_session):
     account = account_repository.insert_account(db_session, _account())
     insert_source(db_session, account.id)
     feed_repository.create_feed(
@@ -130,18 +130,18 @@ def test_chat_summary_derives_counts_flags_score_and_display(db_session):
     )
     db_session.commit()
 
-    chat = present_chats(db_session, account.id)[0]
+    feed = present_feeds(db_session, account.id)[0]
 
-    assert chat["id"] == "7"
-    assert chat["name"] == "Pilot Signals"
-    assert chat["tag"] == "@pilot"
-    assert chat["fetched"] == 2
-    assert chat["lastDate"] == "Jun 7, 2025"
-    assert chat["historyGaps"] is True
-    assert chat["signalDeletion"] is True
-    assert chat["score"] == 0
-    assert chat["winRate"] == 61.5
-    assert chat["pnl"] == 12.4
-    assert chat["hasRisk"] is True
-    assert chat["initials"] == "PS"
-    assert chat["tint"].startswith("var(--viz-")
+    assert feed["id"] == "7"
+    assert feed["name"] == "Pilot Signals"
+    assert feed["tag"] == "@pilot"
+    assert feed["fetched"] == 2
+    assert feed["lastDate"] == "Jun 7, 2025"
+    assert feed["historyGaps"] is True
+    assert feed["signalDeletion"] is True
+    assert feed["score"] == 0
+    assert feed["winRate"] == 61.5
+    assert feed["pnl"] == 12.4
+    assert feed["hasRisk"] is True
+    assert feed["initials"] == "PS"
+    assert feed["tint"].startswith("var(--viz-")

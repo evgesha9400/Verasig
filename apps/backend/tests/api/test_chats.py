@@ -133,7 +133,7 @@ def test_delete_chat_purges_feed_and_masks_foreign_user(client, app):
     listed = client.get("/chats", headers=_auth(owner))
 
     assert foreign.status_code == 404
-    assert foreign.json()["error"]["code"] == "CHAT_NOT_FOUND"
+    assert foreign.json()["error"]["code"] == "FEED_NOT_FOUND"
     assert deleted.status_code == 204
     assert listed.json() == {"chats": []}
 

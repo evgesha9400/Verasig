@@ -75,7 +75,7 @@ def _latest_results(session: Session, user_id: UUID) -> dict[int, BacktestResult
     return latest
 
 
-def present_chats(session: Session, user_id: UUID) -> list[dict]:
+def present_feeds(session: Session, user_id: UUID) -> list[dict]:
     feeds = list(
         session.scalars(
             select(FeedRow).where(FeedRow.user_id == user_id).order_by(FeedRow.added_at)
@@ -88,12 +88,12 @@ def present_chats(session: Session, user_id: UUID) -> list[dict]:
     deletion_flags = _deletion_flags(session, user_id, external_ids)
     latest_results = _latest_results(session, user_id)
     return [
-        _present_chat(feed, message_stats, deletion_flags, latest_results)
+        _present_feed(feed, message_stats, deletion_flags, latest_results)
         for feed in feeds
     ]
 
 
-def _present_chat(
+def _present_feed(
     feed: FeedRow,
     message_stats: dict[int, tuple[int, object]],
     deletion_flags: dict[int, tuple[bool, bool]],

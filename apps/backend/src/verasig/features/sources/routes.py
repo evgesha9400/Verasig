@@ -17,7 +17,7 @@ from verasig.features.sources.backfill_job_run import (
     present_progress,
     progress_event_name,
 )
-from verasig.features.sources.chat_views import present_chats
+from verasig.features.sources.feed_views import present_feeds
 from verasig.features.sources.schemas import BackfillStartIn, ChatCreateIn
 from verasig.features.telegram_links.workflow import read_connection
 from verasig.foundation.http.auth_dependencies import (
@@ -53,7 +53,7 @@ def _require_connected_source(request: Request, session, user_id):
 def list_chats(request: Request, user: UserAccount = Depends(get_current_user)) -> dict:
     request.app.state.backfill_jobs.mark_inactive_backfilling_failed(user.id)
     with request.app.state.session_factory() as session:
-        return {"chats": present_chats(session, user.id)}
+        return {"chats": present_feeds(session, user.id)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -75,8 +75,8 @@ async def create_chat(
             raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
         feed_repository.create_feed(session, user.id, channel, datetime.now(tz=UTC))
         session.commit()
-        chats = present_chats(session, user.id)
-    return next(chat for chat in chats if chat["id"] == str(channel.channel_id))
+        feeds = present_feeds(session, user.id)
+    return next(feed for feed in feeds if feed["id"] == str(channel.channel_id))
 
 
 @router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)

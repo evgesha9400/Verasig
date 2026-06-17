@@ -112,7 +112,7 @@ def test_backtest_foreign_user_is_not_found(client, app):
 
     assert owner
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "CHAT_NOT_FOUND"
+    assert response.json()["error"]["code"] == "FEED_NOT_FOUND"
 
 
 def test_backtest_progress_reports_missing_job_as_404(client, app):

@@ -160,5 +160,5 @@ def test_verify_routes_mask_foreign_user(client, app):
     assert owner
     assert [response.status_code for response in responses] == [404, 404]
     assert {response.json()["error"]["code"] for response in responses} == {
-        "CHAT_NOT_FOUND"
+        "FEED_NOT_FOUND"
     }

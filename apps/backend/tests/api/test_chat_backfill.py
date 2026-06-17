@@ -354,7 +354,7 @@ def test_backfill_foreign_user_is_not_found(client, app):
     response = client.post("/chats/7/backfill", headers=_auth(other))
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "CHAT_NOT_FOUND"
+    assert response.json()["error"]["code"] == "FEED_NOT_FOUND"
 
 
 def test_backfill_progress_reports_missing_job_as_404(client, app):
