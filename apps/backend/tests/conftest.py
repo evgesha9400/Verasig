@@ -35,7 +35,7 @@ _ALL_TABLES = ", ".join(
         "parser_drift_warning",
         "deleted_signal_evidence",
         "user_account",
-        "user_telegram_link",
+        "source",
         "feed",
         "backfill_job_run",
         "user_exchange_connection",

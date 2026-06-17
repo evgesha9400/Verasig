@@ -11,6 +11,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fakes import FakeExtractor
+from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
@@ -65,6 +66,7 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 created_at=_instant(),
             ),
         )
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(
             session,
             _USER_ID,

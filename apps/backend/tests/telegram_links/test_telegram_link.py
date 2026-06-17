@@ -13,7 +13,7 @@ from verasig.domain.telegram_ports import (
     TwoFactorUnsupportedError,
 )
 from verasig.features.accounts import repository as account_repository
-from verasig.features.telegram_links import repository as telegram_link_repository
+from verasig.features.sources import source_repository
 from verasig.features.telegram_links.workflow import connect, status, verify
 from verasig.foundation.security.secrets import SecretCipher
 
@@ -36,8 +36,12 @@ def _account() -> UserAccount:
     )
 
 
+def _source(session, user_id):
+    return source_repository.read_source(session, user_id, "Telegram")
+
+
 @pytest.mark.asyncio
-async def test_connect_stores_encrypted_pending_link(db_session):
+async def test_connect_stores_encrypted_pending_source(db_session):
     account = account_repository.insert_account(db_session, _account())
     auth = FakeTelegramAuth(pending_session="pending-secret")
     cipher = _cipher()
@@ -52,13 +56,13 @@ async def test_connect_stores_encrypted_pending_link(db_session):
         cipher,
     )
     db_session.commit()
-    link = telegram_link_repository.read_link(db_session, account.id)
+    config = _source(db_session, account.id).config_encrypted
 
-    assert link.status == "pending"
-    assert link.api_hash_encrypted.startswith("v1:test:")
-    assert link.session_string_encrypted.startswith("v1:test:")
-    assert "api-secret" not in link.api_hash_encrypted
-    assert "pending-secret" not in link.session_string_encrypted
+    assert _source(db_session, account.id).status == "pending"
+    assert config["api_hash_encrypted"].startswith("v1:test:")
+    assert config["session_string_encrypted"].startswith("v1:test:")
+    assert "api-secret" not in config["api_hash_encrypted"]
+    assert "pending-secret" not in config["session_string_encrypted"]
 
 
 @pytest.mark.asyncio
@@ -72,11 +76,15 @@ async def test_verify_flips_to_connected_and_stores_final_session(db_session):
 
     await verify(db_session, account.id, "12345", auth, cipher, None)
     db_session.commit()
-    link = telegram_link_repository.read_link(db_session, account.id)
+    source = _source(db_session, account.id)
 
-    assert link.status == "connected"
+    assert source.status == "connected"
+    assert source.config_encrypted["phone_code_hash"] is None
     assert (
-        cipher.decrypt(link.session_string_encrypted, f"{account.id}:telegram_link")
+        cipher.decrypt(
+            source.config_encrypted["session_string_encrypted"],
+            f"{account.id}:telegram_link",
+        )
         == "final-secret"
     )
 
@@ -93,9 +101,7 @@ async def test_wrong_code_surfaces_error_and_stays_pending(db_session):
     with pytest.raises(CodeInvalidError):
         await verify(db_session, account.id, "00000", auth, cipher, None)
 
-    assert (
-        telegram_link_repository.read_link(db_session, account.id).status == "pending"
-    )
+    assert _source(db_session, account.id).status == "pending"
 
 
 @pytest.mark.asyncio
@@ -116,11 +122,14 @@ async def test_verify_requires_two_factor_password_when_enabled(db_session):
 
     await verify(db_session, account.id, "12345", auth, cipher, "two-factor-password")
     db_session.commit()
-    link = telegram_link_repository.read_link(db_session, account.id)
+    source = _source(db_session, account.id)
 
-    assert link.status == "connected"
+    assert source.status == "connected"
     assert (
-        cipher.decrypt(link.session_string_encrypted, f"{account.id}:telegram_link")
+        cipher.decrypt(
+            source.config_encrypted["session_string_encrypted"],
+            f"{account.id}:telegram_link",
+        )
         == "final-secret"
     )
 
@@ -142,9 +151,7 @@ async def test_verify_reports_invalid_two_factor_password(db_session):
             db_session, account.id, "12345", auth, cipher, "incorrect-password"
         )
 
-    assert (
-        telegram_link_repository.read_link(db_session, account.id).status == "pending"
-    )
+    assert _source(db_session, account.id).status == "pending"
 
 
 @pytest.mark.asyncio

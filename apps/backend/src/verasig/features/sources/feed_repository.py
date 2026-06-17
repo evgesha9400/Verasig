@@ -25,6 +25,8 @@ from verasig.domain.channel_reference import (
     normalize_channel_title,
     parse_channel_reference,
 )
+from verasig.domain.source import TELEGRAM
+from verasig.features.sources import source_repository
 from verasig.storage.models import FeedRow
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,14 @@ def _metadata(channel: TelegramChannel) -> dict:
         "is_private": channel.is_private,
         "subscriber_count": channel.subscriber_count,
     }
+
+
+def _require_source_id(session: Session, user_id: UUID) -> UUID:
+    """The id of the user's source — every feed cascades from it (NOT NULL FK)."""
+    source = source_repository.read_source(session, user_id, TELEGRAM)
+    if source is None:
+        raise ValueError(f"user {user_id} has no connected source to own the feed")
+    return source.id
 
 
 def _upsert_feed(
@@ -61,6 +71,7 @@ def _upsert_feed(
     statement = pg_insert(FeedRow.__table__).values(
         user_id=user_id,
         external_id=channel.channel_id,
+        source_id=_require_source_id(session, user_id),
         title=channel.title,
         status="new",
         verify_attempt=1,

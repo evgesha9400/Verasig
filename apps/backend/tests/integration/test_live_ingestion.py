@@ -2,6 +2,8 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import DeletionConfidence, DeletionMethod
@@ -98,6 +100,7 @@ def _deletion(message_id: int, detected_at: datetime) -> TelegramDeletionEvent:
 def _seed_channel(session_factory) -> None:
     with session_factory() as session:
         account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
         session.commit()
 
@@ -105,6 +108,7 @@ def _seed_channel(session_factory) -> None:
 def _seed_captured_signal(session_factory, message: RawTelegramMessage) -> None:
     with session_factory() as session:
         account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
         message_repository.insert_messages(session, _USER_ID, [message])
         event_repository.insert_signal_events(

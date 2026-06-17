@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import (
@@ -49,6 +51,7 @@ def test_date_formatters():
 
 def test_chat_summary_derives_counts_flags_score_and_display(db_session):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed_repository.create_feed(
         db_session,
         account.id,

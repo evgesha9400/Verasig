@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.features.accounts import repository as account_repository
@@ -41,6 +43,7 @@ def _channel() -> TelegramChannel:
 def test_service_restart_marks_running_backfill_run_failed(session_factory):
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
+        insert_source(session, account.id)
         feed_repository.create_feed(session, account.id, _channel(), _instant())
         feed_repository.set_status(session, account.id, 7, "backfilling")
         run = backfill_job_repository.create_run(session, account.id, 7, _instant())

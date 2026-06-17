@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -59,6 +61,7 @@ def _seed(session) -> None:
             created_at=_BASE,
         ),
     )
+    insert_source(session, _USER_ID)
     feed_repository.create_feed(
         session,
         _USER_ID,

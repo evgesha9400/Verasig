@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fakes import FakeExchange
+from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
@@ -60,6 +61,7 @@ def _seed(session_factory, texts: dict[int, str]) -> None:
                 created_at=_instant(),
             ),
         )
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(
             session,
             _USER_ID,

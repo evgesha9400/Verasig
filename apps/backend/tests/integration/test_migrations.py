@@ -26,7 +26,7 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     tables = set(inspector.get_table_names())
     assert {
         "user_account",
-        "user_telegram_link",
+        "source",
         "feed",
         "backfill_job_run",
         "user_exchange_connection",
@@ -34,6 +34,7 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
         "backtest_result",
         "lifecycle_link",
     } <= tables
+    assert "user_telegram_link" not in tables
 
     columns_by_table = {
         table: {column["name"] for column in inspector.get_columns(table)}
@@ -166,3 +167,55 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         "fk_filter_drift_warning_message",
         "fk_lifecycle_link_root_signal",
     } <= foreign_key_names
+
+
+def test_generic_source_replaces_telegram_link_after_upgrade(pg_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.upgrade(cfg, "head")
+
+    inspector = inspect(create_engine(pg_url, future=True))
+    tables = set(inspector.get_table_names())
+    assert "source" in tables
+    assert "user_telegram_link" not in tables
+
+    source_columns = {column["name"] for column in inspector.get_columns("source")}
+    assert {
+        "id",
+        "user_id",
+        "name",
+        "status",
+        "config_encrypted",
+        "created_at",
+        "updated_at",
+    } <= source_columns
+
+    source_checks = {
+        check["name"] for check in inspector.get_check_constraints("source")
+    }
+    assert "ck_source_name" in source_checks
+
+    source_uniques = {
+        tuple(unique["column_names"])
+        for unique in inspector.get_unique_constraints("source")
+    }
+    assert ("user_id", "name") in source_uniques
+
+
+def test_feed_source_id_cascades_from_source_after_upgrade(pg_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.upgrade(cfg, "head")
+
+    inspector = inspect(create_engine(pg_url, future=True))
+    feed_columns = {column["name"]: column for column in inspector.get_columns("feed")}
+    assert "source_id" in feed_columns
+    assert feed_columns["source_id"]["nullable"] is False
+
+    source_fk = next(
+        fk
+        for fk in inspector.get_foreign_keys("feed")
+        if fk["constrained_columns"] == ["source_id"]
+    )
+    assert source_fk["referred_table"] == "source"
+    assert source_fk["options"].get("ondelete") == "CASCADE"

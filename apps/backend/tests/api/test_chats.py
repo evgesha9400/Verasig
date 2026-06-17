@@ -136,3 +136,49 @@ def test_delete_chat_purges_feed_and_masks_foreign_user(client, app):
     assert foreign.json()["error"]["code"] == "CHAT_NOT_FOUND"
     assert deleted.status_code == 204
     assert listed.json() == {"chats": []}
+
+
+def test_delete_source_cascades_feeds_and_capture(client, app):
+    from verasig.domain.message import RawTelegramMessage
+    from verasig.features.accounts.tokens import read_user_id
+    from verasig.features.sources import (
+        feed_repository,
+        message_repository,
+        source_repository,
+    )
+
+    token = _register(client)
+    _connect_telegram(client, app, token)
+    app.state.telegram_source_factory = lambda _link: FakeSource(_channel(), [])
+    assert (
+        client.post("/chats", headers=_auth(token), json={"tag": "@pilot"}).status_code
+        == 201
+    )
+
+    user_id = read_user_id(token, app.state.jwt_secret)
+    with app.state.session_factory() as session:
+        message_repository.insert_messages(
+            session,
+            user_id,
+            [
+                RawTelegramMessage(
+                    channel_id=7,
+                    message_id=1,
+                    posted_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+                    captured_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+                    has_media=False,
+                    raw_payload={},
+                )
+            ],
+        )
+        session.commit()
+        assert message_repository.count_messages(session, user_id, 7) == 1
+
+    with app.state.session_factory() as session:
+        source_repository.delete_source(session, user_id, "Telegram")
+        session.commit()
+
+    with app.state.session_factory() as session:
+        assert feed_repository.read_feed(session, user_id, 7) is None
+        assert message_repository.count_messages(session, user_id, 7) == 0
+    assert client.get("/chats", headers=_auth(token)).json() == {"chats": []}

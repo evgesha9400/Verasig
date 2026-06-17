@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
+from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
@@ -42,6 +43,7 @@ def _seed(db_session):
             created_at=_instant(),
         ),
     )
+    insert_source(db_session, account.id)
     feed_repository.create_feed(
         db_session,
         account.id,

@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.drift import FilterDriftWarning, MissDiscoveredBy
@@ -53,6 +55,7 @@ def _seed_feed_with_messages(session_factory, message_ids: list[int]) -> UUID:
     """Seed account + feed + messages; return the owning user_id."""
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
+        insert_source(session, account.id)
         feed_repository.create_feed(session, account.id, _channel(), _instant())
         message_repository.insert_messages(
             session,

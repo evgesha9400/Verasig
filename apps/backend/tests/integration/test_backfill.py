@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fakes import FakeSource, FakeStreamInterrupted
+from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
@@ -60,6 +61,7 @@ def _account() -> UserAccount:
 def _seed_account(session_factory) -> UUID:
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
+        insert_source(session, account.id)
         session.commit()
         return account.id
 

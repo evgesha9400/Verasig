@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -22,8 +24,8 @@ from verasig.features.simulation import repository as backtest_repository
 from verasig.features.sources import (
     feed_repository,
     message_repository,
+    source_repository,
 )
-from verasig.features.telegram_links import repository as telegram_link_repository
 from verasig.storage.models import FeedRow
 
 
@@ -69,6 +71,7 @@ def _account(email: str = "user@example.com") -> UserAccount:
 
 def test_insert_messages_dedups_on_conflict(db_session):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     db_session.commit()
     inserted_first = message_repository.insert_messages(
@@ -86,6 +89,7 @@ def test_insert_messages_dedups_on_conflict(db_session):
 
 def test_advance_cursor_is_monotonic(db_session):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     db_session.commit()
     feed_repository.advance_cursor(db_session, account.id, 1, 50)
@@ -103,6 +107,7 @@ def test_upsert_feed_refreshes_metadata_but_preserves_first_seen_and_cursor(
     db_session,
 ):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed_repository.create_feed(
         db_session, account.id, _channel(subscriber_count=100), _instant()
     )
@@ -148,34 +153,42 @@ def test_account_repository_round_trips_profile_plan_and_email(db_session):
     assert cancelled.cancel_at == _instant()
 
 
-def test_telegram_link_repository_round_trips_pending_and_connected(db_session):
+def test_source_repository_round_trips_status_config_and_delete(db_session):
     account = account_repository.insert_account(db_session, _account())
     db_session.commit()
 
-    pending = telegram_link_repository.upsert_pending(
+    pending = source_repository.create_source(
         db_session,
         account.id,
-        123,
-        "api-hash-envelope",
-        "+15551234567",
-        "phone-code-hash",
+        "Telegram",
+        "pending",
+        {"api_id": 123, "phone": "+15551234567"},
         _instant(),
     )
+    db_session.commit()
     assert pending.status == "pending"
+    assert pending.config_encrypted == {"api_id": 123, "phone": "+15551234567"}
 
-    connected = telegram_link_repository.mark_connected(
-        db_session, account.id, "session-envelope", _instant()
+    connected = source_repository.set_status(
+        db_session, account.id, "Telegram", "connected"
     )
-
+    db_session.commit()
     assert connected.status == "connected"
     assert (
-        telegram_link_repository.read_link(db_session, account.id).phone
+        source_repository.read_source(
+            db_session, account.id, "Telegram"
+        ).config_encrypted["phone"]
         == "+15551234567"
     )
+
+    source_repository.delete_source(db_session, account.id, "Telegram")
+    db_session.commit()
+    assert source_repository.read_source(db_session, account.id, "Telegram") is None
 
 
 def test_feed_repository_round_trips_and_purges_capture_on_delete(db_session):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed = feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     message_repository.insert_messages(db_session, account.id, [_message(99)])
     rule_repository.upsert_labels(
@@ -211,6 +224,7 @@ def test_feed_repository_round_trips_and_purges_capture_on_delete(db_session):
 
 def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     message_repository.insert_messages(db_session, account.id, [_message(77)])
     event = RawSignalEvent(

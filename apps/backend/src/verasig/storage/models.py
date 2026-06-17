@@ -65,6 +65,11 @@ class FeedRow(Base):
         Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), primary_key=True
     )
     external_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    source_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("source.id", ondelete="CASCADE", name="fk_feed_source"),
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="new")
     verify_attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -450,24 +455,33 @@ class UserAccountRow(Base):
     )
 
 
-class UserTelegramLinkRow(Base):
-    __tablename__ = "user_telegram_link"
+class SourceRow(Base):
+    """A user's connection to a provider (Telegram today).
+
+    Generic + provider-agnostic: the only Telegram-specific surface is `name`
+    (`CHECK IN ('Telegram')`) and the shape of `config_encrypted` — a JSON object
+    holding the connection secrets, where the sensitive fields are AES-GCM
+    envelopes (the codec lives in the Telegram adapter). A feed's `source_id`
+    cascades from here, so disconnecting a source purges its feeds + capture.
+    """
+
+    __tablename__ = "source"
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('pending', 'connected')",
-            name="ck_user_telegram_link_status",
-        ),
+        UniqueConstraint("user_id", "name", name="uq_source_user_name"),
+        CheckConstraint("name IN ('Telegram')", name="ck_source_name"),
+        CheckConstraint("status IN ('pending', 'connected')", name="ck_source_status"),
     )
 
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id"), primary_key=True
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
     )
-    api_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    api_hash_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
-    phone: Mapped[str] = mapped_column(String, nullable=False)
-    session_string_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
-    phone_code_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
+    config_encrypted: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

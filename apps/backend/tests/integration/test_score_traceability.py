@@ -3,6 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import (
@@ -133,6 +135,7 @@ def _seed_score_inputs(session_factory) -> None:
     event_b = _event(2, 2)
     with session_factory() as session:
         account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(session, _USER_ID, _channel(), _BASE)
         message_repository.insert_messages(
             session,

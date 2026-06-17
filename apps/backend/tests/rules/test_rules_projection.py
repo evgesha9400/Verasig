@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.filter_rule import FilterRule
@@ -34,6 +36,7 @@ def test_present_rules_projects_display_and_signal_match(db_session):
             created_at=_instant(),
         ),
     )
+    insert_source(db_session, account.id)
     feed_repository.create_feed(
         db_session,
         account.id,

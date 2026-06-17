@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -164,6 +166,7 @@ def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_f
 def _seed(session_factory) -> UserAccount:
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
+        insert_source(session, account.id)
         feed_repository.create_feed(session, account.id, _channel(), _BASE)
         message_repository.insert_messages(session, account.id, [_message()])
         event_repository.insert_signal_events(session, account.id, [_event()])

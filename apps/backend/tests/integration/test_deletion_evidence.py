@@ -11,6 +11,7 @@ from uuid import UUID
 
 import pytest
 from fakes import FakeSource
+from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
@@ -63,6 +64,7 @@ def _account() -> UserAccount:
 def _seed_channel(session_factory) -> None:
     with session_factory() as session:
         account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(session, _USER_ID, _channel(), _FIRST)
         session.commit()
 
@@ -179,6 +181,7 @@ def _seed_corpus(session_factory) -> None:
     """Channel + messages {1,2,3}; message 2 is a signal candidate (RawSignalEvent)."""
     with session_factory() as session:
         account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
         feed_repository.create_feed(session, _USER_ID, _channel(), _FIRST)
         message_repository.insert_messages(
             session,

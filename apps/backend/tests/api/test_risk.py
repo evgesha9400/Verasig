@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.risk_config import EntryMode, ExitSource, RiskConfig, Weighting
 from verasig.features.accounts.tokens import read_user_id
@@ -31,6 +33,7 @@ def _auth(token: str) -> dict:
 
 def _seed_subscription(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
+        insert_source(session, user_id)
         feed_repository.create_feed(
             session,
             user_id,

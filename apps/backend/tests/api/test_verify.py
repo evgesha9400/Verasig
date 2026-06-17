@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.filter_rule import FilterRule
@@ -36,6 +38,7 @@ def _auth(token: str) -> dict:
 
 def _seed(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
+        insert_source(session, user_id)
         feed_repository.create_feed(
             session,
             user_id,

@@ -14,6 +14,7 @@ from verasig.features.sources import deletion_repository
 
 _CHANNEL_ID = 7
 _USER_ID = UUID("80000000-0000-0000-0000-000000000001")
+_SOURCE_ID = UUID("80000000-0000-0000-0000-000000000002")
 _NOW = datetime(2026, 6, 8, 12, 0, tzinfo=timezone.utc)
 
 
@@ -32,19 +33,40 @@ def _insert_account(session) -> None:
     )
 
 
+def _insert_source(session) -> None:
+    session.execute(
+        text(
+            """
+            INSERT INTO source
+                (id, user_id, name, status, config_encrypted, created_at, updated_at)
+            VALUES
+                (:id, :user_id, 'Telegram', 'connected', CAST('{}' AS jsonb),
+                 :now, :now)
+            """
+        ),
+        {"id": _SOURCE_ID, "user_id": _USER_ID, "now": _NOW},
+    )
+
+
 def _insert_feed(session) -> None:
+    _insert_source(session)
     session.execute(
         text(
             """
             INSERT INTO feed
-                (user_id, external_id, title, status, verify_attempt, metadata,
-                 first_seen_at, added_at)
+                (user_id, external_id, source_id, title, status, verify_attempt,
+                 metadata, first_seen_at, added_at)
             VALUES
-                (:user_id, :external_id, 'Pilot', 'new', 1, CAST('{}' AS jsonb),
-                 :now, :now)
+                (:user_id, :external_id, :source_id, 'Pilot', 'new', 1,
+                 CAST('{}' AS jsonb), :now, :now)
             """
         ),
-        {"user_id": _USER_ID, "external_id": _CHANNEL_ID, "now": _NOW},
+        {
+            "user_id": _USER_ID,
+            "external_id": _CHANNEL_ID,
+            "source_id": _SOURCE_ID,
+            "now": _NOW,
+        },
     )
 
 

@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from seed import insert_source
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
@@ -38,6 +40,7 @@ def _instant(day: int) -> datetime:
 
 def _seed_chat(app, user_id: str) -> None:
     with app.state.session_factory() as session:
+        insert_source(session, user_id)
         feed_repository.create_feed(
             session,
             user_id,

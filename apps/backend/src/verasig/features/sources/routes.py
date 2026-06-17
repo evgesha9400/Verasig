@@ -19,7 +19,7 @@ from verasig.features.sources.backfill_job_run import (
 )
 from verasig.features.sources.chat_views import present_chats
 from verasig.features.sources.schemas import BackfillStartIn, ChatCreateIn
-from verasig.features.telegram_links.repository import read_link
+from verasig.features.telegram_links.workflow import read_connection
 from verasig.foundation.http.auth_dependencies import (
     get_current_user,
     require_user_channel,
@@ -31,17 +31,22 @@ from verasig.foundation.telegram.session import make_user_source
 router = APIRouter(prefix="/chats")
 
 
-def _resolve_source(request: Request, link):
+def _resolve_source(request: Request, connection):
     factory = getattr(request.app.state, "telegram_source_factory", None)
     if factory is not None:
-        return factory(link)
-    cipher = request.app.state.secret_cipher
-    aad = f"{link.user_id}:telegram_link"
+        return factory(connection)
     return make_user_source(
-        cipher.decrypt(link.session_string_encrypted, aad),
-        link.api_id,
-        cipher.decrypt(link.api_hash_encrypted, aad),
+        connection.config["session_string"],
+        connection.config["api_id"],
+        connection.config["api_hash"],
     )
+
+
+def _require_connected_source(request: Request, session, user_id):
+    connection = read_connection(session, user_id, request.app.state.secret_cipher)
+    if connection is None or connection.status != "connected":
+        raise ApiError(409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected")
+    return _resolve_source(request, connection)
 
 
 @router.get("")
@@ -62,10 +67,7 @@ async def create_chat(
             require_source_capacity(user, session)
         except PlanSourceLimitExceeded as error:
             raise ApiError(403, "PLAN_LIMIT_SOURCES", "Source limit reached") from error
-        link = read_link(session, user.id)
-        if link is None or link.status != "connected":
-            raise ApiError(409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected")
-        source = _resolve_source(request, link)
+        source = _require_connected_source(request, session, user.id)
         try:
             async with source:
                 channel = await source.resolve_channel(payload.tag)
@@ -101,12 +103,7 @@ async def start_backfill(
 
     def make_source():
         with request.app.state.session_factory() as session:
-            link = read_link(session, subscription.user_id)
-            if link is None or link.status != "connected":
-                raise ApiError(
-                    409, "TELEGRAM_NOT_CONNECTED", "Telegram is not connected"
-                )
-            return _resolve_source(request, link)
+            return _require_connected_source(request, session, subscription.user_id)
 
     run = request.app.state.backfill_jobs.start(
         subscription.user_id, channel_id, make_source, mode

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -39,6 +41,7 @@ def _account() -> UserAccount:
 
 def _seed(db_session):
     account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
     feed_repository.create_feed(
         db_session,
         account.id,

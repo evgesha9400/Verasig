@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import (
     DeletedSignalEvidence,
@@ -125,6 +127,7 @@ def test_backtest_progress_reports_missing_job_as_404(client, app):
 
 def _seed(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
+        insert_source(session, user_id)
         feed_repository.create_feed(
             session,
             user_id,
