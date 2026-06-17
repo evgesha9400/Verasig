@@ -23,7 +23,7 @@ from verasig.features.rules import drift_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.extract_service import ExtractService
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
 
@@ -65,8 +65,9 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 created_at=_instant(),
             ),
         )
-        channel_repository.upsert_channel(
+        feed_repository.create_feed(
             session,
+            _USER_ID,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -74,9 +75,11 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 is_private=False,
                 first_seen_at=_instant(),
             ),
+            _instant(),
         )
         message_repository.insert_messages(
             session,
+            _USER_ID,
             [
                 RawTelegramMessage(
                     channel_id=7,
@@ -89,7 +92,7 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 )
             ],
         )
-        event_repository.insert_signal_events(session, [event])
+        event_repository.insert_signal_events(session, _USER_ID, [event])
         session.commit()
     return event
 

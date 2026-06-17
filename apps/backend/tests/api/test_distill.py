@@ -11,10 +11,9 @@ from verasig.features.accounts.tokens import read_user_id
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 
@@ -43,8 +42,9 @@ def _instant(day: int) -> datetime:
 
 def _seed_chat(app, user_id, signal_count: int) -> None:
     with app.state.session_factory() as session:
-        channel_repository.upsert_channel(
+        feed_repository.create_feed(
             session,
+            user_id,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -52,6 +52,7 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
                 is_private=False,
                 first_seen_at=_instant(1),
             ),
+            _instant(1),
         )
         messages = [
             RawTelegramMessage(
@@ -65,9 +66,10 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
             )
             for idx in range(1, signal_count + 1)
         ]
-        message_repository.insert_messages(session, messages)
+        message_repository.insert_messages(session, user_id, messages)
         event_repository.insert_signal_events(
             session,
+            user_id,
             [
                 RawSignalEvent(
                     channel_id=7,
@@ -90,7 +92,6 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
                 for message in messages
             ],
         )
-        user_channel_repository.subscribe(session, user_id, 7, _instant(1))
         session.commit()
 
 

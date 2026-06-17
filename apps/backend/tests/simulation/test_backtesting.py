@@ -15,10 +15,9 @@ from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.backtesting import run_backtest
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _NOW = _BASE + timedelta(minutes=2)
@@ -148,7 +147,7 @@ def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_f
     with session_factory() as session:
         result = backtest_repository.read_latest_results(session, account.id)[7]
         signals = outcome_repository.read_extracted_signals(session, 7, account.id)
-        subscription = user_channel_repository.read_subscription(session, account.id, 7)
+        subscription = feed_repository.read_feed(session, account.id, 7)
 
     assert market_data.calls == [("BTCUSDT", _BASE, _NOW, "1")]
     assert len(signals) == 1
@@ -165,10 +164,9 @@ def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_f
 def _seed(session_factory) -> UserAccount:
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
-        channel_repository.upsert_channel(session, _channel())
-        message_repository.insert_messages(session, [_message()])
-        event_repository.insert_signal_events(session, [_event()])
+        feed_repository.create_feed(session, account.id, _channel(), _BASE)
+        message_repository.insert_messages(session, account.id, [_message()])
+        event_repository.insert_signal_events(session, account.id, [_event()])
         rule_repository.upsert_parser_rules(session, [_parser_rule(account.id)])
-        user_channel_repository.subscribe(session, account.id, 7, _BASE)
         session.commit()
         return account

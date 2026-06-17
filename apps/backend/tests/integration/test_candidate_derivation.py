@@ -15,7 +15,7 @@ from verasig.features.rules import drift_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
 from verasig.features.sources.candidate_derivation import (
@@ -60,8 +60,9 @@ def _seed(session_factory, texts: dict[int, str]) -> None:
                 created_at=_instant(),
             ),
         )
-        channel_repository.upsert_channel(
+        feed_repository.create_feed(
             session,
+            _USER_ID,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -69,9 +70,11 @@ def _seed(session_factory, texts: dict[int, str]) -> None:
                 is_private=False,
                 first_seen_at=_instant(),
             ),
+            _instant(),
         )
         message_repository.insert_messages(
             session,
+            _USER_ID,
             [
                 RawTelegramMessage(
                     channel_id=7,
@@ -99,18 +102,18 @@ _CORPUS = {
 
 def test_derive_flags_signals_as_seed_heuristic_not_chatter(session_factory):
     _seed(session_factory, _CORPUS)
-    created = derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
+    created = derive_candidates(session_factory, _USER_ID, 7, FakeExchange({"BTC"}))
     assert created == 1
     with session_factory() as session:
-        events = event_repository.read_signal_events(session, 7)
+        events = event_repository.read_signal_events(session, _USER_ID, 7)
     assert {e.message_id for e in events} == {1}
     assert events[0].materialized_by is MaterializationPath.SEED_HEURISTIC
 
 
 def test_derive_is_idempotent(session_factory):
     _seed(session_factory, _CORPUS)
-    derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
-    again = derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
+    derive_candidates(session_factory, _USER_ID, 7, FakeExchange({"BTC"}))
+    again = derive_candidates(session_factory, _USER_ID, 7, FakeExchange({"BTC"}))
     assert again == 0
 
 
@@ -126,25 +129,28 @@ def test_derive_uses_distilled_filter_rule_over_seed(session_factory):
         rule_repository.upsert_filter_rule(session, rule)
         session.commit()
     created = derive_candidates(
-        session_factory, 7, StaticExchange(), filter_rules=[rule]
+        session_factory, _USER_ID, 7, StaticExchange(), filter_rules=[rule]
     )
     assert created == 1
     with session_factory() as session:
-        event = event_repository.read_signal_events(session, 7)[0]
+        event = event_repository.read_signal_events(session, _USER_ID, 7)[0]
     assert event.materialized_by is MaterializationPath.FILTER_RULE
     assert event.filter_rule_id == "7-filter-v1"
 
 
 def test_sweep_recovers_filter_miss_with_one_drift(session_factory):
     _seed(session_factory, _CORPUS)
-    derive_candidates(session_factory, 7, FakeExchange({"BTC"}))  # candidates = {1}
+    derive_candidates(
+        session_factory, _USER_ID, 7, FakeExchange({"BTC"})
+    )  # candidates = {1}
     new_events, new_drift = sweep_advisory(
-        session_factory, 7, [_LONG_RULE, _SLANG_RULE], _USER_ID
+        session_factory, _USER_ID, 7, [_LONG_RULE, _SLANG_RULE]
     )
     assert (new_events, new_drift) == (1, 1)  # only message 3 (a true miss)
     with session_factory() as session:
         events = {
-            e.message_id: e for e in event_repository.read_signal_events(session, 7)
+            e.message_id: e
+            for e in event_repository.read_signal_events(session, _USER_ID, 7)
         }
         warnings = drift_repository.read_drift_warnings(session, 7, _USER_ID)
     assert events[3].materialized_by is MaterializationPath.PARSER_BACKFILL
@@ -156,9 +162,9 @@ def test_sweep_recovers_filter_miss_with_one_drift(session_factory):
 
 def test_sweep_does_not_drift_on_existing_candidate(session_factory):
     _seed(session_factory, _CORPUS)
-    derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
+    derive_candidates(session_factory, _USER_ID, 7, FakeExchange({"BTC"}))
     # message 1 is already a candidate AND parses via _LONG_RULE -> must NOT drift
-    sweep_advisory(session_factory, 7, [_LONG_RULE, _SLANG_RULE], _USER_ID)
+    sweep_advisory(session_factory, _USER_ID, 7, [_LONG_RULE, _SLANG_RULE])
     with session_factory() as session:
         warnings = drift_repository.read_drift_warnings(session, 7, _USER_ID)
     assert all(w.message_id != 1 for w in warnings)
@@ -166,7 +172,7 @@ def test_sweep_does_not_drift_on_existing_candidate(session_factory):
 
 def test_sweep_is_idempotent(session_factory):
     _seed(session_factory, _CORPUS)
-    derive_candidates(session_factory, 7, FakeExchange({"BTC"}))
-    sweep_advisory(session_factory, 7, [_SLANG_RULE], _USER_ID)
-    again = sweep_advisory(session_factory, 7, [_SLANG_RULE], _USER_ID)
+    derive_candidates(session_factory, _USER_ID, 7, FakeExchange({"BTC"}))
+    sweep_advisory(session_factory, _USER_ID, 7, [_SLANG_RULE])
+    again = sweep_advisory(session_factory, _USER_ID, 7, [_SLANG_RULE])
     assert again == (0, 0)

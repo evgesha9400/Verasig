@@ -7,10 +7,9 @@ from sqlalchemy.orm import Session
 from verasig.shared.time import format_long
 from verasig.storage.models import (
     BacktestResultRow,
-    ChannelRow,
     DeletedSignalEvidenceRow,
+    FeedRow,
     RawMessageRow,
-    UserChannelRow,
 )
 
 
@@ -27,36 +26,40 @@ def _tint(title: str) -> str:
 
 
 def _message_stats(
-    session: Session, channel_ids: list[int]
+    session: Session, user_id: UUID, external_ids: list[int]
 ) -> dict[int, tuple[int, object]]:
     rows = session.execute(
         select(
-            RawMessageRow.channel_id,
-            func.count(RawMessageRow.message_id),
+            RawMessageRow.external_id,
+            func.count(RawMessageRow.external_message_id),
             func.min(RawMessageRow.posted_at),
         )
-        .where(RawMessageRow.channel_id.in_(channel_ids))
-        .group_by(RawMessageRow.channel_id)
+        .where(
+            RawMessageRow.user_id == user_id,
+            RawMessageRow.external_id.in_(external_ids),
+        )
+        .group_by(RawMessageRow.external_id)
     ).all()
-    return {channel_id: (count, oldest) for channel_id, count, oldest in rows}
+    return {external_id: (count, oldest) for external_id, count, oldest in rows}
 
 
 def _deletion_flags(
-    session: Session, channel_ids: list[int]
+    session: Session, user_id: UUID, external_ids: list[int]
 ) -> dict[int, tuple[bool, bool]]:
     rows = session.scalars(
         select(DeletedSignalEvidenceRow).where(
-            DeletedSignalEvidenceRow.channel_id.in_(channel_ids)
+            DeletedSignalEvidenceRow.user_id == user_id,
+            DeletedSignalEvidenceRow.external_id.in_(external_ids),
         )
     ).all()
-    flags = {channel_id: (False, False) for channel_id in channel_ids}
+    flags = {external_id: (False, False) for external_id in external_ids}
     for row in rows:
-        history_gaps, signal_deletion = flags[row.channel_id]
+        history_gaps, signal_deletion = flags[row.external_id]
         history_gaps = history_gaps or row.confidence == "SUSPECTED"
         signal_deletion = signal_deletion or (
             row.confidence == "CONFIRMED" and row.was_signal_candidate
         )
-        flags[row.channel_id] = (history_gaps, signal_deletion)
+        flags[row.external_id] = (history_gaps, signal_deletion)
     return flags
 
 
@@ -64,62 +67,57 @@ def _latest_results(session: Session, user_id: UUID) -> dict[int, BacktestResult
     rows = session.scalars(
         select(BacktestResultRow)
         .where(BacktestResultRow.user_id == user_id)
-        .order_by(BacktestResultRow.channel_id, BacktestResultRow.completed_at.desc())
+        .order_by(BacktestResultRow.external_id, BacktestResultRow.completed_at.desc())
     ).all()
     latest: dict[int, BacktestResultRow] = {}
     for row in rows:
-        latest.setdefault(row.channel_id, row)
+        latest.setdefault(row.external_id, row)
     return latest
 
 
 def present_chats(session: Session, user_id: UUID) -> list[dict]:
-    rows = session.execute(
-        select(UserChannelRow, ChannelRow)
-        .join(ChannelRow, ChannelRow.channel_id == UserChannelRow.channel_id)
-        .where(UserChannelRow.user_id == user_id)
-        .order_by(UserChannelRow.added_at)
-    ).all()
-    channel_ids = [channel.channel_id for _subscription, channel in rows]
-    if not channel_ids:
+    feeds = list(
+        session.scalars(
+            select(FeedRow).where(FeedRow.user_id == user_id).order_by(FeedRow.added_at)
+        )
+    )
+    external_ids = [feed.external_id for feed in feeds]
+    if not external_ids:
         return []
-    message_stats = _message_stats(session, channel_ids)
-    deletion_flags = _deletion_flags(session, channel_ids)
+    message_stats = _message_stats(session, user_id, external_ids)
+    deletion_flags = _deletion_flags(session, user_id, external_ids)
     latest_results = _latest_results(session, user_id)
     return [
-        _present_chat(
-            subscription, channel, message_stats, deletion_flags, latest_results
-        )
-        for subscription, channel in rows
+        _present_chat(feed, message_stats, deletion_flags, latest_results)
+        for feed in feeds
     ]
 
 
 def _present_chat(
-    subscription: UserChannelRow,
-    channel: ChannelRow,
+    feed: FeedRow,
     message_stats: dict[int, tuple[int, object]],
     deletion_flags: dict[int, tuple[bool, bool]],
     latest_results: dict[int, BacktestResultRow],
 ) -> dict:
-    fetched, oldest = message_stats.get(channel.channel_id, (0, None))
-    history_gaps, signal_deletion = deletion_flags.get(
-        channel.channel_id, (False, False)
-    )
-    result = latest_results.get(channel.channel_id)
+    fetched, oldest = message_stats.get(feed.external_id, (0, None))
+    history_gaps, signal_deletion = deletion_flags.get(feed.external_id, (False, False))
+    result = latest_results.get(feed.external_id)
     score = result.score if result else None
+    handle = feed.meta.get("handle")
     return {
-        "id": str(channel.channel_id),
-        "name": channel.title,
-        "tag": f"@{channel.handle}" if channel.handle else None,
-        "subscribers": channel.subscriber_count,
-        "initials": _initials(channel.title),
-        "tint": _tint(channel.title),
-        "status": subscription.status,
+        "id": str(feed.external_id),
+        "name": feed.title,
+        "tag": f"@{handle}" if handle else None,
+        "subscribers": feed.meta.get("subscriber_count"),
+        "initials": _initials(feed.title),
+        "tint": _tint(feed.title),
+        "status": feed.status,
         "fetched": fetched,
         "lastDate": format_long(oldest) if oldest else None,
         "score": 0 if signal_deletion else score,
         "winRate": float(result.win_rate) if result else None,
         "pnl": float(result.pnl) if result else None,
-        "hasRisk": subscription.status in {"verified", "analyzed"},
+        "hasRisk": feed.status in {"verified", "analyzed"},
         "historyGaps": history_gaps,
         "signalDeletion": signal_deletion,
     }

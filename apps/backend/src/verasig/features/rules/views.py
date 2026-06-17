@@ -25,12 +25,13 @@ def _signal_label_texts(session: Session, user_id: UUID, channel_id: int) -> lis
         select(RawMessageRow.text)
         .join(
             GoldenLabelRow,
-            (GoldenLabelRow.channel_id == RawMessageRow.channel_id)
-            & (GoldenLabelRow.message_id == RawMessageRow.message_id),
+            (GoldenLabelRow.user_id == RawMessageRow.user_id)
+            & (GoldenLabelRow.external_id == RawMessageRow.external_id)
+            & (GoldenLabelRow.external_message_id == RawMessageRow.external_message_id),
         )
         .where(
             GoldenLabelRow.user_id == user_id,
-            GoldenLabelRow.channel_id == channel_id,
+            GoldenLabelRow.external_id == channel_id,
             GoldenLabelRow.label == LabelKind.SIGNAL.value,
         )
     ).all()

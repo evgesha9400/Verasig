@@ -118,9 +118,7 @@ def test_observer_second_chat_hits_source_limit(client, app):
     assert response.json()["error"]["code"] == "PLAN_LIMIT_SOURCES"
 
 
-def test_delete_chat_removes_subscription_not_capture_and_masks_foreign_user(
-    client, app
-):
+def test_delete_chat_purges_feed_and_masks_foreign_user(client, app):
     owner = _register(client, "owner@example.com")
     other = _register(client, "other@example.com")
     _connect_telegram(client, app, owner)

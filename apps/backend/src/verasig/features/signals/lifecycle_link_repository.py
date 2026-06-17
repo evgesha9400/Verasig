@@ -20,16 +20,16 @@ def insert_link(
     statement = pg_insert(LifecycleLinkRow).values(
         id=link_id or uuid4(),
         user_id=user_id,
-        channel_id=channel_id,
-        message_id=message_id,
+        external_id=channel_id,
+        external_message_id=message_id,
         root_signal_id=root_signal_id,
         created_at=created_at,
     )
     statement = statement.on_conflict_do_update(
         index_elements=[
             LifecycleLinkRow.user_id,
-            LifecycleLinkRow.channel_id,
-            LifecycleLinkRow.message_id,
+            LifecycleLinkRow.external_id,
+            LifecycleLinkRow.external_message_id,
         ],
         set_={
             "root_signal_id": statement.excluded.root_signal_id,
@@ -41,8 +41,8 @@ def insert_link(
     return session.scalars(
         select(LifecycleLinkRow).where(
             LifecycleLinkRow.user_id == user_id,
-            LifecycleLinkRow.channel_id == channel_id,
-            LifecycleLinkRow.message_id == message_id,
+            LifecycleLinkRow.external_id == channel_id,
+            LifecycleLinkRow.external_message_id == message_id,
         )
     ).one()
 
@@ -54,7 +54,7 @@ def read_links(
         session.scalars(
             select(LifecycleLinkRow).where(
                 LifecycleLinkRow.user_id == user_id,
-                LifecycleLinkRow.channel_id == channel_id,
+                LifecycleLinkRow.external_id == channel_id,
             )
         )
     )

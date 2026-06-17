@@ -17,11 +17,10 @@ from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.sources import (
-    channel_repository,
     deletion_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
@@ -84,7 +83,7 @@ def test_backtest_job_streams_phases_persists_outcomes_and_updates_chat(client, 
     listed = client.get("/chats", headers=_auth(token))
     row = _latest_backtest(app, user_id)
 
-    _seed_confirmed_signal_deletion(app)
+    _seed_confirmed_signal_deletion(app, user_id)
     deletion_listed = client.get("/chats", headers=_auth(token))
 
     assert started.status_code == 202
@@ -126,8 +125,9 @@ def test_backtest_progress_reports_missing_job_as_404(client, app):
 
 def _seed(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
-        channel_repository.upsert_channel(
+        feed_repository.create_feed(
             session,
+            user_id,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -136,9 +136,11 @@ def _seed(app, user_id: UUID) -> None:
                 subscriber_count=1234,
                 first_seen_at=_BASE,
             ),
+            _BASE,
         )
         message_repository.insert_messages(
             session,
+            user_id,
             [
                 RawTelegramMessage(
                     channel_id=7,
@@ -153,6 +155,7 @@ def _seed(app, user_id: UUID) -> None:
         )
         event_repository.insert_signal_events(
             session,
+            user_id,
             [
                 RawSignalEvent(
                     channel_id=7,
@@ -164,8 +167,7 @@ def _seed(app, user_id: UUID) -> None:
             ],
         )
         rule_repository.upsert_parser_rules(session, [_parser_rule(user_id)])
-        user_channel_repository.subscribe(session, user_id, 7, _BASE)
-        user_channel_repository.set_status(session, user_id, 7, "verified")
+        feed_repository.set_status(session, user_id, 7, "verified")
         session.commit()
 
 
@@ -197,10 +199,11 @@ def _latest_backtest(app, user_id: UUID):
         return row
 
 
-def _seed_confirmed_signal_deletion(app) -> None:
+def _seed_confirmed_signal_deletion(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
         deletion_repository.upsert_deletion_evidence(
             session,
+            user_id,
             [
                 DeletedSignalEvidence(
                     channel_id=7,

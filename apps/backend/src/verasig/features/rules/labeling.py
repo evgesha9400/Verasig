@@ -6,12 +6,12 @@ from sqlalchemy.orm import Session
 
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.features.rules.repository import upsert_labels
+from verasig.features.sources import feed_repository
 from verasig.features.sources.message_views import (
     project_message,
     read_replies_by_message_id,
 )
 from verasig.storage.models import (
-    ChannelRow,
     GoldenLabelRow,
     RawMessageRow,
     RawSignalEventRow,
@@ -21,12 +21,12 @@ from verasig.storage.models import (
 def labeling_sample(
     session: Session, user_id: UUID, channel_id: int, limit: int
 ) -> list[dict]:
-    channel = session.get(ChannelRow, channel_id)
+    channel = feed_repository.read_feed(session, user_id, channel_id)
     labeled = (
-        select(GoldenLabelRow.message_id)
+        select(GoldenLabelRow.external_message_id)
         .where(
             GoldenLabelRow.user_id == user_id,
-            GoldenLabelRow.channel_id == channel_id,
+            GoldenLabelRow.external_id == channel_id,
         )
         .subquery()
     )
@@ -34,19 +34,26 @@ def labeling_sample(
         select(RawMessageRow)
         .join(
             RawSignalEventRow,
-            (RawSignalEventRow.channel_id == RawMessageRow.channel_id)
-            & (RawSignalEventRow.message_id == RawMessageRow.message_id),
+            (RawSignalEventRow.user_id == RawMessageRow.user_id)
+            & (RawSignalEventRow.external_id == RawMessageRow.external_id)
+            & (
+                RawSignalEventRow.external_message_id
+                == RawMessageRow.external_message_id
+            ),
         )
         .where(
-            RawMessageRow.channel_id == channel_id,
-            RawMessageRow.message_id.not_in(select(labeled.c.message_id)),
+            RawMessageRow.user_id == user_id,
+            RawMessageRow.external_id == channel_id,
+            RawMessageRow.external_message_id.not_in(
+                select(labeled.c.external_message_id)
+            ),
         )
-        .order_by(RawMessageRow.posted_at, RawMessageRow.message_id)
+        .order_by(RawMessageRow.posted_at, RawMessageRow.external_message_id)
         .limit(limit)
     ).all()
-    replies = read_replies_by_message_id(session, channel_id, rows)
+    replies = read_replies_by_message_id(session, user_id, channel_id, rows)
     return [
-        project_message(row, channel, replies.get(row.reply_to_message_id))
+        project_message(row, channel, replies.get(row.reply_to_external_message_id))
         for row in rows
     ]
 
@@ -72,7 +79,7 @@ def label_counts(session: Session, user_id: UUID, channel_id: int) -> dict:
     rows = session.execute(
         select(GoldenLabelRow.label, func.count())
         .where(
-            GoldenLabelRow.user_id == user_id, GoldenLabelRow.channel_id == channel_id
+            GoldenLabelRow.user_id == user_id, GoldenLabelRow.external_id == channel_id
         )
         .group_by(GoldenLabelRow.label)
     ).all()

@@ -14,10 +14,9 @@ from verasig.features.rules.labeling import (
 )
 from verasig.features.signals import event_repository
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 
 def _instant(day: int = 1) -> datetime:
@@ -40,8 +39,9 @@ def _account() -> UserAccount:
 
 def _seed(db_session):
     account = account_repository.insert_account(db_session, _account())
-    channel_repository.upsert_channel(
+    feed_repository.create_feed(
         db_session,
+        account.id,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -49,9 +49,11 @@ def _seed(db_session):
             is_private=False,
             first_seen_at=_instant(),
         ),
+        _instant(),
     )
     message_repository.insert_messages(
         db_session,
+        account.id,
         [
             RawTelegramMessage(
                 channel_id=7,
@@ -85,6 +87,7 @@ def _seed(db_session):
     )
     event_repository.insert_signal_events(
         db_session,
+        account.id,
         [
             RawSignalEvent(
                 channel_id=7,
@@ -100,7 +103,6 @@ def _seed(db_session):
             ),
         ],
     )
-    user_channel_repository.subscribe(db_session, account.id, 7, _instant())
     db_session.commit()
     return account
 

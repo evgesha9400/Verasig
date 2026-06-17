@@ -1,6 +1,8 @@
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
+from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import DeletionConfidence, DeletionMethod
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -10,15 +12,17 @@ from verasig.domain.telegram import (
     TelegramDeliveryEvent,
     TelegramLiveEvent,
 )
+from verasig.features.accounts import repository as account_repository
 from verasig.features.signals import event_repository
 from verasig.features.sources import (
-    channel_repository,
     deletion_repository,
+    feed_repository,
     message_repository,
 )
 from verasig.features.sources.live import ingest_live
 
 _CHANNEL_ID = 7
+_USER_ID = UUID("a0000000-0000-0000-0000-000000000001")
 _POSTED = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 
 
@@ -43,6 +47,20 @@ def _channel() -> TelegramChannel:
         title="Pilot",
         is_private=False,
         first_seen_at=_POSTED,
+    )
+
+
+def _account() -> UserAccount:
+    return UserAccount(
+        id=_USER_ID,
+        email="live@example.com",
+        password_hash="hash",
+        first_name="Ada",
+        last_name="Lovelace",
+        plan=Plan.OBSERVER,
+        pending_email=None,
+        cancel_at=None,
+        created_at=_POSTED,
     )
 
 
@@ -79,16 +97,19 @@ def _deletion(message_id: int, detected_at: datetime) -> TelegramDeletionEvent:
 
 def _seed_channel(session_factory) -> None:
     with session_factory() as session:
-        channel_repository.upsert_channel(session, _channel())
+        account_repository.insert_account(session, _account())
+        feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
         session.commit()
 
 
 def _seed_captured_signal(session_factory, message: RawTelegramMessage) -> None:
     with session_factory() as session:
-        channel_repository.upsert_channel(session, _channel())
-        message_repository.insert_messages(session, [message])
+        account_repository.insert_account(session, _account())
+        feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
+        message_repository.insert_messages(session, _USER_ID, [message])
         event_repository.insert_signal_events(
             session,
+            _USER_ID,
             [
                 RawSignalEvent(
                     channel_id=_CHANNEL_ID,
@@ -114,14 +135,14 @@ async def test_live_ingestion_persists_push_and_dedupes_later_poll(
         ]
     )
 
-    result = await ingest_live(source, [_CHANNEL_ID], session_factory)
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
 
     assert result.inserted == 1
     assert result.duplicates == 1
     assert result.captured_by_mode == {DeliveryMode.PUSH: 1}
     assert source.requested_channel_ids == [[_CHANNEL_ID]]
     with session_factory() as session:
-        messages = message_repository.read_messages(session, _CHANNEL_ID)
+        messages = message_repository.read_messages(session, _USER_ID, _CHANNEL_ID)
     assert [message.message_id for message in messages] == [10]
     assert messages[0].captured_at == push_at
 
@@ -135,13 +156,13 @@ async def test_live_ingestion_dedupes_catch_up_against_backfilled_row(
         [_delivery(10, DeliveryMode.CATCH_UP, _POSTED + timedelta(seconds=4))]
     )
 
-    result = await ingest_live(source, [_CHANNEL_ID], session_factory)
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
 
     assert result.inserted == 0
     assert result.duplicates == 1
     assert result.captured_by_mode == {}
     with session_factory() as session:
-        messages = message_repository.read_messages(session, _CHANNEL_ID)
+        messages = message_repository.read_messages(session, _USER_ID, _CHANNEL_ID)
     assert len(messages) == 1
     assert messages[0].captured_at == captured_at
 
@@ -154,11 +175,13 @@ async def test_live_ingestion_persists_confirmed_delete_event_with_stored_text(
     _seed_captured_signal(session_factory, _message(10, captured_at))
     source = FakeLiveSource([_deletion(10, detected_at)])
 
-    result = await ingest_live(source, [_CHANNEL_ID], session_factory)
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
 
     assert result.deleted == 1
     with session_factory() as session:
-        evidence = deletion_repository.read_deletion_evidence(session, _CHANNEL_ID)
+        evidence = deletion_repository.read_deletion_evidence(
+            session, _USER_ID, _CHANNEL_ID
+        )
     assert len(evidence) == 1
     assert evidence[0].confidence is DeletionConfidence.CONFIRMED
     assert evidence[0].method is DeletionMethod.LIVE_EVENT
@@ -179,7 +202,7 @@ async def test_live_ingestion_reports_median_capture_latency(session_factory):
         ]
     )
 
-    result = await ingest_live(source, [_CHANNEL_ID], session_factory)
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
 
     assert result.median_latency == timedelta(seconds=4)
     assert result.median_latency <= timedelta(seconds=4)

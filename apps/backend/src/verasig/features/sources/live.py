@@ -7,6 +7,7 @@ dedupes push, poll, catch-up, and any rows captured by earlier backfill.
 from dataclasses import dataclass, field
 from datetime import timedelta
 from statistics import median
+from uuid import UUID
 
 from sqlalchemy.orm import sessionmaker
 
@@ -49,12 +50,13 @@ class _LiveIngestionTally:
 
 async def ingest_live(
     source: TelegramSource,
+    user_id: UUID,
     channel_ids: list[int],
     session_factory: sessionmaker,
 ) -> LiveIngestionResult:
     tally = _LiveIngestionTally()
     async for event in source.live_events(channel_ids):
-        _persist_event(session_factory, tally, event)
+        _persist_event(session_factory, user_id, tally, event)
     return LiveIngestionResult(
         channel_ids=channel_ids,
         inserted=tally.inserted,
@@ -67,22 +69,23 @@ async def ingest_live(
 
 def _persist_event(
     session_factory: sessionmaker,
+    user_id: UUID,
     tally: _LiveIngestionTally,
     event: TelegramLiveEvent,
 ) -> None:
     if isinstance(event, TelegramDeliveryEvent):
-        inserted = _persist_delivery(session_factory, event)
+        inserted = _persist_delivery(session_factory, user_id, event)
         _record_delivery(tally, event, inserted)
         return
-    written = _persist_deletion(session_factory, event)
+    written = _persist_deletion(session_factory, user_id, event)
     tally.deleted += written
 
 
 def _persist_delivery(
-    session_factory: sessionmaker, event: TelegramDeliveryEvent
+    session_factory: sessionmaker, user_id: UUID, event: TelegramDeliveryEvent
 ) -> bool:
     with session_factory() as session:
-        inserted = message_repository.insert_messages(session, [event.message])
+        inserted = message_repository.insert_messages(session, user_id, [event.message])
         session.commit()
         return inserted == 1
 
@@ -107,15 +110,19 @@ def _median_latency(latencies: list[timedelta]) -> timedelta | None:
 
 
 def _persist_deletion(
-    session_factory: sessionmaker, event: TelegramDeletionEvent
+    session_factory: sessionmaker, user_id: UUID, event: TelegramDeletionEvent
 ) -> int:
     with session_factory() as session:
         message = message_repository.read_message(
-            session, event.channel_id, event.message_id
+            session, user_id, event.channel_id, event.message_id
         )
-        candidates = message_repository.candidate_message_ids(session, event.channel_id)
+        candidates = message_repository.candidate_message_ids(
+            session, user_id, event.channel_id
+        )
         evidence = _live_deletion_evidence(event, message, candidates)
-        written = deletion_repository.upsert_deletion_evidence(session, [evidence])
+        written = deletion_repository.upsert_deletion_evidence(
+            session, user_id, [evidence]
+        )
         session.commit()
         return written
 

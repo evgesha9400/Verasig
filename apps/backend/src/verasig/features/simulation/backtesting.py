@@ -21,11 +21,10 @@ from verasig.features.signals.fold import fold
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
 from verasig.features.sources import (
-    channel_repository,
     deletion_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 
 @dataclass(frozen=True)
@@ -69,17 +68,19 @@ def load_folded_signals(
     with session_factory() as session:
         _materialize_missing_outcomes(session, user_id, channel_id)
         session.commit()
-        channel = channel_repository.find_channel(session, channel_id)
-        messages = message_repository.read_messages(session, channel_id)
-        events = event_repository.read_signal_events(session, channel_id)
+        channel = feed_repository.read_feed_channel(session, user_id, channel_id)
+        messages = message_repository.read_messages(session, user_id, channel_id)
+        events = event_repository.read_signal_events(session, user_id, channel_id)
         signals = outcome_repository.read_extracted_signals(
             session, channel_id, user_id
         )
         unrecognized = outcome_repository.read_unrecognized_signals(
             session, channel_id, user_id
         )
-        deletions = deletion_repository.read_deletion_evidence(session, channel_id)
-        message_count = message_repository.count_messages(session, channel_id)
+        deletions = deletion_repository.read_deletion_evidence(
+            session, user_id, channel_id
+        )
+        message_count = message_repository.count_messages(session, user_id, channel_id)
     return BacktestInputs(
         channel=channel,
         messages=messages,
@@ -146,12 +147,12 @@ def persist_result(
             [_outcome_json(outcome) for outcome in summary.outcomes],
             now,
         )
-        user_channel_repository.set_status(session, user_id, channel_id, "analyzed")
+        feed_repository.set_status(session, user_id, channel_id, "analyzed")
         session.commit()
 
 
 def _materialize_missing_outcomes(session, user_id: UUID, channel_id: int) -> None:
-    events = event_repository.read_signal_events(session, channel_id)
+    events = event_repository.read_signal_events(session, user_id, channel_id)
     done_event_ids = {
         outcome.event_id
         for outcome in [

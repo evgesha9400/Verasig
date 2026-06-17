@@ -8,43 +8,51 @@ from verasig.features.sources.backfill_job_run import (
     BackfillJobRun,
     BackfillJobStatus,
 )
-from verasig.storage.models import BackfillJobRunRow, ChannelRow, RawMessageRow
+from verasig.storage.models import BackfillJobRunRow, FeedRow, RawMessageRow
 
 
 def _row_to_run(row: BackfillJobRunRow) -> BackfillJobRun:
     return BackfillJobRun(
         id=row.id,
         user_id=row.user_id,
-        channel_id=row.channel_id,
+        channel_id=row.external_id,
         status=row.status,
         started_at=row.started_at,
         finished_at=row.finished_at,
         fetched_count=row.fetched_count,
         oldest_posted_at=row.oldest_posted_at,
-        cursor_message_id=row.cursor_message_id,
+        cursor_message_id=row.cursor_external_message_id,
         error_code=row.error_code,
         error_message=row.error_message,
     )
 
 
 def _read_stored_progress(
-    session: Session, channel_id: int
+    session: Session, user_id: UUID, external_id: int
 ) -> tuple[int, datetime | None, int | None]:
     fetched, oldest = session.execute(
-        select(func.count(RawMessageRow.message_id), func.min(RawMessageRow.posted_at))
+        select(
+            func.count(RawMessageRow.external_message_id),
+            func.min(RawMessageRow.posted_at),
+        )
         .select_from(RawMessageRow)
-        .where(RawMessageRow.channel_id == channel_id)
+        .where(
+            RawMessageRow.user_id == user_id,
+            RawMessageRow.external_id == external_id,
+        )
     ).one()
-    channel = session.get(ChannelRow, channel_id)
-    cursor = channel.captured_through_message_id if channel else None
+    feed = session.get(FeedRow, (user_id, external_id))
+    cursor = feed.captured_through_external_message_id if feed else None
     return int(fetched or 0), oldest, cursor
 
 
 def _sync_progress(session: Session, row: BackfillJobRunRow) -> BackfillJobRunRow:
-    fetched, oldest, cursor = _read_stored_progress(session, row.channel_id)
+    fetched, oldest, cursor = _read_stored_progress(
+        session, row.user_id, row.external_id
+    )
     row.fetched_count = fetched
     row.oldest_posted_at = oldest
-    row.cursor_message_id = cursor
+    row.cursor_external_message_id = cursor
     session.flush()
     return row
 
@@ -52,17 +60,17 @@ def _sync_progress(session: Session, row: BackfillJobRunRow) -> BackfillJobRunRo
 def create_run(
     session: Session, user_id: UUID, channel_id: int, started_at: datetime
 ) -> BackfillJobRun:
-    fetched, oldest, cursor = _read_stored_progress(session, channel_id)
+    fetched, oldest, cursor = _read_stored_progress(session, user_id, channel_id)
     row = BackfillJobRunRow(
         id=uuid4(),
         user_id=user_id,
-        channel_id=channel_id,
+        external_id=channel_id,
         status=BackfillJobStatus.RUNNING,
         started_at=started_at,
         finished_at=None,
         fetched_count=fetched,
         oldest_posted_at=oldest,
-        cursor_message_id=cursor,
+        cursor_external_message_id=cursor,
         error_code=None,
         error_message=None,
     )
@@ -83,7 +91,7 @@ def read_latest_run(
         select(BackfillJobRunRow)
         .where(
             BackfillJobRunRow.user_id == user_id,
-            BackfillJobRunRow.channel_id == channel_id,
+            BackfillJobRunRow.external_id == channel_id,
         )
         .order_by(BackfillJobRunRow.started_at.desc())
         .limit(1)
@@ -97,7 +105,7 @@ def read_running_run(
     row = session.scalar(
         select(BackfillJobRunRow).where(
             BackfillJobRunRow.user_id == user_id,
-            BackfillJobRunRow.channel_id == channel_id,
+            BackfillJobRunRow.external_id == channel_id,
             BackfillJobRunRow.status == BackfillJobStatus.RUNNING,
         )
     )

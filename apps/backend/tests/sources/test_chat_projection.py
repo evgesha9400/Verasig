@@ -13,11 +13,10 @@ from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.sources import (
-    channel_repository,
     deletion_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 from verasig.features.sources.chat_views import present_chats
 from verasig.shared.time import format_long, format_short, format_time
 
@@ -50,8 +49,9 @@ def test_date_formatters():
 
 def test_chat_summary_derives_counts_flags_score_and_display(db_session):
     account = account_repository.insert_account(db_session, _account())
-    channel_repository.upsert_channel(
+    feed_repository.create_feed(
         db_session,
+        account.id,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -60,9 +60,11 @@ def test_chat_summary_derives_counts_flags_score_and_display(db_session):
             subscriber_count=1234,
             first_seen_at=_instant(),
         ),
+        _instant(),
     )
     message_repository.insert_messages(
         db_session,
+        account.id,
         [
             RawTelegramMessage(
                 channel_id=7,
@@ -84,10 +86,10 @@ def test_chat_summary_derives_counts_flags_score_and_display(db_session):
             ),
         ],
     )
-    user_channel_repository.subscribe(db_session, account.id, 7, _instant())
-    user_channel_repository.set_status(db_session, account.id, 7, "analyzed")
+    feed_repository.set_status(db_session, account.id, 7, "analyzed")
     deletion_repository.upsert_deletion_evidence(
         db_session,
+        account.id,
         [
             DeletedSignalEvidence(
                 channel_id=7,
@@ -101,6 +103,7 @@ def test_chat_summary_derives_counts_flags_score_and_display(db_session):
     )
     deletion_repository.upsert_deletion_evidence(
         db_session,
+        account.id,
         [
             DeletedSignalEvidence(
                 channel_id=7,

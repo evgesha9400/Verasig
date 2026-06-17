@@ -32,17 +32,19 @@ def _insert_account(session) -> None:
     )
 
 
-def _insert_channel(session) -> None:
+def _insert_feed(session) -> None:
     session.execute(
         text(
             """
-            INSERT INTO telegram_channel
-                (channel_id, title, is_private, first_seen_at)
+            INSERT INTO feed
+                (user_id, external_id, title, status, verify_attempt, metadata,
+                 first_seen_at, added_at)
             VALUES
-                (:channel_id, 'Pilot', false, :now)
+                (:user_id, :external_id, 'Pilot', 'new', 1, CAST('{}' AS jsonb),
+                 :now, :now)
             """
         ),
-        {"channel_id": _CHANNEL_ID, "now": _NOW},
+        {"user_id": _USER_ID, "external_id": _CHANNEL_ID, "now": _NOW},
     )
 
 
@@ -50,16 +52,17 @@ def _insert_captured_message(session, message_id: int) -> None:
     session.execute(
         text(
             """
-            INSERT INTO raw_telegram_message
-                (channel_id, message_id, text, posted_at, captured_at,
-                 has_media, raw_payload)
+            INSERT INTO raw_message
+                (user_id, external_id, external_message_id, text, posted_at,
+                 captured_at, has_media, raw_payload)
             VALUES
-                (:channel_id, :message_id, 'BTC long', :now, :now,
+                (:user_id, :external_id, :message_id, 'BTC long', :now, :now,
                  false, CAST(:payload AS jsonb))
             """
         ),
         {
-            "channel_id": _CHANNEL_ID,
+            "user_id": _USER_ID,
+            "external_id": _CHANNEL_ID,
             "message_id": message_id,
             "now": _NOW,
             "payload": '{"id": 1}',
@@ -68,7 +71,8 @@ def _insert_captured_message(session, message_id: int) -> None:
 
 
 def test_null_user_id_insert_fails_at_db_level(db_session):
-    _insert_channel(db_session)
+    _insert_account(db_session)
+    _insert_feed(db_session)
     _insert_captured_message(db_session, 1)
     db_session.commit()
 
@@ -77,17 +81,18 @@ def test_null_user_id_insert_fails_at_db_level(db_session):
             text(
                 """
                 INSERT INTO golden_label
-                    (id, user_id, channel_id, message_id, label, labeled_at)
+                    (id, user_id, external_id, external_message_id, label, labeled_at)
                 VALUES
-                    (:id, NULL, :channel_id, 1, 'signal', :now)
+                    (:id, NULL, :external_id, 1, 'signal', :now)
                 """
             ),
-            {"id": uuid4(), "channel_id": _CHANNEL_ID, "now": _NOW},
+            {"id": uuid4(), "external_id": _CHANNEL_ID, "now": _NOW},
         )
 
 
 def test_invalid_enum_string_fails_at_db_level(db_session):
-    _insert_channel(db_session)
+    _insert_account(db_session)
+    _insert_feed(db_session)
     db_session.commit()
 
     with pytest.raises(IntegrityError):
@@ -95,19 +100,24 @@ def test_invalid_enum_string_fails_at_db_level(db_session):
             text(
                 """
                 INSERT INTO deleted_signal_evidence
-                    (id, channel_id, message_id, confidence, method, detected_at,
-                     was_signal_candidate)
+                    (id, user_id, external_id, external_message_id, confidence,
+                     method, detected_at, was_signal_candidate)
                 VALUES
-                    (:id, :channel_id, 99, 'MAYBE', 'ID_GAP', :now, false)
+                    (:id, :user_id, :external_id, 99, 'MAYBE', 'ID_GAP', :now, false)
                 """
             ),
-            {"id": uuid4(), "channel_id": _CHANNEL_ID, "now": _NOW},
+            {
+                "id": uuid4(),
+                "user_id": _USER_ID,
+                "external_id": _CHANNEL_ID,
+                "now": _NOW,
+            },
         )
 
 
 def test_orphan_captured_message_links_fail_at_db_level(db_session):
     _insert_account(db_session)
-    _insert_channel(db_session)
+    _insert_feed(db_session)
     db_session.commit()
 
     with pytest.raises(IntegrityError):
@@ -115,14 +125,19 @@ def test_orphan_captured_message_links_fail_at_db_level(db_session):
             text(
                 """
                 INSERT INTO raw_signal_event
-                    (id, channel_id, message_id, candidate_text, materialized_by,
-                     matched_reasons, created_at)
+                    (id, user_id, external_id, external_message_id, candidate_text,
+                     materialized_by, matched_reasons, created_at)
                 VALUES
-                    (:id, :channel_id, 404, 'BTC long', 'SEED_HEURISTIC',
+                    (:id, :user_id, :external_id, 404, 'BTC long', 'SEED_HEURISTIC',
                      CAST('[]' AS jsonb), :now)
                 """
             ),
-            {"id": uuid4(), "channel_id": _CHANNEL_ID, "now": _NOW},
+            {
+                "id": uuid4(),
+                "user_id": _USER_ID,
+                "external_id": _CHANNEL_ID,
+                "now": _NOW,
+            },
         )
     db_session.rollback()
 
@@ -131,26 +146,28 @@ def test_orphan_captured_message_links_fail_at_db_level(db_session):
             text(
                 """
                 INSERT INTO golden_label
-                    (id, user_id, channel_id, message_id, label, labeled_at)
+                    (id, user_id, external_id, external_message_id, label, labeled_at)
                 VALUES
-                    (:id, :user_id, :channel_id, 404, 'signal', :now)
+                    (:id, :user_id, :external_id, 404, 'signal', :now)
                 """
             ),
             {
                 "id": uuid4(),
                 "user_id": _USER_ID,
-                "channel_id": _CHANNEL_ID,
+                "external_id": _CHANNEL_ID,
                 "now": _NOW,
             },
         )
 
 
 def test_deleted_signal_evidence_can_reference_uncaptured_messages(db_session):
-    _insert_channel(db_session)
+    _insert_account(db_session)
+    _insert_feed(db_session)
     db_session.commit()
 
     inserted = deletion_repository.upsert_deletion_evidence(
         db_session,
+        _USER_ID,
         [
             DeletedSignalEvidence(
                 channel_id=_CHANNEL_ID,
@@ -164,6 +181,8 @@ def test_deleted_signal_evidence_can_reference_uncaptured_messages(db_session):
     )
     db_session.commit()
 
-    stored = deletion_repository.read_deletion_evidence(db_session, _CHANNEL_ID)
+    stored = deletion_repository.read_deletion_evidence(
+        db_session, _USER_ID, _CHANNEL_ID
+    )
     assert inserted == 1
     assert stored[0].message_id == 404

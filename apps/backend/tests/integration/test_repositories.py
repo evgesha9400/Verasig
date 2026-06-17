@@ -20,12 +20,11 @@ from verasig.features.signals import (
 )
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 from verasig.features.telegram_links import repository as telegram_link_repository
-from verasig.storage.models import ChannelRow
+from verasig.storage.models import FeedRow
 
 
 def _instant() -> datetime:
@@ -69,55 +68,62 @@ def _account(email: str = "user@example.com") -> UserAccount:
 
 
 def test_insert_messages_dedups_on_conflict(db_session):
-    channel_repository.upsert_channel(db_session, _channel())
+    account = account_repository.insert_account(db_session, _account())
+    feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     db_session.commit()
     inserted_first = message_repository.insert_messages(
-        db_session, [_message(1), _message(2)]
+        db_session, account.id, [_message(1), _message(2)]
     )
     db_session.commit()
     inserted_again = message_repository.insert_messages(
-        db_session, [_message(2), _message(3)]
+        db_session, account.id, [_message(2), _message(3)]
     )
     db_session.commit()
     assert inserted_first == 2
     assert inserted_again == 1
-    assert message_repository.count_messages(db_session, 1) == 3
+    assert message_repository.count_messages(db_session, account.id, 1) == 3
 
 
 def test_advance_cursor_is_monotonic(db_session):
-    channel_repository.upsert_channel(db_session, _channel())
+    account = account_repository.insert_account(db_session, _account())
+    feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     db_session.commit()
-    channel_repository.advance_cursor(db_session, 1, 50)
+    feed_repository.advance_cursor(db_session, account.id, 1, 50)
     db_session.commit()
-    channel_repository.advance_cursor(db_session, 1, 30)
+    feed_repository.advance_cursor(db_session, account.id, 1, 30)
     db_session.commit()
-    assert channel_repository.read_cursor(db_session, 1) == 50
+    assert feed_repository.read_cursor(db_session, account.id, 1) == 50
 
 
 def test_read_cursor_is_none_for_unknown_channel(db_session):
-    assert channel_repository.read_cursor(db_session, 999) is None
+    assert feed_repository.read_cursor(db_session, uuid4(), 999) is None
 
 
-def test_upsert_channel_updates_metadata_but_preserves_first_seen_and_cursor(
+def test_upsert_feed_refreshes_metadata_but_preserves_first_seen_and_cursor(
     db_session,
 ):
-    channel_repository.upsert_channel(db_session, _channel(subscriber_count=100))
+    account = account_repository.insert_account(db_session, _account())
+    feed_repository.create_feed(
+        db_session, account.id, _channel(subscriber_count=100), _instant()
+    )
     db_session.commit()
-    channel_repository.advance_cursor(db_session, 1, 42)
+    feed_repository.advance_cursor(db_session, account.id, 1, 42)
     db_session.commit()
 
     later = datetime(2027, 1, 1, tzinfo=timezone.utc)
-    channel_repository.upsert_channel(
+    feed_repository.upsert_feed_metadata(
         db_session,
+        account.id,
         _channel(title="Renamed", subscriber_count=200, first_seen_at=later),
+        _instant(),
     )
     db_session.commit()
 
-    channel = db_session.get(ChannelRow, 1)
-    assert channel.title == "Renamed"
-    assert channel.subscriber_count == 200
-    assert channel.first_seen_at == _instant()
-    assert channel_repository.read_cursor(db_session, 1) == 42
+    feed = db_session.get(FeedRow, (account.id, 1))
+    assert feed.title == "Renamed"
+    assert feed.meta["subscriber_count"] == 200
+    assert feed.first_seen_at == _instant()
+    assert feed_repository.read_cursor(db_session, account.id, 1) == 42
 
 
 def test_account_repository_round_trips_profile_plan_and_email(db_session):
@@ -168,15 +174,10 @@ def test_telegram_link_repository_round_trips_pending_and_connected(db_session):
     )
 
 
-def test_user_channel_repository_round_trips_and_cascades_user_scope(db_session):
+def test_feed_repository_round_trips_and_purges_capture_on_delete(db_session):
     account = account_repository.insert_account(db_session, _account())
-    channel_repository.upsert_channel(db_session, _channel())
-    message_repository.insert_messages(db_session, [_message(99)])
-    db_session.commit()
-
-    subscription = user_channel_repository.subscribe(
-        db_session, account.id, 1, _instant()
-    )
+    feed = feed_repository.create_feed(db_session, account.id, _channel(), _instant())
+    message_repository.insert_messages(db_session, account.id, [_message(99)])
     rule_repository.upsert_labels(
         db_session,
         [
@@ -188,27 +189,30 @@ def test_user_channel_repository_round_trips_and_cascades_user_scope(db_session)
             )
         ],
     )
+    feed_repository.advance_cursor(db_session, account.id, 1, 99)
     db_session.commit()
 
-    assert subscription.status == "new"
-    assert user_channel_repository.count_subscriptions(db_session, account.id) == 1
-    assert user_channel_repository.bump_verify_attempt(db_session, account.id, 1) == 2
+    assert feed.status == "new"
+    assert feed_repository.count_feeds(db_session, account.id) == 1
+    assert feed_repository.bump_verify_attempt(db_session, account.id, 1) == 2
     assert (
-        user_channel_repository.set_status(db_session, account.id, 1, "verified").status
+        feed_repository.set_status(db_session, account.id, 1, "verified").status
         == "verified"
     )
 
-    user_channel_repository.unsubscribe(db_session, account.id, 1)
+    feed_repository.delete_feed(db_session, account.id, 1)
     db_session.commit()
 
-    assert user_channel_repository.read_subscription(db_session, account.id, 1) is None
+    assert feed_repository.read_feed(db_session, account.id, 1) is None
+    assert message_repository.count_messages(db_session, account.id, 1) == 0
+    assert feed_repository.read_cursor(db_session, account.id, 1) is None
     assert rule_repository.read_labels(db_session, 1, account.id) == []
 
 
 def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session):
     account = account_repository.insert_account(db_session, _account())
-    channel_repository.upsert_channel(db_session, _channel())
-    message_repository.insert_messages(db_session, [_message(77)])
+    feed_repository.create_feed(db_session, account.id, _channel(), _instant())
+    message_repository.insert_messages(db_session, account.id, [_message(77)])
     event = RawSignalEvent(
         channel_id=1,
         message_id=77,
@@ -216,7 +220,7 @@ def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session
         materialized_by=MaterializationPath.SEED_HEURISTIC,
         created_at=_instant(),
     )
-    event_repository.insert_signal_events(db_session, [event])
+    event_repository.insert_signal_events(db_session, account.id, [event])
     signal = ExtractedSignal(
         event_id=event.id,
         channel_id=1,

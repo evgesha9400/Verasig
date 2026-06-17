@@ -11,8 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from verasig.domain.telegram_ports import TelegramSource
 from verasig.features.sources import (
     backfill_job_repository,
-    channel_repository,
-    subscription_repository,
+    feed_repository,
 )
 from verasig.features.sources.backfill import backfill
 from verasig.features.sources.backfill_job_run import (
@@ -32,7 +31,7 @@ from verasig.foundation.jobs.registry import (
     JobTerminalError,
 )
 from verasig.foundation.market_data.static_exchange import StaticExchange
-from verasig.storage.models import UserChannelRow
+from verasig.storage.models import FeedRow
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +83,7 @@ class BackfillJobCoordinator:
             return idempotent
 
         if mode is BackfillMode.FULL:
-            self._reset_cursor(channel_id)
+            self._reset_cursor(user_id, channel_id)
 
         source = make_source()
         run = self._create_run(user_id, channel_id)
@@ -121,9 +120,7 @@ class BackfillJobCoordinator:
             cancelled = backfill_job_repository.mark_run_cancelled(
                 session, run.id, _now()
             )
-            subscription_repository.set_status(
-                session, user_id, channel_id, "cancelled"
-            )
+            feed_repository.set_status(session, user_id, channel_id, "cancelled")
             session.commit()
             return cancelled
 
@@ -145,7 +142,7 @@ class BackfillJobCoordinator:
                 "Backfill was interrupted by a service restart.",
             )
             for run in failed_runs:
-                subscription_repository.set_status(
+                feed_repository.set_status(
                     session, run.user_id, run.channel_id, "failed"
                 )
             session.commit()
@@ -154,20 +151,18 @@ class BackfillJobCoordinator:
         self, user_id: UUID | None = None, channel_id: int | None = None
     ) -> None:
         with self._session_factory() as session:
-            statement = select(UserChannelRow).where(
-                UserChannelRow.status == "backfilling"
-            )
+            statement = select(FeedRow).where(FeedRow.status == "backfilling")
             if user_id is not None:
-                statement = statement.where(UserChannelRow.user_id == user_id)
+                statement = statement.where(FeedRow.user_id == user_id)
             if channel_id is not None:
-                statement = statement.where(UserChannelRow.channel_id == channel_id)
+                statement = statement.where(FeedRow.external_id == channel_id)
             rows = session.scalars(statement).all()
             for row in rows:
-                key = backfill_job_key(row.user_id, row.channel_id)
+                key = backfill_job_key(row.user_id, row.external_id)
                 if self._jobs.has_job(key):
                     continue
                 run = backfill_job_repository.read_running_run(
-                    session, row.user_id, row.channel_id
+                    session, row.user_id, row.external_id
                 )
                 if run is not None:
                     backfill_job_repository.mark_run_failed(
@@ -203,10 +198,10 @@ class BackfillJobCoordinator:
             return latest
         return None
 
-    def _reset_cursor(self, channel_id: int) -> None:
+    def _reset_cursor(self, user_id: UUID, channel_id: int) -> None:
         with self._session_factory() as session:
-            previous = channel_repository.read_cursor(session, channel_id)
-            channel_repository.reset_cursor(session, channel_id)
+            previous = feed_repository.read_cursor(session, user_id, channel_id)
+            feed_repository.reset_cursor(session, user_id, channel_id)
             session.commit()
         logger.info(
             "backfill.full reset cursor: channel=%s previous_cursor=%s -> None "
@@ -232,9 +227,7 @@ class BackfillJobCoordinator:
             run = backfill_job_repository.create_run(
                 session, user_id, channel_id, _now()
             )
-            subscription_repository.set_status(
-                session, user_id, channel_id, "backfilling"
-            )
+            feed_repository.set_status(session, user_id, channel_id, "backfilling")
             session.commit()
             return run
 
@@ -259,6 +252,7 @@ class BackfillJobCoordinator:
                 )
                 result = await backfill(
                     source,
+                    user_id,
                     channel_id,
                     self._session_factory,
                     self._batch_size,
@@ -269,13 +263,15 @@ class BackfillJobCoordinator:
                     run_id,
                     channel_id,
                     result.inserted,
-                    result.captured_through_message_id,
+                    result.captured_through_external_message_id,
                 )
                 self._publish_progress(publisher, run_id, "Indexing message bodies...")
                 logger.info(
                     "backfill.run derive_candidates begin: channel=%s", channel_id
                 )
-                derive_candidates(self._session_factory, channel_id, StaticExchange())
+                derive_candidates(
+                    self._session_factory, user_id, channel_id, StaticExchange()
+                )
                 logger.info(
                     "backfill.run derive_candidates done: channel=%s", channel_id
                 )
@@ -290,6 +286,7 @@ class BackfillJobCoordinator:
                 )
                 rescan_result = await rescan(
                     source,
+                    user_id,
                     channel_id,
                     self._session_factory,
                     on_progress=self._rescan_progress_reporter(publisher, run_id),
@@ -344,9 +341,7 @@ class BackfillJobCoordinator:
     ) -> BackfillProgress:
         with self._session_factory() as session:
             run = backfill_job_repository.mark_run_succeeded(session, run_id, _now())
-            subscription_repository.set_status(
-                session, user_id, channel_id, "backfilled"
-            )
+            feed_repository.set_status(session, user_id, channel_id, "backfilled")
             session.commit()
         return self._progress_from_run(run, "Backfill complete.")
 
@@ -355,9 +350,7 @@ class BackfillJobCoordinator:
     ) -> BackfillProgress:
         with self._session_factory() as session:
             run = backfill_job_repository.mark_run_cancelled(session, run_id, _now())
-            subscription_repository.set_status(
-                session, user_id, channel_id, "cancelled"
-            )
+            feed_repository.set_status(session, user_id, channel_id, "cancelled")
             session.commit()
         return self._progress_from_run(run, "Backfill cancelled.")
 
@@ -369,7 +362,7 @@ class BackfillJobCoordinator:
             run = backfill_job_repository.mark_run_failed(
                 session, run_id, _now(), error.__class__.__name__, message
             )
-            subscription_repository.set_status(session, user_id, channel_id, "failed")
+            feed_repository.set_status(session, user_id, channel_id, "failed")
             session.commit()
         return self._progress_from_run(run, "Backfill failed.")
 

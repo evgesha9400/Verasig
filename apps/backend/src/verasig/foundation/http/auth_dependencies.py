@@ -5,9 +5,9 @@ from fastapi import Depends, Header, Query, Request
 from verasig.domain.account import UserAccount
 from verasig.features.accounts.repository import find_by_id
 from verasig.features.accounts.tokens import TokenInvalidError, read_user_id
-from verasig.features.sources.subscription_repository import read_subscription
+from verasig.features.sources import feed_repository
 from verasig.foundation.http.errors import ApiError
-from verasig.storage.models import UserChannelRow
+from verasig.storage.models import FeedRow
 
 
 def access_token_ttl(request: Request) -> timedelta:
@@ -46,9 +46,9 @@ def require_user_channel(
     chat_id: str,
     request: Request,
     user: UserAccount = Depends(get_current_user),
-) -> UserChannelRow:
+) -> FeedRow:
     with request.app.state.session_factory() as session:
-        subscription = read_subscription(session, user.id, int(chat_id))
+        subscription = feed_repository.read_feed(session, user.id, int(chat_id))
         if subscription is None:
             raise ApiError(404, "CHAT_NOT_FOUND", "Chat not found")
         session.expunge(subscription)

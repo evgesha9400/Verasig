@@ -13,6 +13,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlalchemy.orm import sessionmaker
 
@@ -22,8 +23,8 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.telegram_ports import TelegramSource
 from verasig.features.sources import (
-    channel_repository,
     deletion_repository,
+    feed_repository,
     message_repository,
 )
 from verasig.features.sources.deletion_diff import detect_deletions
@@ -37,7 +38,7 @@ class RescanAborted(RuntimeError):
 
 @dataclass(frozen=True)
 class RescanResult:
-    channel_id: int
+    external_id: int
     confirmed: int  # CONFIRMED deletions detected this rescan
     suspected: int  # SUSPECTED gaps detected this rescan
     written: int  # rows newly written/upgraded (0 on a same-state re-run)
@@ -49,66 +50,78 @@ def _utc_now() -> datetime:
 
 async def rescan(
     source: TelegramSource,
+    user_id: UUID,
     reference: str | int,
     session_factory: sessionmaker,
     on_progress: Callable[[int], None] | None = None,
 ) -> RescanResult:
-    channel_id = _resolve_channel_id(session_factory, reference)
+    external_id = _resolve_external_id(session_factory, user_id, reference)
     logger.info(
-        "rescan.live_message_ids begin: channel=%s (walking the full live channel "
+        "rescan.live_message_ids begin: external_id=%s (walking the full live channel "
         "via the source — may take a while for large channels)",
-        channel_id,
+        external_id,
     )
-    live_ids = await source.live_message_ids(channel_id, on_progress=on_progress)
+    live_ids = await source.live_message_ids(external_id, on_progress=on_progress)
     logger.info(
-        "rescan.live_message_ids done: channel=%s live_count=%s",
-        channel_id,
+        "rescan.live_message_ids done: external_id=%s live_count=%s",
+        external_id,
         len(live_ids),
     )
-    _guard_live_snapshot(live_ids, channel_id)
-    evidence = _detect(session_factory, channel_id, live_ids)
-    written = _persist(session_factory, evidence)
-    return _tally(channel_id, evidence, written)
+    _guard_live_snapshot(live_ids, external_id)
+    evidence = _detect(session_factory, user_id, external_id, live_ids)
+    written = _persist(session_factory, user_id, evidence)
+    return _tally(external_id, evidence, written)
 
 
-def _resolve_channel_id(session_factory: sessionmaker, reference: str | int) -> int:
+def _resolve_external_id(
+    session_factory: sessionmaker, user_id: UUID, reference: str | int
+) -> int:
     with session_factory() as session:
-        channel = channel_repository.find_channel(session, reference)
-    if channel is None:
-        raise ValueError(f"no channel matching {reference!r}; run backfill first")
-    return channel.channel_id
+        feed = feed_repository.find_feed(session, user_id, reference)
+    if feed is None:
+        raise ValueError(f"no feed matching {reference!r}; run backfill first")
+    return feed.external_id
 
 
-def _guard_live_snapshot(live_ids: set[int], channel_id: int) -> None:
+def _guard_live_snapshot(live_ids: set[int], external_id: int) -> None:
     if not live_ids:
         raise RescanAborted(
-            f"channel {channel_id}: empty live snapshot — refusing to read an "
+            f"feed {external_id}: empty live snapshot — refusing to read an "
             "inaccessible channel as a mass deletion"
         )
 
 
 def _detect(
-    session_factory: sessionmaker, channel_id: int, live_ids: set[int]
+    session_factory: sessionmaker,
+    user_id: UUID,
+    external_id: int,
+    live_ids: set[int],
 ) -> list[DeletedSignalEvidence]:
     with session_factory() as session:
-        stored = message_repository.read_messages(session, channel_id)
-        candidates = message_repository.candidate_message_ids(session, channel_id)
-    return detect_deletions(channel_id, stored, live_ids, candidates, _utc_now())
+        stored = message_repository.read_messages(session, user_id, external_id)
+        candidates = message_repository.candidate_message_ids(
+            session, user_id, external_id
+        )
+    return detect_deletions(external_id, stored, live_ids, candidates, _utc_now())
 
 
 def _persist(
-    session_factory: sessionmaker, evidence: list[DeletedSignalEvidence]
+    session_factory: sessionmaker,
+    user_id: UUID,
+    evidence: list[DeletedSignalEvidence],
 ) -> int:
     with session_factory() as session:
-        written = deletion_repository.upsert_deletion_evidence(session, evidence)
+        written = deletion_repository.upsert_deletion_evidence(
+            session, user_id, evidence
+        )
         session.commit()
         return written
 
 
 def _tally(
-    channel_id: int, evidence: list[DeletedSignalEvidence], written: int
+    external_id: int, evidence: list[DeletedSignalEvidence], written: int
 ) -> RescanResult:
     confirmed = sum(
         1 for item in evidence if item.confidence is DeletionConfidence.CONFIRMED
     )
-    return RescanResult(channel_id, confirmed, len(evidence) - confirmed, written)
+    return RescanResult(external_id, confirmed, len(evidence) - confirmed, written)

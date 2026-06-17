@@ -10,7 +10,7 @@ from verasig.features.accounts import repository as account_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.rules.views import present_rules
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
 
@@ -34,8 +34,9 @@ def test_present_rules_projects_display_and_signal_match(db_session):
             created_at=_instant(),
         ),
     )
-    channel_repository.upsert_channel(
+    feed_repository.create_feed(
         db_session,
+        account.id,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -43,9 +44,11 @@ def test_present_rules_projects_display_and_signal_match(db_session):
             is_private=False,
             first_seen_at=_instant(),
         ),
+        _instant(),
     )
     message_repository.insert_messages(
         db_session,
+        account.id,
         [
             RawTelegramMessage(
                 channel_id=7,

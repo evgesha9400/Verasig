@@ -9,10 +9,9 @@ from verasig.features.accounts.tokens import read_user_id
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 SECRET = "s" * 32
 
@@ -37,8 +36,9 @@ def _auth(token: str) -> dict:
 
 def _seed(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
-        channel_repository.upsert_channel(
+        feed_repository.create_feed(
             session,
+            user_id,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -46,6 +46,7 @@ def _seed(app, user_id: UUID) -> None:
                 is_private=False,
                 first_seen_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
             ),
+            datetime(2026, 6, 1, tzinfo=timezone.utc),
         )
         messages = [
             RawTelegramMessage(
@@ -59,9 +60,10 @@ def _seed(app, user_id: UUID) -> None:
             )
             for idx in range(1, 7)
         ]
-        message_repository.insert_messages(session, messages)
+        message_repository.insert_messages(session, user_id, messages)
         event_repository.insert_signal_events(
             session,
+            user_id,
             [
                 RawSignalEvent(
                     channel_id=7,
@@ -80,9 +82,6 @@ def _seed(app, user_id: UUID) -> None:
                 channel_id=7,
                 include_patterns=["alpha"],
             ),
-        )
-        user_channel_repository.subscribe(
-            session, user_id, 7, datetime(2026, 6, 1, tzinfo=timezone.utc)
         )
         session.commit()
 

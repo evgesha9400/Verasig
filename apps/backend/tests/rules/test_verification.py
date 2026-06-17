@@ -18,10 +18,9 @@ from verasig.features.rules.verification import (
 )
 from verasig.features.signals import event_repository
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 
 def _instant() -> datetime:
@@ -43,8 +42,9 @@ def _seed(db_session):
             created_at=_instant(),
         ),
     )
-    channel_repository.upsert_channel(
+    feed_repository.create_feed(
         db_session,
+        account.id,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -52,6 +52,7 @@ def _seed(db_session):
             is_private=False,
             first_seen_at=_instant(),
         ),
+        _instant(),
     )
     messages = [
         RawTelegramMessage(
@@ -65,9 +66,10 @@ def _seed(db_session):
         )
         for idx in range(1, 7)
     ]
-    message_repository.insert_messages(db_session, messages)
+    message_repository.insert_messages(db_session, account.id, messages)
     event_repository.insert_signal_events(
         db_session,
+        account.id,
         [
             RawSignalEvent(
                 channel_id=7,
@@ -87,7 +89,6 @@ def _seed(db_session):
             include_patterns=["alpha"],
         ),
     )
-    user_channel_repository.subscribe(db_session, account.id, 7, _instant())
     db_session.commit()
     return account
 
@@ -130,19 +131,11 @@ def test_apply_verdicts_records_wrong_feedback_and_passes_all_correct(db_session
 
     assert passed is False
     assert misclassified == ["4"]
-    assert (
-        user_channel_repository.read_subscription(
-            db_session, account.id, 7
-        ).verify_attempt
-        == 2
-    )
+    assert feed_repository.read_feed(db_session, account.id, 7).verify_attempt == 2
     assert len(drift_repository.read_drift_warnings(db_session, 7, account.id)) == 1
     assert followup_passed is True
     assert followup_misclassified == []
-    assert (
-        user_channel_repository.read_subscription(db_session, account.id, 7).status
-        == "verified"
-    )
+    assert feed_repository.read_feed(db_session, account.id, 7).status == "verified"
 
 
 def test_apply_verdicts_rejects_too_few_verdicts(db_session):

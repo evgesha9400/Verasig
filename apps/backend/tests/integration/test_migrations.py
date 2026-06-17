@@ -9,12 +9,12 @@ def test_migrations_apply(pg_url):
     command.upgrade(cfg, "head")  # no error == migrations apply
 
 
-def test_raw_capture_tables_exist_after_upgrade(pg_url):
+def test_feed_capture_tables_exist_after_upgrade(pg_url):
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", pg_url)
     command.upgrade(cfg, "head")
     tables = set(inspect(create_engine(pg_url, future=True)).get_table_names())
-    assert {"telegram_channel", "raw_telegram_message"} <= tables
+    assert {"feed", "raw_message"} <= tables
 
 
 def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
@@ -27,10 +27,10 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     assert {
         "user_account",
         "user_telegram_link",
-        "user_channel",
+        "feed",
         "backfill_job_run",
         "user_exchange_connection",
-        "chat_risk_config",
+        "feed_risk_config",
         "backtest_result",
         "lifecycle_link",
     } <= tables
@@ -62,13 +62,13 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     assert {
         "id",
         "user_id",
-        "channel_id",
+        "external_id",
         "status",
         "started_at",
         "finished_at",
         "fetched_count",
         "oldest_posted_at",
-        "cursor_message_id",
+        "cursor_external_message_id",
         "error_code",
         "error_message",
     } <= backfill_columns
@@ -133,7 +133,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
             "extracted_signal",
             "deleted_signal_evidence",
             "backfill_job_run",
-            "chat_risk_config",
+            "feed_risk_config",
         )
         for check in inspector.get_check_constraints(table)
     }
@@ -145,9 +145,9 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         "ck_deleted_signal_evidence_confidence",
         "ck_deleted_signal_evidence_method",
         "ck_backfill_job_run_status",
-        "ck_chat_risk_config_entry_mode",
-        "ck_chat_risk_config_weighting",
-        "ck_chat_risk_config_exit_source",
+        "ck_feed_risk_config_entry_mode",
+        "ck_feed_risk_config_weighting",
+        "ck_feed_risk_config_exit_source",
     } <= check_names
 
     foreign_key_names = {

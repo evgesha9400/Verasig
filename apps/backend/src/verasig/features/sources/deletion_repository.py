@@ -1,4 +1,10 @@
-"""Deletion repository functions."""
+"""Deletion repository functions.
+
+The domain `DeletedSignalEvidence` speaks `channel_id`/`message_id`; storage
+speaks `external_id`/`external_message_id` and is user-owned.
+"""
+
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -8,11 +14,12 @@ from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.storage.models import DeletedSignalEvidenceRow
 
 
-def _deletion_values(evidence: DeletedSignalEvidence) -> dict:
+def _deletion_values(user_id: UUID, evidence: DeletedSignalEvidence) -> dict:
     return {
         "id": evidence.id,
-        "channel_id": evidence.channel_id,
-        "message_id": evidence.message_id,
+        "user_id": user_id,
+        "external_id": evidence.channel_id,
+        "external_message_id": evidence.message_id,
         "confidence": evidence.confidence.value,
         "method": evidence.method.value,
         "original_text": evidence.original_text,
@@ -23,16 +30,16 @@ def _deletion_values(evidence: DeletedSignalEvidence) -> dict:
 
 
 def upsert_deletion_evidence(
-    session: Session, evidence: list[DeletedSignalEvidence]
+    session: Session, user_id: UUID, evidence: list[DeletedSignalEvidence]
 ) -> int:
     """Persist evidence; upgrade SUSPECTED->CONFIRMED only, preserving detected_at."""
     if not evidence:
         return 0
     statement = pg_insert(DeletedSignalEvidenceRow).values(
-        [_deletion_values(item) for item in evidence]
+        [_deletion_values(user_id, item) for item in evidence]
     )
     statement = statement.on_conflict_do_update(
-        index_elements=["channel_id", "message_id"],
+        index_elements=["user_id", "external_id", "external_message_id"],
         set_={
             "confidence": statement.excluded.confidence,
             "method": statement.excluded.method,
@@ -51,8 +58,8 @@ def upsert_deletion_evidence(
 def _row_to_deletion(row: DeletedSignalEvidenceRow) -> DeletedSignalEvidence:
     return DeletedSignalEvidence(
         id=row.id,
-        channel_id=row.channel_id,
-        message_id=row.message_id,
+        channel_id=row.external_id,
+        message_id=row.external_message_id,
         confidence=row.confidence,
         method=row.method,
         original_text=row.original_text,
@@ -63,11 +70,12 @@ def _row_to_deletion(row: DeletedSignalEvidenceRow) -> DeletedSignalEvidence:
 
 
 def read_deletion_evidence(
-    session: Session, channel_id: int
+    session: Session, user_id: UUID, external_id: int
 ) -> list[DeletedSignalEvidence]:
     rows = session.scalars(
         select(DeletedSignalEvidenceRow).where(
-            DeletedSignalEvidenceRow.channel_id == channel_id
+            DeletedSignalEvidenceRow.user_id == user_id,
+            DeletedSignalEvidenceRow.external_id == external_id,
         )
     ).all()
     return [_row_to_deletion(row) for row in rows]

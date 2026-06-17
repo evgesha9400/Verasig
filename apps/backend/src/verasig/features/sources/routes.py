@@ -9,7 +9,7 @@ from verasig.features.accounts.plans import (
     require_source_capacity,
 )
 from verasig.features.sources import (
-    channel_repository,
+    feed_repository,
 )
 from verasig.features.sources.backfill_job_run import (
     BackfillMode,
@@ -19,10 +19,6 @@ from verasig.features.sources.backfill_job_run import (
 )
 from verasig.features.sources.chat_views import present_chats
 from verasig.features.sources.schemas import BackfillStartIn, ChatCreateIn
-from verasig.features.sources.subscription_repository import (
-    subscribe,
-    unsubscribe,
-)
 from verasig.features.telegram_links.repository import read_link
 from verasig.foundation.http.auth_dependencies import (
     get_current_user,
@@ -75,8 +71,7 @@ async def create_chat(
                 channel = await source.resolve_channel(payload.tag)
         except ChannelReferenceResolutionError as error:
             raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
-        channel_repository.upsert_channel(session, channel)
-        subscribe(session, user.id, channel.channel_id, datetime.now(tz=UTC))
+        feed_repository.create_feed(session, user.id, channel, datetime.now(tz=UTC))
         session.commit()
         chats = present_chats(session, user.id)
     return next(chat for chat in chats if chat["id"] == str(channel.channel_id))
@@ -89,7 +84,7 @@ def delete_chat(
     _subscription=Depends(require_user_channel),
 ) -> Response:
     with request.app.state.session_factory() as session:
-        unsubscribe(session, _subscription.user_id, int(chat_id))
+        feed_repository.delete_feed(session, _subscription.user_id, int(chat_id))
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
