@@ -113,7 +113,7 @@ def test_distill_requires_five_signal_labels(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id, signal_count=4)
 
-    response = client.post("/chats/7/distill", headers=_auth(token))
+    response = client.post("/feeds/7/distill", headers=_auth(token))
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "LABELS_INSUFFICIENT"
@@ -124,12 +124,12 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
     _seed_chat(app, user_id, signal_count=5)
     app.state.distiller_factory = lambda: FakeDistiller(_distiller_stdout())
 
-    started = client.post("/chats/7/distill", headers=_auth(token))
+    started = client.post("/feeds/7/distill", headers=_auth(token))
     with client.stream(
-        "GET", "/chats/7/distill/progress", headers=_auth(token)
+        "GET", "/feeds/7/distill/progress", headers=_auth(token)
     ) as response:
         body = "".join(response.iter_text())
-    rules = client.get("/chats/7/rules", headers=_auth(token))
+    rules = client.get("/feeds/7/rules", headers=_auth(token))
 
     assert started.status_code == 202
     assert "Compiling filter ruleset" in body
@@ -149,7 +149,7 @@ def test_distill_progress_reports_missing_job_as_404(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id, signal_count=5)
 
-    response = client.get("/chats/7/distill/progress", headers=_auth(token))
+    response = client.get("/feeds/7/distill/progress", headers=_auth(token))
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "JOB_NOT_FOUND"

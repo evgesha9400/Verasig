@@ -1,4 +1,4 @@
-/* Verasig prototype — Telegram chat list */
+/* Verasig prototype — Telegram feed list */
 import { useState } from 'react'
 import {
   Badge,
@@ -20,24 +20,24 @@ const CONFIRM_COPY = {
     confirmLabel: 'Fetch new',
     variant: 'primary',
     icon: 'refresh',
-    body: (chat) =>
-      `Pull messages posted since the last backfill of ${chat.name}. Existing labels and rules are kept.`
+    body: (feed) =>
+      `Pull messages posted since the last backfill of ${feed.name}. Existing labels and rules are kept.`
   },
   refetchFull: {
     title: 'Re-fetch full history?',
     confirmLabel: 'Re-fetch all',
     variant: 'primary',
     icon: 'download',
-    body: (chat) =>
-      `Re-pull the entire history of ${chat.name} from the start. This can take a while; existing labels and rules are kept.`
+    body: (feed) =>
+      `Re-pull the entire history of ${feed.name} from the start. This can take a while; existing labels and rules are kept.`
   },
   remove: {
     title: 'Remove this feed?',
     confirmLabel: 'Remove feed',
     variant: 'danger',
     icon: 'alert',
-    body: (chat) =>
-      `${chat.name}, its labels, rules and score will be removed from your feeds. You can add it again later by its handle.`
+    body: (feed) =>
+      `${feed.name}, its labels, rules and score will be removed from your feeds. You can add it again later by its handle.`
   }
 }
 
@@ -46,8 +46,8 @@ function fmtNum(n) {
   return String(n)
 }
 
-export function ChatsView({
-  chats,
+export function FeedsView({
+  feeds,
   onStartBackfill,
   onRetry,
   onResume,
@@ -57,7 +57,7 @@ export function ChatsView({
   onViewDeleted,
   onCheckGaps,
   onBacktest,
-  onAddChat
+  onAddFeed
 }) {
   const [tag, setTag] = useState('')
   const [adding, setAdding] = useState(false)
@@ -66,22 +66,22 @@ export function ChatsView({
 
   function runConfirm() {
     if (!confirm) return
-    const { kind, chat } = confirm
+    const { kind, feed } = confirm
     setConfirm(null)
-    if (kind === 'fetchNew') onFetchNew(chat)
-    else if (kind === 'refetchFull') onRefetchFull(chat)
-    else if (kind === 'remove') onRemove(chat)
+    if (kind === 'fetchNew') onFetchNew(feed)
+    else if (kind === 'refetchFull') onRefetchFull(feed)
+    else if (kind === 'remove') onRemove(feed)
   }
 
-  async function addChat(event) {
+  async function addFeed(event) {
     event.preventDefault()
-    if (!onAddChat || !tag.trim()) return
+    if (!onAddFeed || !tag.trim()) return
 
     setAdding(true)
     setError(null)
 
     try {
-      await onAddChat(tag.trim())
+      await onAddFeed(tag.trim())
       setTag('')
     } catch (caughtError) {
       setError(caughtError?.message || 'Could not add this Telegram feed.')
@@ -196,14 +196,14 @@ export function ChatsView({
         <MenuItem
           iconLeft={<Icon name="refresh" size={15} />}
           disabled={busy || !started}
-          onClick={() => setConfirm({ kind: 'fetchNew', chat: c })}
+          onClick={() => setConfirm({ kind: 'fetchNew', feed: c })}
         >
           Fetch new signals
         </MenuItem>
         <MenuItem
           iconLeft={<Icon name="download" size={15} />}
           disabled={busy || !started}
-          onClick={() => setConfirm({ kind: 'refetchFull', chat: c })}
+          onClick={() => setConfirm({ kind: 'refetchFull', feed: c })}
         >
           Re-fetch full history
         </MenuItem>
@@ -219,7 +219,7 @@ export function ChatsView({
           tone="danger"
           iconLeft={<Icon name="trash" size={15} />}
           disabled={busy}
-          onClick={() => setConfirm({ kind: 'remove', chat: c })}
+          onClick={() => setConfirm({ kind: 'remove', feed: c })}
         >
           Remove feed
         </MenuItem>
@@ -317,10 +317,10 @@ export function ChatsView({
     <div className="vrs-page">
       <div className="vrs-sec-h">
         <span className="vrs-sec-t">Feeds from Telegram</span>
-        <span className="vrs-sec-c">{chats.length} available</span>
+        <span className="vrs-sec-c">{feeds.length} available</span>
       </div>
-      {onAddChat && (
-        <form className="vrs-form__actions" onSubmit={addChat}>
+      {onAddFeed && (
+        <form className="vrs-form__actions" onSubmit={addFeed}>
           <Input
             label="Channel tag"
             mono
@@ -346,7 +346,7 @@ export function ChatsView({
         </Banner>
       )}
       <div className="vrs-stack-sm">
-        {chats.map((c) => (
+        {feeds.map((c) => (
           <div key={c.id} className="vrs-chat-row">
             <span className="vrs-chat-av" style={{ background: c.tint }}>
               {c.initials}
@@ -416,7 +416,7 @@ export function ChatsView({
             </>
           }
         >
-          {CONFIRM_COPY[confirm.kind].body(confirm.chat)}
+          {CONFIRM_COPY[confirm.kind].body(confirm.feed)}
         </Dialog>
       )}
     </div>

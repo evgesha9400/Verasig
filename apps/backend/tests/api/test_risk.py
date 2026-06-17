@@ -53,7 +53,7 @@ def test_risk_get_returns_default_config(client, app):
     token, user_id = _register(client)
     _seed_subscription(app, user_id)
 
-    response = client.get("/chats/7/risk", headers=_auth(token))
+    response = client.get("/feeds/7/risk", headers=_auth(token))
 
     assert response.status_code == 200
     assert response.json() == _risk_json(RiskConfig())
@@ -73,7 +73,7 @@ def test_risk_put_persists_and_echoes_config(client, app):
         "leverage": 8,
     }
 
-    response = client.put("/chats/7/risk", headers=_auth(token), json=payload)
+    response = client.put("/feeds/7/risk", headers=_auth(token), json=payload)
 
     assert response.status_code == 200
     assert response.json() == payload
@@ -95,10 +95,10 @@ def test_risk_rejects_invalid_levels_and_unknown_enums(client, app):
     valid = _risk_json(RiskConfig())
 
     low_level = client.put(
-        "/chats/7/risk", headers=_auth(token), json={**valid, "levels": 1}
+        "/feeds/7/risk", headers=_auth(token), json={**valid, "levels": 1}
     )
     unknown_mode = client.put(
-        "/chats/7/risk", headers=_auth(token), json={**valid, "entryMode": "last"}
+        "/feeds/7/risk", headers=_auth(token), json={**valid, "entryMode": "last"}
     )
 
     assert low_level.status_code == 422
@@ -112,22 +112,22 @@ def test_risk_rejects_invalid_risk_values(client, app):
     base = _risk_json(RiskConfig())
 
     invalid_stop = client.put(
-        "/chats/7/risk",
+        "/feeds/7/risk",
         headers=_auth(token),
         json={**base, "stopPct": "0"},
     )
     invalid_tp = client.put(
-        "/chats/7/risk",
+        "/feeds/7/risk",
         headers=_auth(token),
         json={**base, "tpPct": "0"},
     )
     invalid_risk = client.put(
-        "/chats/7/risk",
+        "/feeds/7/risk",
         headers=_auth(token),
         json={**base, "riskPct": "-1"},
     )
     invalid_leverage = client.put(
-        "/chats/7/risk",
+        "/feeds/7/risk",
         headers=_auth(token),
         json={**base, "leverage": 0},
     )
@@ -144,9 +144,9 @@ def test_risk_routes_mask_foreign_user(client, app):
     _seed_subscription(app, owner_id)
 
     responses = [
-        client.get("/chats/7/risk", headers=_auth(other)),
+        client.get("/feeds/7/risk", headers=_auth(other)),
         client.put(
-            "/chats/7/risk", headers=_auth(other), json=_risk_json(RiskConfig())
+            "/feeds/7/risk", headers=_auth(other), json=_risk_json(RiskConfig())
         ),
     ]
 

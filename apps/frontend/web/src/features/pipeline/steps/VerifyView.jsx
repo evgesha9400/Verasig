@@ -10,8 +10,8 @@ import { Icon } from '@verasig/design-system'
 import { MessageCard } from '../../../shared/components/MessageCard.jsx'
 
 /* Verasig — Verify step: confirm the ruleset's classifications on a fresh sample.
-   Samples and their predictions come from GET /chats/{id}/verify/samples; the
-   verdicts POST to /chats/{id}/verify, and the BACKEND decides pass/fail. */
+   Samples and their predictions come from GET /feeds/{id}/verify/samples; the
+   verdicts POST to /feeds/{id}/verify, and the BACKEND decides pass/fail. */
 const VERIFY_MIN = 6
 
 function VerifyCard({ item, dragX = 0, isTop, style }) {

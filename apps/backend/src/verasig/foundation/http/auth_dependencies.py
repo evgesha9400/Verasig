@@ -42,13 +42,13 @@ def get_current_user(
     return account
 
 
-def require_user_channel(
-    chat_id: str,
+def require_feed(
+    external_id: str,
     request: Request,
     user: UserAccount = Depends(get_current_user),
 ) -> FeedRow:
     with request.app.state.session_factory() as session:
-        subscription = feed_repository.read_feed(session, user.id, int(chat_id))
+        subscription = feed_repository.read_feed(session, user.id, int(external_id))
         if subscription is None:
             raise ApiError(404, "FEED_NOT_FOUND", "Feed not found")
         session.expunge(subscription)

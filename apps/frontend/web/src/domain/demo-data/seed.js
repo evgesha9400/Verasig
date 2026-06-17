@@ -1,7 +1,7 @@
 /* Verasig prototype — sample data */
 
-/* ---- Chats retrieved from Telegram ---- */
-export const CHATS = [
+/* ---- Feeds retrieved from Telegram ---- */
+export const FEEDS = [
   {
     id: 'apex',
     name: 'Apex Crypto Calls',

@@ -102,18 +102,18 @@ def test_messages_label_and_counts(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id)
 
-    sample = client.get("/chats/7/messages", headers=_auth(token))
+    sample = client.get("/feeds/7/messages", headers=_auth(token))
     first_label = client.post(
-        "/chats/7/messages/1/label",
+        "/feeds/7/messages/1/label",
         headers=_auth(token),
         json={"label": "signal"},
     )
     relabel = client.post(
-        "/chats/7/messages/1/label",
+        "/feeds/7/messages/1/label",
         headers=_auth(token),
         json={"label": "noise"},
     )
-    counts = client.get("/chats/7/labels", headers=_auth(token))
+    counts = client.get("/feeds/7/labels", headers=_auth(token))
 
     assert sample.status_code == 200
     assert [message["id"] for message in sample.json()["messages"]] == ["1", "2"]
@@ -133,7 +133,7 @@ def test_label_rejects_unknown_value(client, app):
     _seed_chat(app, user_id)
 
     response = client.post(
-        "/chats/7/messages/1/label",
+        "/feeds/7/messages/1/label",
         headers=_auth(token),
         json={"label": "maybe"},
     )
@@ -147,13 +147,13 @@ def test_label_routes_mask_foreign_user(client, app):
     _seed_chat(app, owner_id)
 
     responses = [
-        client.get("/chats/7/messages", headers=_auth(other)),
+        client.get("/feeds/7/messages", headers=_auth(other)),
         client.post(
-            "/chats/7/messages/1/label",
+            "/feeds/7/messages/1/label",
             headers=_auth(other),
             json={"label": "signal"},
         ),
-        client.get("/chats/7/labels", headers=_auth(other)),
+        client.get("/feeds/7/labels", headers=_auth(other)),
     ]
 
     assert owner

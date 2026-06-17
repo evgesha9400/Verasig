@@ -12,7 +12,7 @@ import { Shell } from './layout/Shell.jsx'
 import { Pipeline } from '../features/pipeline/Pipeline.jsx'
 import { SourcesView } from '../features/sources/SourcesView.jsx'
 import { TelegramSetup } from '../features/sources/TelegramSetup.jsx'
-import { ChatsView } from '../features/sources/ChatsView.jsx'
+import { FeedsView } from '../features/sources/FeedsView.jsx'
 import { SignalsView } from '../features/signals/SignalsView.jsx'
 import { BackfillView } from '../features/pipeline/steps/BackfillView.jsx'
 import { LabelView } from '../features/pipeline/steps/LabelView.jsx'
@@ -28,11 +28,11 @@ import {
 } from '../shared/api/telegramApi.js'
 import {
   cancelBackfill,
-  createChat,
-  deleteChat,
+  createFeed,
+  deleteFeed,
   startBackfill as startBackfillJob,
   streamBackfillProgress
-} from '../shared/api/chatsApi.js'
+} from '../shared/api/feedsApi.js'
 import {
   getLabelCounts,
   getRules,
@@ -78,8 +78,8 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     setNav,
     screen,
     telegramConnected,
-    chats,
-    activeChat,
+    feeds,
+    activeFeed,
     verifyAttempt,
     setVerifyAttempt,
     setScreen,
@@ -95,10 +95,10 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     goToDeletedSignals,
     startBackfill,
     retryBackfill,
-    resumeChat,
+    resumeFeed,
     fetchNewSignals,
     refetchFullHistory,
-    removeChat,
+    removeFeed,
     checkGaps,
     stopAfterVerify,
     backtestFeed,
@@ -109,13 +109,13 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     openSettings,
     restoreNav,
     handleNav,
-    exitToChats,
+    exitToFeeds,
     exitToSources,
     connectBybit,
     disconnectBybit,
     connectTelegram: markTelegramConnected,
     refreshSources,
-    upsertChat,
+    upsertFeed,
     setBackTarget
   } = useWorkflowState(authToken)
 
@@ -149,17 +149,17 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
   let body = null
   let actions = null
 
-  async function addTelegramChat(tag) {
-    const chat = await createChat(authToken, tag)
-    upsertChat(chat)
-    fireToast('verified', 'Feed added', `${chat.name} is ready to backfill.`)
+  async function addTelegramFeed(tag) {
+    const feed = await createFeed(authToken, tag)
+    upsertFeed(feed)
+    fireToast('verified', 'Feed added', `${feed.name} is ready to backfill.`)
   }
 
-  async function removeFeed(chat) {
+  async function handleRemoveFeed(feed) {
     try {
-      await deleteChat(authToken, chat.id)
-      removeChat(chat.id)
-      fireToast('info', 'Feed removed', `${chat.name} was removed from your feeds.`)
+      await deleteFeed(authToken, feed.id)
+      removeFeed(feed.id)
+      fireToast('info', 'Feed removed', `${feed.name} was removed from your feeds.`)
     } catch (error) {
       fireToast(
         'rejected',
@@ -176,7 +176,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
 
   function handleBackfillError(error) {
     void refreshSources().catch(() => {})
-    setScreen('chats')
+    setScreen('feeds')
     if (error?.status === 'cancelled') return
     fireToast(
       'rejected',
@@ -190,11 +190,11 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     subtitle = 'Signals extracted from your analyzed feeds'
     body = (
       <SignalsView
-        feeds={chats}
+        feeds={feeds}
         initial={signalsPreset}
         onGoToSources={() => {
           setNav('sources')
-          setScreen(telegramConnected ? 'chats' : 'sources')
+          setScreen(telegramConnected ? 'feeds' : 'sources')
         }}
       />
     )
@@ -227,9 +227,9 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     body = (
       <SourcesView
         telegramConnected={telegramConnected}
-        chats={chats}
+        feeds={feeds}
         onConnectTelegram={() => setScreen('tg-setup')}
-        onOpenTelegram={() => setScreen('chats')}
+        onOpenTelegram={() => setScreen('feeds')}
       />
     )
   } else if (screen === 'tg-setup') {
@@ -245,29 +245,29 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onCancel={exitToSources}
       />
     )
-  } else if (screen === 'chats') {
+  } else if (screen === 'feeds') {
     title = 'Telegram'
-    subtitle = `${chats.length} feeds · ${chats.filter((c) => c.status === 'analyzed').length} analyzed`
+    subtitle = `${feeds.length} feeds · ${feeds.filter((c) => c.status === 'analyzed').length} analyzed`
     breadcrumb = 'Sources'
     onExit = exitToSources
     body = (
-      <ChatsView
-        chats={chats}
+      <FeedsView
+        feeds={feeds}
         onStartBackfill={startBackfill}
         onRetry={retryBackfill}
-        onResume={resumeChat}
+        onResume={resumeFeed}
         onFetchNew={fetchNewSignals}
         onRefetchFull={refetchFullHistory}
-        onRemove={removeFeed}
+        onRemove={handleRemoveFeed}
         onViewDeleted={goToDeletedSignals}
         onCheckGaps={checkGaps}
         onBacktest={backtestFeed}
-        onAddChat={addTelegramChat}
+        onAddFeed={addTelegramFeed}
       />
     )
-  } else if (isWorkflow && activeChat) {
-    breadcrumb = activeChat.name
-    onExit = exitToChats
+  } else if (isWorkflow && activeFeed) {
+    breadcrumb = activeFeed.name
+    onExit = exitToFeeds
     pipeline = <Pipeline current={pipelineStep} onStepBack={requestStepBack} />
 
     const stepTitles = {
@@ -282,12 +282,12 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     }
 
     title = stepTitles[screen][0]
-    subtitle = `${activeChat.name} · ${stepTitles[screen][1]}`
+    subtitle = `${activeFeed.name} · ${stepTitles[screen][1]}`
 
     if (screen === 'backfill') {
       body = (
         <BackfillView
-          chat={activeChat}
+          chat={activeFeed}
           onStart={(chatId) => startBackfillJob(authToken, chatId, backfillMode)}
           onStream={(chatId, handlers) =>
             streamBackfillProgress(authToken, chatId, handlers)
@@ -301,7 +301,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     } else if (screen === 'label') {
       body = (
         <LabelView
-          chatId={activeChat.id}
+          chatId={activeFeed.id}
           onListMessages={(chatId) => listMessages(authToken, chatId)}
           onGetCounts={(chatId) => getLabelCounts(authToken, chatId)}
           onRecordLabel={(chatId, msgId, label) =>
@@ -315,7 +315,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     } else if (screen === 'distill') {
       body = (
         <DistillView
-          chatId={activeChat.id}
+          chatId={activeFeed.id}
           onStartDistill={(chatId) => startDistill(authToken, chatId)}
           onStreamProgress={(chatId, handlers) =>
             streamDistillProgress(authToken, chatId, handlers)
@@ -329,7 +329,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       body = (
         <VerifyView
           key={`verify-${verifyAttempt}`}
-          chatId={activeChat.id}
+          chatId={activeFeed.id}
           onGetSamples={(chatId) => getVerifySamples(authToken, chatId)}
           onSubmit={(chatId, verdicts) => submitVerify(authToken, chatId, verdicts)}
           onPass={() => setScreen('exchange')}
@@ -359,13 +359,13 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
             ? 'Execution'
             : 'Backtesting'
       title = featureName
-      subtitle = `${activeChat.name} · Available on a higher plan`
+      subtitle = `${activeFeed.name} · Available on a higher plan`
       body = (
         <PaidFeaturePlaceholder
           feature={featureName}
           onDone={() => {
             void refreshSources().catch(() => {})
-            exitToChats()
+            exitToFeeds()
           }}
         />
       )
@@ -375,14 +375,14 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     body = (
       <SourcesView
         telegramConnected={telegramConnected}
-        chats={chats}
+        feeds={feeds}
         onConnectTelegram={() => setScreen('tg-setup')}
-        onOpenTelegram={() => setScreen('chats')}
+        onOpenTelegram={() => setScreen('feeds')}
       />
     )
   }
 
-  if (nav === 'sources' && screen === 'chats') {
+  if (nav === 'sources' && screen === 'feeds') {
     actions = (
       <IconButton
         label="Refresh feeds"

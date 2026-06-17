@@ -17,12 +17,12 @@ const telegramLogo = (
 
 export function SourcesView({
   telegramConnected,
-  chats,
+  feeds,
   onConnectTelegram,
   onOpenTelegram
 }) {
-  const analyzed = chats.filter((c) => c.status === 'analyzed').length
-  const inProgress = chats.filter((c) =>
+  const analyzed = feeds.filter((c) => c.status === 'analyzed').length
+  const inProgress = feeds.filter((c) =>
     ['backfilling', 'cancelled', 'failed', 'backfilled', 'labeling'].includes(c.status)
   ).length
 
@@ -47,7 +47,7 @@ export function SourcesView({
               }
               desc={
                 <>
-                  {chats.length} feeds available · {analyzed} analyzed
+                  {feeds.length} feeds available · {analyzed} analyzed
                   {inProgress ? ` · ${inProgress} in progress` : ''}.
                 </>
               }

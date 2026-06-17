@@ -18,17 +18,17 @@ from verasig.features.sources.backfill_job_run import (
     progress_event_name,
 )
 from verasig.features.sources.feed_views import present_feeds
-from verasig.features.sources.schemas import BackfillStartIn, ChatCreateIn
+from verasig.features.sources.schemas import BackfillStartIn, FeedCreateIn
 from verasig.features.telegram_links.workflow import read_connection
 from verasig.foundation.http.auth_dependencies import (
     get_current_user,
-    require_user_channel,
+    require_feed,
 )
 from verasig.foundation.http.errors import ApiError
 from verasig.foundation.http.sse import sse_single_event, sse_stream
 from verasig.foundation.telegram.session import make_user_source
 
-router = APIRouter(prefix="/chats")
+router = APIRouter(prefix="/feeds")
 
 
 def _resolve_source(request: Request, connection):
@@ -50,16 +50,16 @@ def _require_connected_source(request: Request, session, user_id):
 
 
 @router.get("")
-def list_chats(request: Request, user: UserAccount = Depends(get_current_user)) -> dict:
+def list_feeds(request: Request, user: UserAccount = Depends(get_current_user)) -> dict:
     request.app.state.backfill_jobs.mark_inactive_backfilling_failed(user.id)
     with request.app.state.session_factory() as session:
-        return {"chats": present_feeds(session, user.id)}
+        return {"feeds": present_feeds(session, user.id)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_chat(
+async def create_feed(
     request: Request,
-    payload: ChatCreateIn,
+    payload: FeedCreateIn,
     user: UserAccount = Depends(get_current_user),
 ) -> dict:
     with request.app.state.session_factory() as session:
@@ -79,26 +79,26 @@ async def create_chat(
     return next(feed for feed in feeds if feed["id"] == str(channel.channel_id))
 
 
-@router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_chat(
+@router.delete("/{external_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_feed(
     request: Request,
-    chat_id: str,
-    _subscription=Depends(require_user_channel),
+    external_id: str,
+    _subscription=Depends(require_feed),
 ) -> Response:
     with request.app.state.session_factory() as session:
-        feed_repository.delete_feed(session, _subscription.user_id, int(chat_id))
+        feed_repository.delete_feed(session, _subscription.user_id, int(external_id))
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/{chat_id}/backfill", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/{external_id}/backfill", status_code=status.HTTP_202_ACCEPTED)
 async def start_backfill(
     request: Request,
-    chat_id: str,
+    external_id: str,
     payload: BackfillStartIn | None = None,
-    subscription=Depends(require_user_channel),
+    subscription=Depends(require_feed),
 ) -> dict:
-    channel_id = int(chat_id)
+    channel_id = int(external_id)
     mode = payload.mode if payload else BackfillMode.RESUME
 
     def make_source():
@@ -111,23 +111,23 @@ async def start_backfill(
     return {"jobId": str(run.id)}
 
 
-@router.post("/{chat_id}/backfill/cancel", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{external_id}/backfill/cancel", status_code=status.HTTP_204_NO_CONTENT)
 def cancel_backfill(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ) -> Response:
-    request.app.state.backfill_jobs.cancel(subscription.user_id, int(chat_id))
+    request.app.state.backfill_jobs.cancel(subscription.user_id, int(external_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{chat_id}/backfill/progress")
+@router.get("/{external_id}/backfill/progress")
 def backfill_progress(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ):
-    channel_id = int(chat_id)
+    channel_id = int(external_id)
     request.app.state.backfill_jobs.mark_inactive_backfilling_failed(
         subscription.user_id, channel_id
     )

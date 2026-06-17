@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   cancelBackfill,
-  createChat,
-  deleteChat,
-  listChats,
+  createFeed,
+  deleteFeed,
+  listFeeds,
   startBackfill,
   streamBackfillProgress
-} from './chatsApi.js'
+} from './feedsApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -15,7 +15,7 @@ function jsonResponse(body, status = 200) {
   })
 }
 
-const chat = {
+const feed = {
   id: '7',
   name: 'Pilot Signals',
   tag: '@pilot',
@@ -37,25 +37,25 @@ beforeEach(() => {
   globalThis.fetch = vi.fn()
 })
 
-describe('chatsApi', () => {
-  it('lists chats with bearer auth', async () => {
-    fetch.mockResolvedValueOnce(jsonResponse({ chats: [chat] }))
+describe('feedsApi', () => {
+  it('lists feeds with bearer auth', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ feeds: [feed] }))
 
-    const body = await listChats('jwt-token')
+    const body = await listFeeds('jwt-token')
 
-    expect(body.chats[0].name).toBe('Pilot Signals')
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats', {
+    expect(body.feeds[0].name).toBe('Pilot Signals')
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds', {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
   })
 
-  it('creates a chat subscription by tag', async () => {
-    fetch.mockResolvedValueOnce(jsonResponse(chat, 201))
+  it('creates a feed subscription by tag', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse(feed, 201))
 
-    await createChat('jwt-token', '@pilot')
+    await createFeed('jwt-token', '@pilot')
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,12 +65,12 @@ describe('chatsApi', () => {
     })
   })
 
-  it('deletes a chat subscription', async () => {
+  it('deletes a feed subscription', async () => {
     fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
 
-    await deleteChat('jwt-token', '7')
+    await deleteFeed('jwt-token', '7')
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7', {
       method: 'DELETE',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -84,7 +84,7 @@ describe('chatsApi', () => {
     await startBackfill('jwt-token', '7')
     await cancelBackfill('jwt-token', '7')
 
-    expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/chats/7/backfill', {
+    expect(fetch).toHaveBeenNthCalledWith(1, 'http://localhost:8000/feeds/7/backfill', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ describe('chatsApi', () => {
     })
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      'http://localhost:8000/chats/7/backfill/cancel',
+      'http://localhost:8000/feeds/7/backfill/cancel',
       {
         method: 'POST',
         headers: { Authorization: 'Bearer jwt-token' }
@@ -107,7 +107,7 @@ describe('chatsApi', () => {
 
     await startBackfill('jwt-token', '7', 'full')
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/backfill', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/backfill', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -153,7 +153,7 @@ describe('chatsApi', () => {
     events[0].emit('done', { fetched: 12 })
 
     expect(events[0].url).toBe(
-      'http://localhost:8000/chats/7/backfill/progress?token=jwt-token'
+      'http://localhost:8000/feeds/7/backfill/progress?token=jwt-token'
     )
     expect(onProgress).toHaveBeenCalledWith({
       fetched: 5,

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ChatsView } from './ChatsView.jsx'
+import { FeedsView } from './FeedsView.jsx'
 
 const feed = {
   id: 'delta',
@@ -15,11 +15,11 @@ const feed = {
   signalDeletion: true
 }
 
-describe('ChatsView', () => {
+describe('FeedsView', () => {
   it('uses shared popover content for feed flags', () => {
     render(
-      <ChatsView
-        chats={[feed]}
+      <FeedsView
+        feeds={[feed]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -41,8 +41,8 @@ describe('ChatsView', () => {
     const onCheckGaps = vi.fn()
 
     render(
-      <ChatsView
-        chats={[feed]}
+      <FeedsView
+        feeds={[feed]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -65,8 +65,8 @@ describe('ChatsView', () => {
     const backfilledFeed = { ...feed, status: 'backfilled', signalDeletion: false }
 
     render(
-      <ChatsView
-        chats={[backfilledFeed]}
+      <FeedsView
+        feeds={[backfilledFeed]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -91,8 +91,8 @@ describe('ChatsView', () => {
     const onRemove = vi.fn()
 
     render(
-      <ChatsView
-        chats={[feed]}
+      <FeedsView
+        feeds={[feed]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -120,8 +120,8 @@ describe('ChatsView', () => {
     const onFetchNew = vi.fn()
 
     render(
-      <ChatsView
-        chats={[feed]}
+      <FeedsView
+        feeds={[feed]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -143,11 +143,11 @@ describe('ChatsView', () => {
   })
 
   it('adds a Telegram feed by channel tag', async () => {
-    const onAddChat = vi.fn().mockResolvedValue()
+    const onAddFeed = vi.fn().mockResolvedValue()
 
     render(
-      <ChatsView
-        chats={[]}
+      <FeedsView
+        feeds={[]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -157,7 +157,7 @@ describe('ChatsView', () => {
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
         onBacktest={() => {}}
-        onAddChat={onAddChat}
+        onAddFeed={onAddFeed}
       />
     )
 
@@ -167,18 +167,18 @@ describe('ChatsView', () => {
     fireEvent.submit(screen.getByRole('button', { name: /add feed/i }).closest('form'))
 
     await waitFor(() => {
-      expect(onAddChat).toHaveBeenCalledWith('@pilot')
+      expect(onAddFeed).toHaveBeenCalledWith('@pilot')
     })
   })
 
   it('shows the failure reason when adding a feed is rejected', async () => {
-    const onAddChat = vi
+    const onAddFeed = vi
       .fn()
       .mockRejectedValue(new Error('Cannot resolve Telegram channel reference.'))
 
     render(
-      <ChatsView
-        chats={[]}
+      <FeedsView
+        feeds={[]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -188,7 +188,7 @@ describe('ChatsView', () => {
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
         onBacktest={() => {}}
-        onAddChat={onAddChat}
+        onAddFeed={onAddFeed}
       />
     )
 
@@ -212,8 +212,8 @@ describe('ChatsView', () => {
     const onRetry = vi.fn()
 
     render(
-      <ChatsView
-        chats={[failedFeed]}
+      <FeedsView
+        feeds={[failedFeed]}
         onStartBackfill={() => {}}
         onRetry={onRetry}
         onResume={() => {}}

@@ -10,8 +10,8 @@ import { MessageCard } from '../../../shared/components/MessageCard.jsx'
    context is shown on the card; the parsed action gets confirmed at Verify.
 
    Data is backend-owned: the deck is the unlabeled candidate messages from
-   GET /chats/{id}/messages; each swipe persists with POST .../label; the rail
-   counts are seeded from GET /chats/{id}/labels and bumped locally. */
+   GET /feeds/{id}/messages; each swipe persists with POST .../label; the rail
+   counts are seeded from GET /feeds/{id}/labels and bumped locally. */
 function LabelCard({ msg, label, dragX = 0, isTop, style }) {
   const head = (
     <>

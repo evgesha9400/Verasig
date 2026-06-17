@@ -77,16 +77,16 @@ def test_backtest_job_streams_phases_persists_outcomes_and_updates_chat(client, 
     _seed(app, user_id)
     app.state.market_data_factory = FakeMarketData
 
-    started = client.post("/chats/7/backtest", headers=_auth(token))
+    started = client.post("/feeds/7/backtest", headers=_auth(token))
     with client.stream(
-        "GET", "/chats/7/backtest/progress", headers=_auth(token)
+        "GET", "/feeds/7/backtest/progress", headers=_auth(token)
     ) as response:
         body = "".join(response.iter_text())
-    listed = client.get("/chats", headers=_auth(token))
+    listed = client.get("/feeds", headers=_auth(token))
     row = _latest_backtest(app, user_id)
 
     _seed_confirmed_signal_deletion(app, user_id)
-    deletion_listed = client.get("/chats", headers=_auth(token))
+    deletion_listed = client.get("/feeds", headers=_auth(token))
 
     assert started.status_code == 202
     assert response.status_code == 200
@@ -96,11 +96,11 @@ def test_backtest_job_streams_phases_persists_outcomes_and_updates_chat(client, 
     assert "Scoring confidence & drawdown" in body
     assert "event: done" in body
     assert '"winRate": 100.0' in body
-    assert listed.json()["chats"][0]["status"] == "analyzed"
-    assert listed.json()["chats"][0]["score"] is not None
+    assert listed.json()["feeds"][0]["status"] == "analyzed"
+    assert listed.json()["feeds"][0]["score"] is not None
     assert len(row.outcomes) == 1
     assert row.outcomes[0]["pctReturn"] == 1.0
-    assert deletion_listed.json()["chats"][0]["score"] == 0
+    assert deletion_listed.json()["feeds"][0]["score"] == 0
 
 
 def test_backtest_foreign_user_is_not_found(client, app):
@@ -108,7 +108,7 @@ def test_backtest_foreign_user_is_not_found(client, app):
     other, _other_id = _register(client, "other@example.com")
     _seed(app, owner_id)
 
-    response = client.post("/chats/7/backtest", headers=_auth(other))
+    response = client.post("/feeds/7/backtest", headers=_auth(other))
 
     assert owner
     assert response.status_code == 404
@@ -119,7 +119,7 @@ def test_backtest_progress_reports_missing_job_as_404(client, app):
     token, user_id = _register(client)
     _seed(app, user_id)
 
-    response = client.get("/chats/7/backtest/progress", headers=_auth(token))
+    response = client.get("/feeds/7/backtest/progress", headers=_auth(token))
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "JOB_NOT_FOUND"

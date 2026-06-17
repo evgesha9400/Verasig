@@ -55,29 +55,29 @@ def _connect_telegram(client, app, token: str) -> None:
     )
 
 
-def test_get_chats_empty(client):
+def test_get_feeds_empty(client):
     token = _register(client)
 
-    response = client.get("/chats", headers=_auth(token))
+    response = client.get("/feeds", headers=_auth(token))
 
     assert response.status_code == 200
-    assert response.json() == {"chats": []}
+    assert response.json() == {"feeds": []}
 
 
-def test_post_chat_subscribes_via_user_source(client, app):
+def test_post_feed_subscribes_via_user_source(client, app):
     token = _register(client)
     _connect_telegram(client, app, token)
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(), [])
 
-    created = client.post("/chats", headers=_auth(token), json={"tag": "@pilot"})
-    listed = client.get("/chats", headers=_auth(token))
+    created = client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"})
+    listed = client.get("/feeds", headers=_auth(token))
 
     assert created.status_code == 201
     assert created.json()["id"] == "7"
-    assert listed.json()["chats"][0]["name"] == "Pilot Signals"
+    assert listed.json()["feeds"][0]["name"] == "Pilot Signals"
 
 
-def test_post_chat_unresolvable_channel_returns_404(client, app):
+def test_post_feed_unresolvable_channel_returns_404(client, app):
     token = _register(client)
     _connect_telegram(client, app, token)
     app.state.telegram_source_factory = lambda _link: FakeSource(
@@ -86,56 +86,56 @@ def test_post_chat_unresolvable_channel_returns_404(client, app):
         resolve_error=ChannelReferenceResolutionError("no such channel"),
     )
 
-    response = client.post("/chats", headers=_auth(token), json={"tag": "@ghost"})
+    response = client.post("/feeds", headers=_auth(token), json={"tag": "@ghost"})
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "CHANNEL_NOT_FOUND"
     assert response.json()["error"]["message"] == "no such channel"
 
 
-def test_post_chat_requires_telegram_link(client):
+def test_post_feed_requires_telegram_link(client):
     token = _register(client)
 
-    response = client.post("/chats", headers=_auth(token), json={"tag": "@pilot"})
+    response = client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"})
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "TELEGRAM_NOT_CONNECTED"
 
 
-def test_observer_second_chat_hits_source_limit(client, app):
+def test_observer_second_feed_hits_source_limit(client, app):
     token = _register(client)
     _connect_telegram(client, app, token)
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(7), [])
     assert (
-        client.post("/chats", headers=_auth(token), json={"tag": "@pilot"}).status_code
+        client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"}).status_code
         == 201
     )
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(8), [])
 
-    response = client.post("/chats", headers=_auth(token), json={"tag": "@other"})
+    response = client.post("/feeds", headers=_auth(token), json={"tag": "@other"})
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "PLAN_LIMIT_SOURCES"
 
 
-def test_delete_chat_purges_feed_and_masks_foreign_user(client, app):
+def test_delete_feed_purges_feed_and_masks_foreign_user(client, app):
     owner = _register(client, "owner@example.com")
     other = _register(client, "other@example.com")
     _connect_telegram(client, app, owner)
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(), [])
     assert (
-        client.post("/chats", headers=_auth(owner), json={"tag": "@pilot"}).status_code
+        client.post("/feeds", headers=_auth(owner), json={"tag": "@pilot"}).status_code
         == 201
     )
 
-    foreign = client.delete("/chats/7", headers=_auth(other))
-    deleted = client.delete("/chats/7", headers=_auth(owner))
-    listed = client.get("/chats", headers=_auth(owner))
+    foreign = client.delete("/feeds/7", headers=_auth(other))
+    deleted = client.delete("/feeds/7", headers=_auth(owner))
+    listed = client.get("/feeds", headers=_auth(owner))
 
     assert foreign.status_code == 404
     assert foreign.json()["error"]["code"] == "FEED_NOT_FOUND"
     assert deleted.status_code == 204
-    assert listed.json() == {"chats": []}
+    assert listed.json() == {"feeds": []}
 
 
 def test_delete_source_cascades_feeds_and_capture(client, app):
@@ -151,7 +151,7 @@ def test_delete_source_cascades_feeds_and_capture(client, app):
     _connect_telegram(client, app, token)
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(), [])
     assert (
-        client.post("/chats", headers=_auth(token), json={"tag": "@pilot"}).status_code
+        client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"}).status_code
         == 201
     )
 
@@ -181,4 +181,4 @@ def test_delete_source_cascades_feeds_and_capture(client, app):
     with app.state.session_factory() as session:
         assert feed_repository.read_feed(session, user_id, 7) is None
         assert message_repository.count_messages(session, user_id, 7) == 0
-    assert client.get("/chats", headers=_auth(token)).json() == {"chats": []}
+    assert client.get("/feeds", headers=_auth(token)).json() == {"feeds": []}

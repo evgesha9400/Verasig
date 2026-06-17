@@ -28,7 +28,7 @@ describe('pipelineApi — label', () => {
     const body = await listMessages('jwt-token', '7')
 
     expect(body.messages[0].id).toBe('1')
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/messages', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/messages', {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -40,7 +40,7 @@ describe('pipelineApi — label', () => {
     await recordLabel('jwt-token', '7', '42', 'signal')
 
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/chats/7/messages/42/label',
+      'http://localhost:8000/feeds/7/messages/42/label',
       {
         method: 'POST',
         headers: {
@@ -60,7 +60,7 @@ describe('pipelineApi — label', () => {
     const counts = await getLabelCounts('jwt-token', '7')
 
     expect(counts.signalCount).toBe(3)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/labels', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/labels', {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -74,7 +74,7 @@ describe('pipelineApi — distill', () => {
     const body = await startDistill('jwt-token', '7')
 
     expect(body.jobId).toBe('u:7:distill')
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/distill', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/distill', {
       method: 'POST',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -90,7 +90,7 @@ describe('pipelineApi — distill', () => {
     const body = await getRules('jwt-token', '7')
 
     expect(body.rules[0].match).toBe(94)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/rules', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/rules', {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -115,7 +115,7 @@ describe('pipelineApi — distill', () => {
     streamDistillProgress('jwt-token', '7', {})
 
     expect(FakeEventSource.last.url).toBe(
-      'http://localhost:8000/chats/7/distill/progress?token=jwt-token'
+      'http://localhost:8000/feeds/7/distill/progress?token=jwt-token'
     )
   })
 })
@@ -129,7 +129,7 @@ describe('pipelineApi — verify', () => {
     const body = await getVerifySamples('jwt-token', '7')
 
     expect(body.attempt).toBe(1)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/verify/samples', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/verify/samples', {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -142,7 +142,7 @@ describe('pipelineApi — verify', () => {
     const body = await submitVerify('jwt-token', '7', verdicts)
 
     expect(body.passed).toBe(true)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/chats/7/verify', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/verify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

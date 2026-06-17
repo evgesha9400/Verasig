@@ -93,9 +93,9 @@ def test_verify_samples_and_submit_verdicts(client, app):
     token, user_id = _register(client)
     _seed(app, user_id)
 
-    samples = client.get("/chats/7/verify/samples", headers=_auth(token))
+    samples = client.get("/feeds/7/verify/samples", headers=_auth(token))
     mixed = client.post(
-        "/chats/7/verify",
+        "/feeds/7/verify",
         headers=_auth(token),
         json={
             "verdicts": [
@@ -105,7 +105,7 @@ def test_verify_samples_and_submit_verdicts(client, app):
         },
     )
     passed = client.post(
-        "/chats/7/verify",
+        "/feeds/7/verify",
         headers=_auth(token),
         json={
             "verdicts": [
@@ -126,7 +126,7 @@ def test_verify_rejects_too_few_verdicts(client, app):
     _seed(app, user_id)
 
     response = client.post(
-        "/chats/7/verify",
+        "/feeds/7/verify",
         headers=_auth(token),
         json={
             "verdicts": [
@@ -145,9 +145,9 @@ def test_verify_routes_mask_foreign_user(client, app):
     _seed(app, owner_id)
 
     responses = [
-        client.get("/chats/7/verify/samples", headers=_auth(other)),
+        client.get("/feeds/7/verify/samples", headers=_auth(other)),
         client.post(
-            "/chats/7/verify",
+            "/feeds/7/verify",
             headers=_auth(other),
             json={
                 "verdicts": [

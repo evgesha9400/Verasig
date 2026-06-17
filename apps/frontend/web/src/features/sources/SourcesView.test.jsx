@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SourcesView } from './SourcesView.jsx'
 
-const chats = [
+const feeds = [
   { id: 'feed-1', status: 'analyzed' },
   { id: 'feed-2', status: 'backfilled' }
 ]
@@ -16,7 +16,7 @@ describe('SourcesView', () => {
     render(
       <SourcesView
         telegramConnected
-        chats={chats}
+        feeds={feeds}
         onConnectTelegram={() => {}}
         onOpenTelegram={onOpenTelegram}
       />
