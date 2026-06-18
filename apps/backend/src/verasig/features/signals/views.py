@@ -9,6 +9,11 @@ from verasig.domain.label import LabelKind
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
+from verasig.features.feeds import (
+    deletion_repository,
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
     event_repository,
@@ -18,11 +23,6 @@ from verasig.features.signals import (
 from verasig.features.signals.fold import fold
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
-    deletion_repository,
-    message_repository,
-)
-from verasig.features.sources import subscription_repository as user_channel_repository
 from verasig.shared.time import format_short, format_time
 
 OBSERVER_SIGNAL_LIMIT = 200
@@ -77,8 +77,8 @@ def link_modifier(
 def _project_user_signals(
     session: Session, user_id: UUID, feed_id: str | None
 ) -> tuple[list[dict], list[dict]]:
-    subscriptions = user_channel_repository.read_subscriptions(session, user_id)
-    channel_ids = [subscription.channel_id for subscription in subscriptions]
+    feeds = feed_repository.read_feeds(session, user_id)
+    channel_ids = [feed.external_id for feed in feeds]
     if feed_id is not None:
         channel_ids = [
             channel_id for channel_id in channel_ids if str(channel_id) == feed_id
@@ -98,11 +98,11 @@ def _project_user_signals(
 def _project_channel(
     session: Session, user_id: UUID, channel_id: int, result
 ) -> tuple[list[dict], list[dict]]:
-    messages = message_repository.read_messages(session, channel_id)
-    events = event_repository.read_signal_events(session, channel_id)
+    messages = message_repository.read_messages(session, user_id, channel_id)
+    events = event_repository.read_signal_events(session, user_id, channel_id)
     signals = outcome_repository.read_extracted_signals(session, channel_id, user_id)
     manual_links = {
-        link.message_id: link.root_signal_id
+        link.external_message_id: link.root_signal_id
         for link in lifecycle_link_repository.read_links(session, user_id, channel_id)
     }
     folded = fold(signals, events, messages, manual_links=manual_links)
@@ -114,7 +114,7 @@ def _project_channel(
         if signal.event_id in event_message_ids
     }
     outcome_by_signal_id = _outcomes_by_signal_id(result)
-    deleted_message_ids = _deleted_message_ids(session, channel_id)
+    deleted_message_ids = _deleted_message_ids(session, user_id, channel_id)
     rows = [
         _signal_row(
             item,
@@ -292,10 +292,12 @@ def _outcomes_by_signal_id(result) -> dict[str, dict]:
     return {outcome["rootSignalId"]: outcome for outcome in result.outcomes}
 
 
-def _deleted_message_ids(session: Session, channel_id: int) -> set[int]:
+def _deleted_message_ids(session: Session, user_id: UUID, channel_id: int) -> set[int]:
     return {
         evidence.message_id
-        for evidence in deletion_repository.read_deletion_evidence(session, channel_id)
+        for evidence in deletion_repository.read_deletion_evidence(
+            session, user_id, channel_id
+        )
         if evidence.confidence.value == "CONFIRMED" and evidence.was_signal_candidate
     }
 

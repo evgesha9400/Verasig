@@ -15,7 +15,7 @@ const backendUser = {
   pendingEmail: null,
   cancelAt: null
 }
-const backendChat = {
+const backendFeed = {
   id: '7',
   name: 'Pilot Signals',
   tag: '@pilot',
@@ -92,11 +92,11 @@ function installFetch(routes = {}) {
 
 function sourceRoutes({
   telegram = { connected: false, phone: null },
-  chats = []
+  feeds = []
 } = {}) {
   return {
     'GET /telegram/status': () => jsonResponse(telegram),
-    'GET /chats': () => jsonResponse({ chats })
+    'GET /feeds': () => jsonResponse({ feeds })
   }
 }
 
@@ -238,14 +238,14 @@ describe('AppRoutes', () => {
     expect(screen.getByText('ada@example.com')).toBeTruthy()
   })
 
-  it('hydrates Telegram status and chats from the backend after session reload', async () => {
+  it('hydrates Telegram status and feeds from the backend after session reload', async () => {
     const user = userEvent.setup()
     localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
     installFetch({
       'GET /auth/me': () => jsonResponse(backendUser),
       ...sourceRoutes({
         telegram: { connected: true, phone: '+44 •••• 8821' },
-        chats: [backendChat]
+        feeds: [backendFeed]
       })
     })
 

@@ -11,6 +11,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fakes import FakeExtractor
+from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
@@ -19,13 +20,13 @@ from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import Side, TradeIntent
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import drift_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.extract_service import ExtractService
-from verasig.features.sources import (
-    channel_repository,
-    message_repository,
-)
 
 _LONG_RULE = ParserRule(
     rule_id="r1",
@@ -65,8 +66,10 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 created_at=_instant(),
             ),
         )
-        channel_repository.upsert_channel(
+        insert_source(session, _USER_ID)
+        feed_repository.create_feed(
             session,
+            _USER_ID,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -74,9 +77,11 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 is_private=False,
                 first_seen_at=_instant(),
             ),
+            _instant(),
         )
         message_repository.insert_messages(
             session,
+            _USER_ID,
             [
                 RawTelegramMessage(
                     channel_id=7,
@@ -89,7 +94,7 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
                 )
             ],
         )
-        event_repository.insert_signal_events(session, [event])
+        event_repository.insert_signal_events(session, _USER_ID, [event])
         session.commit()
     return event
 

@@ -2,19 +2,19 @@ import json
 from datetime import datetime, timezone
 
 from fakes import FakeDistiller
+from seed import insert_source
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
-from verasig.features.rules import repository as rule_repository
-from verasig.features.signals import event_repository
-from verasig.features.sources import (
-    channel_repository,
+from verasig.features.feeds import (
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
+from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
 
 SECRET = "s" * 32
 
@@ -43,8 +43,10 @@ def _instant(day: int) -> datetime:
 
 def _seed_chat(app, user_id, signal_count: int) -> None:
     with app.state.session_factory() as session:
-        channel_repository.upsert_channel(
+        insert_source(session, user_id)
+        feed_repository.create_feed(
             session,
+            user_id,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -52,6 +54,7 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
                 is_private=False,
                 first_seen_at=_instant(1),
             ),
+            _instant(1),
         )
         messages = [
             RawTelegramMessage(
@@ -65,9 +68,10 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
             )
             for idx in range(1, signal_count + 1)
         ]
-        message_repository.insert_messages(session, messages)
+        message_repository.insert_messages(session, user_id, messages)
         event_repository.insert_signal_events(
             session,
+            user_id,
             [
                 RawSignalEvent(
                     channel_id=7,
@@ -90,7 +94,6 @@ def _seed_chat(app, user_id, signal_count: int) -> None:
                 for message in messages
             ],
         )
-        user_channel_repository.subscribe(session, user_id, 7, _instant(1))
         session.commit()
 
 
@@ -110,7 +113,7 @@ def test_distill_requires_five_signal_labels(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id, signal_count=4)
 
-    response = client.post("/chats/7/distill", headers=_auth(token))
+    response = client.post("/feeds/7/distill", headers=_auth(token))
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "LABELS_INSUFFICIENT"
@@ -121,12 +124,12 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
     _seed_chat(app, user_id, signal_count=5)
     app.state.distiller_factory = lambda: FakeDistiller(_distiller_stdout())
 
-    started = client.post("/chats/7/distill", headers=_auth(token))
+    started = client.post("/feeds/7/distill", headers=_auth(token))
     with client.stream(
-        "GET", "/chats/7/distill/progress", headers=_auth(token)
+        "GET", "/feeds/7/distill/progress", headers=_auth(token)
     ) as response:
         body = "".join(response.iter_text())
-    rules = client.get("/chats/7/rules", headers=_auth(token))
+    rules = client.get("/feeds/7/rules", headers=_auth(token))
 
     assert started.status_code == 202
     assert "Compiling filter ruleset" in body
@@ -146,7 +149,7 @@ def test_distill_progress_reports_missing_job_as_404(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id, signal_count=5)
 
-    response = client.get("/chats/7/distill/progress", headers=_auth(token))
+    response = client.get("/feeds/7/distill/progress", headers=_auth(token))
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "JOB_NOT_FOUND"

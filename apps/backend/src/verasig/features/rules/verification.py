@@ -8,21 +8,16 @@ from sqlalchemy.orm import Session
 from verasig.domain.drift import FilterDriftWarning, MissDiscoveredBy
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel, LabelKind
-from verasig.features.rules import drift_repository
-from verasig.features.rules import repository as rule_repository
-from verasig.features.rules.repository import upsert_labels
-from verasig.features.sources.candidate_filter import apply_filter_rule
-from verasig.features.sources.message_views import (
+from verasig.features.feeds import feed_repository
+from verasig.features.feeds.candidate_filter import apply_filter_rule
+from verasig.features.feeds.message_views import (
     project_message,
     read_replies_by_message_id,
 )
-from verasig.features.sources.subscription_repository import (
-    bump_verify_attempt,
-    read_subscription,
-    set_status,
-)
+from verasig.features.rules import drift_repository
+from verasig.features.rules import repository as rule_repository
+from verasig.features.rules.repository import upsert_labels
 from verasig.storage.models import (
-    ChannelRow,
     GoldenLabelRow,
     RawMessageRow,
     RawSignalEventRow,
@@ -50,15 +45,17 @@ type VerdictInput = dict[str, str]
 
 def verification_samples(session: Session, user_id: UUID, channel_id: int) -> dict:
     rows = _sample_rows(session, user_id, channel_id)
-    channel = session.get(ChannelRow, channel_id)
-    replies = read_replies_by_message_id(session, channel_id, rows)
+    channel = feed_repository.read_feed(session, user_id, channel_id)
+    replies = read_replies_by_message_id(session, user_id, channel_id, rows)
     rules = rule_repository.read_filter_rules(session, channel_id, user_id)
-    subscription = read_subscription(session, user_id, channel_id)
+    subscription = feed_repository.read_feed(session, user_id, channel_id)
     return {
         "attempt": subscription.verify_attempt if subscription else 1,
         "samples": [
             {
-                **project_message(row, channel, replies.get(row.reply_to_message_id)),
+                **project_message(
+                    row, channel, replies.get(row.reply_to_external_message_id)
+                ),
                 "predicted": predict_sample(rules, row).value,
             }
             for row in rows
@@ -71,7 +68,7 @@ def apply_verdicts(
 ) -> tuple[bool, list[str]]:
     if len(verdicts) < MIN_VERDICTS:
         raise TooFewVerdictsError
-    rows = _rows_by_message_id(session, channel_id, _message_ids(verdicts))
+    rows = _rows_by_message_id(session, user_id, channel_id, _message_ids(verdicts))
     rules = rule_repository.read_filter_rules(session, channel_id, user_id)
     labels = flip_wrong_predictions_into_labels(
         user_id, channel_id, verdicts, rows, rules
@@ -89,10 +86,10 @@ def apply_verdicts(
     )
     passed, misclassified = decide_pass(verdicts)
     if passed:
-        set_status(session, user_id, channel_id, "verified")
+        feed_repository.set_status(session, user_id, channel_id, "verified")
         return True, []
     if misclassified:
-        bump_verify_attempt(session, user_id, channel_id)
+        feed_repository.bump_verify_attempt(session, user_id, channel_id)
     return False, misclassified
 
 
@@ -100,10 +97,10 @@ def _sample_rows(
     session: Session, user_id: UUID, channel_id: int, limit: int = 20
 ) -> list[RawMessageRow]:
     labeled = (
-        select(GoldenLabelRow.message_id)
+        select(GoldenLabelRow.external_message_id)
         .where(
             GoldenLabelRow.user_id == user_id,
-            GoldenLabelRow.channel_id == channel_id,
+            GoldenLabelRow.external_id == channel_id,
         )
         .subquery()
     )
@@ -112,14 +109,21 @@ def _sample_rows(
             select(RawMessageRow)
             .join(
                 RawSignalEventRow,
-                (RawSignalEventRow.channel_id == RawMessageRow.channel_id)
-                & (RawSignalEventRow.message_id == RawMessageRow.message_id),
+                (RawSignalEventRow.user_id == RawMessageRow.user_id)
+                & (RawSignalEventRow.external_id == RawMessageRow.external_id)
+                & (
+                    RawSignalEventRow.external_message_id
+                    == RawMessageRow.external_message_id
+                ),
             )
             .where(
-                RawMessageRow.channel_id == channel_id,
-                RawMessageRow.message_id.not_in(select(labeled.c.message_id)),
+                RawMessageRow.user_id == user_id,
+                RawMessageRow.external_id == channel_id,
+                RawMessageRow.external_message_id.not_in(
+                    select(labeled.c.external_message_id)
+                ),
             )
-            .order_by(RawMessageRow.posted_at, RawMessageRow.message_id)
+            .order_by(RawMessageRow.posted_at, RawMessageRow.external_message_id)
             .limit(limit)
         )
     )
@@ -130,15 +134,16 @@ def _message_ids(verdicts: list[VerdictInput]) -> list[int]:
 
 
 def _rows_by_message_id(
-    session: Session, channel_id: int, message_ids: list[int]
+    session: Session, user_id: UUID, channel_id: int, message_ids: list[int]
 ) -> dict[int, RawMessageRow]:
     rows = session.scalars(
         select(RawMessageRow).where(
-            RawMessageRow.channel_id == channel_id,
-            RawMessageRow.message_id.in_(message_ids),
+            RawMessageRow.user_id == user_id,
+            RawMessageRow.external_id == channel_id,
+            RawMessageRow.external_message_id.in_(message_ids),
         )
     ).all()
-    return {row.message_id: row for row in rows}
+    return {row.external_message_id: row for row in rows}
 
 
 def predict_sample(rules: list[FilterRule], row: RawMessageRow) -> Prediction:
@@ -190,7 +195,9 @@ def emit_drift_for_missed_signals(
     rules: list[FilterRule],
     source_label_ids: dict[int, UUID],
 ) -> None:
-    event_ids = _event_ids_by_message_id(session, channel_id, list(source_label_ids))
+    event_ids = _event_ids_by_message_id(
+        session, user_id, channel_id, list(source_label_ids)
+    )
     warnings = [
         FilterDriftWarning(
             channel_id=channel_id,
@@ -209,12 +216,13 @@ def emit_drift_for_missed_signals(
 
 
 def _event_ids_by_message_id(
-    session: Session, channel_id: int, message_ids: list[int]
+    session: Session, user_id: UUID, channel_id: int, message_ids: list[int]
 ) -> dict[int, UUID]:
     rows = session.execute(
-        select(RawSignalEventRow.message_id, RawSignalEventRow.id).where(
-            RawSignalEventRow.channel_id == channel_id,
-            RawSignalEventRow.message_id.in_(message_ids),
+        select(RawSignalEventRow.external_message_id, RawSignalEventRow.id).where(
+            RawSignalEventRow.user_id == user_id,
+            RawSignalEventRow.external_id == channel_id,
+            RawSignalEventRow.external_message_id.in_(message_ids),
         )
     ).all()
     return {message_id: event_id for message_id, event_id in rows}
@@ -239,10 +247,10 @@ def _label_ids_by_message_id(
 ) -> dict[int, UUID]:
     message_ids = [label.message_id for label in labels]
     rows = session.execute(
-        select(GoldenLabelRow.message_id, GoldenLabelRow.id).where(
+        select(GoldenLabelRow.external_message_id, GoldenLabelRow.id).where(
             GoldenLabelRow.user_id == user_id,
-            GoldenLabelRow.channel_id == channel_id,
-            GoldenLabelRow.message_id.in_(message_ids),
+            GoldenLabelRow.external_id == channel_id,
+            GoldenLabelRow.external_message_id.in_(message_ids),
         )
     ).all()
     return {message_id: label_id for message_id, label_id in rows}

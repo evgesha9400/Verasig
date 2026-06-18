@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listChats } from '../../shared/api/chatsApi.js'
+import { listFeeds } from '../../shared/api/feedsApi.js'
 import { getTelegramStatus } from '../../shared/api/telegramApi.js'
 import { PIPELINE_STEPS } from '../../domain/workflow/pipelineSteps.js'
-import { CHATS } from '../../domain/demo-data/seed.js'
+import { FEEDS } from '../../domain/demo-data/seed.js'
 
-const LS_KEY = 'vrs-proto-state-1'
+const LS_KEY = 'vrs-proto-state-2'
 
 const PIPELINE_SCREEN_BY_SCREEN = {
   backfill: 'backfill',
@@ -27,10 +27,10 @@ function loadState() {
   }
 }
 
-function mergeChatFlags(savedChats) {
-  if (!Array.isArray(savedChats)) return CHATS
-  const seed = Object.fromEntries(CHATS.map((c) => [c.id, c]))
-  return savedChats.map((c) => {
+function mergeFeedFlags(savedFeeds) {
+  if (!Array.isArray(savedFeeds)) return FEEDS
+  const seed = Object.fromEntries(FEEDS.map((c) => [c.id, c]))
+  return savedFeeds.map((c) => {
     const source = seed[c.id]
     return source
       ? { ...c, historyGaps: source.historyGaps, signalDeletion: source.signalDeletion }
@@ -48,14 +48,14 @@ function createToast(title, msg, tone) {
 }
 
 async function readSourceState(authToken) {
-  const [telegram, chats] = await Promise.all([
+  const [telegram, feeds] = await Promise.all([
     getTelegramStatus(authToken),
-    listChats(authToken)
+    listFeeds(authToken)
   ])
 
   return {
     telegram,
-    chats: chats.chats || []
+    feeds: feeds.feeds || []
   }
 }
 
@@ -67,10 +67,10 @@ export function useWorkflowState(authToken) {
   const [telegramConnected, setTelegramConnected] = useState(
     saved ? saved.telegramConnected : false
   )
-  const [chats, setChats] = useState(
-    saved ? mergeChatFlags(saved.chats) : authToken ? [] : CHATS
+  const [feeds, setFeeds] = useState(
+    saved ? mergeFeedFlags(saved.feeds) : authToken ? [] : FEEDS
   )
-  const [activeChatId, setActiveChatId] = useState(saved ? saved.activeChatId : null)
+  const [activeFeedId, setActiveFeedId] = useState(saved ? saved.activeFeedId : null)
   const [verifyAttempt, setVerifyAttempt] = useState(saved ? saved.verifyAttempt : 1)
   const [bybitConnected, setBybitConnected] = useState(
     saved ? saved.bybitConnected : false
@@ -78,6 +78,7 @@ export function useWorkflowState(authToken) {
   const [toast, setToast] = useState(null)
   const [backTarget, setBackTarget] = useState(null)
   const [signalsPreset, setSignalsPreset] = useState(null)
+  const [backfillMode, setBackfillMode] = useState('resume')
 
   const prevNavRef = useRef('sources')
 
@@ -94,8 +95,8 @@ export function useWorkflowState(authToken) {
       JSON.stringify({
         screen,
         telegramConnected,
-        chats,
-        activeChatId,
+        feeds,
+        activeFeedId,
         verifyAttempt,
         bybitConnected
       })
@@ -104,8 +105,8 @@ export function useWorkflowState(authToken) {
     authToken,
     screen,
     telegramConnected,
-    chats,
-    activeChatId,
+    feeds,
+    activeFeedId,
     verifyAttempt,
     bybitConnected
   ])
@@ -115,7 +116,7 @@ export function useWorkflowState(authToken) {
 
     const sourceState = await readSourceState(authToken)
     setTelegramConnected(sourceState.telegram.connected)
-    setChats(mergeChatFlags(sourceState.chats))
+    setFeeds(mergeFeedFlags(sourceState.feeds))
     return sourceState
   }
 
@@ -128,7 +129,7 @@ export function useWorkflowState(authToken) {
       .then((sourceState) => {
         if (!active) return
         setTelegramConnected(sourceState.telegram.connected)
-        setChats(mergeChatFlags(sourceState.chats))
+        setFeeds(mergeFeedFlags(sourceState.feeds))
       })
       .catch((error) => {
         if (!active) return
@@ -144,99 +145,110 @@ export function useWorkflowState(authToken) {
     }
   }, [authToken, fireToast])
 
-  const activeChat = chats.find((chat) => chat.id === activeChatId) || null
+  const activeFeed = feeds.find((feed) => feed.id === activeFeedId) || null
 
   function clearToast() {
     setToast(null)
   }
 
-  function patchChat(id, patch) {
-    setChats((currentChats) =>
-      currentChats.map((chat) => (chat.id === id ? { ...chat, ...patch } : chat))
+  function patchFeed(id, patch) {
+    setFeeds((currentFeeds) =>
+      currentFeeds.map((feed) => (feed.id === id ? { ...feed, ...patch } : feed))
     )
   }
 
-  function upsertChat(chat) {
-    setChats((currentChats) => {
-      const exists = currentChats.some((currentChat) => currentChat.id === chat.id)
+  function upsertFeed(feed) {
+    setFeeds((currentFeeds) => {
+      const exists = currentFeeds.some((currentFeed) => currentFeed.id === feed.id)
       if (exists) {
-        return currentChats.map((currentChat) =>
-          currentChat.id === chat.id ? chat : currentChat
+        return currentFeeds.map((currentFeed) =>
+          currentFeed.id === feed.id ? feed : currentFeed
         )
       }
-      return [...currentChats, chat]
+      return [...currentFeeds, feed]
     })
   }
 
-  function goToDeletedSignals(chat) {
-    setSignalsPreset({ source: 'all', feed: chat.id, tab: 'deleted', _t: Date.now() })
+  function goToDeletedSignals(feed) {
+    setSignalsPreset({ source: 'all', feed: feed.id, tab: 'deleted', _t: Date.now() })
     setNav('signals')
   }
 
-  function startBackfill(chat) {
-    setActiveChatId(chat.id)
-    patchChat(chat.id, { status: 'backfilling' })
+  function startBackfill(feed) {
+    setBackfillMode('resume')
+    setActiveFeedId(feed.id)
+    patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
   }
 
-  function retryBackfill(chat) {
-    setActiveChatId(chat.id)
-    patchChat(chat.id, { status: 'backfilling' })
+  function retryBackfill(feed) {
+    setBackfillMode('resume')
+    setActiveFeedId(feed.id)
+    patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
   }
 
-  function resumeChat(chat) {
-    setActiveChatId(chat.id)
-    if (chat.status === 'analyzed') setScreen('backtest-result')
-    else if (chat.status === 'backfilled') setScreen('label')
+  function resumeFeed(feed) {
+    setActiveFeedId(feed.id)
+    if (feed.status === 'analyzed') setScreen('backtest-result')
+    else if (feed.status === 'backfilled') setScreen('label')
     else setScreen('label')
   }
 
-  function reanalyze(chat) {
-    setActiveChatId(chat.id)
-    patchChat(chat.id, { status: 'backfilling' })
+  function fetchNewSignals(feed) {
+    setBackfillMode('refresh')
+    setActiveFeedId(feed.id)
+    patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
-    fireToast('info', 'Re-backfilling', `Fetching new signals from ${chat.name}.`)
+    fireToast('info', 'Fetching new signals', `Pulling new messages from ${feed.name}.`)
   }
 
-  function restartChat(chat) {
-    patchChat(chat.id, {
-      status: 'new',
-      fetched: 0,
-      lastDate: null,
-      score: null,
-      winRate: null,
-      pnl: null
-    })
-    fireToast('rejected', 'Feed reset', `${chat.name} backfill and labels deleted.`)
+  function refetchFullHistory(feed) {
+    setBackfillMode('full')
+    setActiveFeedId(feed.id)
+    patchFeed(feed.id, { status: 'backfilling' })
+    setScreen('backfill')
+    fireToast(
+      'info',
+      'Re-fetching history',
+      `Re-pulling the full history of ${feed.name}.`
+    )
   }
 
-  function checkGaps(chat) {
-    if (chat.signalDeletion) {
+  function removeFeed(id) {
+    setFeeds((currentFeeds) => currentFeeds.filter((feed) => feed.id !== id))
+    if (activeFeedId === id) {
+      setActiveFeedId(null)
+      setScreen('feeds')
+    }
+  }
+
+  function checkGaps(feed) {
+    if (feed.signalDeletion) {
       fireToast(
         'rejected',
         'Signal deletion confirmed',
-        `${chat.name} is missing extracted signals — quality is floored to 0.`
+        `${feed.name} is missing extracted signals — quality is floored to 0.`
       )
-    } else if (chat.historyGaps) {
+    } else if (feed.historyGaps) {
       fireToast(
         'pending',
         'History gaps found',
-        `${chat.name} has breaks in its message-ID sequence — some history may be missing.`
+        `${feed.name} has breaks in its message-ID sequence — some history may be missing.`
       )
     } else {
       fireToast(
         'verified',
         'No gaps found',
-        `${chat.name}'s message history is contiguous — no missing IDs.`
+        `${feed.name}'s message history is contiguous — no missing IDs.`
       )
     }
   }
 
   function stopAfterVerify() {
-    const current = chats.find((chat) => chat.id === activeChatId)
-    patchChat(activeChatId, { status: 'verified', hasRisk: true })
-    setScreen('chats')
+    const current = feeds.find((feed) => feed.id === activeFeedId)
+    patchFeed(activeFeedId, { status: 'verified', hasRisk: true })
+    setScreen('feeds')
     fireToast(
       'verified',
       'Source verified',
@@ -244,32 +256,33 @@ export function useWorkflowState(authToken) {
     )
   }
 
-  function backtestFeed(chat) {
-    setActiveChatId(chat.id)
+  function backtestFeed(feed) {
+    setActiveFeedId(feed.id)
     setScreen('backtest')
   }
 
   function onBackfillComplete(result) {
-    const current = chats.find((chat) => chat.id === activeChatId)
+    const current = feeds.find((feed) => feed.id === activeFeedId)
     const summary =
       typeof result === 'number'
         ? { fetched: result, lastDate: current?.lastDate || null }
         : result || {}
-    patchChat(activeChatId, {
+    patchFeed(activeFeedId, {
       status: 'backfilled',
       fetched: summary.fetched ?? current?.fetched ?? 0,
       lastDate: summary.lastDate ?? current?.lastDate ?? null
     })
+    setBackfillMode('resume')
     setScreen('label')
   }
 
   function onBackfillCancel(count, date) {
-    patchChat(activeChatId, {
+    patchFeed(activeFeedId, {
       status: 'cancelled',
       fetched: count,
       lastDate: date || null
     })
-    setScreen('chats')
+    setScreen('feeds')
     fireToast(
       'pending',
       'Backfill paused',
@@ -279,18 +292,18 @@ export function useWorkflowState(authToken) {
 
   function onBacktestComplete(result) {
     const summary = result || {}
-    patchChat(activeChatId, {
+    patchFeed(activeFeedId, {
       status: 'analyzed',
       score: summary.score,
       winRate: summary.winRate,
       pnl: summary.pnl,
       hasRisk: true
     })
-    setScreen('chats')
+    setScreen('feeds')
     fireToast(
       'verified',
       'Source verified',
-      `${activeChat?.name || 'Feed'} scored ${summary.score}/100 and is ready to go live.`
+      `${activeFeed?.name || 'Feed'} scored ${summary.score}/100 and is ready to go live.`
     )
   }
 
@@ -332,8 +345,8 @@ export function useWorkflowState(authToken) {
     }
   }
 
-  function exitToChats() {
-    setScreen('chats')
+  function exitToFeeds() {
+    setScreen('feeds')
   }
 
   function exitToSources() {
@@ -356,7 +369,7 @@ export function useWorkflowState(authToken) {
 
   function connectTelegram() {
     setTelegramConnected(true)
-    setScreen('chats')
+    setScreen('feeds')
     void refreshSources().catch((error) =>
       fireToast(
         'rejected',
@@ -373,24 +386,26 @@ export function useWorkflowState(authToken) {
     screen,
     setScreen,
     telegramConnected,
-    chats,
-    activeChatId,
+    feeds,
+    activeFeedId,
     verifyAttempt,
     setVerifyAttempt,
     bybitConnected,
     toast,
     backTarget,
     signalsPreset,
-    activeChat,
+    backfillMode,
+    activeFeed,
     isWorkflow: WORKFLOW_SCREENS.has(screen),
     pipelineStep: PIPELINE_SCREEN_BY_SCREEN[screen] || null,
 
     goToDeletedSignals,
     startBackfill,
     retryBackfill,
-    resumeChat,
-    reanalyze,
-    restartChat,
+    resumeFeed,
+    fetchNewSignals,
+    refetchFullHistory,
+    removeFeed,
     checkGaps,
     stopAfterVerify,
     backtestFeed,
@@ -404,14 +419,14 @@ export function useWorkflowState(authToken) {
     openSettings,
     restoreNav,
     handleNav,
-    exitToChats,
+    exitToFeeds,
     exitToSources,
     connectBybit,
     disconnectBybit,
     connectTelegram,
     refreshSources,
-    upsertChat,
-    setActiveChatId,
+    upsertFeed,
+    setActiveFeedId,
     setBackTarget
   }
 }

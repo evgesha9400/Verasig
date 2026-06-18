@@ -12,12 +12,12 @@ from verasig.features.rules.repository import (
 )
 from verasig.features.rules.schemas import JobOut
 from verasig.features.rules.views import present_rules
-from verasig.foundation.http.auth_dependencies import require_user_channel
+from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
 from verasig.foundation.http.sse import sse_stream
 from verasig.foundation.jobs.registry import JobAlreadyRunningError
 
-router = APIRouter(prefix="/chats/{chat_id}")
+router = APIRouter(prefix="/feeds/{external_id}")
 
 DISTILL_PHASES = (
     "Reading your labelled signals",
@@ -96,20 +96,20 @@ async def _run_distill(
 @router.post("/distill", status_code=status.HTTP_202_ACCEPTED)
 async def start_distill(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ) -> JobOut:
     with request.app.state.session_factory() as session:
-        if _signal_label_count(session, subscription.user_id, int(chat_id)) < 5:
+        if _signal_label_count(session, subscription.user_id, int(external_id)) < 5:
             raise ApiError(409, "LABELS_INSUFFICIENT", "Need at least 5 signal labels")
-    key = _job_key(subscription.user_id, int(chat_id))
+    key = _job_key(subscription.user_id, int(external_id))
     try:
         request.app.state.jobs.start(
             key,
             lambda publisher: _run_distill(
                 publisher,
                 subscription.user_id,
-                int(chat_id),
+                int(external_id),
                 request.app.state.session_factory,
                 request.app.state.distiller_factory,
             ),
@@ -122,10 +122,10 @@ async def start_distill(
 @router.get("/distill/progress")
 def distill_progress(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ):
-    key = _job_key(subscription.user_id, int(chat_id))
+    key = _job_key(subscription.user_id, int(external_id))
     if not request.app.state.jobs.has_job(key):
         raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
     return sse_stream(request.app.state.jobs, key)
@@ -134,8 +134,8 @@ def distill_progress(
 @router.get("/rules")
 def rules(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ) -> dict:
     with request.app.state.session_factory() as session:
-        return {"rules": present_rules(session, subscription.user_id, int(chat_id))}
+        return {"rules": present_rules(session, subscription.user_id, int(external_id))}

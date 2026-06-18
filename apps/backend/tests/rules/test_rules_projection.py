@@ -1,18 +1,20 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
-from verasig.features.rules import repository as rule_repository
-from verasig.features.rules.views import present_rules
-from verasig.features.sources import (
-    channel_repository,
+from verasig.features.feeds import (
+    feed_repository,
     message_repository,
 )
+from verasig.features.rules import repository as rule_repository
+from verasig.features.rules.views import present_rules
 
 
 def _instant() -> datetime:
@@ -34,8 +36,10 @@ def test_present_rules_projects_display_and_signal_match(db_session):
             created_at=_instant(),
         ),
     )
-    channel_repository.upsert_channel(
+    insert_source(db_session, account.id)
+    feed_repository.create_feed(
         db_session,
+        account.id,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -43,9 +47,11 @@ def test_present_rules_projects_display_and_signal_match(db_session):
             is_private=False,
             first_seen_at=_instant(),
         ),
+        _instant(),
     )
     message_repository.insert_messages(
         db_session,
+        account.id,
         [
             RawTelegramMessage(
                 channel_id=7,

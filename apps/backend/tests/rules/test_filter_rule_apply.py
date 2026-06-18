@@ -1,5 +1,5 @@
 from verasig.domain.filter_rule import FilterRule
-from verasig.features.sources.candidate_filter import apply_filter_rule
+from verasig.features.feeds.candidate_filter import apply_filter_rule
 
 
 def test_include_pattern_match_is_a_candidate():

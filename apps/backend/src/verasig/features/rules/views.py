@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import LabelKind
+from verasig.features.feeds.candidate_filter import apply_filter_rule
 from verasig.features.rules.repository import read_filter_rules
-from verasig.features.sources.candidate_filter import apply_filter_rule
 from verasig.storage.models import GoldenLabelRow, RawMessageRow
 
 
@@ -25,12 +25,13 @@ def _signal_label_texts(session: Session, user_id: UUID, channel_id: int) -> lis
         select(RawMessageRow.text)
         .join(
             GoldenLabelRow,
-            (GoldenLabelRow.channel_id == RawMessageRow.channel_id)
-            & (GoldenLabelRow.message_id == RawMessageRow.message_id),
+            (GoldenLabelRow.user_id == RawMessageRow.user_id)
+            & (GoldenLabelRow.external_id == RawMessageRow.external_id)
+            & (GoldenLabelRow.external_message_id == RawMessageRow.external_message_id),
         )
         .where(
             GoldenLabelRow.user_id == user_id,
-            GoldenLabelRow.channel_id == channel_id,
+            GoldenLabelRow.external_id == channel_id,
             GoldenLabelRow.label == LabelKind.SIGNAL.value,
         )
     ).all()

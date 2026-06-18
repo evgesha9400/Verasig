@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from verasig.domain.deletion import DeletionConfidence, DeletionMethod
 from verasig.domain.message import RawTelegramMessage
-from verasig.features.sources.deletion_diff import detect_deletions
+from verasig.features.feeds.deletion_diff import detect_deletions
 
 _DETECTED_AT = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
 

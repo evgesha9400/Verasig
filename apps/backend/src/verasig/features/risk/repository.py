@@ -4,10 +4,10 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from verasig.domain.risk_config import EntryMode, ExitSource, RiskConfig, Weighting
-from verasig.storage.models import ChatRiskConfigRow
+from verasig.storage.models import FeedRiskConfigRow
 
 
-def _to_config(row: ChatRiskConfigRow) -> RiskConfig:
+def _to_config(row: FeedRiskConfigRow) -> RiskConfig:
     return RiskConfig(
         entry_mode=EntryMode(row.entry_mode),
         levels=row.levels,
@@ -27,9 +27,9 @@ def upsert_risk_config(
     config: RiskConfig,
     updated_at: datetime,
 ) -> RiskConfig:
-    row = session.get(ChatRiskConfigRow, (user_id, channel_id))
+    row = session.get(FeedRiskConfigRow, (user_id, channel_id))
     if row is None:
-        row = ChatRiskConfigRow(user_id=user_id, channel_id=channel_id)
+        row = FeedRiskConfigRow(user_id=user_id, external_id=channel_id)
         session.add(row)
     row.entry_mode = config.entry_mode.value
     row.levels = config.levels
@@ -47,5 +47,5 @@ def upsert_risk_config(
 def read_risk_config(
     session: Session, user_id: UUID, channel_id: int
 ) -> RiskConfig | None:
-    row = session.get(ChatRiskConfigRow, (user_id, channel_id))
+    row = session.get(FeedRiskConfigRow, (user_id, channel_id))
     return _to_config(row) if row else None

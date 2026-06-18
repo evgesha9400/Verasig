@@ -13,12 +13,12 @@ from verasig.features.simulation.backtesting import (
     simulate_outcomes,
 )
 from verasig.features.simulation.schemas import done_out
-from verasig.foundation.http.auth_dependencies import require_user_channel
+from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
 from verasig.foundation.http.sse import sse_stream
 from verasig.foundation.jobs.registry import JobAlreadyRunningError
 
-router = APIRouter(prefix="/chats/{chat_id}")
+router = APIRouter(prefix="/feeds/{external_id}")
 
 BACKTEST_PHASES = (
     "Replaying historical signals",
@@ -60,10 +60,10 @@ def _risk_config(session_factory, user_id: UUID, channel_id: int) -> RiskConfig:
 @router.post("/backtest", status_code=status.HTTP_202_ACCEPTED)
 async def start_backtest(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ) -> JobOut:
-    key = _job_key(subscription.user_id, int(chat_id))
+    key = _job_key(subscription.user_id, int(external_id))
     try:
         request.app.state.jobs.start(
             key,
@@ -71,7 +71,7 @@ async def start_backtest(
                 publisher,
                 request.app.state.session_factory,
                 subscription.user_id,
-                int(chat_id),
+                int(external_id),
                 request.app.state.market_data_factory,
                 datetime.now(tz=UTC),
             ),
@@ -84,10 +84,10 @@ async def start_backtest(
 @router.get("/backtest/progress")
 def backtest_progress(
     request: Request,
-    chat_id: str,
-    subscription=Depends(require_user_channel),
+    external_id: str,
+    subscription=Depends(require_feed),
 ):
-    key = _job_key(subscription.user_id, int(chat_id))
+    key = _job_key(subscription.user_id, int(external_id))
     if not request.app.state.jobs.has_job(key):
         raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
     return sse_stream(request.app.state.jobs, key)

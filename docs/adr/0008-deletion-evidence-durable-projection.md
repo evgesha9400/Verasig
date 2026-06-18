@@ -22,3 +22,17 @@ We did this because raw capture is **insert-only** (`raw_telegram_message` is ap
 - **Gated orchestration:** `services/deletion/rescan.py` re-fetches the live id set, runs the pure diff, and persists, mirroring `backfill.py`. It **aborts on an empty/failed live re-fetch** so an inaccessible channel is never misread as a mass deletion.
 - **Surface:** gated `verasig rescan <ref>` (re-fetch + detect + store) + offline `verasig deletions <ref>` (read stored evidence: signal-`CONFIRMED` with text + a per-channel `SUSPECTED` count; chatter hidden). Mirrors the established gated-writer (`backfill`) vs offline-reader (`stats`/`lifecycle`) split.
 - **Boundary:** only signal-candidate confirmed deletions are scored; chatter is audit-only; `SUSPECTED` is per-channel display.
+
+## Amendment — durability is now scoped to a feed's lifetime
+
+The user-owned [Source→Feed model](0012-user-owned-generic-source-feed-model.md) makes
+`DeletedSignalEvidence` `user_id`-scoped (`UNIQUE(user_id, external_id, external_message_id)`)
+and roots it at `feed(user_id, external_id)` with `ON DELETE CASCADE`. So "durable,
+non-recomputable" now means **durable for as long as the feed exists**: deleting a feed (or
+the source above it) purges its deletion evidence together with the capture it described.
+This is deliberate — the evidence is proof *about a specific captured history*, and a re-add
+starts that history over from a NULL cursor, so stale evidence from a prior capture must not
+survive. Re-adding a feed and rescanning rebuilds evidence from the live channel. The
+"third storage class" claim stands **within** a feed's lifetime; it is not retained across a
+delete/re-add. (The cross-feed-delete `SUSPECTED`/`CONFIRMED` upgrade guarantees in the
+original decision still hold for evidence that is never orphaned by a delete.)

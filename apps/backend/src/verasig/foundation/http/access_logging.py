@@ -1,8 +1,30 @@
 import logging
 
 UVICORN_ACCESS_LOGGER_NAME = "uvicorn.access"
+APP_LOGGER_NAME = "verasig"
+_APP_HANDLER_NAME = "verasig_app_handler"
 HEALTH_PATH = "/health"
 _FULL_PATH_ARG_INDEX = 2
+
+
+def configure_app_logging(level: int = logging.INFO) -> None:
+    """Emit `verasig.*` logs at INFO on their own stream handler (idempotent).
+
+    Uvicorn only configures its own loggers, leaving the root at WARNING, so
+    application INFO logs are otherwise swallowed. Attach a dedicated handler
+    once and stop propagation to avoid duplicate lines via the root logger.
+    """
+    logger = logging.getLogger(APP_LOGGER_NAME)
+    logger.setLevel(level)
+    if any(handler.name == _APP_HANDLER_NAME for handler in logger.handlers):
+        return
+    handler = logging.StreamHandler()
+    handler.set_name(_APP_HANDLER_NAME)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    logger.addHandler(handler)
+    logger.propagate = False
 
 
 def _record_request_path(record: logging.LogRecord) -> str | None:

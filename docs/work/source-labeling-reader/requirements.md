@@ -8,8 +8,8 @@
 - V1 supports Bybit as the first Destination.
 - Discord is shown as Coming soon.
 - Binance is shown as Coming soon.
-- Frontend copy may say chat where Telegram users expect it.
-- Domain language remains `TelegramChannel`.
+- A connected Signal Source is a `Source`; the streams a user follows through it are `Feed`s (the `/feeds` API + UI term). "chat" is retired.
+- In-code domain language remains `TelegramChannel`; it is persisted as a user-owned `feed` row. See [CONTEXT.md](../../context/CONTEXT.md) and [ADR 0012](../../adr/0012-user-owned-generic-source-feed-model.md).
 
 ## User Stories
 

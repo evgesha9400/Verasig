@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
@@ -9,15 +11,14 @@ from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.views import present_signals
 from verasig.features.simulation import repository as backtest_repository
-from verasig.features.sources import (
-    channel_repository,
-    message_repository,
-)
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _USER_ID = UUID("60000000-0000-0000-0000-000000000001")
@@ -60,8 +61,10 @@ def _seed(session) -> None:
             created_at=_BASE,
         ),
     )
-    channel_repository.upsert_channel(
+    insert_source(session, _USER_ID)
+    feed_repository.create_feed(
         session,
+        _USER_ID,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -69,16 +72,18 @@ def _seed(session) -> None:
             is_private=False,
             first_seen_at=_BASE,
         ),
+        _BASE,
     )
     message_repository.insert_messages(
         session,
+        _USER_ID,
         [
             _message(1, "BTC long entry", None),
             _message(2, "move SL to BE", 1),
             _message(3, "close BTC at 110", None),
         ],
     )
-    event_repository.insert_signal_events(session, [_event()])
+    event_repository.insert_signal_events(session, _USER_ID, [_event()])
     outcome_repository.insert_extracted_signals(session, [_signal()], _USER_ID)
     rule_repository.upsert_labels(
         session,
@@ -106,8 +111,7 @@ def _seed(session) -> None:
         ],
         _BASE,
     )
-    user_channel_repository.subscribe(session, _USER_ID, 7, _BASE)
-    user_channel_repository.set_status(session, _USER_ID, 7, "analyzed")
+    feed_repository.set_status(session, _USER_ID, 7, "analyzed")
     session.commit()
 
 

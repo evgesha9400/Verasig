@@ -24,8 +24,7 @@ def migrated_engine(pg_url):
 
 _ALL_TABLES = ", ".join(
     [
-        "raw_telegram_message",
-        "telegram_channel",
+        "raw_message",
         "raw_signal_event",
         "extracted_signal",
         "unrecognized_signal",
@@ -36,11 +35,11 @@ _ALL_TABLES = ", ".join(
         "parser_drift_warning",
         "deleted_signal_evidence",
         "user_account",
-        "user_telegram_link",
-        "user_channel",
+        "source",
+        "feed",
         "backfill_job_run",
         "user_exchange_connection",
-        "chat_risk_config",
+        "feed_risk_config",
         "backtest_result",
         "lifecycle_link",
     ]

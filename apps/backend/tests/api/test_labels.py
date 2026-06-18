@@ -1,15 +1,16 @@
 from datetime import datetime, timezone
 
+from seed import insert_source
+
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
-from verasig.features.signals import event_repository
-from verasig.features.sources import (
-    channel_repository,
+from verasig.features.feeds import (
+    feed_repository,
     message_repository,
 )
-from verasig.features.sources import subscription_repository as user_channel_repository
+from verasig.features.signals import event_repository
 
 SECRET = "s" * 32
 
@@ -39,8 +40,10 @@ def _instant(day: int) -> datetime:
 
 def _seed_chat(app, user_id: str) -> None:
     with app.state.session_factory() as session:
-        channel_repository.upsert_channel(
+        insert_source(session, user_id)
+        feed_repository.create_feed(
             session,
+            user_id,
             TelegramChannel(
                 channel_id=7,
                 handle="pilot",
@@ -48,9 +51,11 @@ def _seed_chat(app, user_id: str) -> None:
                 is_private=False,
                 first_seen_at=_instant(1),
             ),
+            _instant(1),
         )
         message_repository.insert_messages(
             session,
+            user_id,
             [
                 RawTelegramMessage(
                     channel_id=7,
@@ -74,6 +79,7 @@ def _seed_chat(app, user_id: str) -> None:
         )
         event_repository.insert_signal_events(
             session,
+            user_id,
             [
                 RawSignalEvent(
                     channel_id=7,
@@ -89,7 +95,6 @@ def _seed_chat(app, user_id: str) -> None:
                 ),
             ],
         )
-        user_channel_repository.subscribe(session, user_id, 7, _instant(1))
         session.commit()
 
 
@@ -97,18 +102,18 @@ def test_messages_label_and_counts(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id)
 
-    sample = client.get("/chats/7/messages", headers=_auth(token))
+    sample = client.get("/feeds/7/messages", headers=_auth(token))
     first_label = client.post(
-        "/chats/7/messages/1/label",
+        "/feeds/7/messages/1/label",
         headers=_auth(token),
         json={"label": "signal"},
     )
     relabel = client.post(
-        "/chats/7/messages/1/label",
+        "/feeds/7/messages/1/label",
         headers=_auth(token),
         json={"label": "noise"},
     )
-    counts = client.get("/chats/7/labels", headers=_auth(token))
+    counts = client.get("/feeds/7/labels", headers=_auth(token))
 
     assert sample.status_code == 200
     assert [message["id"] for message in sample.json()["messages"]] == ["1", "2"]
@@ -128,7 +133,7 @@ def test_label_rejects_unknown_value(client, app):
     _seed_chat(app, user_id)
 
     response = client.post(
-        "/chats/7/messages/1/label",
+        "/feeds/7/messages/1/label",
         headers=_auth(token),
         json={"label": "maybe"},
     )
@@ -142,17 +147,17 @@ def test_label_routes_mask_foreign_user(client, app):
     _seed_chat(app, owner_id)
 
     responses = [
-        client.get("/chats/7/messages", headers=_auth(other)),
+        client.get("/feeds/7/messages", headers=_auth(other)),
         client.post(
-            "/chats/7/messages/1/label",
+            "/feeds/7/messages/1/label",
             headers=_auth(other),
             json={"label": "signal"},
         ),
-        client.get("/chats/7/labels", headers=_auth(other)),
+        client.get("/feeds/7/labels", headers=_auth(other)),
     ]
 
     assert owner
     assert [response.status_code for response in responses] == [404, 404, 404]
     assert {response.json()["error"]["code"] for response in responses} == {
-        "CHAT_NOT_FOUND"
+        "FEED_NOT_FOUND"
     }

@@ -1,4 +1,8 @@
-"""Rule repository functions."""
+"""Rule repository functions.
+
+Domain rules/labels speak `channel_id`/`message_id`; storage speaks
+`external_id`/`external_message_id` and is user-owned, so reads/writes translate.
+"""
 
 from uuid import UUID
 
@@ -20,7 +24,7 @@ def upsert_filter_rule(session: Session, rule: FilterRule) -> None:
     statement = pg_insert(FilterRuleRow).values(
         rule_id=rule.rule_id,
         user_id=rule.user_id,
-        channel_id=rule.channel_id,
+        external_id=rule.channel_id,
         version=rule.version,
         include_patterns=rule.include_patterns,
         exclude_patterns=rule.exclude_patterns,
@@ -34,7 +38,7 @@ def upsert_filter_rule(session: Session, rule: FilterRule) -> None:
     statement = statement.on_conflict_do_update(
         index_elements=[FilterRuleRow.rule_id],
         set_={
-            "channel_id": statement.excluded.channel_id,
+            "external_id": statement.excluded.external_id,
             "version": statement.excluded.version,
             "include_patterns": statement.excluded.include_patterns,
             "exclude_patterns": statement.excluded.exclude_patterns,
@@ -53,7 +57,7 @@ def read_filter_rules(
 ) -> list[FilterRule]:
     rows = session.scalars(
         select(FilterRuleRow).where(
-            FilterRuleRow.channel_id == channel_id,
+            FilterRuleRow.external_id == channel_id,
             FilterRuleRow.user_id == user_id,
         )
     ).all()
@@ -61,7 +65,7 @@ def read_filter_rules(
         FilterRule(
             rule_id=row.rule_id,
             user_id=row.user_id,
-            channel_id=row.channel_id,
+            channel_id=row.external_id,
             version=row.version,
             include_patterns=row.include_patterns,
             exclude_patterns=row.exclude_patterns,
@@ -81,7 +85,7 @@ def upsert_parser_rules(session: Session, rules: list[ParserRule]) -> None:
         statement = pg_insert(ParserRuleRow).values(
             rule_id=rule.rule_id,
             user_id=rule.user_id,
-            channel_id=rule.channel_id,
+            external_id=rule.channel_id,
             version=rule.version,
             patterns=rule.patterns,
             field_map=rule.field_map,
@@ -93,7 +97,7 @@ def upsert_parser_rules(session: Session, rules: list[ParserRule]) -> None:
         statement = statement.on_conflict_do_update(
             index_elements=[ParserRuleRow.rule_id],
             set_={
-                "channel_id": statement.excluded.channel_id,
+                "external_id": statement.excluded.external_id,
                 "version": statement.excluded.version,
                 "patterns": statement.excluded.patterns,
                 "field_map": statement.excluded.field_map,
@@ -110,7 +114,7 @@ def read_parser_rules(
 ) -> list[ParserRule]:
     rows = session.scalars(
         select(ParserRuleRow).where(
-            ParserRuleRow.channel_id == channel_id,
+            ParserRuleRow.external_id == channel_id,
             ParserRuleRow.user_id == user_id,
         )
     ).all()
@@ -118,7 +122,7 @@ def read_parser_rules(
         ParserRule(
             rule_id=row.rule_id,
             user_id=row.user_id,
-            channel_id=row.channel_id,
+            channel_id=row.external_id,
             version=row.version,
             patterns=row.patterns,
             field_map=row.field_map,
@@ -136,8 +140,8 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
         statement = pg_insert(GoldenLabelRow).values(
             id=label.id,
             user_id=label.user_id,
-            channel_id=label.channel_id,
-            message_id=label.message_id,
+            external_id=label.channel_id,
+            external_message_id=label.message_id,
             label=label.label.value,
             expected=(
                 label.expected.model_dump(mode="json") if label.expected else None
@@ -145,7 +149,7 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
             labeled_at=label.labeled_at,
         )
         statement = statement.on_conflict_do_update(
-            index_elements=["user_id", "channel_id", "message_id"],
+            index_elements=["user_id", "external_id", "external_message_id"],
             set_={
                 "label": statement.excluded.label,
                 "expected": statement.excluded.expected,
@@ -158,7 +162,7 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
 def read_labels(session: Session, channel_id: int, user_id: UUID) -> list[GoldenLabel]:
     rows = session.scalars(
         select(GoldenLabelRow).where(
-            GoldenLabelRow.channel_id == channel_id,
+            GoldenLabelRow.external_id == channel_id,
             GoldenLabelRow.user_id == user_id,
         )
     ).all()
@@ -166,8 +170,8 @@ def read_labels(session: Session, channel_id: int, user_id: UUID) -> list[Golden
         GoldenLabel(
             id=row.id,
             user_id=row.user_id,
-            channel_id=row.channel_id,
-            message_id=row.message_id,
+            channel_id=row.external_id,
+            message_id=row.external_message_id,
             label=row.label,
             expected=row.expected,
             labeled_at=row.labeled_at,

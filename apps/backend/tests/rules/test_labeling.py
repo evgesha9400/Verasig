@@ -1,23 +1,24 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules.labeling import (
     label_counts,
     labeling_sample,
     record_label,
 )
 from verasig.features.signals import event_repository
-from verasig.features.sources import (
-    channel_repository,
-    message_repository,
-)
-from verasig.features.sources import subscription_repository as user_channel_repository
 
 
 def _instant(day: int = 1) -> datetime:
@@ -40,8 +41,10 @@ def _account() -> UserAccount:
 
 def _seed(db_session):
     account = account_repository.insert_account(db_session, _account())
-    channel_repository.upsert_channel(
+    insert_source(db_session, account.id)
+    feed_repository.create_feed(
         db_session,
+        account.id,
         TelegramChannel(
             channel_id=7,
             handle="pilot",
@@ -49,9 +52,11 @@ def _seed(db_session):
             is_private=False,
             first_seen_at=_instant(),
         ),
+        _instant(),
     )
     message_repository.insert_messages(
         db_session,
+        account.id,
         [
             RawTelegramMessage(
                 channel_id=7,
@@ -85,6 +90,7 @@ def _seed(db_session):
     )
     event_repository.insert_signal_events(
         db_session,
+        account.id,
         [
             RawSignalEvent(
                 channel_id=7,
@@ -100,7 +106,6 @@ def _seed(db_session):
             ),
         ],
     )
-    user_channel_repository.subscribe(db_session, account.id, 7, _instant())
     db_session.commit()
     return account
 

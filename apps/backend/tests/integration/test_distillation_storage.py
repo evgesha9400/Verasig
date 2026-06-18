@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.drift import FilterDriftWarning, MissDiscoveredBy
@@ -12,13 +14,13 @@ from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    feed_repository,
+    message_repository,
+)
 from verasig.features.rules import drift_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
-from verasig.features.sources import (
-    channel_repository,
-    message_repository,
-)
 
 
 def _instant() -> datetime:
@@ -49,18 +51,15 @@ def _account() -> UserAccount:
     )
 
 
-def _seed_account(session_factory) -> UUID:
+def _seed_feed_with_messages(session_factory, message_ids: list[int]) -> UUID:
+    """Seed account + feed + messages; return the owning user_id."""
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
-        session.commit()
-        return account.id
-
-
-def _seed_channel_with_messages(session_factory, message_ids: list[int]) -> None:
-    with session_factory() as session:
-        channel_repository.upsert_channel(session, _channel())
+        insert_source(session, account.id)
+        feed_repository.create_feed(session, account.id, _channel(), _instant())
         message_repository.insert_messages(
             session,
+            account.id,
             [
                 RawTelegramMessage(
                     channel_id=7,
@@ -75,6 +74,7 @@ def _seed_channel_with_messages(session_factory, message_ids: list[int]) -> None
             ],
         )
         session.commit()
+    return account.id
 
 
 def _event(message_id: int, **overrides) -> RawSignalEvent:
@@ -89,22 +89,25 @@ def _event(message_id: int, **overrides) -> RawSignalEvent:
 
 
 def test_signal_events_persist_idempotently_and_read_back(session_factory):
-    _seed_channel_with_messages(session_factory, [1, 2, 3])
+    user_id = _seed_feed_with_messages(session_factory, [1, 2, 3])
     with session_factory() as session:
-        first = event_repository.insert_signal_events(session, [_event(1), _event(2)])
+        first = event_repository.insert_signal_events(
+            session, user_id, [_event(1), _event(2)]
+        )
         session.commit()
-        again = event_repository.insert_signal_events(session, [_event(2), _event(3)])
+        again = event_repository.insert_signal_events(
+            session, user_id, [_event(2), _event(3)]
+        )
         session.commit()
     assert (first, again) == (2, 1)  # idempotent on (channel_id, message_id)
     with session_factory() as session:
-        events = event_repository.read_signal_events(session, 7)
+        events = event_repository.read_signal_events(session, user_id, 7)
     assert {e.message_id for e in events} == {1, 2, 3}
     assert all(e.materialized_by is MaterializationPath.SEED_HEURISTIC for e in events)
 
 
 def test_filter_rule_upserts_and_reads_back(session_factory):
-    user_id = _seed_account(session_factory)
-    _seed_channel_with_messages(session_factory, [1])
+    user_id = _seed_feed_with_messages(session_factory, [1])
     rule = FilterRule(
         rule_id="7-filter-v1",
         user_id=user_id,
@@ -122,8 +125,7 @@ def test_filter_rule_upserts_and_reads_back(session_factory):
 
 
 def test_parser_rules_upsert_and_read_back_with_side_aliases(session_factory):
-    user_id = _seed_account(session_factory)
-    _seed_channel_with_messages(session_factory, [1])
+    user_id = _seed_feed_with_messages(session_factory, [1])
     rule = ParserRule(
         rule_id="7-parser-1-v1",
         user_id=user_id,
@@ -141,8 +143,7 @@ def test_parser_rules_upsert_and_read_back_with_side_aliases(session_factory):
 
 
 def test_golden_labels_upsert_overwrites_and_round_trips_expected(session_factory):
-    user_id = _seed_account(session_factory)
-    _seed_channel_with_messages(session_factory, [1])
+    user_id = _seed_feed_with_messages(session_factory, [1])
     expected = ExtractedSignal(
         event_id=_event(1).id,
         channel_id=7,
@@ -186,8 +187,7 @@ def test_golden_labels_upsert_overwrites_and_round_trips_expected(session_factor
 
 
 def test_drift_warnings_persist_idempotently(session_factory):
-    user_id = _seed_account(session_factory)
-    _seed_channel_with_messages(session_factory, [5])
+    user_id = _seed_feed_with_messages(session_factory, [5])
     warning = FilterDriftWarning(
         channel_id=7,
         message_id=5,
@@ -216,20 +216,19 @@ def test_drift_warnings_persist_idempotently(session_factory):
 
 
 def test_read_messages_returns_domain_messages(session_factory):
-    _seed_channel_with_messages(session_factory, [1, 2])
+    user_id = _seed_feed_with_messages(session_factory, [1, 2])
     with session_factory() as session:
-        messages = message_repository.read_messages(session, 7)
+        messages = message_repository.read_messages(session, user_id, 7)
     assert {m.message_id for m in messages} == {1, 2}
     assert all(isinstance(m, RawTelegramMessage) for m in messages)
 
 
 def test_extracted_and_unrecognized_signals_persist(session_factory):
-    user_id = _seed_account(session_factory)
-    _seed_channel_with_messages(session_factory, [1, 2])
+    user_id = _seed_feed_with_messages(session_factory, [1, 2])
     with session_factory() as session:
-        event_repository.insert_signal_events(session, [_event(1), _event(2)])
+        event_repository.insert_signal_events(session, user_id, [_event(1), _event(2)])
         session.commit()
-        events = event_repository.read_signal_events(session, 7)
+        events = event_repository.read_signal_events(session, user_id, 7)
         by_message = {e.message_id: e for e in events}
         signal = ExtractedSignal(
             event_id=by_message[1].id,

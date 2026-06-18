@@ -1,4 +1,8 @@
-"""Drift repository functions."""
+"""Drift repository functions.
+
+Domain drift warnings speak `channel_id`/`message_id`; storage speaks
+`external_id`/`external_message_id` and is user-owned, so reads/writes translate.
+"""
 
 from uuid import UUID
 
@@ -22,8 +26,8 @@ def insert_drift_warnings(
                 {
                     "id": warning.id,
                     "user_id": user_id,
-                    "channel_id": warning.channel_id,
-                    "message_id": warning.message_id,
+                    "external_id": warning.channel_id,
+                    "external_message_id": warning.message_id,
                     "filter_rule_version": warning.filter_rule_version,
                     "miss_discovered_by": warning.miss_discovered_by.value,
                     "event_id": warning.event_id,
@@ -33,7 +37,9 @@ def insert_drift_warnings(
                 for warning in warnings
             ]
         )
-        .on_conflict_do_nothing(index_elements=["user_id", "channel_id", "message_id"])
+        .on_conflict_do_nothing(
+            index_elements=["user_id", "external_id", "external_message_id"]
+        )
         .returning(FilterDriftWarningRow.id)
     )
     return len(session.execute(statement).fetchall())
@@ -44,15 +50,15 @@ def read_drift_warnings(
 ) -> list[FilterDriftWarning]:
     rows = session.scalars(
         select(FilterDriftWarningRow).where(
-            FilterDriftWarningRow.channel_id == channel_id,
+            FilterDriftWarningRow.external_id == channel_id,
             FilterDriftWarningRow.user_id == user_id,
         )
     ).all()
     return [
         FilterDriftWarning(
             id=row.id,
-            channel_id=row.channel_id,
-            message_id=row.message_id,
+            channel_id=row.external_id,
+            message_id=row.external_message_id,
             filter_rule_version=row.filter_rule_version,
             miss_discovered_by=row.miss_discovered_by,
             event_id=row.event_id,
@@ -70,7 +76,7 @@ def _parser_drift_values(
         "id": drift.id,
         "user_id": user_id,
         "event_id": drift.event_id,
-        "channel_id": drift.channel_id,
+        "external_id": drift.channel_id,
         "deterministic_result": drift.deterministic_result,
         "fallback_result": drift.fallback_result,
         "fallback_signal_id": fallback_signal_id,
@@ -83,7 +89,7 @@ def read_parser_drift_warnings(
 ) -> list[ParserDriftWarning]:
     rows = session.scalars(
         select(ParserDriftWarningRow).where(
-            ParserDriftWarningRow.channel_id == channel_id,
+            ParserDriftWarningRow.external_id == channel_id,
             ParserDriftWarningRow.user_id == user_id,
         )
     ).all()
@@ -91,7 +97,7 @@ def read_parser_drift_warnings(
         ParserDriftWarning(
             id=row.id,
             event_id=row.event_id,
-            channel_id=row.channel_id,
+            channel_id=row.external_id,
             deterministic_result=row.deterministic_result,
             fallback_result=row.fallback_result,
             fallback_signal_id=row.fallback_signal_id,

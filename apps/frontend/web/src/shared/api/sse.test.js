@@ -27,11 +27,11 @@ describe('streamJobProgress', () => {
     const onProgress = vi.fn()
     const onDone = vi.fn()
 
-    streamJobProgress('jwt-token', '/chats/7/distill/progress', { onProgress, onDone })
+    streamJobProgress('jwt-token', '/feeds/7/distill/progress', { onProgress, onDone })
     const source = FakeEventSource.last
 
     expect(source.url).toBe(
-      'http://localhost:8000/chats/7/distill/progress?token=jwt-token'
+      'http://localhost:8000/feeds/7/distill/progress?token=jwt-token'
     )
     source.emit('progress', { phase: 'Reading your labelled signals' })
     source.emit('done', { rules: 5 })
@@ -45,7 +45,7 @@ describe('streamJobProgress', () => {
     globalThis.EventSource = FakeEventSource
     const onError = vi.fn()
 
-    streamJobProgress('jwt-token', '/chats/7/distill/progress', { onError })
+    streamJobProgress('jwt-token', '/feeds/7/distill/progress', { onError })
     const source = FakeEventSource.last
     source.emit('error', undefined)
 

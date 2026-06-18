@@ -14,8 +14,8 @@ from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import TradeIntent
+from verasig.features.feeds.candidate_filter import apply_filter_rule
 from verasig.features.signals.deterministic_parser import parse
-from verasig.features.sources.candidate_filter import apply_filter_rule
 
 
 @dataclass(frozen=True)

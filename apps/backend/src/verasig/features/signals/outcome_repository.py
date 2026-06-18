@@ -25,7 +25,7 @@ def _extracted_values(signal: ExtractedSignal) -> dict:
     return {
         "id": signal.id,
         "event_id": signal.event_id,
-        "channel_id": signal.channel_id,
+        "external_id": signal.channel_id,
         "symbol": signal.symbol,
         "side": signal.side.value,
         "event_type": signal.event_type.value,
@@ -67,7 +67,7 @@ def read_extracted_signals(
 ) -> list[ExtractedSignal]:
     rows = session.scalars(
         select(ExtractedSignalRow).where(
-            ExtractedSignalRow.channel_id == channel_id,
+            ExtractedSignalRow.external_id == channel_id,
             ExtractedSignalRow.user_id == user_id,
         )
     ).all()
@@ -75,7 +75,7 @@ def read_extracted_signals(
         ExtractedSignal(
             id=row.id,
             event_id=row.event_id,
-            channel_id=row.channel_id,
+            channel_id=row.external_id,
             symbol=row.symbol,
             side=row.side,
             event_type=row.event_type,
@@ -125,7 +125,7 @@ def read_unrecognized_signals(
         select(UnrecognizedSignalRow)
         .join(RawSignalEventRow, UnrecognizedSignalRow.event_id == RawSignalEventRow.id)
         .where(
-            RawSignalEventRow.channel_id == channel_id,
+            RawSignalEventRow.external_id == channel_id,
             UnrecognizedSignalRow.user_id == user_id,
         )
     ).all()
@@ -148,7 +148,7 @@ def _parser_drift_values(
         "id": drift.id,
         "user_id": user_id,
         "event_id": drift.event_id,
-        "channel_id": drift.channel_id,
+        "external_id": drift.channel_id,
         "deterministic_result": drift.deterministic_result,
         "fallback_result": drift.fallback_result,
         "fallback_signal_id": fallback_signal_id,

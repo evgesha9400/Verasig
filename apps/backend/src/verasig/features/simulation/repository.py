@@ -22,7 +22,7 @@ def insert_result(
     row = BacktestResultRow(
         id=result_id or uuid4(),
         user_id=user_id,
-        channel_id=channel_id,
+        external_id=channel_id,
         score=score,
         win_rate=win_rate,
         pnl=pnl,
@@ -40,9 +40,9 @@ def read_latest_results(
     rows = session.scalars(
         select(BacktestResultRow)
         .where(BacktestResultRow.user_id == user_id)
-        .order_by(BacktestResultRow.channel_id, BacktestResultRow.completed_at.desc())
+        .order_by(BacktestResultRow.external_id, BacktestResultRow.completed_at.desc())
     ).all()
     latest: dict[int, BacktestResultRow] = {}
     for row in rows:
-        latest.setdefault(row.channel_id, row)
+        latest.setdefault(row.external_id, row)
     return latest

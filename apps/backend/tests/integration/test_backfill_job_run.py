@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from seed import insert_source
+
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.features.accounts import repository as account_repository
-from verasig.features.sources import backfill_job_repository
-from verasig.features.sources import subscription_repository as user_channel_repository
-from verasig.features.sources.backfill_job_coordinator import BackfillJobCoordinator
-from verasig.features.sources.channel_repository import upsert_channel
+from verasig.features.feeds import backfill_job_repository, feed_repository
+from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
 from verasig.foundation.jobs.registry import JobRegistry
 
 
@@ -43,9 +43,9 @@ def _channel() -> TelegramChannel:
 def test_service_restart_marks_running_backfill_run_failed(session_factory):
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
-        upsert_channel(session, _channel())
-        user_channel_repository.subscribe(session, account.id, 7, _instant())
-        user_channel_repository.set_status(session, account.id, 7, "backfilling")
+        insert_source(session, account.id)
+        feed_repository.create_feed(session, account.id, _channel(), _instant())
+        feed_repository.set_status(session, account.id, 7, "backfilling")
         run = backfill_job_repository.create_run(session, account.id, 7, _instant())
         session.commit()
 
@@ -54,8 +54,8 @@ def test_service_restart_marks_running_backfill_run_failed(session_factory):
 
     with session_factory() as session:
         recovered = backfill_job_repository.read_run(session, run.id)
-        subscription = user_channel_repository.read_subscription(session, account.id, 7)
+        feed = feed_repository.read_feed(session, account.id, 7)
 
     assert recovered.status == "failed"
     assert recovered.error_code == "SERVICE_INTERRUPTED"
-    assert subscription.status == "failed"
+    assert feed.status == "failed"
