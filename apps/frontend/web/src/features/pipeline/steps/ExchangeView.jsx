@@ -112,7 +112,9 @@ export function ExchangeView({ onConnected, bybitConnected }) {
                     <div className="vrs-opt__title">
                       {d.name}
                       {d.status === 'soon' && (
-                        <Pill tone="pending" variant="outline" size="xs">Soon</Pill>
+                        <Pill tone="pending" variant="outline" size="xs">
+                          Soon
+                        </Pill>
                       )}
                       {dConnected && (
                         <Badge tone="verified" dot>

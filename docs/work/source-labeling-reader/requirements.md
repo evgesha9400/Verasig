@@ -147,6 +147,12 @@ Sources
 | 7 | Continue verification when verification fails. |
 | 8 | Proceed to extraction when verification passes. |
 
+## Open Recommendations
+
+- Review [label-sampling-recommendation.md](label-sampling-recommendation.md) before finalizing label and verify thresholds.
+- The current 5 Signal label distill gate is a prototype threshold.
+- The current verify sample policy needs raw unflagged audits before it can measure filter misses.
+
 ## Extraction
 
 | Step | Requirement |

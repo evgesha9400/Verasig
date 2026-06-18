@@ -22,9 +22,7 @@ describe('MessageCard', () => {
   })
 
   it('renders the reply context when replyTo is given', () => {
-    render(
-      <MessageCard text="update" replyTo={{ author: 'Apex', text: 'LONG BTC' }} />
-    )
+    render(<MessageCard text="update" replyTo={{ author: 'Apex', text: 'LONG BTC' }} />)
     expect(screen.getByText('Apex')).toBeTruthy()
     expect(screen.getByText('LONG BTC')).toBeTruthy()
   })
