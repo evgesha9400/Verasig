@@ -98,7 +98,6 @@ def sweep_advisory(
     user_id: UUID,
     external_id: int,
     parser_rules: list[ParserRule],
-    user_id: UUID,
     *,
     batch_size: int = 200,
 ) -> tuple[int, int]:

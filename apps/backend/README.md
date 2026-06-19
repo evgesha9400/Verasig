@@ -36,9 +36,9 @@
 | Health | `GET /health` |
 | Auth/User | `/auth/*`, `/user/*` |
 | Telegram | `/telegram/connect`, `/telegram/verify`, `/telegram/status` |
-| Chats | `/chats`, `/chats/{id}/backfill`, `/chats/{id}/messages` |
-| Verify/Rules | `/chats/{id}/verify/*`, `/chats/{id}/distill`, `/chats/{id}/rules` |
-| Exchanges/Risk/Backtest | `/exchanges`, `/chats/{id}/risk`, `/chats/{id}/backtest` |
+| Feeds | `/feeds`, `/feeds/{id}/backfill`, `/feeds/{id}/messages` |
+| Verify/Rules | `/feeds/{id}/verify/*`, `/feeds/{id}/distill`, `/feeds/{id}/rules` |
+| Exchanges/Risk/Backtest | `/exchanges`, `/feeds/{id}/risk`, `/feeds/{id}/backtest` |
 | Signals | `/signals`, `/signals/{id}`, `/signals/{id}/link-mod` |
 
 See `tests/api/` for executable API behavior.

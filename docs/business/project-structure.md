@@ -47,6 +47,7 @@ apps/backend/
 |   |-- accounts/
 |   |-- api/
 |   |-- exchanges/
+|   |-- feeds/
 |   |-- foundation/
 |   |-- integration/
 |   |-- provider_scores/
@@ -55,7 +56,6 @@ apps/backend/
 |   |-- signals/
 |   |-- simulation/
 |   |-- sources/
-|   |-- telegram_links/
 |   `-- fixtures/
 |-- Dockerfile
 |-- .dockerignore

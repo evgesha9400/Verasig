@@ -29,7 +29,7 @@ test: ## Run backend tests
 	uv run pytest
 
 test-unit: ## Run backend unit tests
-	uv run pytest tests/accounts tests/exchanges tests/foundation tests/provider_scores tests/risk tests/rules tests/signals tests/simulation tests/sources tests/telegram_links
+	uv run pytest tests/accounts tests/exchanges tests/feeds tests/foundation tests/provider_scores tests/risk tests/rules tests/signals tests/simulation tests/sources
 
 test-integration: ## Run backend integration tests
 	uv run pytest tests/integration
