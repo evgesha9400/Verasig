@@ -27,7 +27,13 @@ from verasig.foundation.http.access_logging import (
 )
 from verasig.foundation.http.errors import ApiError, api_error_handler
 from verasig.foundation.jobs.registry import JobRegistry
-from verasig.foundation.llm.anthropic_runner import make_anthropic_runner
+from verasig.foundation.llm.claude_code_runner import make_claude_code_runner
+from verasig.foundation.llm.prompt_audit import (
+    make_distill_prompt_auditor,
+    make_distill_response_auditor,
+    make_distill_skip_auditor,
+    make_distill_validation_auditor,
+)
 from verasig.foundation.market_data.bybit_account import verify_api_keys
 from verasig.foundation.market_data.bybit_market_data import BybitKlineClient
 from verasig.foundation.security.secrets import SecretCipher
@@ -72,9 +78,13 @@ def create_app(
     app.state.exchange_verifier = verify_api_keys
     app.state.market_data_factory = BybitKlineClient
     app.state.distiller_factory = lambda: AnthropicDistiller(
-        runner=make_anthropic_runner(
-            settings.anthropic_api_key, settings.anthropic_model
-        )
+        runner=make_claude_code_runner(
+            settings.claude_code_oauth_token, settings.claude_code_model
+        ),
+        prompt_auditor=make_distill_prompt_auditor(),
+        response_auditor=make_distill_response_auditor(),
+        validation_auditor=make_distill_validation_auditor(),
+        parser_skip_auditor=make_distill_skip_auditor(),
     )
     app.add_middleware(
         CORSMiddleware,

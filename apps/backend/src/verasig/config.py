@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-secret"
     jwt_ttl_days: int = 7
     secret_keys: str = ""
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-6"
+    claude_code_oauth_token: str = ""
+    claude_code_model: str = "sonnet"
     cors_origins: list[str] = ["http://localhost:5173"]
 
     @property

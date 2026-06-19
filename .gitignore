@@ -46,6 +46,7 @@ graphify-out/manifest.json
 .graphify_ast.json
 .graphify_incremental.json
 apps/graphify-out/
+distill-prompt-audit/
 
 # IDE metadata (JetBrains)
 .idea/

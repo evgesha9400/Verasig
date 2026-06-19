@@ -3,7 +3,7 @@
 from typing import Protocol, runtime_checkable
 
 from verasig.domain.filter_rule import FilterRule
-from verasig.domain.label import GoldenLabel
+from verasig.domain.label import DistillationExample
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import TradeIntent
 
@@ -15,5 +15,7 @@ class LlmExtractor(Protocol):
 
 @runtime_checkable
 class RuleDistiller(Protocol):
-    def distill_filter(self, labels: list[GoldenLabel]) -> FilterRule: ...
-    def distill_parsers(self, labels: list[GoldenLabel]) -> list[ParserRule]: ...
+    def distill_filter(self, examples: list[DistillationExample]) -> FilterRule: ...
+    def distill_parsers(
+        self, examples: list[DistillationExample]
+    ) -> list[ParserRule]: ...

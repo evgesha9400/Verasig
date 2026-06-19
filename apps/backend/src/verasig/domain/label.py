@@ -36,3 +36,7 @@ class GoldenLabel(BaseModel):
     @property
     def is_signal(self) -> bool:
         return self.label == LabelKind.SIGNAL
+
+
+class DistillationExample(GoldenLabel):
+    text: str | None = None
