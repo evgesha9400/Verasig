@@ -11,9 +11,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.filter_rule import FilterRule
-from verasig.domain.label import GoldenLabel
+from verasig.domain.label import DistillationExample, GoldenLabel
 from verasig.domain.parser_rule import ParserRule
-from verasig.storage.models import FilterRuleRow, GoldenLabelRow, ParserRuleRow
+from verasig.storage.models import (
+    FilterRuleRow,
+    GoldenLabelRow,
+    ParserRuleRow,
+    RawMessageRow,
+)
 
 
 def _str_list(values: list) -> list[str]:
@@ -159,22 +164,58 @@ def upsert_labels(session: Session, labels: list[GoldenLabel]) -> None:
         session.execute(statement)
 
 
+def _label_from_row(row: GoldenLabelRow) -> GoldenLabel:
+    return GoldenLabel(
+        id=row.id,
+        user_id=row.user_id,
+        channel_id=row.external_id,
+        message_id=row.external_message_id,
+        label=row.label,
+        expected=row.expected,
+        labeled_at=row.labeled_at,
+    )
+
+
+def _example_from_row(row: GoldenLabelRow, text: str | None) -> DistillationExample:
+    return DistillationExample(
+        id=row.id,
+        user_id=row.user_id,
+        channel_id=row.external_id,
+        message_id=row.external_message_id,
+        label=row.label,
+        expected=row.expected,
+        labeled_at=row.labeled_at,
+        text=text,
+    )
+
+
 def read_labels(session: Session, channel_id: int, user_id: UUID) -> list[GoldenLabel]:
     rows = session.scalars(
-        select(GoldenLabelRow).where(
+        select(GoldenLabelRow)
+        .where(
             GoldenLabelRow.external_id == channel_id,
             GoldenLabelRow.user_id == user_id,
         )
+        .order_by(GoldenLabelRow.labeled_at, GoldenLabelRow.external_message_id)
     ).all()
-    return [
-        GoldenLabel(
-            id=row.id,
-            user_id=row.user_id,
-            channel_id=row.external_id,
-            message_id=row.external_message_id,
-            label=row.label,
-            expected=row.expected,
-            labeled_at=row.labeled_at,
+    return [_label_from_row(row) for row in rows]
+
+
+def read_distillation_examples(
+    session: Session, channel_id: int, user_id: UUID
+) -> list[DistillationExample]:
+    rows = session.execute(
+        select(GoldenLabelRow, RawMessageRow.text)
+        .join(
+            RawMessageRow,
+            (RawMessageRow.user_id == GoldenLabelRow.user_id)
+            & (RawMessageRow.external_id == GoldenLabelRow.external_id)
+            & (RawMessageRow.external_message_id == GoldenLabelRow.external_message_id),
         )
-        for row in rows
-    ]
+        .where(
+            GoldenLabelRow.external_id == channel_id,
+            GoldenLabelRow.user_id == user_id,
+        )
+        .order_by(GoldenLabelRow.labeled_at, GoldenLabelRow.external_message_id)
+    ).all()
+    return [_example_from_row(label_row, text) for label_row, text in rows]

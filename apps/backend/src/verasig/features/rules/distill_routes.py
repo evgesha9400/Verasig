@@ -6,16 +6,18 @@ from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import LabelKind
 from verasig.domain.parser_rule import ParserRule
 from verasig.features.rules.repository import (
+    read_distillation_examples,
     read_labels,
     upsert_filter_rule,
     upsert_parser_rules,
 )
+from verasig.features.rules.rule_distiller import FilterDistillationError
 from verasig.features.rules.schemas import JobOut
 from verasig.features.rules.views import present_rules
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
 from verasig.foundation.http.sse import sse_stream
-from verasig.foundation.jobs.registry import JobAlreadyRunningError
+from verasig.foundation.jobs.registry import JobAlreadyRunningError, JobTerminalError
 
 router = APIRouter(prefix="/feeds/{external_id}")
 
@@ -74,16 +76,19 @@ async def _run_distill(
 ) -> dict:
     publisher.progress({"phase": DISTILL_PHASES[0]})
     with session_factory() as session:
-        labels = read_labels(session, channel_id, user_id)
+        examples = read_distillation_examples(session, channel_id, user_id)
     publisher.progress({"phase": DISTILL_PHASES[1]})
     distiller = distiller_factory()
     publisher.progress({"phase": DISTILL_PHASES[2]})
-    filter_rule = _scope_filter_rule(
-        distiller.distill_filter(labels), user_id, channel_id
-    )
+    try:
+        filter_rule = _scope_filter_rule(
+            distiller.distill_filter(examples), user_id, channel_id
+        )
+    except FilterDistillationError as error:
+        raise JobTerminalError(str(error), {"validation": error.report}) from error
     publisher.progress({"phase": DISTILL_PHASES[3]})
     parser_rules = _scope_parser_rules(
-        distiller.distill_parsers(labels), user_id, channel_id
+        distiller.distill_parsers(examples), user_id, channel_id
     )
     publisher.progress({"phase": DISTILL_PHASES[4]})
     with session_factory() as session:
