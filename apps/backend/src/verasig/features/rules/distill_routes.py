@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
@@ -21,13 +22,19 @@ from verasig.foundation.jobs.registry import JobAlreadyRunningError, JobTerminal
 
 router = APIRouter(prefix="/feeds/{external_id}")
 
-DISTILL_PHASES = (
-    "Reading your labelled signals",
-    "Extracting structure & tickers",
-    "Inferring discriminative patterns",
-    "Cross-checking against non-signals",
-    "Compiling filter ruleset",
+DISTILL_STAGES = (
+    ("labels_read", "Reading labels"),
+    ("filter_distilling", "Distilling filter rules"),
+    ("filter_validating", "Validating against labelled messages"),
+    ("parser_distilling", "Distilling parser rules"),
+    ("rules_persisting", "Saving ruleset"),
+    ("rules_complete", "Ruleset compiled"),
 )
+DISTILL_TOTAL_STEPS = len(DISTILL_STAGES)
+DISTILL_STAGE_BY_KEY = {
+    stage: {"phase": phase, "step": index}
+    for index, (stage, phase) in enumerate(DISTILL_STAGES, start=1)
+}
 
 
 def _job_key(user_id: UUID, channel_id: int) -> str:
@@ -40,6 +47,40 @@ def _signal_label_count(session, user_id: UUID, channel_id: int) -> int:
         for label in read_labels(session, channel_id, user_id)
         if label.label is LabelKind.SIGNAL
     )
+
+
+def _label_counts(examples) -> tuple[int, int]:
+    signal_count = sum(1 for example in examples if example.label == LabelKind.SIGNAL)
+    return signal_count, len(examples) - signal_count
+
+
+def _progress_payload(
+    stage: str,
+    counts: tuple[int, int],
+    attempt: int | None = None,
+) -> dict:
+    definition = DISTILL_STAGE_BY_KEY[stage]
+    signal_count, noise_count = counts
+    payload = {
+        "stage": stage,
+        "phase": definition["phase"],
+        "step": definition["step"],
+        "totalSteps": DISTILL_TOTAL_STEPS,
+        "signalLabels": signal_count,
+        "noiseLabels": noise_count,
+    }
+    if attempt is not None:
+        payload["attempt"] = attempt
+    return payload
+
+
+def _publish_progress(
+    publisher,
+    stage: str,
+    counts: tuple[int, int],
+    attempt: int | None = None,
+) -> None:
+    publisher.progress(_progress_payload(stage, counts, attempt))
 
 
 def _scope_filter_rule(rule: FilterRule, user_id: UUID, channel_id: int) -> FilterRule:
@@ -74,27 +115,33 @@ async def _run_distill(
     session_factory,
     distiller_factory,
 ) -> dict:
-    publisher.progress({"phase": DISTILL_PHASES[0]})
     with session_factory() as session:
         examples = read_distillation_examples(session, channel_id, user_id)
-    publisher.progress({"phase": DISTILL_PHASES[1]})
+    counts = _label_counts(examples)
+    _publish_progress(publisher, "labels_read", counts)
     distiller = distiller_factory()
-    publisher.progress({"phase": DISTILL_PHASES[2]})
+    _publish_progress(publisher, "filter_distilling", counts)
     try:
         filter_rule = _scope_filter_rule(
-            distiller.distill_filter(examples), user_id, channel_id
+            await asyncio.to_thread(distiller.distill_filter, examples),
+            user_id,
+            channel_id,
         )
     except FilterDistillationError as error:
         raise JobTerminalError(str(error), {"validation": error.report}) from error
-    publisher.progress({"phase": DISTILL_PHASES[3]})
+    _publish_progress(publisher, "filter_validating", counts)
+    _publish_progress(publisher, "parser_distilling", counts)
     parser_rules = _scope_parser_rules(
-        distiller.distill_parsers(examples), user_id, channel_id
+        await asyncio.to_thread(distiller.distill_parsers, examples),
+        user_id,
+        channel_id,
     )
-    publisher.progress({"phase": DISTILL_PHASES[4]})
+    _publish_progress(publisher, "rules_persisting", counts)
     with session_factory() as session:
         upsert_filter_rule(session, filter_rule)
         upsert_parser_rules(session, parser_rules)
         session.commit()
+    _publish_progress(publisher, "rules_complete", counts)
     return {"rules": len(filter_rule.include_patterns)}
 
 

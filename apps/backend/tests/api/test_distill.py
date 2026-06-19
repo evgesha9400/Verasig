@@ -1,20 +1,26 @@
 import json
+import time
 from datetime import datetime, timezone
+from uuid import uuid4
 
+import pytest
 from seed import insert_source
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
+from verasig.domain.filter_rule import FilterRule
+from verasig.domain.label import DistillationExample, GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
 from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.rules import distill_routes
 from verasig.features.rules import repository as rule_repository
 from verasig.features.rules.rule_distiller import AnthropicDistiller
 from verasig.features.signals import event_repository
+from verasig.foundation.jobs.registry import JobRegistry
 
 SECRET = "s" * 32
 
@@ -131,7 +137,7 @@ def test_distill_requires_five_signal_labels(client, app):
 
 def test_distill_job_persists_rules_and_streams_progress(client, app):
     token, user_id = _register(client)
-    _seed_chat(app, user_id, signal_count=5)
+    _seed_chat(app, user_id, signal_count=5, noise_count=2)
     responses = [
         json.dumps({"include_patterns": ["zzz"]}),
         json.dumps({"include_patterns": ["alpha"]}),
@@ -150,7 +156,12 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
     rules = client.get("/feeds/7/rules", headers=_auth(token))
 
     assert started.status_code == 202
-    assert "Compiling filter ruleset" in body
+    assert '"stage": "labels_read"' in body
+    assert '"stage": "filter_distilling"' in body
+    assert '"stage": "parser_distilling"' in body
+    assert '"stage": "rules_persisting"' in body
+    assert '"signalLabels": 5' in body
+    assert '"noiseLabels": 2' in body
     assert "event: done" in body
     assert responses == []
     assert rules.status_code == 200
@@ -188,6 +199,68 @@ def test_distill_job_emits_error_when_filter_never_validates(client, app):
     assert '"accuracy"' in body
     assert responses == []
     assert rules.json()["rules"] == []
+
+
+@pytest.mark.asyncio
+async def test_distill_progress_is_observable_while_filter_distiller_blocks(
+    monkeypatch,
+):
+    user_id = uuid4()
+    registry = JobRegistry()
+    filter_finished = False
+
+    class Session:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc_info):
+            return None
+
+        def commit(self):
+            return None
+
+    class SlowDistiller:
+        def distill_filter(self, _examples):
+            nonlocal filter_finished
+            time.sleep(0.2)
+            filter_finished = True
+            return FilterRule(rule_id="filter", include_patterns=["alpha"])
+
+        def distill_parsers(self, _examples):
+            return []
+
+    monkeypatch.setattr(
+        distill_routes,
+        "read_distillation_examples",
+        lambda *_args: [
+            DistillationExample(
+                channel_id=7, message_id=1, label=LabelKind.SIGNAL, text="alpha"
+            ),
+            DistillationExample(
+                channel_id=7, message_id=2, label=LabelKind.NOISE, text="noise"
+            ),
+        ],
+    )
+    monkeypatch.setattr(distill_routes, "upsert_filter_rule", lambda *_args: None)
+    monkeypatch.setattr(distill_routes, "upsert_parser_rules", lambda *_args: None)
+
+    registry.start(
+        "job",
+        lambda publisher: distill_routes._run_distill(
+            publisher,
+            user_id,
+            7,
+            lambda: Session(),
+            SlowDistiller,
+        ),
+    )
+
+    async for _event, payload in registry.stream("job"):
+        if payload.get("stage") == "filter_distilling":
+            break
+
+    assert filter_finished is False
+    await registry.channel("job").task
 
 
 def test_distill_progress_reports_missing_job_as_404(client, app):
