@@ -13,6 +13,8 @@ CONFIG_ENV_KEYS = (
     "VERASIG_ENV",
     "VERASIG_JWT_SECRET",
     "VERASIG_SECRET_KEYS",
+    "VERASIG_CLAUDE_CODE_OAUTH_TOKEN",
+    "VERASIG_CLAUDE_CODE_MODEL",
 )
 
 
@@ -99,7 +101,7 @@ def test_settings_carry_api_secrets(monkeypatch):
 
     assert settings.jwt_secret == "jwt-secret"
     assert settings.secret_keys == "2026-06:newb64key,2026-01:oldb64key"
-    assert settings.anthropic_model == "claude-sonnet-4-6"
+    assert settings.claude_code_model == "sonnet"
     assert settings.cors_origins == ["http://localhost:5173"]
 
 

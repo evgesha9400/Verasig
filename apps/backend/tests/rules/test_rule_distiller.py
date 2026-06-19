@@ -2,16 +2,21 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fakes import FakeDistiller
 
 from verasig.domain.filter_rule import FilterRule
-from verasig.domain.label import GoldenLabel, LabelKind
+from verasig.domain.label import DistillationExample, LabelKind
 from verasig.domain.llm_ports import RuleDistiller
 from verasig.domain.parser_rule import ParserRule
-from verasig.domain.signal import Side
+from verasig.domain.signal import ExtractedSignal, Side
 from verasig.features.rules.rule_distiller import (
     AnthropicDistiller,
+    FilterDistillationError,
+    evaluate_filter_candidate,
     parse_distiller_output,
+    parse_filter_distiller_output,
+    parse_parser_distiller_output,
 )
 
 FIXTURE = (
@@ -19,10 +24,20 @@ FIXTURE = (
 ).read_text(encoding="utf-8")
 
 
-def _labels() -> list[GoldenLabel]:
+def _labels() -> list[DistillationExample]:
     return [
-        GoldenLabel(channel_id=7, message_id=1, label=LabelKind.SIGNAL),
-        GoldenLabel(channel_id=7, message_id=2, label=LabelKind.NOISE),
+        DistillationExample(
+            channel_id=7,
+            message_id=1,
+            label=LabelKind.SIGNAL,
+            text="BTC long entry 100 stop 90",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=2,
+            label=LabelKind.NOISE,
+            text="Market commentary only",
+        ),
     ]
 
 
@@ -93,23 +108,260 @@ def test_parse_distiller_output_stamps_user_scope_and_display():
     assert parser_rules[0].rule_id == f"{user_id}:7-parser-1-v1"
 
 
+def test_parse_filter_distiller_output_accepts_include_patterns_only():
+    payload = json.dumps({"include_patterns": ["alpha"]})
+
+    filter_rule = parse_filter_distiller_output(payload, channel_id=7, label_ids=[])
+
+    assert filter_rule.include_patterns == ["alpha"]
+    assert filter_rule.exclude_patterns == []
+    assert filter_rule.display == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"filter_rule": {"include_patterns": ["alpha"]}},
+        {"include_patterns": ["alpha"], "parser_rules": []},
+        {"include_patterns": ["alpha"], "display": []},
+        {"include_patterns": ["alpha"], "exclude_patterns": []},
+    ],
+)
+def test_parse_filter_distiller_output_rejects_combined_schema_noise(payload):
+    with pytest.raises(ValueError, match="include_patterns"):
+        parse_filter_distiller_output(json.dumps(payload), channel_id=7, label_ids=[])
+
+
+def test_parse_parser_distiller_output_accepts_parser_only_payload():
+    payload = json.dumps(
+        {
+            "parser_rules": [
+                {
+                    "patterns": ["(?P<symbol>BTC)"],
+                    "field_map": {"symbol": "symbol"},
+                    "side_aliases": {},
+                }
+            ]
+        }
+    )
+
+    parser_rules = parse_parser_distiller_output(payload, channel_id=7, label_ids=[])
+
+    assert parser_rules[0].patterns == ["(?P<symbol>BTC)"]
+    assert parser_rules[0].field_map == {"symbol": "symbol"}
+
+
+def test_evaluate_filter_candidate_reports_perfect_accuracy():
+    report = evaluate_filter_candidate([r"(?i)\blong\b"], _labels())
+
+    assert report["accuracy"] == 100.0
+    assert report["false_positive_message_ids"] == []
+    assert report["false_negative_message_ids"] == []
+
+
+def test_evaluate_filter_candidate_reports_false_positives_and_false_negatives():
+    examples = [
+        DistillationExample(
+            channel_id=7,
+            message_id=1,
+            label=LabelKind.SIGNAL,
+            text="BTC long entry",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=2,
+            label=LabelKind.SIGNAL,
+            text="ETH short entry",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=3,
+            label=LabelKind.NOISE,
+            text="BTC market commentary",
+        ),
+    ]
+
+    report = evaluate_filter_candidate([r"(?i)\bbtc\b"], examples)
+
+    assert report["accuracy"] == pytest.approx(33.33, abs=0.01)
+    assert report["false_positive_message_ids"] == [3]
+    assert report["false_negative_message_ids"] == [2]
+    assert (
+        report["false_positive_examples"][0]["text_preview"] == "BTC market commentary"
+    )
+    assert report["false_negative_examples"][0]["text_preview"] == "ETH short entry"
+
+
 def test_anthropic_distiller_satisfies_protocol():
     assert isinstance(AnthropicDistiller(runner=lambda _prompt: FIXTURE), RuleDistiller)
 
 
-def test_anthropic_distiller_wires_runner_to_parser_without_real_network():
+def test_anthropic_distiller_stops_filter_retry_on_perfect_first_candidate():
     prompts: list[str] = []
 
     def fake_runner(prompt: str) -> str:
         prompts.append(prompt)
-        return FIXTURE
+        return json.dumps({"include_patterns": [r"(?i)\blong\b"]})
 
     distiller = AnthropicDistiller(runner=fake_runner)
     filter_rule = distiller.distill_filter(_labels())
-    parser_rules = distiller.distill_parsers(_labels())
+
     assert isinstance(filter_rule, FilterRule) and filter_rule.channel_id == 7
-    assert parser_rules and isinstance(parser_rules[0], ParserRule)
-    assert len(prompts) == 2  # one recall-first, one precision-first; no real CLI
+    assert filter_rule.include_patterns == [r"(?i)\blong\b"]
+    assert len(prompts) == 1
+
+
+def test_anthropic_distiller_widens_decorative_literal_prefixes_when_still_perfect():
+    examples = [
+        DistillationExample(
+            channel_id=7,
+            message_id=1,
+            label=LabelKind.SIGNAL,
+            text="⚫️ Вход: BTC",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=2,
+            label=LabelKind.SIGNAL,
+            text="1️⃣ТЕЙК hit",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=3,
+            label=LabelKind.NOISE,
+            text="Market commentary",
+        ),
+    ]
+
+    distiller = AnthropicDistiller(
+        runner=lambda _prompt: json.dumps({"include_patterns": ["⚫️ Вход:", "️⃣ТЕЙК"]})
+    )
+
+    filter_rule = distiller.distill_filter(examples)
+
+    assert filter_rule.include_patterns == ["Вход:", "ТЕЙК"]
+
+
+def test_anthropic_distiller_keeps_decorative_prefix_when_widening_is_not_perfect():
+    examples = [
+        DistillationExample(
+            channel_id=7,
+            message_id=1,
+            label=LabelKind.SIGNAL,
+            text="⚫️ Вход: BTC",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=2,
+            label=LabelKind.NOISE,
+            text="Вход: newsletter section",
+        ),
+    ]
+
+    distiller = AnthropicDistiller(
+        runner=lambda _prompt: json.dumps({"include_patterns": ["⚫️ Вход:"]})
+    )
+
+    filter_rule = distiller.distill_filter(examples)
+
+    assert filter_rule.include_patterns == ["⚫️ Вход:"]
+
+
+def test_anthropic_distiller_retries_filter_with_validation_feedback():
+    prompts: list[str] = []
+
+    def fake_runner(prompt: str) -> str:
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            return json.dumps({"include_patterns": [r"(?i)\bmarket\b"]})
+        return json.dumps({"include_patterns": [r"(?i)\blong\b"]})
+
+    distiller = AnthropicDistiller(runner=fake_runner)
+    filter_rule = distiller.distill_filter(_labels())
+
+    assert filter_rule.include_patterns == [r"(?i)\blong\b"]
+    assert len(prompts) == 2
+    assert "Previous include_patterns" in prompts[1]
+    assert "false positives" in prompts[1]
+    assert "false negatives" in prompts[1]
+    assert "BTC long entry 100 stop 90" in prompts[1]
+    assert "Market commentary only" in prompts[1]
+
+
+def test_anthropic_distiller_fails_after_three_invalid_filter_candidates():
+    calls = 0
+
+    def fake_runner(_prompt: str) -> str:
+        nonlocal calls
+        calls += 1
+        return json.dumps({"include_patterns": [r"(?i)\bmarket\b"]})
+
+    distiller = AnthropicDistiller(runner=fake_runner)
+
+    with pytest.raises(FilterDistillationError) as error:
+        distiller.distill_filter(_labels())
+
+    assert calls == 3
+    assert error.value.report["accuracy"] < 100.0
+
+
+def test_anthropic_distiller_skips_parser_when_no_expected_fields_exist():
+    prompts: list[str] = []
+    skips: list[str] = []
+
+    distiller = AnthropicDistiller(
+        runner=lambda prompt: (
+            prompts.append(prompt) or json.dumps({"parser_rules": []})
+        ),
+        parser_skip_auditor=lambda _kind, content, _examples: skips.append(content),
+    )
+
+    assert distiller.distill_parsers(_labels()) == []
+    assert prompts == []
+    assert skips == ["parser distillation skipped because expected_count=0"]
+
+
+def test_anthropic_distiller_sends_only_signal_examples_with_expected_to_parser():
+    signal_expected = DistillationExample(
+        channel_id=7,
+        message_id=10,
+        label=LabelKind.SIGNAL,
+        text="BTC long entry",
+        expected=ExtractedSignal(
+            event_id=uuid4(),
+            channel_id=7,
+            symbol="BTC",
+            side=Side.LONG,
+        ),
+    )
+    signal_without_expected = DistillationExample(
+        channel_id=7,
+        message_id=11,
+        label=LabelKind.SIGNAL,
+        text="ETH long entry",
+    )
+    noise = DistillationExample(
+        channel_id=7,
+        message_id=12,
+        label=LabelKind.NOISE,
+        text="Market commentary",
+    )
+    prompts: list[str] = []
+
+    def fake_runner(prompt: str) -> str:
+        prompts.append(prompt)
+        return json.dumps({"parser_rules": []})
+
+    distiller = AnthropicDistiller(runner=fake_runner)
+
+    assert (
+        distiller.distill_parsers([signal_expected, signal_without_expected, noise])
+        == []
+    )
+    assert "message 10" in prompts[0]
+    assert "message 11" not in prompts[0]
+    assert "message 12" not in prompts[0]
+    assert '"filter_rule"' not in prompts[0]
 
 
 def test_fake_distiller_returns_rules_from_canned_output():
