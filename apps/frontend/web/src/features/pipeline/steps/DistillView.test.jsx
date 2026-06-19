@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DistillView } from './DistillView.jsx'
 
 function renderView(overrides = {}) {
@@ -38,12 +38,48 @@ function renderView(overrides = {}) {
 }
 
 describe('DistillView', () => {
-  it('starts the distill job and streams phases', async () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('starts the distill job and renders structured progress', async () => {
     const { onStartDistill, getHandlers } = renderView()
     await waitFor(() => expect(getHandlers()).toBeTruthy())
     expect(onStartDistill).toHaveBeenCalledWith('7')
+    act(() =>
+      getHandlers().onProgress({
+        stage: 'filter_distilling',
+        phase: 'Distilling filter rules',
+        step: 2,
+        totalSteps: 6,
+        signalLabels: 5,
+        noiseLabels: 2
+      })
+    )
+    expect(screen.getByText('Distilling filter rules')).toBeTruthy()
+    expect(screen.getByText('Step 2 of 6')).toBeTruthy()
+    expect(screen.getByText('5 signal labels')).toBeTruthy()
+    expect(screen.getByText('2 non-signal labels')).toBeTruthy()
+  })
+
+  it('advances for legacy phase-only progress payloads', async () => {
+    const { getHandlers } = renderView()
+    await waitFor(() => expect(getHandlers()).toBeTruthy())
     act(() => getHandlers().onProgress({ phase: 'Extracting structure & tickers' }))
     expect(screen.getByText('Extracting structure & tickers')).toBeTruthy()
+    expect(screen.getByText('Step 2 of 6')).toBeTruthy()
+  })
+
+  it('shows elapsed time without waiting on wall clock time', async () => {
+    vi.useFakeTimers()
+    const { getHandlers } = renderView()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(getHandlers()).toBeTruthy()
+    expect(screen.getByText('Elapsed 0:00')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(2000))
+    expect(screen.getByText('Elapsed 0:02')).toBeTruthy()
   })
 
   it('fetches and renders real rules on done, with match as a percentage', async () => {

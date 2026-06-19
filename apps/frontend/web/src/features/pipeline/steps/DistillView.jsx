@@ -3,7 +3,7 @@ import { Button } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
 /* Verasig — Distill step: backend distills filtering rules from the labels.
-   POST /distill starts the job; SSE streams the five phases; GET /rules returns
+   POST /distill starts the job; SSE streams structured stages; GET /rules returns
    the compiled ruleset (match is already a 0–100 percentage). */
 function ThinkOrb() {
   return (
@@ -39,14 +39,78 @@ function ThinkOrb() {
   )
 }
 
-/* Must match the backend DISTILL_PHASES strings exactly (distill_routes.py). */
-const DISTILL_STEPS = [
-  'Reading your labelled signals',
-  'Extracting structure & tickers',
-  'Inferring discriminative patterns',
-  'Cross-checking against non-signals',
-  'Compiling filter ruleset'
+const DISTILL_STAGES = [
+  { stage: 'labels_read', phase: 'Reading labels', checklist: 'Labels read' },
+  {
+    stage: 'filter_distilling',
+    phase: 'Distilling filter rules',
+    checklist: 'Filter rules'
+  },
+  {
+    stage: 'filter_validating',
+    phase: 'Validating against labelled messages',
+    checklist: 'Label validation'
+  },
+  {
+    stage: 'parser_distilling',
+    phase: 'Distilling parser rules',
+    checklist: 'Parser rules'
+  },
+  { stage: 'rules_persisting', phase: 'Saving ruleset', checklist: 'Ruleset save' },
+  { stage: 'rules_complete', phase: 'Ruleset compiled', checklist: 'Complete' }
 ]
+const DISTILL_TOTAL_STEPS = DISTILL_STAGES.length
+const DISTILL_STAGE_BY_KEY = new Map(
+  DISTILL_STAGES.map((definition, index) => [
+    definition.stage,
+    { ...definition, step: index + 1 }
+  ])
+)
+const LEGACY_STAGE_BY_PHASE = new Map([
+  ['Reading your labelled signals', 'labels_read'],
+  ['Extracting structure & tickers', 'filter_distilling'],
+  ['Inferring discriminative patterns', 'filter_validating'],
+  ['Cross-checking against non-signals', 'parser_distilling'],
+  ['Compiling filter ruleset', 'rules_persisting']
+])
+const INITIAL_PROGRESS = {
+  stage: 'labels_read',
+  phase: 'Reading labels',
+  step: 1,
+  totalSteps: DISTILL_TOTAL_STEPS,
+  signalLabels: null,
+  noiseLabels: null
+}
+
+function formatElapsed(seconds) {
+  const minutes = Math.floor(seconds / 60)
+  const remaining = String(seconds % 60).padStart(2, '0')
+  return `${minutes}:${remaining}`
+}
+
+function formatLabelCount(count, label) {
+  return `${count} ${label} label${count === 1 ? '' : 's'}`
+}
+
+function numberOrNull(value) {
+  return Number.isFinite(value) ? value : null
+}
+
+function normalizeProgressPayload(payload, current) {
+  if (!payload) return null
+  const legacyStage = LEGACY_STAGE_BY_PHASE.get(payload.phase)
+  const stage = payload.stage || legacyStage || current.stage
+  const definition = DISTILL_STAGE_BY_KEY.get(stage)
+  if (!definition && !payload.phase) return null
+  return {
+    stage,
+    phase: payload.phase || definition?.phase || current.phase,
+    step: numberOrNull(payload.step) || definition?.step || current.step,
+    totalSteps: numberOrNull(payload.totalSteps) || current.totalSteps,
+    signalLabels: numberOrNull(payload.signalLabels) ?? current.signalLabels,
+    noiseLabels: numberOrNull(payload.noiseLabels) ?? current.noiseLabels
+  }
+}
 
 export function DistillView({
   chatId,
@@ -57,7 +121,8 @@ export function DistillView({
   onError
 }) {
   const [phase, setPhase] = useState('thinking') // 'thinking' | 'done' | 'error'
-  const [step, setStep] = useState(0)
+  const [progress, setProgress] = useState(INITIAL_PROGRESS)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [rules, setRules] = useState([])
 
   const handlersRef = useRef({
@@ -70,6 +135,16 @@ export function DistillView({
   useEffect(() => {
     handlersRef.current = { onStartDistill, onStreamProgress, onGetRules, onError }
   }, [onStartDistill, onStreamProgress, onGetRules, onError])
+
+  useEffect(() => {
+    if (phase !== 'thinking') return undefined
+    const startedAt = Date.now()
+    setElapsedSeconds(0)
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [phase])
 
   useEffect(() => {
     let closed = false
@@ -117,10 +192,10 @@ export function DistillView({
       }
       if (closed) return
       subscription = handlersRef.current.onStreamProgress(chatId, {
-        onProgress: (progress) => {
-          if (!progress.phase) return
-          const index = DISTILL_STEPS.indexOf(progress.phase)
-          if (index >= 0) setStep(index + 1)
+        onProgress: (payload) => {
+          setProgress(
+            (current) => normalizeProgressPayload(payload, current) || current
+          )
         },
         onDone: () => loadRules('The distill job did not complete.'),
         onError: (payload) => {
@@ -141,6 +216,19 @@ export function DistillView({
     }
   }, [chatId])
 
+  const activeStepIndex = Math.max(
+    0,
+    Math.min(DISTILL_STAGES.length - 1, progress.step - 1)
+  )
+  const labelCounts = [
+    numberOrNull(progress.signalLabels) === null
+      ? null
+      : formatLabelCount(progress.signalLabels, 'signal'),
+    numberOrNull(progress.noiseLabels) === null
+      ? null
+      : formatLabelCount(progress.noiseLabels, 'non-signal')
+  ].filter(Boolean)
+
   if (phase === 'thinking') {
     return (
       <div className="vrs-think vrs-fade-in">
@@ -152,20 +240,36 @@ export function DistillView({
             signal.
           </div>
         </div>
+        <div className="vrs-think__status">
+          <div className="vrs-think__status-phase">{progress.phase}</div>
+          <div className="vrs-think__meta">
+            <span>
+              Step {progress.step} of {progress.totalSteps}
+            </span>
+            <span>Elapsed {formatElapsed(elapsedSeconds)}</span>
+          </div>
+          {labelCounts.length > 0 && (
+            <div className="vrs-think__meta">
+              {labelCounts.map((count) => (
+                <span key={count}>{count}</span>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="vrs-think__steps">
-          {DISTILL_STEPS.map((s, i) => (
+          {DISTILL_STAGES.map((definition, i) => (
             <div
-              key={i}
-              className={`vrs-think__step ${i < step ? 'is-done' : ''} ${i === step ? 'is-active' : ''}`}
+              key={definition.stage}
+              className={`vrs-think__step ${i < activeStepIndex ? 'is-done' : ''} ${i === activeStepIndex ? 'is-active' : ''}`}
             >
               <span className="vrs-think__tick">
-                {i < step ? (
+                {i < activeStepIndex ? (
                   <Icon
                     name="check"
                     size={14}
                     style={{ color: 'var(--accent-text)' }}
                   />
-                ) : i === step ? (
+                ) : i === activeStepIndex ? (
                   <span className="vrs-dot-pulse" />
                 ) : (
                   <span
@@ -178,7 +282,7 @@ export function DistillView({
                   />
                 )}
               </span>
-              {s}
+              {definition.checklist}
             </div>
           ))}
         </div>

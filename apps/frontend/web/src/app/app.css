@@ -1150,6 +1150,24 @@ button.vrs-pipe__step:active {
   max-width: 44ch;
   line-height: var(--lh-body);
 }
+.vrs-think__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.vrs-think__status-phase {
+  color: var(--text-body);
+}
+.vrs-think__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
 .vrs-think__steps {
   display: flex;
   flex-direction: column;
