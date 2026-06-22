@@ -1,7 +1,10 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import partial
+
+logger = logging.getLogger(__name__)
 
 
 class JobAlreadyRunningError(Exception):
@@ -90,6 +93,7 @@ class JobRegistry:
             publisher.error("cancelled")
             raise
         except Exception as error:
+            logger.exception("job.unexpected_failure")
             publisher.error(str(error))
 
     async def stream(self, key: str) -> AsyncIterator[tuple[str, dict]]:

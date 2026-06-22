@@ -4,6 +4,7 @@ The domain `DeletedSignalEvidence` speaks `channel_id`/`message_id`; storage
 speaks `external_id`/`external_message_id` and is user-owned.
 """
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,7 +12,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.deletion import DeletedSignalEvidence
-from verasig.storage.models import DeletedSignalEvidenceRow
+from verasig.storage.models import DeletedSignalEvidenceRow, GoldenLabelRow
+
+
+@dataclass(frozen=True)
+class DeletionSummary:
+    history_gaps: bool = False
+    signal_deletion: bool = False
+    deleted_count: int = 0
 
 
 def _deletion_values(user_id: UUID, evidence: DeletedSignalEvidence) -> dict:
@@ -79,3 +87,40 @@ def read_deletion_evidence(
         )
     ).all()
     return [_row_to_deletion(row) for row in rows]
+
+
+def summarize_deletions(
+    session: Session, user_id: UUID, external_ids: list[int]
+) -> dict[int, DeletionSummary]:
+    if not external_ids:
+        return {}
+    rows = session.execute(
+        select(
+            DeletedSignalEvidenceRow.external_id,
+            DeletedSignalEvidenceRow.confidence,
+            GoldenLabelRow.label,
+        )
+        .outerjoin(
+            GoldenLabelRow,
+            (GoldenLabelRow.user_id == DeletedSignalEvidenceRow.user_id)
+            & (GoldenLabelRow.external_id == DeletedSignalEvidenceRow.external_id)
+            & (
+                GoldenLabelRow.external_message_id
+                == DeletedSignalEvidenceRow.external_message_id
+            ),
+        )
+        .where(
+            DeletedSignalEvidenceRow.user_id == user_id,
+            DeletedSignalEvidenceRow.external_id.in_(external_ids),
+        )
+    ).all()
+    summaries = {external_id: DeletionSummary() for external_id in external_ids}
+    for external_id, confidence, label in rows:
+        current = summaries[external_id]
+        summaries[external_id] = DeletionSummary(
+            history_gaps=current.history_gaps or confidence == "SUSPECTED",
+            signal_deletion=current.signal_deletion
+            or (confidence == "CONFIRMED" and label == "signal"),
+            deleted_count=current.deleted_count + 1,
+        )
+    return summaries

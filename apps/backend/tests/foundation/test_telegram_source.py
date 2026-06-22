@@ -321,6 +321,27 @@ async def test_live_message_ids_reports_scan_progress():
     assert scanned == [1, 2, 3]
 
 
+async def test_live_message_ids_resolves_joined_dialog_for_fresh_source():
+    entity = _entity(
+        entity_id=2358686814,
+        title="Private Signals",
+        username=None,
+    )
+    message = FakeTelethonMessage(11)
+    client = FakeTelethonClient(
+        messages_by_channel={entity: [message]},
+        dialogs=[_dialog(entity)],
+    )
+    source = TelethonSource(client)
+
+    live_ids = await source.live_message_ids(2358686814)
+
+    assert live_ids == {11}
+    assert client.get_entity_calls == [2358686814]
+    assert client.iter_dialog_calls == 1
+    assert client.iter_calls == [(entity, {})]
+
+
 async def test_resolve_channel_rejects_ambiguous_dialog_title():
     title = "Signals"
     client = FakeTelethonClient(

@@ -179,7 +179,7 @@ class TelethonSource(TelegramSource):
     ) -> set[int]:
         # full live id set for snapshot-diff; report the running count so a long
         # re-fetch never goes silent to progress subscribers
-        entity = self._read_entity(channel_id)
+        entity = await self._read_live_entity(channel_id)
         live_ids: set[int] = set()
         async for message in self._client.iter_messages(entity):
             live_ids.add(message.id)
@@ -195,6 +195,22 @@ class TelethonSource(TelegramSource):
     def _read_entity(self, channel_id: int) -> Any:
         normalized = _normalize_chat_id(channel_id)
         return self._entities_by_channel_id.get(normalized, channel_id)
+
+    async def _read_live_entity(self, channel_id: int) -> Any:
+        normalized = _normalize_chat_id(channel_id)
+        if normalized in self._entities_by_channel_id:
+            return self._entities_by_channel_id[normalized]
+        entity = await self._resolve_channel_id_for_read(channel_id)
+        self._remember_entity(entity)
+        return entity
+
+    async def _resolve_channel_id_for_read(self, channel_id: int) -> Any:
+        try:
+            entity = await self._client.get_entity(channel_id)
+        except (TypeError, ValueError):
+            entity = await self._resolve_dialog_id_entity(channel_id)
+            return entity if entity is not None else channel_id
+        return entity
 
     async def live_events(
         self, channel_ids: list[int]

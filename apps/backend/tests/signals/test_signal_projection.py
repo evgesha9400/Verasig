@@ -6,12 +6,19 @@ from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
+from verasig.domain.deletion import (
+    DeletedSignalEvidence,
+    DeletionConfidence,
+    DeletionMethod,
+)
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
+from verasig.domain.parser_rule import ParserRule
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
+    deletion_repository,
     feed_repository,
     message_repository,
 )
@@ -36,17 +43,81 @@ def test_present_signals_projects_lifecycle_outcomes_and_orphan_mods(db_session)
     assert result["limitReached"] is False
     assert signal["id"] == str(_SIGNAL_ID)
     assert signal["feedId"] == "7"
+    assert signal["feedName"] == "Pilot"
+    assert signal["feedTag"] == "@pilot"
+    assert signal["feedInitials"] == "P"
+    assert signal["feedTint"].startswith("var(--viz-")
+    assert signal["text"] == "BTC long entry"
     assert signal["status"] == "tested"
     assert signal["outcome"] == "profit"
     assert signal["pnl"] == 1.5
+    assert signal["tp"] == ["110"]
+    assert signal["tpText"] == "110"
     assert signal["mods"][0]["kind"] == "move_stop"
     assert signal["mods"][0]["via"] == "reply"
+    assert signal["mods"][0]["effect"] == "Stop -> 100"
     assert signal["effective"]["stop"] == "100"
     assert orphan["id"] == "3"
     assert orphan["suggestId"] == str(_SIGNAL_ID)
 
 
-def _seed(session) -> None:
+def test_present_signals_includes_verified_feed_without_backtest(db_session):
+    _seed(db_session, status="verified", with_backtest=False)
+
+    result = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)
+
+    assert result["signals"][0]["status"] == "untested"
+    assert result["signals"][0]["text"] == "BTC long entry"
+
+
+def test_present_signals_materializes_verified_feed_signals(db_session):
+    _seed(
+        db_session,
+        status="verified",
+        with_backtest=False,
+        with_extracted=False,
+        message_text="BTC long entry 100 sl 95 tp 110",
+    )
+
+    result = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)
+
+    signal = result["signals"][0]
+    assert signal["status"] == "untested"
+    assert signal["symbol"] == "BTCUSDT"
+    assert signal["entry"] == "100"
+    assert signal["stop"] == "95"
+    assert signal["tp"] == ["110"]
+    assert signal["text"] == "BTC long entry 100 sl 95 tp 110"
+
+
+def test_present_signals_filters_confirmed_deleted_evidence(db_session):
+    _seed(db_session, deleted=True)
+
+    result = present_signals(db_session, _USER_ID, status="deleted", plan=Plan.OPERATOR)
+
+    assert len(result["signals"]) == 1
+    assert result["signals"][0]["status"] == "deleted"
+    assert result["signals"][0]["deleted"] is True
+
+
+def test_present_signals_ignores_unlabelled_candidate_deletion(db_session):
+    _seed(db_session, deleted=True, label_deleted_signal=False)
+
+    result = present_signals(db_session, _USER_ID, status="deleted", plan=Plan.OPERATOR)
+
+    assert result["signals"] == []
+
+
+def _seed(
+    session,
+    *,
+    status: str = "analyzed",
+    with_backtest: bool = True,
+    with_extracted: bool = True,
+    message_text: str = "BTC long entry",
+    deleted: bool = False,
+    label_deleted_signal: bool = True,
+) -> None:
     account_repository.insert_account(
         session,
         UserAccount(
@@ -78,40 +149,68 @@ def _seed(session) -> None:
         session,
         _USER_ID,
         [
-            _message(1, "BTC long entry", None),
+            _message(1, message_text, None),
             _message(2, "move SL to BE", 1),
             _message(3, "close BTC at 110", None),
         ],
     )
-    event_repository.insert_signal_events(session, _USER_ID, [_event()])
-    outcome_repository.insert_extracted_signals(session, [_signal()], _USER_ID)
-    rule_repository.upsert_labels(
-        session,
-        [
+    event_repository.insert_signal_events(session, _USER_ID, [_event(message_text)])
+    if with_extracted:
+        outcome_repository.insert_extracted_signals(session, [_signal()], _USER_ID)
+    else:
+        rule_repository.upsert_parser_rules(session, [_parser_rule()])
+    labels = [
+        GoldenLabel(
+            user_id=_USER_ID, channel_id=7, message_id=3, label=LabelKind.MODIFIER
+        )
+    ]
+    if deleted and label_deleted_signal:
+        labels.append(
             GoldenLabel(
-                user_id=_USER_ID, channel_id=7, message_id=3, label=LabelKind.MODIFIER
+                user_id=_USER_ID,
+                channel_id=7,
+                message_id=1,
+                label=LabelKind.SIGNAL,
             )
-        ],
-    )
-    backtest_repository.insert_result(
-        session,
-        _USER_ID,
-        7,
-        90,
-        Decimal("100.0"),
-        Decimal("1.5"),
-        [
-            {
-                "rootSignalId": str(_SIGNAL_ID),
-                "kind": "R_MULTIPLE",
-                "rMultiple": 2.0,
-                "pctReturn": 1.5,
-                "exitReason": "tp",
-            }
-        ],
-        _BASE,
-    )
-    feed_repository.set_status(session, _USER_ID, 7, "analyzed")
+        )
+    rule_repository.upsert_labels(session, labels)
+    if with_backtest:
+        backtest_repository.insert_result(
+            session,
+            _USER_ID,
+            7,
+            90,
+            Decimal("100.0"),
+            Decimal("1.5"),
+            [
+                {
+                    "rootSignalId": str(_SIGNAL_ID),
+                    "kind": "R_MULTIPLE",
+                    "rMultiple": 2.0,
+                    "pctReturn": 1.5,
+                    "exitReason": "tp",
+                }
+            ],
+            _BASE,
+        )
+    if deleted:
+        deletion_repository.upsert_deletion_evidence(
+            session,
+            _USER_ID,
+            [
+                DeletedSignalEvidence(
+                    channel_id=7,
+                    message_id=1,
+                    confidence=DeletionConfidence.CONFIRMED,
+                    method=DeletionMethod.SNAPSHOT_DIFF,
+                    original_text="BTC long entry",
+                    first_seen_at=_BASE,
+                    detected_at=_BASE,
+                    was_signal_candidate=True,
+                )
+            ],
+        )
+    feed_repository.set_status(session, _USER_ID, 7, status)
     session.commit()
 
 
@@ -128,12 +227,12 @@ def _message(message_id: int, text: str, reply_to: int | None) -> RawTelegramMes
     )
 
 
-def _event() -> RawSignalEvent:
+def _event(candidate_text: str = "BTC long entry") -> RawSignalEvent:
     return RawSignalEvent(
         id=_EVENT_ID,
         channel_id=7,
         message_id=1,
-        candidate_text="BTC long entry",
+        candidate_text=candidate_text,
         materialized_by=MaterializationPath.SEED_HEURISTIC,
         created_at=_BASE,
     )
@@ -152,4 +251,25 @@ def _signal() -> ExtractedSignal:
         stop_loss=Decimal("95"),
         take_profits=[Decimal("110")],
         extracted_at=_BASE,
+    )
+
+
+def _parser_rule() -> ParserRule:
+    return ParserRule(
+        rule_id=f"{_USER_ID}:7-parser-v1",
+        user_id=_USER_ID,
+        channel_id=7,
+        patterns=[
+            r"(?P<symbol>[A-Z]{2,10})\s+(?P<side>long|short)"
+            r".*?entry\s+(?P<entry>[\d.]+).*?sl\s+(?P<sl>[\d.]+)"
+            r".*?tp\s+(?P<tp>[\d.]+)"
+        ],
+        field_map={
+            "symbol": "symbol",
+            "side": "side",
+            "entry": "entry",
+            "sl": "stop_loss",
+            "tp": "take_profit",
+        },
+        side_aliases={"long": "LONG", "short": "SHORT"},
     )

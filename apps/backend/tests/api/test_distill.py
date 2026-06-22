@@ -1,5 +1,7 @@
 import json
+import logging
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -23,6 +25,36 @@ from verasig.features.signals import event_repository
 from verasig.foundation.jobs.registry import JobRegistry
 
 SECRET = "s" * 32
+
+
+class _RecordLogHandler(logging.Handler):
+    def __init__(self, level: int = logging.INFO) -> None:
+        super().__init__(level)
+        self.records: list[logging.LogRecord] = []
+
+    @property
+    def text(self) -> str:
+        return "\n".join(record.getMessage() for record in self.records)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@contextmanager
+def _capture_logger(name: str, level: int = logging.INFO):
+    handler = _RecordLogHandler(level)
+    logger = logging.getLogger(name)
+    previous_level = logger.level
+    previous_disabled = logger.disabled
+    logger.setLevel(level)
+    logger.disabled = False
+    logger.addHandler(handler)
+    try:
+        yield handler
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+        logger.disabled = previous_disabled
 
 
 def _register(client) -> tuple[str, object]:
@@ -141,6 +173,17 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
     responses = [
         json.dumps({"include_patterns": ["zzz"]}),
         json.dumps({"include_patterns": ["alpha"]}),
+        json.dumps(
+            {
+                "parser_rules": [
+                    {
+                        "patterns": [r"(?P<symbol>BTC)\s+alpha\s+(?P<side>long)"],
+                        "field_map": {"symbol": "symbol", "side": "side"},
+                        "side_aliases": {"long": "LONG"},
+                    }
+                ]
+            }
+        ),
     ]
 
     def runner(_prompt: str) -> str:
@@ -154,16 +197,25 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
     ) as response:
         body = "".join(response.iter_text())
     rules = client.get("/feeds/7/rules", headers=_auth(token))
+    with app.state.session_factory() as session:
+        parser_rules = rule_repository.read_parser_rules(session, 7, user_id)
 
     assert started.status_code == 202
-    assert '"stage": "labels_read"' in body
-    assert '"stage": "filter_distilling"' in body
-    assert '"stage": "parser_distilling"' in body
-    assert '"stage": "rules_persisting"' in body
+    for stage in (
+        "labels_read",
+        "filter_distilling",
+        "filter_validating",
+        "parser_distilling",
+        "rules_persisting",
+        "rules_complete",
+    ):
+        assert f'"stage": "{stage}"' in body
     assert '"signalLabels": 5' in body
     assert '"noiseLabels": 2' in body
     assert "event: done" in body
     assert responses == []
+    assert len(parser_rules) == 1
+    assert parser_rules[0].field_map == {"symbol": "symbol", "side": "side"}
     assert rules.status_code == 200
     assert rules.json()["rules"] == [
         {
@@ -173,6 +225,47 @@ def test_distill_job_persists_rules_and_streams_progress(client, app):
             "match": 100.0,
         }
     ]
+
+
+def test_distill_job_logs_successful_progress(client, app):
+    token, user_id = _register(client)
+    _seed_chat(app, user_id, signal_count=5, noise_count=2)
+
+    class ImmediateDistiller:
+        def distill_filter(self, _examples):
+            return FilterRule(rule_id="filter", include_patterns=["alpha"])
+
+        def distill_parsers(self, _examples):
+            return []
+
+    app.state.distiller_factory = ImmediateDistiller
+
+    with _capture_logger(distill_routes.__name__) as logs:
+        client.post("/feeds/7/distill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/distill/progress", headers=_auth(token)
+        ) as response:
+            body = "".join(response.iter_text())
+
+    assert "event: done" in body
+    for stage in (
+        "labels_read",
+        "filter_distilling",
+        "filter_validating",
+        "parser_distilling",
+        "rules_persisting",
+        "rules_complete",
+    ):
+        assert (
+            f"feed_job.progress: operation=distill external_id=7 "
+            f"phase={distill_routes.DISTILL_STAGE_BY_KEY[stage]['phase']}"
+        ) in logs.text
+        assert f"stage={stage}" in logs.text
+    assert "step=1" in logs.text
+    assert "total_steps=6" in logs.text
+    assert "signal_labels=5" in logs.text
+    assert "noise_labels=2" in logs.text
+    assert "attempt=None" in logs.text
 
 
 def test_distill_job_emits_error_when_filter_never_validates(client, app):
@@ -185,11 +278,12 @@ def test_distill_job_emits_error_when_filter_never_validates(client, app):
 
     app.state.distiller_factory = lambda: AnthropicDistiller(runner=runner)
 
-    started = client.post("/feeds/7/distill", headers=_auth(token))
-    with client.stream(
-        "GET", "/feeds/7/distill/progress", headers=_auth(token)
-    ) as response:
-        body = "".join(response.iter_text())
+    with _capture_logger(distill_routes.__name__, logging.WARNING) as logs:
+        started = client.post("/feeds/7/distill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/distill/progress", headers=_auth(token)
+        ) as response:
+            body = "".join(response.iter_text())
     rules = client.get("/feeds/7/rules", headers=_auth(token))
 
     assert started.status_code == 202
@@ -199,6 +293,51 @@ def test_distill_job_emits_error_when_filter_never_validates(client, app):
     assert '"accuracy"' in body
     assert responses == []
     assert rules.json()["rules"] == []
+    assert "distill.failed: external_id=7 stage=filter_distilling" in logs.text
+    assert "reason=filter distillation failed deterministic validation" in logs.text
+    assert any(record.exc_info for record in logs.records)
+
+
+def test_distill_job_logs_parser_failure_with_exception_details(client, app):
+    token, user_id = _register(client)
+    _seed_chat(app, user_id, signal_count=5)
+    responses = [
+        json.dumps({"include_patterns": ["alpha"]}),
+        *[
+            json.dumps(
+                {
+                    "parser_rules": [
+                        {
+                            "patterns": [r"(?P<symbol>BTC)"],
+                            "field_map": {"symbol": "symbol"},
+                            "side_aliases": {},
+                        }
+                    ]
+                }
+            )
+            for _ in range(3)
+        ],
+    ]
+
+    def runner(_prompt: str) -> str:
+        return responses.pop(0)
+
+    app.state.distiller_factory = lambda: AnthropicDistiller(runner=runner)
+
+    with _capture_logger(distill_routes.__name__, logging.WARNING) as logs:
+        started = client.post("/feeds/7/distill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/distill/progress", headers=_auth(token)
+        ) as response:
+            body = "".join(response.iter_text())
+
+    assert started.status_code == 202
+    assert "event: error" in body
+    assert "parser distillation failed deterministic validation" in body
+    assert responses == []
+    assert "distill.failed: external_id=7 stage=parser_distilling" in logs.text
+    assert "reason=parser distillation failed deterministic validation" in logs.text
+    assert any(record.exc_info for record in logs.records)
 
 
 @pytest.mark.asyncio

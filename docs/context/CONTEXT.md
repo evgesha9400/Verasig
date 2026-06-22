@@ -16,6 +16,10 @@ _Avoid_: account, integration, channel.
 A stream a user follows through a `Source` — **user-owned**, keyed by `user_id` + the provider stream id. Collapses what used to be a shared channel record plus a separate membership row into one entity that also carries the backfill cursor and provider `metadata` (handle, private flag, subscriber count). The API and UI call this a **feed**; in code its resolved form is a `TelegramChannel`.
 _Avoid_: subscription, chat, channel cache.
 
+**Fetch new messages**:
+Resume capture for a `Feed` from its current cursor. It updates captured messages and deletion evidence, but does **not** invalidate existing labels, verification, or analysis by default; re-labeling and re-verification are user-initiated through **Review labels**.
+_Avoid_: re-label, re-verify, reset.
+
 **TelegramChannel**:
 The Telegram adapter's domain view of a `Feed` — a monitored public or private channel a provider posts signals to, identified by its Telegram channel id. Persisted as a user-owned `feed` row (`external_id`); the in-code object keeps `channel_id`.
 _Avoid_: group, chat.
@@ -66,11 +70,11 @@ A declarative, versioned, provider-specific **inclusion** rule (recall-first inc
 _Avoid_: candidate regex, keyword list (those are the cold-start seed, not the distilled rule).
 
 **ParserRule**:
-A declarative, versioned, provider-specific **extraction** rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch. Distilled from `GoldenLabel.expected` fields via human-assisted distillation, never autonomously mined.
+A declarative, versioned, provider-specific **extraction** rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch. Distilled from labelled signal text via human-assisted distillation; `GoldenLabel.expected` fields tighten deterministic validation when present.
 _Avoid_: parser, regex, grammar.
 
 **Distillation loop**:
-The human-assisted labeling cycle: operator classifies messages → AI distills both a `FilterRule` (from signal labels) and `ParserRule`s (from `expected` fields) from the examples → rules are applied and measured against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus.
+The human-assisted labeling cycle: operator classifies messages → AI distills both a `FilterRule` (from labels) and `ParserRule`s (from labelled signal text, tightened by `expected` fields when present) → backend validation applies the rules against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus.
 
 **Golden corpus**:
 The operator-labeled set of messages (signal / not-signal + expected fields) used as ground truth for parser precision and recall.

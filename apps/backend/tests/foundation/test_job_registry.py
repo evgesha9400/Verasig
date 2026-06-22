@@ -1,8 +1,40 @@
 import asyncio
+import logging
+from contextlib import contextmanager
 
 import pytest
 
 from verasig.foundation.jobs.registry import JobAlreadyRunningError, JobRegistry
+
+
+class _RecordLogHandler(logging.Handler):
+    def __init__(self, level: int = logging.ERROR) -> None:
+        super().__init__(level)
+        self.records: list[logging.LogRecord] = []
+
+    @property
+    def text(self) -> str:
+        return "\n".join(record.getMessage() for record in self.records)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@contextmanager
+def _capture_logger(name: str, level: int = logging.ERROR):
+    handler = _RecordLogHandler(level)
+    logger = logging.getLogger(name)
+    previous_level = logger.level
+    previous_disabled = logger.disabled
+    logger.setLevel(level)
+    logger.disabled = False
+    logger.addHandler(handler)
+    try:
+        yield handler
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+        logger.disabled = previous_disabled
 
 
 async def _collect(registry: JobRegistry, key: str) -> list[tuple[str, dict]]:
@@ -101,9 +133,13 @@ async def test_failing_coroutine_yields_error_event():
     async def run(_publisher):
         raise RuntimeError("boom")
 
-    registry.start("job", run)
+    with _capture_logger("verasig.foundation.jobs.registry") as logs:
+        registry.start("job", run)
+        events = await _collect(registry, "job")
 
-    assert await _collect(registry, "job") == [("error", {"message": "boom"})]
+    assert events == [("error", {"message": "boom"})]
+    assert "job.unexpected_failure" in logs.text
+    assert any(record.exc_info for record in logs.records)
 
 
 @pytest.mark.asyncio

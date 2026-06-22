@@ -14,6 +14,7 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.feeds.feed_views import feed_initials, feed_tint
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
     event_repository,
@@ -21,11 +22,13 @@ from verasig.features.signals import (
     outcome_repository,
 )
 from verasig.features.signals.fold import fold
+from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_short, format_time
 
 OBSERVER_SIGNAL_LIMIT = 200
+SIGNAL_FEED_STATUSES = {"verified", "analyzed"}
 
 
 def present_signals(
@@ -77,18 +80,19 @@ def link_modifier(
 def _project_user_signals(
     session: Session, user_id: UUID, feed_id: str | None
 ) -> tuple[list[dict], list[dict]]:
-    feeds = feed_repository.read_feeds(session, user_id)
-    channel_ids = [feed.external_id for feed in feeds]
+    feeds = [
+        feed
+        for feed in feed_repository.read_feeds(session, user_id)
+        if feed.status in SIGNAL_FEED_STATUSES
+    ]
     if feed_id is not None:
-        channel_ids = [
-            channel_id for channel_id in channel_ids if str(channel_id) == feed_id
-        ]
+        feeds = [feed for feed in feeds if str(feed.external_id) == feed_id]
     latest_results = backtest_repository.read_latest_results(session, user_id)
     signals: list[dict] = []
     orphan_mods: list[dict] = []
-    for channel_id in channel_ids:
+    for feed in feeds:
         projected, orphans = _project_channel(
-            session, user_id, channel_id, latest_results.get(channel_id)
+            session, user_id, feed, latest_results.get(feed.external_id)
         )
         signals.extend(projected)
         orphan_mods.extend(orphans)
@@ -96,8 +100,11 @@ def _project_user_signals(
 
 
 def _project_channel(
-    session: Session, user_id: UUID, channel_id: int, result
+    session: Session, user_id: UUID, feed, result
 ) -> tuple[list[dict], list[dict]]:
+    channel_id = feed.external_id
+    materialize_missing_signal_outcomes(session, user_id, channel_id)
+    session.flush()
     messages = message_repository.read_messages(session, user_id, channel_id)
     events = event_repository.read_signal_events(session, user_id, channel_id)
     signals = outcome_repository.read_extracted_signals(session, channel_id, user_id)
@@ -107,7 +114,13 @@ def _project_channel(
     }
     folded = fold(signals, events, messages, manual_links=manual_links)
     message_by_id = {message.message_id: message for message in messages}
+    events_by_id = {event.id: event for event in events}
     event_message_ids = {event.id: event.message_id for event in events}
+    event_text_by_signal_id = {
+        signal.id: events_by_id[signal.event_id].candidate_text
+        for signal in signals
+        if signal.event_id in events_by_id
+    }
     signal_message_ids = {
         signal.id: event_message_ids[signal.event_id]
         for signal in signals
@@ -118,8 +131,10 @@ def _project_channel(
     rows = [
         _signal_row(
             item,
+            feed,
             message_by_id,
             signal_message_ids,
+            event_text_by_signal_id,
             outcome_by_signal_id.get(str(item.root_signal_id)),
             deleted_message_ids,
             set(manual_links),
@@ -129,37 +144,51 @@ def _project_channel(
     used_message_ids = {
         step.source_message_id for item in folded for step in item.timeline
     }
-    return rows, _orphan_mods(
-        session, user_id, channel_id, messages, rows, used_message_ids
-    )
+    return rows, _orphan_mods(session, user_id, feed, messages, rows, used_message_ids)
 
 
 def _signal_row(
     folded: FoldedSignal,
+    feed,
     messages: dict[int, RawTelegramMessage],
     signal_message_ids: dict[UUID, int],
+    event_text_by_signal_id: dict[UUID, str],
     outcome: dict | None,
     deleted_message_ids: set[int],
     manual_message_ids: set[int],
 ) -> dict:
     first = folded.timeline[0]
     message = messages[first.source_message_id]
+    deleted = signal_message_ids.get(first.source_signal_id) in deleted_message_ids
     return {
         "id": str(folded.root_signal_id),
-        "feedId": str(message.channel_id),
+        **_feed_fields(feed),
         "side": folded.side.value,
         "symbol": folded.symbol,
-        **_outcome_fields(outcome),
+        "text": message.text or event_text_by_signal_id.get(first.source_signal_id),
+        **_outcome_fields(outcome, deleted),
         "date": format_short(first.at),
         "time": format_time(first.at),
-        "entry": _decimal_text(first.effective_entry),
+        "entry": _entry_text(first),
         "stop": _decimal_text(first.effective_stop_loss),
         "tp": [_decimal_text(value) for value in first.effective_take_profits],
-        "deleted": signal_message_ids.get(first.source_signal_id)
-        in deleted_message_ids,
+        "tpText": _targets_text(first.effective_take_profits),
+        "deleted": deleted,
         "cancelled": folded.closed_at is not None,
         "mods": _mods(folded, messages, manual_message_ids),
         "effective": _effective(folded),
+    }
+
+
+def _feed_fields(feed) -> dict:
+    handle = feed.meta.get("handle")
+    return {
+        "feedId": str(feed.external_id),
+        "feedName": feed.title,
+        "feedTag": f"@{handle}" if handle else None,
+        "feedInitials": feed_initials(feed.title),
+        "feedTint": feed_tint(feed.title),
+        "source": "telegram",
     }
 
 
@@ -187,7 +216,9 @@ def _mod_row(
         "date": format_short(step.at),
         "time": format_time(step.at),
         "via": "inferred" if message.message_id in manual_message_ids else "reply",
+        "price": _mod_price(step, patch),
         "text": message.text,
+        "effect": _mod_effect(step, patch),
     }
 
 
@@ -221,7 +252,9 @@ def _effective(folded: FoldedSignal) -> dict:
     return effective
 
 
-def _outcome_fields(outcome: dict | None) -> dict:
+def _outcome_fields(outcome: dict | None, deleted: bool) -> dict:
+    if deleted:
+        return {"status": "deleted", "outcome": None, "pnl": None}
     if outcome is None:
         return {"status": "untested", "outcome": None, "pnl": None}
     if outcome.get("kind") == "UNFILLED":
@@ -237,11 +270,12 @@ def _outcome_fields(outcome: dict | None) -> dict:
 def _orphan_mods(
     session: Session,
     user_id: UUID,
-    channel_id: int,
+    feed,
     messages: list[RawTelegramMessage],
     signals: list[dict],
     used_message_ids: set[int],
 ) -> list[dict]:
+    channel_id = feed.external_id
     labels = [
         label
         for label in rule_repository.read_labels(session, channel_id, user_id)
@@ -250,16 +284,16 @@ def _orphan_mods(
     ]
     messages_by_id = {message.message_id: message for message in messages}
     return [
-        _orphan_row(messages_by_id[label.message_id], signals)
+        _orphan_row(feed, messages_by_id[label.message_id], signals)
         for label in labels
         if label.message_id in messages_by_id
     ]
 
 
-def _orphan_row(message: RawTelegramMessage, signals: list[dict]) -> dict:
+def _orphan_row(feed, message: RawTelegramMessage, signals: list[dict]) -> dict:
     return {
         "id": str(message.message_id),
-        "feedId": str(message.channel_id),
+        **_feed_fields(feed),
         "symbol": _suggested_symbol(message.text, signals),
         "date": format_short(message.posted_at),
         "time": format_time(message.posted_at),
@@ -293,12 +327,18 @@ def _outcomes_by_signal_id(result) -> dict[str, dict]:
 
 
 def _deleted_message_ids(session: Session, user_id: UUID, channel_id: int) -> set[int]:
+    signal_label_ids = {
+        label.message_id
+        for label in rule_repository.read_labels(session, channel_id, user_id)
+        if label.label is LabelKind.SIGNAL
+    }
     return {
         evidence.message_id
         for evidence in deletion_repository.read_deletion_evidence(
             session, user_id, channel_id
         )
-        if evidence.confidence.value == "CONFIRMED" and evidence.was_signal_candidate
+        if evidence.confidence.value == "CONFIRMED"
+        and evidence.message_id in signal_label_ids
     }
 
 
@@ -307,3 +347,49 @@ def _decimal_text(value: Decimal | None) -> str | None:
         return None
     text = format(value, "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def _entry_text(step: FoldStep) -> str | None:
+    low = _decimal_text(step.entry_low or step.effective_entry)
+    high = _decimal_text(step.entry_high)
+    if low is None:
+        return None
+    if high is None or high == low:
+        return low
+    return f"{low} - {high}"
+
+
+def _targets_text(values: list[Decimal]) -> str | None:
+    targets = [_decimal_text(value) for value in values]
+    return " / ".join(value for value in targets if value) or None
+
+
+def _mod_price(step: FoldStep, patch: LifecyclePatch) -> str | None:
+    if step.leg_price is not None:
+        return _decimal_text(step.leg_price)
+    if patch.set_stop_loss is not None:
+        return _decimal_text(patch.set_stop_loss)
+    if patch.stop_to_breakeven:
+        return _decimal_text(step.effective_stop_loss)
+    return None
+
+
+def _mod_effect(step: FoldStep, patch: LifecyclePatch) -> str | None:
+    if patch.close:
+        return "Closed by author"
+    if patch.reduce_fraction is not None:
+        pct = _decimal_text(patch.reduce_fraction * Decimal(100))
+        return f"{pct}% out" if pct else "Reduced position"
+    if patch.add_multiplier is not None:
+        entry = _decimal_text(step.effective_entry)
+        size = _decimal_text(step.effective_size)
+        if entry and size:
+            return f"Avg entry -> {entry} - size x{size}"
+        return "Averaged position"
+    if patch.stop_to_breakeven or patch.set_stop_loss is not None:
+        stop = _decimal_text(step.effective_stop_loss)
+        return f"Stop -> {stop}" if stop else "Stop updated"
+    if patch.set_take_profits is not None:
+        targets = _targets_text(step.effective_take_profits)
+        return f"Targets -> {targets}" if targets else "Targets updated"
+    return None

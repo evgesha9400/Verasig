@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 from fakes import FakeSource, FakeTelegramAuth
@@ -23,6 +25,41 @@ def _register(client, email: str = "ada@example.com") -> str:
 
 def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+class _MessageLogHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__(logging.INFO)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+_APP_LOGGER_NAMES = (
+    "verasig",
+    "verasig.features.feeds.backfill_job_coordinator",
+    "verasig.features.feeds.deletion_rescan",
+)
+
+
+@contextmanager
+def _capture_app_logs():
+    handler = _MessageLogHandler()
+    loggers = [logging.getLogger(name) for name in _APP_LOGGER_NAMES]
+    previous_levels = {logger: logger.level for logger in loggers}
+    previous_disabled = {logger: logger.disabled for logger in loggers}
+    for logger in loggers:
+        logger.setLevel(logging.INFO)
+        logger.disabled = False
+        logger.addHandler(handler)
+    try:
+        yield handler.messages
+    finally:
+        for logger in loggers:
+            logger.removeHandler(handler)
+            logger.setLevel(previous_levels[logger])
+            logger.disabled = previous_disabled[logger]
 
 
 def _channel() -> TelegramChannel:
@@ -103,7 +140,17 @@ def _connect_and_subscribe(client, app, token: str, source) -> None:
     )
 
 
-def test_backfill_job_streams_progress_and_flags_deleted_signal(client, app):
+def _set_feed_status(app, token: str, status: str) -> None:
+    from verasig.features.accounts.tokens import read_user_id
+    from verasig.features.feeds import feed_repository
+
+    user_id = read_user_id(token, app.state.jwt_secret)
+    with app.state.session_factory() as session:
+        feed_repository.set_status(session, user_id, 7, status)
+        session.commit()
+
+
+def test_backfill_job_streams_progress_and_counts_unlabelled_deletion(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 3})
     _connect_and_subscribe(client, app, token, source)
@@ -119,7 +166,8 @@ def test_backfill_job_streams_progress_and_flags_deleted_signal(client, app):
     assert "event: progress" in body
     assert "event: done" in body
     assert listed.json()["feeds"][0]["status"] == "backfilled"
-    assert listed.json()["feeds"][0]["signalDeletion"] is True
+    assert listed.json()["feeds"][0]["signalDeletion"] is False
+    assert listed.json()["feeds"][0]["deletedCount"] == 1
 
 
 def test_backfill_duplicate_start_and_cancel(client, app):
@@ -244,6 +292,65 @@ def test_refresh_backfill_starts_new_run_and_resumes_from_cursor(client, app):
     assert listed["fetched"] == 5
 
 
+def test_verified_feed_refresh_restores_verified_status(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    first = client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    _set_feed_status(app, token, "verified")
+
+    grown = FakeSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+    app.state.telegram_source_factory = lambda _link: grown
+    refreshed = client.post(
+        "/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"}
+    )
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        refreshed_body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert first.status_code == 202
+    assert refreshed.status_code == 202
+    assert "event: done" in refreshed_body
+    assert listed["status"] == "verified"
+    assert listed["fetched"] == 5
+
+
+def test_analyzed_feed_refresh_restores_analyzed_status(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    _set_feed_status(app, token, "analyzed")
+
+    grown = FakeSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+    app.state.telegram_source_factory = lambda _link: grown
+    refreshed = client.post(
+        "/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"}
+    )
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        refreshed_body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert refreshed.status_code == 202
+    assert "event: done" in refreshed_body
+    assert listed["status"] == "analyzed"
+    assert listed["fetched"] == 5
+
+
 def test_full_backfill_resets_cursor_and_refetches_all(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
@@ -271,6 +378,95 @@ def test_full_backfill_resets_cursor_and_refetches_all(client, app):
     assert "event: done" in full_body
     assert listed["status"] == "backfilled"
     assert listed["fetched"] == 3
+
+
+def test_verified_feed_full_refetch_restores_verified_status(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    _set_feed_status(app, token, "verified")
+
+    refetch = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    app.state.telegram_source_factory = lambda _link: refetch
+    full = client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        full_body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert full.status_code == 202
+    assert refetch.requested_afters[0] is None
+    assert "event: done" in full_body
+    assert listed["status"] == "verified"
+    assert listed["fetched"] == 3
+
+
+def test_analyzed_feed_failed_refresh_restores_analyzed_status(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    _set_feed_status(app, token, "analyzed")
+
+    failed = FakeSource(
+        _channel(), _many_messages(205), live_ids=set(range(1, 206)), fail_after_batch=0
+    )
+    app.state.telegram_source_factory = lambda _link: failed
+    refreshed = client.post(
+        "/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"}
+    )
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        failed_body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert refreshed.status_code == 202
+    assert "event: error" in failed_body
+    assert listed["status"] == "analyzed"
+    assert listed["fetched"] == 3
+
+
+def test_verified_feed_cancelled_refresh_restores_verified_status(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    _set_feed_status(app, token, "verified")
+
+    slow = SlowSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+    app.state.telegram_source_factory = lambda _link: slow
+    refreshed = client.post(
+        "/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"}
+    )
+    cancelled = client.post("/feeds/7/backfill/cancel", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        cancelled_body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert refreshed.status_code == 202
+    assert cancelled.status_code == 204
+    assert "event: error" in cancelled_body
+    assert listed["status"] == "verified"
 
 
 def test_full_backfill_while_running_attaches_without_starting_second_job(client, app):
@@ -324,6 +520,80 @@ def test_backfill_progress_stream_reports_cumulative_count_and_oldest_date(clien
     assert '"fetched": 5' in body
     assert '"lastDate": "Jun 1, 2026"' in body
     assert '"cursorExternalMessageId": 5' in body
+
+
+def test_backfill_logs_shared_progress_for_history_and_rescan(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
+    _connect_and_subscribe(client, app, token, source)
+
+    with _capture_app_logs() as messages:
+        client.post("/feeds/7/backfill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+        ) as response:
+            "".join(response.iter_text())
+
+    logs = "\n".join(messages)
+    assert "feed_job.progress: operation=backfill external_id=7" in logs
+    assert "phase=Reading channel history..." in logs
+    assert "fetched=200" in logs
+    assert "phase=Checking deleted messages... (200 scanned)" in logs
+    assert "scanned=200" in logs
+
+
+def test_refresh_backfill_logs_fetch_latest_progress(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    with _capture_app_logs() as messages:
+        client.post("/feeds/7/backfill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+        ) as response:
+            "".join(response.iter_text())
+        messages.clear()
+
+        grown = FakeSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+        app.state.telegram_source_factory = lambda _link: grown
+        client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"})
+        with client.stream(
+            "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+        ) as response:
+            "".join(response.iter_text())
+
+    logs = "\n".join(messages)
+    assert "feed_job.progress: operation=fetch_latest_messages external_id=7" in logs
+    assert "mode=refresh" in logs
+    assert "fetched=5" in logs
+
+
+def test_full_backfill_logs_rebackfill_progress(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    with _capture_app_logs() as messages:
+        client.post("/feeds/7/backfill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+        ) as response:
+            "".join(response.iter_text())
+        messages.clear()
+
+        refetch = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+        app.state.telegram_source_factory = lambda _link: refetch
+        client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
+        with client.stream(
+            "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+        ) as response:
+            "".join(response.iter_text())
+
+    logs = "\n".join(messages)
+    assert "feed_job.progress: operation=rebackfill external_id=7" in logs
+    assert "mode=full" in logs
+    assert "phase=Reading channel history..." in logs
 
 
 def test_stale_backfilling_subscription_is_reconciled_to_failed(client, app):

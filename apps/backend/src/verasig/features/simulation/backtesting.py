@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.domain.event import RawSignalEvent
+from verasig.domain.label import LabelKind
 from verasig.domain.market_ports import MarketData
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
@@ -19,10 +20,10 @@ from verasig.features.feeds import (
 )
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
-from verasig.features.rules import repository as rule_repository
+from verasig.features.rules.repository import read_labels
 from verasig.features.signals import event_repository, outcome_repository
-from verasig.features.signals.extract_service import ExtractService
 from verasig.features.signals.fold import fold
+from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
 
@@ -66,7 +67,7 @@ def load_folded_signals(
     session_factory: sessionmaker, user_id: UUID, channel_id: int
 ) -> BacktestInputs:
     with session_factory() as session:
-        _materialize_missing_outcomes(session, user_id, channel_id)
+        materialize_missing_signal_outcomes(session, user_id, channel_id)
         session.commit()
         channel = feed_repository.read_feed_channel(session, user_id, channel_id)
         messages = message_repository.read_messages(session, user_id, channel_id)
@@ -80,6 +81,11 @@ def load_folded_signals(
         deletions = deletion_repository.read_deletion_evidence(
             session, user_id, channel_id
         )
+        signal_label_ids = {
+            label.message_id
+            for label in read_labels(session, channel_id, user_id)
+            if label.label is LabelKind.SIGNAL
+        }
         message_count = message_repository.count_messages(session, user_id, channel_id)
     return BacktestInputs(
         channel=channel,
@@ -88,9 +94,20 @@ def load_folded_signals(
         events=events,
         signals=signals,
         unrecognized=unrecognized,
-        deletions=deletions,
+        deletions=_scoreable_deletions(deletions, signal_label_ids),
         folded_signals=fold(signals, events, messages),
     )
+
+
+def _scoreable_deletions(
+    deletions: list[DeletedSignalEvidence], signal_label_ids: set[int]
+) -> list[DeletedSignalEvidence]:
+    return [
+        deletion.model_copy(
+            update={"was_signal_candidate": deletion.message_id in signal_label_ids}
+        )
+        for deletion in deletions
+    ]
 
 
 def simulate_outcomes(
@@ -149,24 +166,6 @@ def persist_result(
         )
         feed_repository.set_status(session, user_id, channel_id, "analyzed")
         session.commit()
-
-
-def _materialize_missing_outcomes(session, user_id: UUID, channel_id: int) -> None:
-    events = event_repository.read_signal_events(session, user_id, channel_id)
-    done_event_ids = {
-        outcome.event_id
-        for outcome in [
-            *outcome_repository.read_extracted_signals(session, channel_id, user_id),
-            *outcome_repository.read_unrecognized_signals(session, channel_id, user_id),
-        ]
-    }
-    service = ExtractService(
-        rule_repository.read_parser_rules(session, channel_id, user_id)
-    )
-    for event in events:
-        if event.id in done_event_ids:
-            continue
-        outcome_repository.record_outcome(session, service.extract(event), user_id)
 
 
 def _tested_outcomes(outcomes: list[SimOutcome]) -> list[SimOutcome]:

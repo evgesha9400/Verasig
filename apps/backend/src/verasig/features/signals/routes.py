@@ -23,7 +23,9 @@ def list_signals(
     user: UserAccount = Depends(get_current_user),
 ) -> dict:
     with request.app.state.session_factory() as session:
-        return present_signals(session, user.id, feed_id, status, user.plan)
+        result = present_signals(session, user.id, feed_id, status, user.plan)
+        session.commit()
+        return result
 
 
 @router.get("/{signal_id}")
@@ -34,6 +36,7 @@ def get_signal(
 ) -> dict:
     with request.app.state.session_factory() as session:
         signal = present_signal(session, user.id, signal_id)
+        session.commit()
     if signal is None:
         raise ApiError(404, "SIGNAL_NOT_FOUND", "Signal not found")
     return signal

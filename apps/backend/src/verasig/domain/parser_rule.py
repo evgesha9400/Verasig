@@ -2,14 +2,15 @@
 
 `ParserRule` is precision-first: ordered `patterns` whose named groups map (via
 `field_map`) onto `ExtractedSignal` fields, with `side_aliases` normalizing
-direction words to `Side`. Distilled from `GoldenLabel.expected`; an optional
-named `python_extractor` is the escape hatch (mirrors `FilterRule.python_filter`).
+direction words to `Side`. Distilled from labelled signal text; `GoldenLabel.expected`
+fields tighten validation when present. An optional named `python_extractor` is
+the escape hatch (mirrors `FilterRule.python_filter`).
 """
 
 from datetime import datetime, timezone
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from verasig.domain.signal import Side
 
@@ -29,3 +30,10 @@ class ParserRule(BaseModel):
     python_extractor: str | None = None  # dotted path; escape hatch
     created_at: datetime = Field(default_factory=_now)
     distilled_from_label_ids: list[UUID] = Field(default_factory=list)
+
+    @field_validator("side_aliases", mode="before")
+    @classmethod
+    def _normalize_side_alias_keys(cls, raw: dict | None) -> dict:
+        if raw is None:
+            return {}
+        return {str(key).strip().lower(): value for key, value in raw.items()}

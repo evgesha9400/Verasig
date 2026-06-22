@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -17,6 +18,12 @@ from verasig.features.feeds.backfill_job_run import (
     present_progress,
     progress_event_name,
 )
+from verasig.features.feeds.deletion_rescan import RescanAborted, RescanResult, rescan
+from verasig.features.feeds.feed_job_progress import (
+    publish_logged_progress,
+    scan_phase,
+    should_publish_count,
+)
 from verasig.features.feeds.feed_views import present_feeds
 from verasig.features.feeds.schemas import BackfillStartIn, FeedCreateIn
 from verasig.features.sources.telegram_adapter import read_connection
@@ -26,9 +33,14 @@ from verasig.foundation.http.auth_dependencies import (
 )
 from verasig.foundation.http.errors import ApiError
 from verasig.foundation.http.sse import sse_single_event, sse_stream
+from verasig.foundation.jobs.registry import JobAlreadyRunningError, JobTerminalError
 from verasig.foundation.telegram.session import make_user_source
 
 router = APIRouter(prefix="/feeds")
+logger = logging.getLogger(__name__)
+
+DELETION_RESCAN_READY_STATUSES = {"verified", "analyzed"}
+DELETION_RESCAN_PROGRESS_INTERVAL = 200
 
 
 def _resolve_source(request: Request, connection):
@@ -119,6 +131,138 @@ def cancel_backfill(
 ) -> Response:
     request.app.state.backfill_jobs.cancel(subscription.user_id, int(external_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _deletion_rescan_job_key(user_id, external_id: int) -> str:
+    return f"{user_id}:{external_id}:deletion-rescan"
+
+
+def _require_deletion_rescan_ready(feed) -> None:
+    if feed.status in DELETION_RESCAN_READY_STATUSES:
+        return
+    raise ApiError(
+        409,
+        "DELETION_RESCAN_NOT_READY",
+        "Check gaps is available after feed verification.",
+    )
+
+
+def _present_deletion_rescan_result(result: RescanResult) -> dict:
+    return {
+        "externalId": str(result.external_id),
+        "newDeletedSignalCount": result.new_deleted_signal_count,
+        "newDeletedNonSignalCount": result.new_deleted_non_signal_count,
+        "newSuspectedGapCount": result.new_suspected_gap_count,
+        "totalDeletedCount": result.total_deleted_count,
+        "signalDeletion": result.signal_deletion,
+    }
+
+
+def _publish_deletion_rescan_progress(
+    publisher, external_id: int, scanned: int
+) -> None:
+    phase = scan_phase(scanned)
+    publish_logged_progress(
+        publisher,
+        {
+            "phase": phase,
+            "scanned": scanned,
+        },
+        logger=logger,
+        operation="deletion_rescan",
+        external_id=external_id,
+        phase=phase,
+        scanned=scanned,
+    )
+
+
+def _publish_deletion_rescan_phase(publisher, external_id: int, phase: str) -> None:
+    publish_logged_progress(
+        publisher,
+        {"phase": phase},
+        logger=logger,
+        operation="deletion_rescan",
+        external_id=external_id,
+        phase=phase,
+    )
+
+
+def _deletion_rescan_progress_reporter(publisher, external_id: int):
+    def report(scanned: int) -> None:
+        if should_publish_count(scanned, DELETION_RESCAN_PROGRESS_INTERVAL):
+            _publish_deletion_rescan_progress(publisher, external_id, scanned)
+
+    return report
+
+
+async def _run_deletion_rescan_job(
+    publisher,
+    source,
+    user_id,
+    external_id: int,
+    session_factory,
+) -> dict:
+    _publish_deletion_rescan_phase(publisher, external_id, "Opening MTProto session...")
+    try:
+        async with source:
+            _publish_deletion_rescan_progress(publisher, external_id, 0)
+            result = await rescan(
+                source,
+                user_id,
+                external_id,
+                session_factory,
+                on_progress=_deletion_rescan_progress_reporter(publisher, external_id),
+            )
+    except RescanAborted as error:
+        raise JobTerminalError(
+            str(error),
+            {
+                "code": "EMPTY_LIVE_SNAPSHOT",
+                "message": str(error),
+            },
+        ) from error
+    return _present_deletion_rescan_result(result)
+
+
+@router.post("/{external_id}/deletion-rescan", status_code=status.HTTP_202_ACCEPTED)
+async def start_deletion_rescan(
+    request: Request,
+    external_id: str,
+    subscription=Depends(require_feed),
+) -> dict:
+    channel_id = int(external_id)
+    _require_deletion_rescan_ready(subscription)
+
+    with request.app.state.session_factory() as session:
+        source = _require_connected_source(request, session, subscription.user_id)
+
+    key = _deletion_rescan_job_key(subscription.user_id, channel_id)
+    try:
+        request.app.state.jobs.start(
+            key,
+            lambda publisher: _run_deletion_rescan_job(
+                publisher,
+                source,
+                subscription.user_id,
+                channel_id,
+                request.app.state.session_factory,
+            ),
+        )
+    except JobAlreadyRunningError as error:
+        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
+    return {"jobId": key}
+
+
+@router.get("/{external_id}/deletion-rescan/progress")
+def deletion_rescan_progress(
+    request: Request,
+    external_id: str,
+    subscription=Depends(require_feed),
+):
+    key = _deletion_rescan_job_key(subscription.user_id, int(external_id))
+    if not request.app.state.jobs.has_job(key):
+        raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
+    return sse_stream(request.app.state.jobs, key)
 
 
 @router.get("/{external_id}/backfill/progress")

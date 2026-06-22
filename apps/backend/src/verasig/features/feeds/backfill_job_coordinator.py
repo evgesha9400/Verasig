@@ -24,6 +24,11 @@ from verasig.features.feeds.backfill_job_run import (
 )
 from verasig.features.feeds.candidate_derivation import derive_candidates
 from verasig.features.feeds.deletion_rescan import rescan
+from verasig.features.feeds.feed_job_progress import (
+    publish_logged_progress,
+    scan_phase,
+    should_publish_count,
+)
 from verasig.foundation.jobs.registry import (
     JobAlreadyRunningError,
     JobPublisher,
@@ -49,6 +54,7 @@ SERVICE_INTERRUPTED = "SERVICE_INTERRUPTED"
 # Publish one deletion-scan progress event every this many live messages, so a
 # long re-fetch keeps the stream alive without flooding it with one event per id.
 RESCAN_PROGRESS_INTERVAL = 200
+REVIEWED_FEED_STATUSES = {"verified", "analyzed"}
 
 
 class BackfillJobCoordinator:
@@ -61,6 +67,7 @@ class BackfillJobCoordinator:
         self._session_factory = session_factory
         self._jobs = jobs
         self._batch_size = batch_size
+        self._previous_status_by_run_id: dict[UUID, str | None] = {}
 
     def start(
         self,
@@ -86,7 +93,8 @@ class BackfillJobCoordinator:
             self._reset_cursor(user_id, channel_id)
 
         source = make_source()
-        run = self._create_run(user_id, channel_id)
+        run, previous_status = self._create_run(user_id, channel_id)
+        self._previous_status_by_run_id[run.id] = previous_status
         key = backfill_job_key(user_id, channel_id)
         logger.info(
             "backfill.start new run: channel=%s mode=%s run=%s",
@@ -98,7 +106,13 @@ class BackfillJobCoordinator:
             self._jobs.start(
                 key,
                 lambda publisher: self._run_backfill(
-                    publisher, source, run.id, user_id, channel_id
+                    publisher,
+                    source,
+                    run.id,
+                    user_id,
+                    channel_id,
+                    mode,
+                    previous_status,
                 ),
             )
         except JobAlreadyRunningError:
@@ -120,7 +134,13 @@ class BackfillJobCoordinator:
             cancelled = backfill_job_repository.mark_run_cancelled(
                 session, run.id, _now()
             )
-            feed_repository.set_status(session, user_id, channel_id, "cancelled")
+            previous_status = self._previous_status_by_run_id.get(run.id)
+            feed_repository.set_status(
+                session,
+                user_id,
+                channel_id,
+                _feed_status_after_backfill(previous_status, "cancelled"),
+            )
             session.commit()
             return cancelled
 
@@ -143,8 +163,14 @@ class BackfillJobCoordinator:
             )
             for run in failed_runs:
                 feed_repository.set_status(
-                    session, run.user_id, run.channel_id, "failed"
+                    session,
+                    run.user_id,
+                    run.channel_id,
+                    _feed_status_after_backfill(
+                        self._previous_status_by_run_id.get(run.id), "failed"
+                    ),
                 )
+                self._previous_status_by_run_id.pop(run.id, None)
             session.commit()
 
     def mark_inactive_backfilling_failed(
@@ -172,7 +198,14 @@ class BackfillJobCoordinator:
                         SERVICE_INTERRUPTED,
                         "Backfill was interrupted by a service restart.",
                     )
-                row.status = "failed"
+                previous_status = (
+                    self._previous_status_by_run_id.get(run.id)
+                    if run is not None
+                    else None
+                )
+                row.status = _feed_status_after_backfill(previous_status, "failed")
+                if run is not None:
+                    self._previous_status_by_run_id.pop(run.id, None)
             session.commit()
 
     def _read_idempotent_run(
@@ -222,14 +255,18 @@ class BackfillJobCoordinator:
                 session, user_id, channel_id
             )
 
-    def _create_run(self, user_id: UUID, channel_id: int) -> BackfillJobRun:
+    def _create_run(
+        self, user_id: UUID, channel_id: int
+    ) -> tuple[BackfillJobRun, str | None]:
         with self._session_factory() as session:
+            feed = feed_repository.read_feed(session, user_id, channel_id)
+            previous_status = feed.status if feed is not None else None
             run = backfill_job_repository.create_run(
                 session, user_id, channel_id, _now()
             )
             feed_repository.set_status(session, user_id, channel_id, "backfilling")
             session.commit()
-            return run
+            return run, previous_status
 
     async def _run_backfill(
         self,
@@ -238,12 +275,14 @@ class BackfillJobCoordinator:
         run_id: UUID,
         user_id: UUID,
         channel_id: int,
+        mode: BackfillMode,
+        previous_status: str | None,
     ) -> dict:
         phases = itertools.cycle(BACKFILL_PHASES[1:])
-        self._publish_progress(publisher, run_id, BACKFILL_PHASES[0])
+        self._publish_progress(publisher, run_id, channel_id, mode, BACKFILL_PHASES[0])
 
         def on_batch(_inserted: int, _oldest: datetime) -> None:
-            self._publish_progress(publisher, run_id, next(phases))
+            self._publish_progress(publisher, run_id, channel_id, mode, next(phases))
 
         try:
             async with source:
@@ -265,7 +304,9 @@ class BackfillJobCoordinator:
                     result.inserted,
                     result.captured_through_external_message_id,
                 )
-                self._publish_progress(publisher, run_id, "Indexing message bodies...")
+                self._publish_progress(
+                    publisher, run_id, channel_id, mode, "Indexing message bodies..."
+                )
                 logger.info(
                     "backfill.run derive_candidates begin: channel=%s", channel_id
                 )
@@ -276,7 +317,7 @@ class BackfillJobCoordinator:
                     "backfill.run derive_candidates done: channel=%s", channel_id
                 )
                 self._publish_progress(
-                    publisher, run_id, "Checking deleted messages..."
+                    publisher, run_id, channel_id, mode, "Checking deleted messages..."
                 )
                 logger.info(
                     "backfill.run rescan begin: channel=%s (fetches the FULL live "
@@ -289,7 +330,9 @@ class BackfillJobCoordinator:
                     user_id,
                     channel_id,
                     self._session_factory,
-                    on_progress=self._rescan_progress_reporter(publisher, run_id),
+                    on_progress=self._rescan_progress_reporter(
+                        publisher, run_id, channel_id, mode
+                    ),
                 )
                 logger.info(
                     "backfill.run rescan done: channel=%s confirmed=%s suspected=%s "
@@ -300,32 +343,62 @@ class BackfillJobCoordinator:
                     rescan_result.written,
                 )
         except asyncio.CancelledError as error:
-            progress = self._finish_cancelled(run_id, user_id, channel_id)
+            progress = self._finish_cancelled(
+                run_id, user_id, channel_id, previous_status
+            )
             raise JobTerminalError("cancelled", present_progress(progress)) from error
         except Exception as error:
-            progress = self._finish_failed(run_id, user_id, channel_id, error)
+            progress = self._finish_failed(
+                run_id, user_id, channel_id, previous_status, error
+            )
             raise JobTerminalError(
                 progress.message or "Backfill failed.", present_progress(progress)
             ) from error
 
-        progress = self._finish_succeeded(run_id, user_id, channel_id)
+        progress = self._finish_succeeded(run_id, user_id, channel_id, previous_status)
         return present_progress(progress)
 
     def _publish_progress(
-        self, publisher: JobPublisher, run_id: UUID, phase: str
+        self,
+        publisher: JobPublisher,
+        run_id: UUID,
+        channel_id: int,
+        mode: BackfillMode,
+        phase: str,
+        **fields,
     ) -> None:
         progress = self._refresh_progress(run_id, phase)
-        publisher.progress(present_progress(progress))
+        publish_logged_progress(
+            publisher,
+            present_progress(progress),
+            logger=logger,
+            operation=_operation_for_mode(mode),
+            external_id=channel_id,
+            phase=phase,
+            run_id=run_id,
+            mode=mode,
+            status=progress.status,
+            fetched=progress.fetched,
+            cursor=progress.cursor_message_id,
+            **fields,
+        )
 
     def _rescan_progress_reporter(
-        self, publisher: JobPublisher, run_id: UUID
+        self,
+        publisher: JobPublisher,
+        run_id: UUID,
+        channel_id: int,
+        mode: BackfillMode,
     ) -> Callable[[int], None]:
         def report(scanned: int) -> None:
-            if scanned % RESCAN_PROGRESS_INTERVAL == 0:
+            if should_publish_count(scanned, RESCAN_PROGRESS_INTERVAL):
                 self._publish_progress(
                     publisher,
                     run_id,
-                    f"Checking deleted messages... ({scanned:,} scanned)",
+                    channel_id,
+                    mode,
+                    scan_phase(scanned),
+                    scanned=scanned,
                 )
 
         return report
@@ -337,33 +410,64 @@ class BackfillJobCoordinator:
         return self._progress_from_run(run, phase)
 
     def _finish_succeeded(
-        self, run_id: UUID, user_id: UUID, channel_id: int
+        self,
+        run_id: UUID,
+        user_id: UUID,
+        channel_id: int,
+        previous_status: str | None,
     ) -> BackfillProgress:
         with self._session_factory() as session:
             run = backfill_job_repository.mark_run_succeeded(session, run_id, _now())
-            feed_repository.set_status(session, user_id, channel_id, "backfilled")
+            feed_repository.set_status(
+                session,
+                user_id,
+                channel_id,
+                _feed_status_after_backfill(previous_status, "backfilled"),
+            )
             session.commit()
+        self._previous_status_by_run_id.pop(run_id, None)
         return self._progress_from_run(run, "Backfill complete.")
 
     def _finish_cancelled(
-        self, run_id: UUID, user_id: UUID, channel_id: int
+        self,
+        run_id: UUID,
+        user_id: UUID,
+        channel_id: int,
+        previous_status: str | None,
     ) -> BackfillProgress:
         with self._session_factory() as session:
             run = backfill_job_repository.mark_run_cancelled(session, run_id, _now())
-            feed_repository.set_status(session, user_id, channel_id, "cancelled")
+            feed_repository.set_status(
+                session,
+                user_id,
+                channel_id,
+                _feed_status_after_backfill(previous_status, "cancelled"),
+            )
             session.commit()
+        self._previous_status_by_run_id.pop(run_id, None)
         return self._progress_from_run(run, "Backfill cancelled.")
 
     def _finish_failed(
-        self, run_id: UUID, user_id: UUID, channel_id: int, error: Exception
+        self,
+        run_id: UUID,
+        user_id: UUID,
+        channel_id: int,
+        previous_status: str | None,
+        error: Exception,
     ) -> BackfillProgress:
         message = str(error) or error.__class__.__name__
         with self._session_factory() as session:
             run = backfill_job_repository.mark_run_failed(
                 session, run_id, _now(), error.__class__.__name__, message
             )
-            feed_repository.set_status(session, user_id, channel_id, "failed")
+            feed_repository.set_status(
+                session,
+                user_id,
+                channel_id,
+                _feed_status_after_backfill(previous_status, "failed"),
+            )
             session.commit()
+        self._previous_status_by_run_id.pop(run_id, None)
         return self._progress_from_run(run, "Backfill failed.")
 
     @staticmethod
@@ -387,6 +491,20 @@ def _phase_for_status(status: str) -> str:
     if status == BackfillJobStatus.CANCELLED:
         return "Backfill cancelled."
     return "Reading channel history..."
+
+
+def _operation_for_mode(mode: BackfillMode) -> str:
+    if mode is BackfillMode.REFRESH:
+        return "fetch_latest_messages"
+    if mode is BackfillMode.FULL:
+        return "rebackfill"
+    return "backfill"
+
+
+def _feed_status_after_backfill(previous_status: str | None, fallback: str) -> str:
+    if previous_status in REVIEWED_FEED_STATUSES:
+        return previous_status
+    return fallback
 
 
 def _now() -> datetime:

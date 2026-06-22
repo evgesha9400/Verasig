@@ -28,6 +28,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.deletion_diff import detect_deletions
+from verasig.features.rules.repository import read_labels
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,11 @@ class RescanResult:
     confirmed: int  # CONFIRMED deletions detected this rescan
     suspected: int  # SUSPECTED gaps detected this rescan
     written: int  # rows newly written/upgraded (0 on a same-state re-run)
+    new_deleted_signal_count: int
+    new_deleted_non_signal_count: int
+    new_suspected_gap_count: int
+    total_deleted_count: int
+    signal_deletion: bool
 
 
 def _utc_now() -> datetime:
@@ -68,9 +74,12 @@ async def rescan(
         len(live_ids),
     )
     _guard_live_snapshot(live_ids, external_id)
+    previous = _read_previous_evidence(session_factory, user_id, external_id)
+    labels = _read_labels_by_message_id(session_factory, user_id, external_id)
     evidence = _detect(session_factory, user_id, external_id, live_ids)
     written = _persist(session_factory, user_id, evidence)
-    return _tally(external_id, evidence, written)
+    summary = _read_deletion_summary(session_factory, user_id, external_id)
+    return _tally(external_id, evidence, written, previous, labels, summary)
 
 
 def _resolve_external_id(
@@ -118,10 +127,105 @@ def _persist(
         return written
 
 
+def _read_previous_evidence(
+    session_factory: sessionmaker, user_id: UUID, external_id: int
+) -> dict[int, DeletedSignalEvidence]:
+    with session_factory() as session:
+        rows = deletion_repository.read_deletion_evidence(session, user_id, external_id)
+    return {row.message_id: row for row in rows}
+
+
+def _read_labels_by_message_id(
+    session_factory: sessionmaker, user_id: UUID, external_id: int
+) -> dict[int, str]:
+    with session_factory() as session:
+        labels = read_labels(session, external_id, user_id)
+    return {label.message_id: label.label.value for label in labels}
+
+
+def _read_deletion_summary(
+    session_factory: sessionmaker, user_id: UUID, external_id: int
+) -> deletion_repository.DeletionSummary:
+    with session_factory() as session:
+        summaries = deletion_repository.summarize_deletions(
+            session, user_id, [external_id]
+        )
+    return summaries[external_id]
+
+
+def _is_new_confirmed(
+    item: DeletedSignalEvidence, previous: dict[int, DeletedSignalEvidence]
+) -> bool:
+    if item.confidence is not DeletionConfidence.CONFIRMED:
+        return False
+    previous_item = previous.get(item.message_id)
+    return (
+        previous_item is None
+        or previous_item.confidence is not DeletionConfidence.CONFIRMED
+    )
+
+
+def _is_new_suspected(
+    item: DeletedSignalEvidence, previous: dict[int, DeletedSignalEvidence]
+) -> bool:
+    return (
+        item.confidence is DeletionConfidence.SUSPECTED
+        and item.message_id not in previous
+    )
+
+
+def _count_new_deleted_signals(
+    evidence: list[DeletedSignalEvidence],
+    previous: dict[int, DeletedSignalEvidence],
+    labels: dict[int, str],
+) -> int:
+    return sum(
+        1
+        for item in evidence
+        if _is_new_confirmed(item, previous) and labels.get(item.message_id) == "signal"
+    )
+
+
+def _count_new_deleted_non_signals(
+    evidence: list[DeletedSignalEvidence],
+    previous: dict[int, DeletedSignalEvidence],
+    labels: dict[int, str],
+) -> int:
+    return sum(
+        1
+        for item in evidence
+        if _is_new_confirmed(item, previous) and labels.get(item.message_id) != "signal"
+    )
+
+
+def _count_new_suspected_gaps(
+    evidence: list[DeletedSignalEvidence],
+    previous: dict[int, DeletedSignalEvidence],
+) -> int:
+    return sum(1 for item in evidence if _is_new_suspected(item, previous))
+
+
 def _tally(
-    external_id: int, evidence: list[DeletedSignalEvidence], written: int
+    external_id: int,
+    evidence: list[DeletedSignalEvidence],
+    written: int,
+    previous: dict[int, DeletedSignalEvidence],
+    labels: dict[int, str],
+    summary: deletion_repository.DeletionSummary,
 ) -> RescanResult:
     confirmed = sum(
         1 for item in evidence if item.confidence is DeletionConfidence.CONFIRMED
     )
-    return RescanResult(external_id, confirmed, len(evidence) - confirmed, written)
+    return RescanResult(
+        external_id=external_id,
+        confirmed=confirmed,
+        suspected=len(evidence) - confirmed,
+        written=written,
+        new_deleted_signal_count=_count_new_deleted_signals(evidence, previous, labels),
+        new_deleted_non_signal_count=_count_new_deleted_non_signals(
+            evidence, previous, labels
+        ),
+        new_suspected_gap_count=_count_new_suspected_gaps(evidence, previous),
+        total_deleted_count=summary.deleted_count,
+        signal_deletion=summary.signal_deletion,
+    )

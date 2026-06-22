@@ -50,6 +50,17 @@ def test_parser_rule_constructs_and_coerces_side_aliases_to_side():
     assert rule.side_aliases["short"] is Side.SHORT
 
 
+def test_parser_rule_normalizes_side_alias_keys_to_lowercase():
+    rule = ParserRule(
+        rule_id="pilot-parser-v1",
+        patterns=[r"(?P<symbol>[A-Z]{2,10})\s+(?P<side>LONG|SHORT)"],
+        field_map={"symbol": "symbol", "side": "side"},
+        side_aliases={"LONG": "LONG", "SHORT": "SHORT"},
+    )
+
+    assert rule.side_aliases == {"long": Side.LONG, "short": Side.SHORT}
+
+
 def test_parser_rule_defaults_optionals():
     rule = ParserRule(rule_id="r", patterns=[r"x"], field_map={})
     assert rule.version == 1

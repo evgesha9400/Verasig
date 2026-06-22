@@ -47,7 +47,7 @@ def test_distill_prompt_audit_writes_attempt_validation_and_skip_artifacts(tmp_p
         examples,
     )
     make_distill_skip_auditor(tmp_path)(
-        "parser", "parser distillation skipped because expected_count=0", examples
+        "parser", "parser distillation skipped because signal_count=0", examples
     )
 
     names = sorted(path.name for path in tmp_path.iterdir())

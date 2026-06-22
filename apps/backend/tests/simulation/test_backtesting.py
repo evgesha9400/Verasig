@@ -6,20 +6,27 @@ from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
+from verasig.domain.deletion import (
+    DeletedSignalEvidence,
+    DeletionConfidence,
+    DeletionMethod,
+)
 from verasig.domain.event import MaterializationPath, RawSignalEvent
+from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.risk_config import RiskConfig
 from verasig.domain.simulation import Kline
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
+    deletion_repository,
     feed_repository,
     message_repository,
 )
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
-from verasig.features.simulation.backtesting import run_backtest
+from verasig.features.simulation.backtesting import load_folded_signals, run_backtest
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _NOW = _BASE + timedelta(minutes=2)
@@ -163,6 +170,19 @@ def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_f
     assert subscription.status == "analyzed"
 
 
+def test_load_folded_signals_scores_only_signal_labelled_deletions(session_factory):
+    account = _seed(session_factory)
+    _insert_deleted_candidate(session_factory, account.id)
+    _label_message(session_factory, account.id, LabelKind.NOISE)
+
+    noise_inputs = load_folded_signals(session_factory, account.id, 7)
+    _label_message(session_factory, account.id, LabelKind.SIGNAL)
+    signal_inputs = load_folded_signals(session_factory, account.id, 7)
+
+    assert noise_inputs.deletions[0].was_signal_candidate is False
+    assert signal_inputs.deletions[0].was_signal_candidate is True
+
+
 def _seed(session_factory) -> UserAccount:
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())
@@ -173,3 +193,39 @@ def _seed(session_factory) -> UserAccount:
         rule_repository.upsert_parser_rules(session, [_parser_rule(account.id)])
         session.commit()
         return account
+
+
+def _insert_deleted_candidate(session_factory, user_id: UUID) -> None:
+    with session_factory() as session:
+        deletion_repository.upsert_deletion_evidence(
+            session,
+            user_id,
+            [
+                DeletedSignalEvidence(
+                    channel_id=7,
+                    message_id=1,
+                    confidence=DeletionConfidence.CONFIRMED,
+                    method=DeletionMethod.SNAPSHOT_DIFF,
+                    detected_at=_BASE,
+                    was_signal_candidate=True,
+                )
+            ],
+        )
+        session.commit()
+
+
+def _label_message(session_factory, user_id: UUID, label: LabelKind) -> None:
+    with session_factory() as session:
+        rule_repository.upsert_labels(
+            session,
+            [
+                GoldenLabel(
+                    user_id=user_id,
+                    channel_id=7,
+                    message_id=1,
+                    label=label,
+                    labeled_at=_BASE,
+                )
+            ],
+        )
+        session.commit()
