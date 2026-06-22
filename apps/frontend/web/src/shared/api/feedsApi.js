@@ -38,3 +38,14 @@ export function cancelBackfill(token, feedId) {
 export function streamBackfillProgress(token, feedId, handlers = {}) {
   return streamJobProgress(token, `/feeds/${feedId}/backfill/progress`, handlers)
 }
+
+export function startDeletionRescan(token, feedId) {
+  return requestJson(`/feeds/${feedId}/deletion-rescan`, {
+    method: 'POST',
+    token
+  })
+}
+
+export function streamDeletionRescanProgress(token, feedId, handlers = {}) {
+  return streamJobProgress(token, `/feeds/${feedId}/deletion-rescan/progress`, handlers)
+}

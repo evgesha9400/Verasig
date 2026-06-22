@@ -18,6 +18,7 @@ const PIPELINE_SCREEN_BY_SCREEN = {
 }
 
 const WORKFLOW_SCREENS = new Set(Object.keys(PIPELINE_SCREEN_BY_SCREEN))
+const REVIEWED_FEED_STATUSES = new Set(['verified', 'analyzed'])
 
 function loadState() {
   try {
@@ -27,7 +28,7 @@ function loadState() {
   }
 }
 
-function mergeFeedFlags(savedFeeds) {
+function mergeDemoFeedFlags(savedFeeds) {
   if (!Array.isArray(savedFeeds)) return FEEDS
   const seed = Object.fromEntries(FEEDS.map((c) => [c.id, c]))
   return savedFeeds.map((c) => {
@@ -45,6 +46,10 @@ function createToast(title, msg, tone) {
     msg,
     time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   }
+}
+
+function isReviewedStatus(status) {
+  return REVIEWED_FEED_STATUSES.has(status)
 }
 
 async function readSourceState(authToken) {
@@ -68,7 +73,7 @@ export function useWorkflowState(authToken) {
     saved ? saved.telegramConnected : false
   )
   const [feeds, setFeeds] = useState(
-    saved ? mergeFeedFlags(saved.feeds) : authToken ? [] : FEEDS
+    saved ? mergeDemoFeedFlags(saved.feeds) : authToken ? [] : FEEDS
   )
   const [activeFeedId, setActiveFeedId] = useState(saved ? saved.activeFeedId : null)
   const [verifyAttempt, setVerifyAttempt] = useState(saved ? saved.verifyAttempt : 1)
@@ -81,6 +86,7 @@ export function useWorkflowState(authToken) {
   const [backfillMode, setBackfillMode] = useState('resume')
 
   const prevNavRef = useRef('sources')
+  const previousBackfillStatusRef = useRef(null)
 
   const fireToast = useCallback((tone, title, msg) => {
     setToast(createToast(title, msg, tone))
@@ -116,7 +122,7 @@ export function useWorkflowState(authToken) {
 
     const sourceState = await readSourceState(authToken)
     setTelegramConnected(sourceState.telegram.connected)
-    setFeeds(mergeFeedFlags(sourceState.feeds))
+    setFeeds(sourceState.feeds)
     return sourceState
   }
 
@@ -129,7 +135,7 @@ export function useWorkflowState(authToken) {
       .then((sourceState) => {
         if (!active) return
         setTelegramConnected(sourceState.telegram.connected)
-        setFeeds(mergeFeedFlags(sourceState.feeds))
+        setFeeds(sourceState.feeds)
       })
       .catch((error) => {
         if (!active) return
@@ -175,6 +181,7 @@ export function useWorkflowState(authToken) {
   }
 
   function startBackfill(feed) {
+    previousBackfillStatusRef.current = null
     setBackfillMode('resume')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
@@ -182,6 +189,7 @@ export function useWorkflowState(authToken) {
   }
 
   function retryBackfill(feed) {
+    previousBackfillStatusRef.current = null
     setBackfillMode('resume')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
@@ -195,15 +203,25 @@ export function useWorkflowState(authToken) {
     else setScreen('label')
   }
 
-  function fetchNewSignals(feed) {
+  function fetchNewMessages(feed) {
+    previousBackfillStatusRef.current = isReviewedStatus(feed.status)
+      ? feed.status
+      : null
     setBackfillMode('refresh')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
-    fireToast('info', 'Fetching new signals', `Pulling new messages from ${feed.name}.`)
+    fireToast(
+      'info',
+      'Fetching new messages',
+      `Pulling new messages from ${feed.name}.`
+    )
   }
 
   function refetchFullHistory(feed) {
+    previousBackfillStatusRef.current = isReviewedStatus(feed.status)
+      ? feed.status
+      : null
     setBackfillMode('full')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
@@ -221,6 +239,11 @@ export function useWorkflowState(authToken) {
       setActiveFeedId(null)
       setScreen('feeds')
     }
+  }
+
+  function reviewLabels(feed) {
+    setActiveFeedId(feed.id)
+    setScreen('label')
   }
 
   function checkGaps(feed) {
@@ -263,31 +286,83 @@ export function useWorkflowState(authToken) {
 
   function onBackfillComplete(result) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
+    const previousStatus = previousBackfillStatusRef.current
+    const keepsReview = isReviewedStatus(previousStatus)
     const summary =
       typeof result === 'number'
         ? { fetched: result, lastDate: current?.lastDate || null }
         : result || {}
     patchFeed(activeFeedId, {
-      status: 'backfilled',
+      status: keepsReview ? previousStatus : 'backfilled',
       fetched: summary.fetched ?? current?.fetched ?? 0,
       lastDate: summary.lastDate ?? current?.lastDate ?? null
     })
+    previousBackfillStatusRef.current = null
     setBackfillMode('resume')
-    setScreen('label')
+    setScreen(keepsReview ? 'feeds' : 'label')
+    if (keepsReview) {
+      fireToast(
+        'verified',
+        'Messages fetched',
+        `${current ? current.name : 'Feed'} was refreshed. Verification is still saved.`
+      )
+    }
   }
 
   function onBackfillCancel(count, date) {
+    const current = feeds.find((feed) => feed.id === activeFeedId)
+    const previousStatus = previousBackfillStatusRef.current
+    const keepsReview = isReviewedStatus(previousStatus)
     patchFeed(activeFeedId, {
-      status: 'cancelled',
+      status: keepsReview ? previousStatus : 'cancelled',
       fetched: count,
       lastDate: date || null
     })
+    previousBackfillStatusRef.current = null
+    setBackfillMode('resume')
     setScreen('feeds')
-    fireToast(
-      'pending',
-      'Backfill paused',
-      `Saved at ${count.toLocaleString()} messages. Retry any time.`
-    )
+    if (keepsReview) {
+      fireToast(
+        'pending',
+        'Fetch cancelled',
+        `${current ? current.name : 'Feed'} was not refreshed. Verification is still saved.`
+      )
+    } else {
+      fireToast(
+        'pending',
+        'Backfill paused',
+        `Saved at ${count.toLocaleString()} messages. Retry any time.`
+      )
+    }
+  }
+
+  function onBackfillError(error = {}) {
+    const current = feeds.find((feed) => feed.id === activeFeedId)
+    const previousStatus = previousBackfillStatusRef.current
+    const keepsReview = isReviewedStatus(previousStatus)
+    const fetched = error.fetched ?? current?.fetched ?? 0
+    const lastDate = error.lastDate ?? current?.lastDate ?? null
+    patchFeed(activeFeedId, {
+      status: keepsReview ? previousStatus : 'failed',
+      fetched,
+      lastDate
+    })
+    previousBackfillStatusRef.current = null
+    setBackfillMode('resume')
+    setScreen('feeds')
+    if (keepsReview) {
+      fireToast(
+        'rejected',
+        'Fetch failed',
+        `${current ? current.name : 'Feed'} was not refreshed. Verification is still saved.`
+      )
+    } else {
+      fireToast(
+        'rejected',
+        'Backfill failed',
+        error?.message || 'Retry when the source is available again.'
+      )
+    }
   }
 
   function onBacktestComplete(result) {
@@ -403,14 +478,16 @@ export function useWorkflowState(authToken) {
     startBackfill,
     retryBackfill,
     resumeFeed,
-    fetchNewSignals,
+    fetchNewMessages,
     refetchFullHistory,
+    reviewLabels,
     removeFeed,
     checkGaps,
     stopAfterVerify,
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,
+    onBackfillError,
     onBacktestComplete,
     requestStepBack,
     confirmStepBack,

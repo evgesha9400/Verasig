@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DistillView } from './DistillView.jsx'
 
@@ -113,7 +113,46 @@ describe('DistillView', () => {
       await Promise.resolve()
     })
     expect(await screen.findByText("Distillation didn't complete")).toBeTruthy()
+    expect(screen.getByText('job exploded')).toBeTruthy()
     expect(onGetRules).not.toHaveBeenCalled()
+  })
+
+  it('shows the last progress phase after a backend error event', async () => {
+    const { getHandlers } = renderView()
+    await waitFor(() => expect(getHandlers()).toBeTruthy())
+    act(() =>
+      getHandlers().onProgress({
+        stage: 'parser_distilling',
+        phase: 'Distilling parser rules',
+        step: 4,
+        totalSteps: 6,
+        signalLabels: 5,
+        noiseLabels: 2
+      })
+    )
+    await act(async () => {
+      getHandlers().onError({
+        message: 'parser distillation failed deterministic validation'
+      })
+      await Promise.resolve()
+    })
+    expect(await screen.findByText('Last progress')).toBeTruthy()
+    expect(screen.getByText('Distilling parser rules')).toBeTruthy()
+  })
+
+  it('retries distillation from the failure screen', async () => {
+    const { getHandlers, onStartDistill, onStreamProgress } = renderView()
+    await waitFor(() => expect(getHandlers()).toBeTruthy())
+    await act(async () => {
+      getHandlers().onError({ message: 'job exploded' })
+      await Promise.resolve()
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry distillation' }))
+
+    await waitFor(() => expect(onStartDistill).toHaveBeenCalledTimes(2))
+    expect(onStreamProgress).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('Distilling signal rules')).toBeTruthy()
   })
 
   it('shows error screen when onGetRules resolves an empty ruleset', async () => {

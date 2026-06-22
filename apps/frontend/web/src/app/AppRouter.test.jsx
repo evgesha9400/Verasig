@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
@@ -30,7 +30,8 @@ const backendFeed = {
   pnl: null,
   hasRisk: false,
   historyGaps: false,
-  signalDeletion: false
+  signalDeletion: false,
+  deletedCount: 0
 }
 
 function createTestStorage() {
@@ -88,6 +89,29 @@ function installFetch(routes = {}) {
 
     return Promise.resolve(route(url, options))
   })
+}
+
+class FakeEventSource {
+  constructor(url) {
+    this.url = url
+    this.closed = false
+    this.listeners = {}
+    FakeEventSource.last = this
+  }
+
+  addEventListener(type, listener) {
+    this.listeners[type] = listener
+  }
+
+  close() {
+    this.closed = true
+  }
+
+  emit(type, data) {
+    this.listeners[type]({
+      data: data === undefined ? undefined : JSON.stringify(data)
+    })
+  }
 }
 
 function sourceRoutes({
@@ -257,6 +281,126 @@ describe('AppRoutes', () => {
     await user.click(screen.getByRole('button', { name: /telegram/i }))
 
     expect(await screen.findByText('Pilot Signals')).toBeTruthy()
+  })
+
+  it('starts streamed deletion rescan from Check gaps and shows signal toast', async () => {
+    const user = userEvent.setup()
+    let feedReads = 0
+    globalThis.EventSource = FakeEventSource
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
+    installFetch({
+      'GET /auth/me': () => jsonResponse(backendUser),
+      'GET /telegram/status': () =>
+        jsonResponse({ connected: true, phone: '+44 •••• 8821' }),
+      'GET /feeds': () => {
+        feedReads += 1
+        const feed =
+          feedReads === 1
+            ? { ...backendFeed, status: 'verified' }
+            : {
+                ...backendFeed,
+                status: 'verified',
+                signalDeletion: true,
+                deletedCount: 1
+              }
+        return jsonResponse({ feeds: [feed] })
+      },
+      'POST /feeds/7/deletion-rescan': () =>
+        jsonResponse({ jobId: 'user:7:deletion-rescan' }, 202)
+    })
+
+    renderRoute('/app')
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
+    })
+    await user.click(screen.getByRole('button', { name: /telegram/i }))
+    expect(await screen.findByText('Pilot Signals')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Options' }))
+    await user.click(screen.getByRole('menuitem', { name: /check gaps/i }))
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        'http://localhost:8000/feeds/7/deletion-rescan',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer stored-token' }
+        }
+      )
+    })
+    expect(FakeEventSource.last.url).toBe(
+      'http://localhost:8000/feeds/7/deletion-rescan/progress?token=stored-token'
+    )
+
+    await act(async () => {
+      FakeEventSource.last.emit('done', {
+        newDeletedSignalCount: 1,
+        newDeletedNonSignalCount: 0,
+        newSuspectedGapCount: 0,
+        totalDeletedCount: 1,
+        signalDeletion: true
+      })
+    })
+
+    expect(await screen.findByText('Signal deletion confirmed')).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByText('Scam')).toBeTruthy()
+    })
+    expect(screen.getByText('1 deleted')).toBeTruthy()
+  })
+
+  it('shows verified feed signals from the backend Signals tab', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
+    installFetch({
+      'GET /auth/me': () => jsonResponse(backendUser),
+      ...sourceRoutes({
+        telegram: { connected: true, phone: '+44 •••• 8821' },
+        feeds: [{ ...backendFeed, status: 'verified' }]
+      }),
+      'GET /signals': () =>
+        jsonResponse({
+          signals: [
+            {
+              id: 'sig-1',
+              feedId: '7',
+              feedName: 'Pilot Signals',
+              feedTag: '@pilot',
+              feedInitials: 'PS',
+              feedTint: 'var(--viz-1)',
+              source: 'telegram',
+              side: 'LONG',
+              symbol: 'BTCUSDT',
+              status: 'untested',
+              date: 'Jun 6',
+              time: '12:00',
+              entry: '100',
+              stop: '95',
+              tp: ['110'],
+              text: 'BTC long entry',
+              deleted: false,
+              cancelled: false,
+              mods: [],
+              effective: { entry: '100', stop: '95', tp: ['110'] }
+            }
+          ],
+          orphanMods: [],
+          limitReached: false
+        })
+    })
+
+    renderRoute('/app')
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
+    })
+    await user.click(screen.getByRole('button', { name: /signals/i }))
+
+    expect(await screen.findByText('BTC/USDT')).toBeTruthy()
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/signals', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer stored-token' }
+    })
   })
 
   it('clears an invalid stored token before redirecting to login', async () => {

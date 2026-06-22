@@ -719,9 +719,11 @@
 }
 .vrs-bf-log {
   font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  color: var(--text-faint);
-  height: 18px;
+  font-size: var(--text-sm);
+  line-height: 22px;
+  color: var(--text-strong);
+  min-height: 22px;
+  max-width: 90vw;
 }
 
 /* ---- Pipeline stepper ---- */

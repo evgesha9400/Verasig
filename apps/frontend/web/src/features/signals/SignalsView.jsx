@@ -7,15 +7,23 @@ import {
   ORPHAN_MODS,
   ORPHAN_LINKED_MOD
 } from '../../domain/demo-data/seed.js'
+import { linkSignalModifier, listSignals } from '../../shared/api/signalsApi.js'
 
 /* Verasig prototype — Signals page: extracted output of analyzed feeds, filterable by source & feed.
    Signals can carry `mods` — follow-up updates (close / avg down / avg up / move stop / cancel)
    the author posted as replies to the original signal message. The row shows the EFFECTIVE
    state (averaged entry, author exits baked into PnL) plus an updates chip; the full chain
    lives in the expanded detail. */
-export function SignalsView({ feeds, onGoToSources, initial }) {
-  // Only analyzed (backfilled + backtested) feeds produce signals.
-  const analyzedFeeds = feeds.filter((f) => f.status === 'analyzed')
+export function SignalsView({
+  feeds,
+  onGoToSources,
+  initial,
+  authToken,
+  onListSignals = listSignals,
+  onLinkSignalModifier = linkSignalModifier
+}) {
+  const useBackend = Boolean(authToken)
+  const signalFeeds = feeds.filter(isSignalFeed)
   const feedById = useMemo(
     () => Object.fromEntries(feeds.map((f) => [f.id, f])),
     [feeds]
@@ -28,6 +36,15 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
   const [openId, setOpenId] = useState(null)
   // Orphan update (no reply link): open → user links it to the suggestion, or dismisses.
   const [orphanState, setOrphanState] = useState('open') // open | linked | dismissed
+  const [dismissedOrphans, setDismissedOrphans] = useState(() => new Set())
+  const [linkingOrphanId, setLinkingOrphanId] = useState(null)
+  const [backendSignals, setBackendSignals] = useState({
+    loading: useBackend,
+    error: null,
+    signals: [],
+    orphanMods: [],
+    limitReached: false
+  })
 
   // Deep-link presets (e.g. the "View deleted signals" link on a scam feed) re-apply when they change.
   useEffect(() => {
@@ -38,20 +55,78 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
     setOpenId(null)
   }, [initial])
 
-  // distinct sources present across analyzed feeds
+  const signalFeedKey = useMemo(
+    () => signalFeeds.map((f) => `${f.id}:${f.status}`).join('|'),
+    [signalFeeds]
+  )
+
+  useEffect(() => {
+    if (!useBackend) {
+      setBackendSignals({
+        loading: false,
+        error: null,
+        signals: [],
+        orphanMods: [],
+        limitReached: false
+      })
+      return undefined
+    }
+
+    let active = true
+    setBackendSignals((current) => ({ ...current, loading: true, error: null }))
+
+    onListSignals(authToken)
+      .then((body) => {
+        if (!active) return
+        setBackendSignals({
+          loading: false,
+          error: null,
+          signals: body.signals || [],
+          orphanMods: body.orphanMods || [],
+          limitReached: Boolean(body.limitReached)
+        })
+      })
+      .catch((error) => {
+        if (!active) return
+        setBackendSignals((current) => ({
+          ...current,
+          loading: false,
+          error: error?.message || 'Could not load signals.'
+        }))
+      })
+
+    return () => {
+      active = false
+    }
+  }, [authToken, onListSignals, signalFeedKey, useBackend])
+
+  async function refreshBackendSignals() {
+    if (!useBackend) return null
+    const body = await onListSignals(authToken)
+    setBackendSignals({
+      loading: false,
+      error: null,
+      signals: body.signals || [],
+      orphanMods: body.orphanMods || [],
+      limitReached: Boolean(body.limitReached)
+    })
+    return body
+  }
+
+  // distinct sources present across signal-producing feeds
   const sourceIds = useMemo(
-    () => [...new Set(analyzedFeeds.map(feedSource))],
-    [analyzedFeeds]
+    () => [...new Set(signalFeeds.map(feedSource))],
+    [signalFeeds]
   )
 
   // feed options narrow to the chosen source
   const feedOptions = useMemo(() => {
-    const fs = analyzedFeeds.filter((f) => source === 'all' || feedSource(f) === source)
+    const fs = signalFeeds.filter((f) => source === 'all' || feedSource(f) === source)
     return [
       { value: 'all', label: 'All feeds' },
       ...fs.map((f) => ({ value: f.id, label: f.name }))
     ]
-  }, [analyzedFeeds, source])
+  }, [signalFeeds, source])
 
   function changeSource(v) {
     setSource(v)
@@ -61,8 +136,8 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
     }
   }
 
-  // Manually linking the orphan attaches it to its suggested signal as a late (ignored) close.
-  const allSignals = useMemo(() => {
+  // Manually linking the demo orphan attaches it to its suggested signal as a late close.
+  const demoSignals = useMemo(() => {
     if (orphanState !== 'linked') return SIGNALS
     return SIGNALS.map((s) =>
       s.id === ORPHAN_MODS[0].suggestId
@@ -71,15 +146,25 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
     )
   }, [orphanState])
 
+  const allSignals = useMemo(() => {
+    const rows = useBackend ? backendSignals.signals : demoSignals
+    return rows.map((row) => normalizeSignal(row, !useBackend))
+  }, [backendSignals.signals, demoSignals, useBackend])
+
+  const orphanMods = useMemo(() => {
+    const rows = useBackend ? backendSignals.orphanMods : ORPHAN_MODS
+    return rows.map(normalizeOrphan)
+  }, [backendSignals.orphanMods, useBackend])
+
   // base set: signals from analyzed feeds, respecting source + feed (not the tab — used for tab counts)
   const scoped = useMemo(() => {
-    const analyzedIds = new Set(analyzedFeeds.map((f) => f.id))
+    const signalFeedIds = new Set(signalFeeds.map((f) => f.id))
     return allSignals
-      .filter((s) => analyzedIds.has(s.feedId))
-      .filter((s) => source === 'all' || feedSource(feedById[s.feedId]) === source)
+      .filter((s) => signalFeedIds.has(s.feedId) || !feedById[s.feedId])
+      .filter((s) => source === 'all' || signalSource(s, feedById[s.feedId]) === source)
       .filter((s) => feed === 'all' || s.feedId === feed)
       .sort((a, b) => sortKey(b) - sortKey(a))
-  }, [allSignals, analyzedFeeds, source, feed, feedById])
+  }, [allSignals, signalFeeds, source, feed, feedById])
 
   // Tab buckets — Tested / Not tested / Skipped exclude deleted; Deleted is its own bucket.
   const live = scoped.filter((s) => !s.deleted)
@@ -99,23 +184,65 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
             : scoped
 
   // Orphan card visibility: pending updates belong to a feed — show while that feed is in scope.
-  const orphan = ORPHAN_MODS[0]
-  const orphanFeed = feedById[orphan.feedId]
-  const orphanVisible =
-    orphanState === 'open' &&
-    tab === 'all' &&
-    (feed === 'all' || feed === orphan.feedId) &&
-    (source === 'all' || feedSource(orphanFeed) === source) &&
-    analyzedFeeds.some((f) => f.id === orphan.feedId)
-  const suggested = allSignals.find((s) => s.id === orphan.suggestId)
+  const orphan = orphanMods.find((item) => {
+    const orphanFeed = feedById[item.feedId]
+    return (
+      !dismissedOrphans.has(item.id) &&
+      tab === 'all' &&
+      (feed === 'all' || feed === item.feedId) &&
+      (source === 'all' || signalSource(item, orphanFeed) === source) &&
+      (signalFeeds.some((f) => f.id === item.feedId) || !orphanFeed)
+    )
+  })
+  const orphanFeed = orphan ? displayFeed(orphan, feedById[orphan.feedId]) : null
+  const orphanVisible = Boolean(orphan) && (useBackend || orphanState === 'open')
+  const suggested = orphan ? allSignals.find((s) => s.id === orphan.suggestId) : null
 
-  function linkOrphan() {
-    setOrphanState('linked')
-    setOpenId(orphan.suggestId)
+  function dismissOrphan(orphanId) {
+    setDismissedOrphans((current) => new Set([...current, orphanId]))
+    if (!useBackend) setOrphanState('dismissed')
   }
 
-  // ---- empty state: nothing analyzed yet ----
-  if (analyzedFeeds.length === 0) {
+  async function linkOrphan(item) {
+    if (!item || !item.suggestId) return
+    if (!useBackend) {
+      setOrphanState('linked')
+      setOpenId(item.suggestId)
+      return
+    }
+
+    setLinkingOrphanId(item.id)
+    setBackendSignals((current) => ({ ...current, error: null }))
+    try {
+      await onLinkSignalModifier(authToken, item.suggestId, item.id)
+      setOpenId(item.suggestId)
+      await refreshBackendSignals()
+    } catch (error) {
+      setBackendSignals((current) => ({
+        ...current,
+        error: error?.message || 'Could not link update.'
+      }))
+    } finally {
+      setLinkingOrphanId(null)
+    }
+  }
+
+  if (backendSignals.loading) {
+    return (
+      <div className="vrs-page">
+        <div className="vrs-empty vrs-empty--lg">
+          <span className="vrs-dot-pulse" />
+          <div className="vrs-empty__title">Loading signals</div>
+          <div className="vrs-empty__note">
+            Reading extracted signals from verified feeds.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ---- empty state: nothing verified or analyzed yet ----
+  if (signalFeeds.length === 0) {
     return (
       <div className="vrs-page">
         <div className="vrs-empty vrs-empty--lg">
@@ -137,8 +264,8 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
           </svg>
           <div className="vrs-empty__title">No signals yet</div>
           <div className="vrs-empty__note">
-            Backfill and backtest a feed under Sources. Once a feed is analyzed, its
-            extracted signals stream here.
+            Backfill, label, distill, and verify a feed under Sources. Once a feed is
+            verified, its extracted signals stream here.
           </div>
           <Button
             variant="secondary"
@@ -181,6 +308,12 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
           </span>
         </div>
       </div>
+
+      {backendSignals.error && (
+        <div className="vrs-empty vrs-empty--sm">
+          <div className="vrs-empty__note">{backendSignals.error}</div>
+        </div>
+      )}
 
       {/* tabs */}
       <div style={{ marginTop: 4 }}>
@@ -227,9 +360,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
               <div className="vrs-orphan__sug">
                 <span className="vrs-sig-lvl__k">Closest match</span>
                 <span className="vrs-orphan__sugsig">
-                  <span
-                    className={`vrs-side vrs-side--${suggested.side.toLowerCase()}`}
-                  >
+                  <span className={`vrs-side vrs-side--${sideClass(suggested.side)}`}>
                     {suggested.side}
                   </span>
                   {suggested.symbol}
@@ -241,7 +372,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setOrphanState('dismissed')}
+                onClick={() => dismissOrphan(orphan.id)}
               >
                 Dismiss
               </Button>
@@ -249,7 +380,9 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                 variant="primary"
                 size="sm"
                 iconLeft={<Icon name="link" size={14} />}
-                onClick={linkOrphan}
+                loading={linkingOrphanId === orphan.id}
+                disabled={!orphan.suggestId || linkingOrphanId === orphan.id}
+                onClick={() => linkOrphan(orphan)}
               >
                 Link to {orphan.suggestId}
               </Button>
@@ -284,7 +417,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
           </div>
         ) : (
           visible.map((s) => {
-            const f = feedById[s.feedId] || {}
+            const f = displayFeed(s, feedById[s.feedId])
             const open = openId === s.id
             const skipped = s.status === 'skipped' && !s.cancelled
             const untested = s.status === 'untested'
@@ -292,6 +425,9 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
             const deleted = s.deleted
             const mods = s.mods || []
             const authorExit = s.effective && s.effective.closedBy === 'author'
+            const changedEntry = hasChangedValue(s.effective?.entry, s.entry)
+            const changedStop = hasChangedValue(s.effective?.stop, s.stop)
+            const changedTargets = hasChangedValue(s.effective?.tpText, s.tp)
             return (
               <div key={s.id} className={`vrs-sig-item ${open ? 'is-open' : ''}`}>
                 <button
@@ -301,7 +437,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                   <span className="vrs-sigrow__rail" aria-hidden="true" />
                   <span className="vrs-sigrow__main">
                     <span className="vrs-sigrow__sym">
-                      <span className={`vrs-side vrs-side--${s.side.toLowerCase()}`}>
+                      <span className={`vrs-side vrs-side--${sideClass(s.side)}`}>
                         {s.side}
                       </span>
                       {s.symbol}
@@ -315,7 +451,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                       )}
                     </span>
                     <span className="vrs-sigrow__id">
-                      {s.id} · {SOURCES[feedSource(f)] || 'Telegram'}
+                      {s.id} · {SOURCES[signalSource(s, f)] || 'Telegram'}
                       {authorExit ? ' · author exit' : ''}
                     </span>
                   </span>
@@ -393,7 +529,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                               {s.date} · {s.time}
                             </span>
                           </div>
-                          <pre className="vrs-sig-bubble__text">{rawMessage(s)}</pre>
+                          <pre className="vrs-sig-bubble__text">{s.text}</pre>
                         </div>
                         {mods.map((m) => {
                           const k = MOD_KINDS[m.kind] || {}
@@ -421,7 +557,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                                 <div className="vrs-replyq">
                                   <span className="vrs-replyq__who">{f.name}</span>
                                   <span className="vrs-replyq__txt">
-                                    {rawMessage(s).split('\n')[0]}
+                                    {(s.text || '').split('\n')[0]}
                                   </span>
                                 </div>
                               ) : (
@@ -449,7 +585,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                           <span className="vrs-sig-lvl__k">Direction</span>
                           <span className="vrs-sig-lvl__v">
                             <span
-                              className={`vrs-side vrs-side--${s.side.toLowerCase()}`}
+                              className={`vrs-side vrs-side--${sideClass(s.side)}`}
                               style={{ marginRight: 0 }}
                             >
                               {s.side}
@@ -458,7 +594,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                         </div>
                         <div className="vrs-sig-field">
                           <span className="vrs-sig-lvl__k">Entry</span>
-                          {s.effective && s.effective.entry ? (
+                          {changedEntry ? (
                             <span className="vrs-sig-lvl__v">
                               <s className="vrs-eff-was">{s.entry}</s>{' '}
                               {s.effective.entry}{' '}
@@ -472,7 +608,7 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                         </div>
                         <div className="vrs-sig-field">
                           <span className="vrs-sig-lvl__k">Stop</span>
-                          {s.effective && s.effective.stop ? (
+                          {changedStop ? (
                             <span className="vrs-sig-lvl__v vrs-sig-lvl__v--stop">
                               <s className="vrs-eff-was">{s.stop}</s> {s.effective.stop}{' '}
                               <span className="vrs-eff-note">
@@ -489,11 +625,18 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
                         </div>
                         <div className="vrs-sig-field vrs-sig-field--wide">
                           <span className="vrs-sig-lvl__k">Targets</span>
-                          <span
-                            className={`vrs-sig-lvl__v ${s.tp ? '' : 'vrs-sig-lvl__v--none'}`}
-                          >
-                            {s.tp || 'None'}
-                          </span>
+                          {changedTargets ? (
+                            <span className="vrs-sig-lvl__v">
+                              <s className="vrs-eff-was">{s.tp || 'None'}</s>{' '}
+                              {s.effective.tpText}
+                            </span>
+                          ) : (
+                            <span
+                              className={`vrs-sig-lvl__v ${s.tp ? '' : 'vrs-sig-lvl__v--none'}`}
+                            >
+                              {s.tp || 'None'}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -646,6 +789,107 @@ export function SignalsView({ feeds, onGoToSources, initial }) {
       </div>
     </div>
   )
+}
+
+function isSignalFeed(feed) {
+  return feed.status === 'verified' || feed.status === 'analyzed'
+}
+
+function normalizeSignal(signal, demoMode) {
+  const tp = formatTargets(signal.tpText || signal.tp)
+  return {
+    ...signal,
+    id: String(signal.id),
+    feedId: String(signal.feedId),
+    side: signal.side || '',
+    symbol: formatSymbol(signal.symbol),
+    status: signal.deleted ? 'deleted' : signal.status,
+    pnl: formatPnl(signal.pnl),
+    entry: signal.entry || null,
+    stop: signal.stop || null,
+    tp,
+    text:
+      signal.text || (demoMode ? rawMessage(signal) : 'Original message unavailable'),
+    mods: (signal.mods || []).map(normalizeMod),
+    effective: normalizeEffective(signal.effective)
+  }
+}
+
+function normalizeMod(mod) {
+  return {
+    ...mod,
+    id: String(mod.id),
+    price: mod.price || null,
+    effect: mod.effect || null
+  }
+}
+
+function normalizeOrphan(orphan) {
+  return {
+    ...orphan,
+    id: String(orphan.id),
+    feedId: String(orphan.feedId),
+    suggestId: orphan.suggestId ? String(orphan.suggestId) : null
+  }
+}
+
+function normalizeEffective(effective) {
+  if (!effective) return null
+  return {
+    ...effective,
+    tpText: formatTargets(effective.tpText || effective.tp)
+  }
+}
+
+function displayFeed(signal, feed) {
+  return {
+    ...(feed || {}),
+    id: signal.feedId,
+    name: feed?.name || signal.feedName || 'Unknown feed',
+    tag: feed?.tag ?? signal.feedTag ?? null,
+    initials: feed?.initials || signal.feedInitials || '?',
+    tint: feed?.tint || signal.feedTint || 'var(--viz-1)',
+    source: feed?.source || signal.source || 'telegram'
+  }
+}
+
+function signalSource(signal, feed) {
+  return signal.source || feedSource(feed)
+}
+
+function feedSource(feed) {
+  return (feed && feed.source) || 'telegram'
+}
+
+function sideClass(side) {
+  return String(side || '').toLowerCase()
+}
+
+function formatSymbol(symbol) {
+  if (!symbol) return ''
+  if (symbol.includes('/')) return symbol
+  if (symbol.endsWith('USDT') && symbol.length > 4) {
+    return `${symbol.slice(0, -4)}/USDT`
+  }
+  return symbol
+}
+
+function formatTargets(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join(' / ') || null
+  }
+  return value || null
+}
+
+function formatPnl(value) {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') return value
+  return `${value > 0 ? '+' : ''}${value}%`
+}
+
+function hasChangedValue(next, base) {
+  if (next === null || next === undefined || next === '') return false
+  return String(next) !== String(base || '')
 }
 
 // Stable per-id hash so each signal's reconstructed source message looks consistent across renders.

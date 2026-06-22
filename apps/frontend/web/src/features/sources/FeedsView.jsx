@@ -16,7 +16,7 @@ import { Icon } from '@verasig/design-system'
 
 const CONFIRM_COPY = {
   fetchNew: {
-    title: 'Fetch new signals?',
+    title: 'Fetch new messages?',
     confirmLabel: 'Fetch new',
     variant: 'primary',
     icon: 'refresh',
@@ -42,8 +42,13 @@ const CONFIRM_COPY = {
 }
 
 function fmtNum(n) {
+  if (n == null) return '0'
   if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K'
   return String(n)
+}
+
+function deletedText(count) {
+  return `${fmtNum(count)} deleted`
 }
 
 export function FeedsView({
@@ -53,9 +58,11 @@ export function FeedsView({
   onResume,
   onFetchNew,
   onRefetchFull,
+  onReviewLabels,
   onRemove,
   onViewDeleted,
   onCheckGaps,
+  checkingGapFeedId,
   onBacktest,
   onAddFeed
 }) {
@@ -128,10 +135,9 @@ export function FeedsView({
           <Icon name="alert" size={13} /> Confirmed signal deletion
         </span>
         <span className="vrs-pilltip__b">
-          On the latest backfill, messages previously classified as signals are gone
-          from this feed&rsquo;s history. Deleting losing &mdash; or winning &mdash;
-          calls to rewrite a track record is a known scam pattern, so the quality score
-          is floored to 0.
+          A confirmed deleted message in this feed is labelled as a signal. Deleting
+          losing or winning calls to rewrite a track record is a known scam pattern, so
+          the quality score is floored to 0.
         </span>
         <Button
           variant="ghost"
@@ -185,6 +191,7 @@ export function FeedsView({
     // Gaps only become meaningful once rules classify signals, i.e. after the
     // user has completed label + verify (status verified or analyzed).
     const reviewed = c.status === 'verified' || c.status === 'analyzed'
+    const checkingGaps = checkingGapFeedId === c.id
     return (
       <Menu
         trigger={
@@ -198,7 +205,7 @@ export function FeedsView({
           disabled={busy || !started}
           onClick={() => setConfirm({ kind: 'fetchNew', feed: c })}
         >
-          Fetch new signals
+          Fetch new messages
         </MenuItem>
         <MenuItem
           iconLeft={<Icon name="download" size={15} />}
@@ -208,12 +215,22 @@ export function FeedsView({
           Re-fetch full history
         </MenuItem>
         <MenuItem
-          iconLeft={<Icon name="search" size={15} />}
-          disabled={busy || !reviewed}
+          iconLeft={<Icon name={checkingGaps ? 'refresh' : 'search'} size={15} />}
+          disabled={busy || !reviewed || checkingGaps}
+          aria-busy={checkingGaps}
           onClick={() => onCheckGaps && onCheckGaps(c)}
         >
-          Check gaps
+          {checkingGaps ? 'Checking gaps' : 'Check gaps'}
         </MenuItem>
+        {reviewed && (
+          <MenuItem
+            iconLeft={<Icon name="doc" size={15} />}
+            disabled={busy}
+            onClick={() => onReviewLabels && onReviewLabels(c)}
+          >
+            Review labels
+          </MenuItem>
+        )}
         <MenuSeparator />
         <MenuItem
           tone="danger"
@@ -363,7 +380,7 @@ export function FeedsView({
                     'failed',
                     'verified'
                   ].includes(c.status) && <FeedFlag kind="gaps" />}
-                {c.signalDeletion && c.status === 'analyzed' && (
+                {c.signalDeletion && ['verified', 'analyzed'].includes(c.status) && (
                   <FeedFlag
                     kind="scam"
                     onLink={() => onViewDeleted && onViewDeleted(c)}
@@ -381,6 +398,12 @@ export function FeedsView({
                   />
                   {fmtNum(c.subscribers)} subscribers
                 </span>
+                {c.deletedCount > 0 && (
+                  <>
+                    <span className="dot" />
+                    <span>{deletedText(c.deletedCount)}</span>
+                  </>
+                )}
                 {c.status === 'analyzed' && !c.signalDeletion && (
                   <>
                     <span className="dot" />

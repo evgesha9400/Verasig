@@ -12,7 +12,8 @@ const feed = {
   score: 86,
   fetched: 18420,
   lastDate: 'Jun 6',
-  signalDeletion: true
+  signalDeletion: true,
+  deletedCount: 0
 }
 
 describe('FeedsView', () => {
@@ -61,12 +62,89 @@ describe('FeedsView', () => {
     expect(onCheckGaps).toHaveBeenCalledWith(feed)
   })
 
-  it('disables Check gaps until label and verify are complete', () => {
-    const backfilledFeed = { ...feed, status: 'backfilled', signalDeletion: false }
+  it.each(['new', 'backfilling', 'backfilled', 'cancelled', 'failed'])(
+    'disables Check gaps for %s feeds',
+    (status) => {
+      const unreviewedFeed = { ...feed, status, signalDeletion: false }
+
+      render(
+        <FeedsView
+          feeds={[unreviewedFeed]}
+          onStartBackfill={() => {}}
+          onRetry={() => {}}
+          onResume={() => {}}
+          onFetchNew={() => {}}
+          onRefetchFull={() => {}}
+          onRemove={() => {}}
+          onViewDeleted={() => {}}
+          onCheckGaps={() => {}}
+          onBacktest={() => {}}
+        />
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+
+      expect(screen.getByRole('menuitem', { name: /check gaps/i }).disabled).toBe(true)
+    }
+  )
+
+  it.each(['verified', 'analyzed'])('enables Check gaps for %s feeds', (status) => {
+    const reviewedFeed = { ...feed, status, signalDeletion: false }
+    const onCheckGaps = vi.fn()
 
     render(
       <FeedsView
-        feeds={[backfilledFeed]}
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={onCheckGaps}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    const item = screen.getByRole('menuitem', { name: /check gaps/i })
+    fireEvent.click(item)
+
+    expect(item.disabled).toBe(false)
+    expect(onCheckGaps).toHaveBeenCalledWith(reviewedFeed)
+  })
+
+  it.each(['verified', 'analyzed'])('shows Review labels for %s feeds', (status) => {
+    const reviewedFeed = { ...feed, status, signalDeletion: false }
+    const onReviewLabels = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onReviewLabels={onReviewLabels}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /review labels/i }))
+
+    expect(onReviewLabels).toHaveBeenCalledWith(reviewedFeed)
+  })
+
+  it('keeps Fetch new messages wording in the menu and confirmation copy', async () => {
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'verified', signalDeletion: false }]}
         onStartBackfill={() => {}}
         onRetry={() => {}}
         onResume={() => {}}
@@ -80,11 +158,74 @@ describe('FeedsView', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /fetch new messages/i }))
 
-    expect(screen.getByRole('menuitem', { name: /check gaps/i }).disabled).toBe(true)
-    expect(screen.getByRole('menuitem', { name: /fetch new signals/i }).disabled).toBe(
-      false
+    expect(await screen.findByText('Fetch new messages?')).toBeTruthy()
+    expect(screen.getByText(/Existing labels and rules are kept/)).toBeTruthy()
+  })
+
+  it('shows a loading state while checking gaps', () => {
+    const reviewedFeed = { ...feed, status: 'verified', signalDeletion: false }
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        checkingGapFeedId={reviewedFeed.id}
+        onBacktest={() => {}}
+      />
     )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    const item = screen.getByRole('menuitem', { name: /checking gaps/i })
+
+    expect(item.disabled).toBe(true)
+    expect(item.getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('shows Scam badge on a verified feed with signal deletion', () => {
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'verified', signalDeletion: true }]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Scam')).toBeTruthy()
+  })
+
+  it('shows the cumulative deleted counter', () => {
+    render(
+      <FeedsView
+        feeds={[{ ...feed, signalDeletion: false, deletedCount: 3 }]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    expect(screen.getByText('3 deleted')).toBeTruthy()
   })
 
   it('confirms before removing a feed', async () => {
@@ -116,7 +257,7 @@ describe('FeedsView', () => {
     expect(onRemove).toHaveBeenCalledWith(feed)
   })
 
-  it('confirms before fetching new signals', async () => {
+  it('confirms before fetching new messages', async () => {
     const onFetchNew = vi.fn()
 
     render(
@@ -135,7 +276,7 @@ describe('FeedsView', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /fetch new signals/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /fetch new messages/i }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch new' }))
 

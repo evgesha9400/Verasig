@@ -50,6 +50,16 @@ describe('BackfillView', () => {
     expect(screen.getByText('Reading channel history...')).toBeTruthy()
 
     act(() => {
+      streamHandlers.onProgress({
+        fetched: 200,
+        lastDate: 'Jun 1, 2026',
+        phase: 'Checking deleted messages... (200 scanned)'
+      })
+    })
+
+    expect(screen.getByText('Checking deleted messages... (200 scanned)')).toBeTruthy()
+
+    act(() => {
       streamHandlers.onDone({ fetched: 12, lastDate: 'May 30, 2026' })
     })
 

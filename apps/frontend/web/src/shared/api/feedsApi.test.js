@@ -5,7 +5,9 @@ import {
   deleteFeed,
   listFeeds,
   startBackfill,
-  streamBackfillProgress
+  startDeletionRescan,
+  streamBackfillProgress,
+  streamDeletionRescanProgress
 } from './feedsApi.js'
 
 function jsonResponse(body, status = 200) {
@@ -30,7 +32,8 @@ const feed = {
   pnl: null,
   hasRisk: false,
   historyGaps: false,
-  signalDeletion: false
+  signalDeletion: false,
+  deletedCount: 0
 }
 
 beforeEach(() => {
@@ -117,6 +120,20 @@ describe('feedsApi', () => {
     })
   })
 
+  it('starts a deletion rescan job', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:deletion-rescan' }, 202))
+
+    await startDeletionRescan('jwt-token', '7')
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/feeds/7/deletion-rescan',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer jwt-token' }
+      }
+    )
+  })
+
   it('streams backfill progress with the token in the query string', () => {
     const events = []
     const onProgress = vi.fn()
@@ -160,6 +177,52 @@ describe('feedsApi', () => {
       phase: 'Reading channel history…'
     })
     expect(onDone).toHaveBeenCalledWith({ fetched: 12 })
+    expect(events[0].closed).toBe(true)
+  })
+
+  it('streams deletion rescan progress with the token in the query string', () => {
+    const events = []
+    const onProgress = vi.fn()
+    const onDone = vi.fn()
+
+    class FakeEventSource {
+      constructor(url) {
+        this.url = url
+        this.closed = false
+        this.listeners = {}
+        events.push(this)
+      }
+
+      addEventListener(type, listener) {
+        this.listeners[type] = listener
+      }
+
+      close() {
+        this.closed = true
+      }
+
+      emit(type, data) {
+        this.listeners[type]({ data: JSON.stringify(data) })
+      }
+    }
+
+    globalThis.EventSource = FakeEventSource
+
+    streamDeletionRescanProgress('jwt-token', '7', {
+      onProgress,
+      onDone
+    })
+    events[0].emit('progress', { phase: 'Checking deleted messages...', scanned: 200 })
+    events[0].emit('done', { newDeletedSignalCount: 1 })
+
+    expect(events[0].url).toBe(
+      'http://localhost:8000/feeds/7/deletion-rescan/progress?token=jwt-token'
+    )
+    expect(onProgress).toHaveBeenCalledWith({
+      phase: 'Checking deleted messages...',
+      scanned: 200
+    })
+    expect(onDone).toHaveBeenCalledWith({ newDeletedSignalCount: 1 })
     expect(events[0].closed).toBe(true)
   })
 })

@@ -26,7 +26,40 @@ function renderTheme(initialTheme) {
   )
 }
 
+function createTestStorage() {
+  const entries = new Map()
+
+  return {
+    getItem: (key) => {
+      const storageKey = String(key)
+      return entries.has(storageKey) ? entries.get(storageKey) : null
+    },
+    setItem: (key, value) => {
+      entries.set(String(key), String(value))
+    },
+    removeItem: (key) => {
+      entries.delete(String(key))
+    },
+    clear: () => {
+      entries.clear()
+    }
+  }
+}
+
+function installTestStorage() {
+  const storage = createTestStorage()
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: storage,
+    configurable: true
+  })
+  Object.defineProperty(window, 'localStorage', {
+    value: storage,
+    configurable: true
+  })
+}
+
 beforeEach(() => {
+  installTestStorage()
   localStorage.clear()
   document.documentElement.removeAttribute('data-theme')
   document.documentElement.removeAttribute('style')

@@ -122,9 +122,14 @@ export function DistillView({
 }) {
   const [phase, setPhase] = useState('thinking') // 'thinking' | 'done' | 'error'
   const [progress, setProgress] = useState(INITIAL_PROGRESS)
+  const [lastProgress, setLastProgress] = useState(null)
+  const [errorMessage, setErrorMessage] = useState(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [rules, setRules] = useState([])
+  const [runKey, setRunKey] = useState(0)
 
+  const progressRef = useRef(INITIAL_PROGRESS)
+  const lastProgressRef = useRef(null)
   const handlersRef = useRef({
     onStartDistill,
     onStreamProgress,
@@ -149,6 +154,12 @@ export function DistillView({
   useEffect(() => {
     let closed = false
     let subscription = null
+    progressRef.current = INITIAL_PROGRESS
+    lastProgressRef.current = null
+    setProgress(INITIAL_PROGRESS)
+    setLastProgress(null)
+    setErrorMessage(null)
+    setRules([])
 
     function showRules(compiled) {
       if (closed) return
@@ -158,12 +169,15 @@ export function DistillView({
 
     function fail(message) {
       if (closed) return
+      const nextMessage = message || 'The distill job did not complete.'
+      setErrorMessage(nextMessage)
+      setLastProgress(lastProgressRef.current)
       setPhase('error')
       handlersRef.current.onError &&
         handlersRef.current.onError(
           'rejected',
           'Distillation failed',
-          message || 'The distill job did not complete.'
+          nextMessage
         )
     }
 
@@ -194,7 +208,12 @@ export function DistillView({
       subscription = handlersRef.current.onStreamProgress(chatId, {
         onProgress: (payload) => {
           setProgress(
-            (current) => normalizeProgressPayload(payload, current) || current
+            (current) => {
+              const next = normalizeProgressPayload(payload, current) || current
+              progressRef.current = next
+              lastProgressRef.current = next
+              return next
+            }
           )
         },
         onDone: () => loadRules('The distill job did not complete.'),
@@ -214,7 +233,19 @@ export function DistillView({
       closed = true
       subscription && subscription.close()
     }
-  }, [chatId])
+  }, [chatId, runKey])
+
+  function retryDistillation() {
+    progressRef.current = INITIAL_PROGRESS
+    lastProgressRef.current = null
+    setProgress(INITIAL_PROGRESS)
+    setLastProgress(null)
+    setErrorMessage(null)
+    setElapsedSeconds(0)
+    setRules([])
+    setPhase('thinking')
+    setRunKey((current) => current + 1)
+  }
 
   const activeStepIndex = Math.max(
     0,
@@ -308,8 +339,29 @@ export function DistillView({
         <div>
           <div className="vrs-think__title">Distillation didn&apos;t complete</div>
           <div className="vrs-think__sub">
-            Something interrupted the distill job. Go back and try again.
+            {errorMessage || 'The distill job did not complete.'}
           </div>
+        </div>
+        {lastProgress && (
+          <div className="vrs-think__status">
+            <div className="vrs-think__meta">
+              <span>Last progress</span>
+              <span>
+                Step {lastProgress.step} of {lastProgress.totalSteps}
+              </span>
+            </div>
+            <div className="vrs-think__status-phase">{lastProgress.phase}</div>
+          </div>
+        )}
+        <div className="vrs-form__actions">
+          <Button
+            variant="primary"
+            size="lg"
+            iconLeft={<Icon name="refresh" size={16} />}
+            onClick={retryDistillation}
+          >
+            Retry distillation
+          </Button>
         </div>
       </div>
     )

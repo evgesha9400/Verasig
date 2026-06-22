@@ -31,7 +31,9 @@ import {
   createFeed,
   deleteFeed,
   startBackfill as startBackfillJob,
-  streamBackfillProgress
+  startDeletionRescan,
+  streamBackfillProgress,
+  streamDeletionRescanProgress
 } from '../shared/api/feedsApi.js'
 import {
   getLabelCounts,
@@ -58,10 +60,40 @@ function mergeUserDefaults(user) {
   return { ...USER_DEFAULTS, ...(user || {}) }
 }
 
+export function deletionRescanToast(feed, result = {}) {
+  const signalCount = result.newDeletedSignalCount || 0
+  const nonSignalCount = result.newDeletedNonSignalCount || 0
+  const gapCount = result.newSuspectedGapCount || 0
+  const warningCount = nonSignalCount + gapCount
+
+  if (signalCount > 0) {
+    return {
+      tone: 'rejected',
+      title: 'Signal deletion confirmed',
+      msg: `${feed.name} has ${signalCount} deleted signal message${signalCount === 1 ? '' : 's'}.`
+    }
+  }
+
+  if (warningCount > 0) {
+    return {
+      tone: 'pending',
+      title: 'Deleted messages found',
+      msg: `${feed.name} has ${warningCount} newly detected deleted or missing message${warningCount === 1 ? '' : 's'} that are not signals.`
+    }
+  }
+
+  return {
+    tone: 'verified',
+    title: 'No deleted messages found',
+    msg: `${feed.name} has no newly detected deleted messages.`
+  }
+}
+
 export function ProductApp({ authToken, user: sessionUser, onLogout }) {
   const [theme, setTheme] = useTheme()
 
   const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
+  const [checkingGapFeedId, setCheckingGapFeedId] = useState(null)
 
   useEffect(() => {
     setUser(mergeUserDefaults(sessionUser))
@@ -96,14 +128,16 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     startBackfill,
     retryBackfill,
     resumeFeed,
-    fetchNewSignals,
+    fetchNewMessages,
     refetchFullHistory,
+    reviewLabels,
     removeFeed,
-    checkGaps,
+    checkGaps: previewCheckGaps,
     stopAfterVerify,
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,
+    onBackfillError,
     requestStepBack,
     confirmStepBack,
     openSettings,
@@ -169,6 +203,46 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     }
   }
 
+  function showDeletionRescanToast(feed, result = {}) {
+    const notice = deletionRescanToast(feed, result)
+    fireToast(notice.tone, notice.title, notice.msg)
+  }
+
+  async function handleCheckGaps(feed) {
+    if (!authToken) {
+      previewCheckGaps(feed)
+      return
+    }
+
+    setCheckingGapFeedId(feed.id)
+
+    try {
+      await startDeletionRescan(authToken, feed.id)
+      streamDeletionRescanProgress(authToken, feed.id, {
+        onDone: (result) => {
+          setCheckingGapFeedId(null)
+          void refreshSources().catch(() => {})
+          showDeletionRescanToast(feed, result)
+        },
+        onError: (error) => {
+          setCheckingGapFeedId(null)
+          fireToast(
+            'rejected',
+            'Check gaps failed',
+            error?.message || 'Could not check this feed right now.'
+          )
+        }
+      })
+    } catch (error) {
+      setCheckingGapFeedId(null)
+      fireToast(
+        'rejected',
+        'Check gaps failed',
+        error?.message || 'Could not check this feed right now.'
+      )
+    }
+  }
+
   function completeBackfill(result) {
     onBackfillComplete(result)
     void refreshSources().catch(() => {})
@@ -176,20 +250,16 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
 
   function handleBackfillError(error) {
     void refreshSources().catch(() => {})
-    setScreen('feeds')
     if (error?.status === 'cancelled') return
-    fireToast(
-      'rejected',
-      'Backfill failed',
-      error?.message || 'Retry when the source is available again.'
-    )
+    onBackfillError(error)
   }
 
   if (nav === 'signals') {
     title = 'Signals'
-    subtitle = 'Signals extracted from your analyzed feeds'
+    subtitle = 'Signals extracted from your verified feeds'
     body = (
       <SignalsView
+        authToken={authToken}
         feeds={feeds}
         initial={signalsPreset}
         onGoToSources={() => {
@@ -256,11 +326,13 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onStartBackfill={startBackfill}
         onRetry={retryBackfill}
         onResume={resumeFeed}
-        onFetchNew={fetchNewSignals}
+        onFetchNew={fetchNewMessages}
         onRefetchFull={refetchFullHistory}
+        onReviewLabels={reviewLabels}
         onRemove={handleRemoveFeed}
         onViewDeleted={goToDeletedSignals}
-        onCheckGaps={checkGaps}
+        onCheckGaps={handleCheckGaps}
+        checkingGapFeedId={checkingGapFeedId}
         onBacktest={backtestFeed}
         onAddFeed={addTelegramFeed}
       />
@@ -333,7 +405,10 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onGetSamples={(chatId) => getVerifySamples(authToken, chatId)}
           onSubmit={(chatId, verdicts) => submitVerify(authToken, chatId, verdicts)}
           onPass={() => setScreen('exchange')}
-          onStop={stopAfterVerify}
+          onStop={() => {
+            stopAfterVerify()
+            void refreshSources().catch(() => {})
+          }}
           onLoop={() => {
             setVerifyAttempt((a) => a + 1)
             setScreen('label')

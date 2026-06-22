@@ -60,6 +60,16 @@ describe('frontend design-system guards', () => {
     expect(domainSource).not.toMatch(/import ['"].+\\.css['"]/)
   })
 
+  it('keeps backfill scanned-progress status readable', () => {
+    const appCss = read('app/app.css')
+    const match = appCss.match(/\.vrs-bf-log\s*\{(?<body>[^}]*)\}/)
+
+    expect(match?.groups?.body).toContain('font-size: var(--text-sm)')
+    expect(match?.groups?.body).toContain('color: var(--text-strong)')
+    expect(match?.groups?.body).toContain('line-height:')
+    expect(match?.groups?.body).toContain('min-height:')
+  })
+
   it('keeps features from importing app modules', () => {
     const featureFiles = filesUnder('features').filter((path) =>
       /\.(js|jsx)$/.test(path)
