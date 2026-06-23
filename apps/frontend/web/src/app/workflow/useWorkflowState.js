@@ -52,6 +52,35 @@ function isReviewedStatus(status) {
   return REVIEWED_FEED_STATUSES.has(status)
 }
 
+function isReviewedFeed(feed) {
+  return Boolean(feed) && (isReviewedStatus(feed.status) || feed.hasRisk)
+}
+
+export function mergeReviewedFeedState(currentFeeds, refreshedFeeds) {
+  if (!Array.isArray(currentFeeds)) return refreshedFeeds
+  if (!Array.isArray(refreshedFeeds)) return refreshedFeeds
+  const currentById = new Map(currentFeeds.map((feed) => [feed.id, feed]))
+  return refreshedFeeds.map((refreshedFeed) => {
+    const currentFeed = currentById.get(refreshedFeed.id)
+    if (!currentFeed) return refreshedFeed
+    if (!isReviewedFeed(currentFeed)) return refreshedFeed
+    if (isReviewedFeed(refreshedFeed)) {
+      return {
+        ...refreshedFeed,
+        hasRisk:
+          refreshedFeed.hasRisk ||
+          currentFeed.hasRisk ||
+          isReviewedStatus(refreshedFeed.status)
+      }
+    }
+    return {
+      ...refreshedFeed,
+      status: currentFeed.status,
+      hasRisk: true
+    }
+  })
+}
+
 async function readSourceState(authToken) {
   const [telegram, feeds] = await Promise.all([
     getTelegramStatus(authToken),
@@ -122,7 +151,9 @@ export function useWorkflowState(authToken) {
 
     const sourceState = await readSourceState(authToken)
     setTelegramConnected(sourceState.telegram.connected)
-    setFeeds(sourceState.feeds)
+    setFeeds((currentFeeds) =>
+      mergeReviewedFeedState(currentFeeds, sourceState.feeds)
+    )
     return sourceState
   }
 
@@ -135,7 +166,9 @@ export function useWorkflowState(authToken) {
       .then((sourceState) => {
         if (!active) return
         setTelegramConnected(sourceState.telegram.connected)
-        setFeeds(sourceState.feeds)
+        setFeeds((currentFeeds) =>
+          mergeReviewedFeedState(currentFeeds, sourceState.feeds)
+        )
       })
       .catch((error) => {
         if (!active) return
@@ -199,12 +232,13 @@ export function useWorkflowState(authToken) {
   function resumeFeed(feed) {
     setActiveFeedId(feed.id)
     if (feed.status === 'analyzed') setScreen('backtest-result')
+    else if (feed.status === 'verified' || feed.hasRisk) setScreen('backtest')
     else if (feed.status === 'backfilled') setScreen('label')
     else setScreen('label')
   }
 
   function fetchNewMessages(feed) {
-    previousBackfillStatusRef.current = isReviewedStatus(feed.status)
+    previousBackfillStatusRef.current = isReviewedFeed(feed)
       ? feed.status
       : null
     setBackfillMode('refresh')
@@ -219,7 +253,7 @@ export function useWorkflowState(authToken) {
   }
 
   function refetchFullHistory(feed) {
-    previousBackfillStatusRef.current = isReviewedStatus(feed.status)
+    previousBackfillStatusRef.current = isReviewedFeed(feed)
       ? feed.status
       : null
     setBackfillMode('full')
@@ -279,6 +313,11 @@ export function useWorkflowState(authToken) {
     )
   }
 
+  function routeAfterVerify() {
+    patchFeed(activeFeedId, { status: 'verified', hasRisk: true })
+    setScreen('exchange')
+  }
+
   function backtestFeed(feed) {
     setActiveFeedId(feed.id)
     setScreen('backtest')
@@ -287,7 +326,7 @@ export function useWorkflowState(authToken) {
   function onBackfillComplete(result) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
     const previousStatus = previousBackfillStatusRef.current
-    const keepsReview = isReviewedStatus(previousStatus)
+    const keepsReview = previousStatus !== null
     const summary =
       typeof result === 'number'
         ? { fetched: result, lastDate: current?.lastDate || null }
@@ -312,7 +351,7 @@ export function useWorkflowState(authToken) {
   function onBackfillCancel(count, date) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
     const previousStatus = previousBackfillStatusRef.current
-    const keepsReview = isReviewedStatus(previousStatus)
+    const keepsReview = previousStatus !== null
     patchFeed(activeFeedId, {
       status: keepsReview ? previousStatus : 'cancelled',
       fetched: count,
@@ -339,7 +378,7 @@ export function useWorkflowState(authToken) {
   function onBackfillError(error = {}) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
     const previousStatus = previousBackfillStatusRef.current
-    const keepsReview = isReviewedStatus(previousStatus)
+    const keepsReview = previousStatus !== null
     const fetched = error.fetched ?? current?.fetched ?? 0
     const lastDate = error.lastDate ?? current?.lastDate ?? null
     patchFeed(activeFeedId, {
@@ -484,6 +523,7 @@ export function useWorkflowState(authToken) {
     removeFeed,
     checkGaps,
     stopAfterVerify,
+    routeAfterVerify,
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,

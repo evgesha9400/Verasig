@@ -115,6 +115,38 @@ describe('FeedsView', () => {
     expect(onCheckGaps).toHaveBeenCalledWith(reviewedFeed)
   })
 
+  it('enables Check gaps for a backfilled feed with saved rules', () => {
+    const reviewedFeed = {
+      ...feed,
+      status: 'backfilled',
+      hasRisk: true,
+      signalDeletion: false
+    }
+    const onCheckGaps = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={onCheckGaps}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    const item = screen.getByRole('menuitem', { name: /check gaps/i })
+    fireEvent.click(item)
+
+    expect(item.disabled).toBe(false)
+    expect(onCheckGaps).toHaveBeenCalledWith(reviewedFeed)
+  })
+
   it.each(['verified', 'analyzed'])('shows Review labels for %s feeds', (status) => {
     const reviewedFeed = { ...feed, status, signalDeletion: false }
     const onReviewLabels = vi.fn()
@@ -139,6 +171,40 @@ describe('FeedsView', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /review labels/i }))
 
     expect(onReviewLabels).toHaveBeenCalledWith(reviewedFeed)
+  })
+
+  it('shows Backtest for a backfilled feed with saved rules', () => {
+    const reviewedBackfilledFeed = {
+      ...feed,
+      status: 'backfilled',
+      hasRisk: true,
+      signalDeletion: false
+    }
+    const onBacktest = vi.fn()
+    const onResume = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedBackfilledFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={onResume}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onReviewLabels={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={onBacktest}
+      />
+    )
+
+    expect(screen.getByText('Ready to backtest')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /backtest/i }))
+
+    expect(onBacktest).toHaveBeenCalledWith(reviewedBackfilledFeed)
+    expect(onResume).not.toHaveBeenCalled()
   })
 
   it('keeps Fetch new messages wording in the menu and confirmation copy', async () => {

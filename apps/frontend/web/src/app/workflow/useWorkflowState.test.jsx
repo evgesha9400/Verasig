@@ -1,6 +1,9 @@
 import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useWorkflowState } from './useWorkflowState.js'
+import {
+  mergeReviewedFeedState,
+  useWorkflowState
+} from './useWorkflowState.js'
 
 const reviewedFeed = {
   id: 'reviewed-feed',
@@ -151,5 +154,111 @@ describe('useWorkflowState', () => {
 
     expect(workflow.activeFeedId).toBe(feed.id)
     expect(workflow.screen).toBe('label')
+  })
+
+  it('keeps reviewed local status when a refreshed feed briefly returns backfilled', () => {
+    const merged = mergeReviewedFeedState(
+      [{ ...reviewedFeed, status: 'verified', hasRisk: true }],
+      [
+        {
+          ...reviewedFeed,
+          status: 'backfilled',
+          hasRisk: false,
+          fetched: 12,
+          lastDate: 'Jun 3, 2026'
+        }
+      ]
+    )
+
+    expect(merged[0].status).toBe('verified')
+    expect(merged[0].hasRisk).toBe(true)
+    expect(merged[0].fetched).toBe(12)
+    expect(merged[0].lastDate).toBe('Jun 3, 2026')
+  })
+
+  it('keeps rules-backed backfilled feeds reviewable after source refresh', () => {
+    const merged = mergeReviewedFeedState(
+      [{ ...reviewedFeed, status: 'backfilled', hasRisk: true }],
+      [
+        {
+          ...reviewedFeed,
+          status: 'backfilled',
+          hasRisk: false,
+          fetched: 12,
+          lastDate: 'Jun 3, 2026'
+        }
+      ]
+    )
+
+    expect(merged[0].status).toBe('backfilled')
+    expect(merged[0].hasRisk).toBe(true)
+    expect(merged[0].fetched).toBe(12)
+    expect(merged[0].lastDate).toBe('Jun 3, 2026')
+  })
+
+  it('continues reviewable backfilled feeds to backtest config', () => {
+    const getWorkflow = renderWorkflow()
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: true }
+
+    act(() => getWorkflow().upsertFeed(feed))
+    act(() => getWorkflow().resumeFeed(feed))
+
+    const workflow = getWorkflow()
+
+    expect(workflow.activeFeedId).toBe(feed.id)
+    expect(workflow.screen).toBe('backtest')
+  })
+
+  it('keeps rules-backed backfilled feeds out of Label after fetching new messages', () => {
+    const getWorkflow = renderWorkflow()
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: true }
+
+    act(() => getWorkflow().upsertFeed(feed))
+    act(() => getWorkflow().fetchNewMessages(feed))
+    act(() =>
+      getWorkflow().onBackfillComplete({
+        fetched: 12,
+        lastDate: 'Jun 3, 2026',
+        status: 'succeeded'
+      })
+    )
+
+    const workflow = getWorkflow()
+    const saved = workflow.feeds.find((candidate) => candidate.id === feed.id)
+
+    expect(saved.status).toBe('backfilled')
+    expect(saved.hasRisk).toBe(true)
+    expect(workflow.screen).toBe('feeds')
+  })
+
+  it('keeps Route & backtest feeds verified before later fetching new messages', () => {
+    const getWorkflow = renderWorkflow()
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: false }
+
+    act(() => getWorkflow().upsertFeed(feed))
+    act(() => getWorkflow().setActiveFeedId(feed.id))
+    act(() => getWorkflow().routeAfterVerify())
+
+    const verifiedFeed = getWorkflow().feeds.find((candidate) => candidate.id === feed.id)
+    expect(verifiedFeed.status).toBe('verified')
+    expect(verifiedFeed.hasRisk).toBe(true)
+    expect(getWorkflow().screen).toBe('exchange')
+
+    act(() => getWorkflow().fetchNewMessages(verifiedFeed))
+    act(() =>
+      getWorkflow().onBackfillComplete({
+        fetched: 12,
+        lastDate: 'Jun 3, 2026',
+        status: 'succeeded'
+      })
+    )
+
+    const refreshedFeed = getWorkflow().feeds.find(
+      (candidate) => candidate.id === feed.id
+    )
+    act(() => getWorkflow().resumeFeed(refreshedFeed))
+
+    expect(refreshedFeed.status).toBe('verified')
+    expect(getWorkflow().screen).toBe('backtest')
   })
 })

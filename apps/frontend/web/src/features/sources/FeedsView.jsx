@@ -51,6 +51,10 @@ function deletedText(count) {
   return `${fmtNum(count)} deleted`
 }
 
+function isReviewedFeed(feed) {
+  return feed.status === 'verified' || feed.status === 'analyzed' || feed.hasRisk
+}
+
 export function FeedsView({
   feeds,
   onStartBackfill,
@@ -179,7 +183,7 @@ export function FeedsView({
     if (c.status === 'backfilled')
       return (
         <Badge tone="info" dot>
-          Ready to label
+          {c.hasRisk ? 'Ready to backtest' : 'Ready to label'}
         </Badge>
       )
     return null
@@ -188,9 +192,8 @@ export function FeedsView({
   function optionsMenu(c) {
     const busy = c.status === 'backfilling'
     const started = c.status !== 'new' && c.status !== 'backfilling'
-    // Gaps only become meaningful once rules classify signals, i.e. after the
-    // user has completed label + verify (status verified or analyzed).
-    const reviewed = c.status === 'verified' || c.status === 'analyzed'
+    // Gaps only become meaningful once rules classify signals.
+    const reviewed = isReviewedFeed(c)
     const checkingGaps = checkingGapFeedId === c.id
     return (
       <Menu
@@ -245,7 +248,7 @@ export function FeedsView({
   }
 
   function rightSide(c) {
-    if (c.status === 'verified') {
+    if (c.status === 'verified' || (c.status === 'backfilled' && c.hasRisk)) {
       return (
         <div className="vrs-chat-right">
           <Button

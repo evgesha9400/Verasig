@@ -134,6 +134,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     removeFeed,
     checkGaps: previewCheckGaps,
     stopAfterVerify,
+    routeAfterVerify,
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,
@@ -404,7 +405,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           chatId={activeFeed.id}
           onGetSamples={(chatId) => getVerifySamples(authToken, chatId)}
           onSubmit={(chatId, verdicts) => submitVerify(authToken, chatId, verdicts)}
-          onPass={() => setScreen('exchange')}
+          onPass={routeAfterVerify}
           onStop={() => {
             stopAfterVerify()
             void refreshSources().catch(() => {})
