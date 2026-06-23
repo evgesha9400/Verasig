@@ -79,7 +79,9 @@ def create_app(
     app.state.market_data_factory = BybitKlineClient
     app.state.distiller_factory = lambda: AnthropicDistiller(
         runner=make_claude_code_runner(
-            settings.claude_code_oauth_token, settings.claude_code_model
+            settings.claude_code_oauth_token,
+            settings.claude_code_model,
+            timeout_seconds=settings.claude_code_timeout_seconds,
         ),
         prompt_auditor=make_distill_prompt_auditor(),
         response_auditor=make_distill_response_auditor(),

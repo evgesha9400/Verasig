@@ -290,6 +290,36 @@ def test_anthropic_distiller_retries_filter_with_validation_feedback():
     assert "Market commentary only" in prompts[1]
 
 
+def test_anthropic_distiller_truncates_long_filter_prompt_examples():
+    prompts: list[str] = []
+    long_tail = "tail-token " * 200
+    examples = [
+        DistillationExample(
+            channel_id=7,
+            message_id=1,
+            label=LabelKind.SIGNAL,
+            text=f"SIGNAL_HEAD {long_tail}",
+        ),
+        DistillationExample(
+            channel_id=7,
+            message_id=2,
+            label=LabelKind.NOISE,
+            text=f"NOISE_HEAD {long_tail}",
+        ),
+    ]
+
+    def fake_runner(prompt: str) -> str:
+        prompts.append(prompt)
+        return json.dumps({"include_patterns": ["SIGNAL_HEAD"]})
+
+    AnthropicDistiller(runner=fake_runner).distill_filter(examples)
+
+    assert "SIGNAL_HEAD" in prompts[0]
+    assert "NOISE_HEAD" in prompts[0]
+    assert prompts[0].count("tail-token") < 120
+    assert "..." in prompts[0]
+
+
 def test_anthropic_distiller_fails_after_three_invalid_filter_candidates():
     calls = 0
 

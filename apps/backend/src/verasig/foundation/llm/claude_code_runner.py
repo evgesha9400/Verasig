@@ -11,7 +11,7 @@ def make_claude_code_runner(
     oauth_token: str,
     model: str,
     command: str = "claude",
-    timeout_seconds: int = 180,
+    timeout_seconds: int = 600,
 ) -> Callable[[str], str]:
     token = oauth_token.strip()
     if not token:
@@ -40,7 +40,9 @@ def make_claude_code_runner(
                 env=_claude_code_environment(os.environ, token),
             )
         except subprocess.TimeoutExpired as error:
-            raise ClaudeCodeRunnerError("Claude Code runner timed out") from error
+            raise ClaudeCodeRunnerError(
+                f"Claude Code runner timed out after {timeout_seconds} seconds"
+            ) from error
         if completed.returncode != 0:
             raise ClaudeCodeRunnerError(_failure_message(completed))
         return completed.stdout.strip()

@@ -57,3 +57,18 @@ def test_claude_code_runner_rejects_blank_oauth_token():
         ClaudeCodeRunnerError, match="VERASIG_CLAUDE_CODE_OAUTH_TOKEN must not be blank"
     ):
         make_claude_code_runner(" ", "sonnet")
+
+
+def test_claude_code_runner_reports_timeout_seconds(monkeypatch):
+    def fake_run(args, **_kwargs):
+        raise subprocess.TimeoutExpired(args, 12)
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    run = make_claude_code_runner(
+        "oauth-token", "sonnet", command="claude-test", timeout_seconds=12
+    )
+
+    with pytest.raises(
+        ClaudeCodeRunnerError, match="Claude Code runner timed out after 12 seconds"
+    ):
+        run("prompt")

@@ -104,6 +104,24 @@ def _publish_progress(
     )
 
 
+def _log_distill_failure(
+    channel_id: int,
+    stage: str,
+    counts: tuple[int, int],
+    error: Exception,
+) -> None:
+    logger.warning(
+        "distill.failed: external_id=%s stage=%s signal_labels=%s "
+        "noise_labels=%s reason=%s",
+        channel_id,
+        stage,
+        counts[0],
+        counts[1],
+        error,
+        exc_info=True,
+    )
+
+
 def _scope_filter_rule(rule: FilterRule, user_id: UUID, channel_id: int) -> FilterRule:
     return rule.model_copy(
         update={
@@ -149,16 +167,11 @@ async def _run_distill(
             channel_id,
         )
     except FilterDistillationError as error:
-        logger.warning(
-            "distill.failed: external_id=%s stage=filter_distilling "
-            "signal_labels=%s noise_labels=%s reason=%s",
-            channel_id,
-            counts[0],
-            counts[1],
-            error,
-            exc_info=True,
-        )
+        _log_distill_failure(channel_id, "filter_distilling", counts, error)
         raise JobTerminalError(str(error), {"validation": error.report}) from error
+    except Exception as error:
+        _log_distill_failure(channel_id, "filter_distilling", counts, error)
+        raise JobTerminalError(str(error), {"stage": "filter_distilling"}) from error
     _publish_progress(publisher, channel_id, "filter_validating", counts)
     _publish_progress(publisher, channel_id, "parser_distilling", counts)
     try:
@@ -168,16 +181,11 @@ async def _run_distill(
             channel_id,
         )
     except ParserDistillationError as error:
-        logger.warning(
-            "distill.failed: external_id=%s stage=parser_distilling "
-            "signal_labels=%s noise_labels=%s reason=%s",
-            channel_id,
-            counts[0],
-            counts[1],
-            error,
-            exc_info=True,
-        )
+        _log_distill_failure(channel_id, "parser_distilling", counts, error)
         raise JobTerminalError(str(error), {"validation": error.report}) from error
+    except Exception as error:
+        _log_distill_failure(channel_id, "parser_distilling", counts, error)
+        raise JobTerminalError(str(error), {"stage": "parser_distilling"}) from error
     _publish_progress(publisher, channel_id, "rules_persisting", counts)
     with session_factory() as session:
         upsert_filter_rule(session, filter_rule)

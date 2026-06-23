@@ -23,6 +23,7 @@ from verasig.features.rules import repository as rule_repository
 from verasig.features.rules.rule_distiller import AnthropicDistiller
 from verasig.features.signals import event_repository
 from verasig.foundation.jobs.registry import JobRegistry
+from verasig.foundation.llm.claude_code_runner import ClaudeCodeRunnerError
 
 SECRET = "s" * 32
 
@@ -337,6 +338,34 @@ def test_distill_job_logs_parser_failure_with_exception_details(client, app):
     assert responses == []
     assert "distill.failed: external_id=7 stage=parser_distilling" in logs.text
     assert "reason=parser distillation failed deterministic validation" in logs.text
+    assert any(record.exc_info for record in logs.records)
+
+
+def test_distill_job_logs_filter_runner_timeout_as_terminal_failure(client, app):
+    token, user_id = _register(client)
+    _seed_chat(app, user_id, signal_count=5)
+
+    class TimeoutDistiller:
+        def distill_filter(self, _examples):
+            raise ClaudeCodeRunnerError("Claude Code runner timed out after 12 seconds")
+
+        def distill_parsers(self, _examples):
+            return []
+
+    app.state.distiller_factory = TimeoutDistiller
+
+    with _capture_logger(distill_routes.__name__, logging.WARNING) as logs:
+        started = client.post("/feeds/7/distill", headers=_auth(token))
+        with client.stream(
+            "GET", "/feeds/7/distill/progress", headers=_auth(token)
+        ) as response:
+            body = "".join(response.iter_text())
+
+    assert started.status_code == 202
+    assert "event: error" in body
+    assert "Claude Code runner timed out after 12 seconds" in body
+    assert "distill.failed: external_id=7 stage=filter_distilling" in logs.text
+    assert "reason=Claude Code runner timed out after 12 seconds" in logs.text
     assert any(record.exc_info for record in logs.records)
 
 

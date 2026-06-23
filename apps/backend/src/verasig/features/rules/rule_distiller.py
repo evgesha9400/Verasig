@@ -47,6 +47,8 @@ _PARSER_GUARD_CLUE_PATTERN = re.compile(
 _PARSER_GUARD_EXAMPLE_LIMIT = 12
 _PARSER_SIGNAL_TEXT_LIMIT = 1200
 _PARSER_GUARD_TEXT_LIMIT = 500
+_FILTER_SIGNAL_TEXT_LIMIT = 500
+_FILTER_GUARD_TEXT_LIMIT = 350
 _FILTER_KEYS = {
     "include_patterns",
     "exclude_patterns",
@@ -605,6 +607,23 @@ def _label_lines(examples: list[DistillationExample]) -> str:
     return "\n".join(lines)
 
 
+def _filter_label_lines(examples: list[DistillationExample]) -> str:
+    lines = []
+    for example in examples:
+        text_limit = (
+            _FILTER_SIGNAL_TEXT_LIMIT if example.is_signal else _FILTER_GUARD_TEXT_LIMIT
+        )
+        text = json.dumps(_truncate(example.text or "", text_limit), ensure_ascii=False)
+        line = f"- message {example.message_id}: label={example.label.value}"
+        line += f"\n  text={text}"
+        if example.expected is not None:
+            line += (
+                f"\n  expected={example.expected.model_dump_json(exclude_none=True)}"
+            )
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _parser_label_lines(examples: list[DistillationExample]) -> str:
     lines = []
     for example in examples:
@@ -639,7 +658,7 @@ def _filter_prompt(examples: list[DistillationExample]) -> str:
         "Prefer the smallest readable set of regex patterns that exactly separates "
         "label=signal from label=noise and label=modifier. "
         "Only output JSON.\n\n"
-        f"Labeled examples:\n{_label_lines(examples)}"
+        f"Labeled examples:\n{_filter_label_lines(examples)}"
     )
 
 
@@ -670,7 +689,7 @@ def _filter_retry_prompt(
         f"{false_positives}\n\n"
         "Fix these false negatives by covering the missed signal language:\n"
         f"{false_negatives}\n\n"
-        f"Labeled examples:\n{_label_lines(examples)}"
+        f"Labeled examples:\n{_filter_label_lines(examples)}"
     )
 
 
