@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from verasig.features.feeds import deletion_repository
+from verasig.features.rules import repository as rule_repository
 from verasig.shared.time import format_long
 from verasig.storage.models import (
     BacktestResultRow,
@@ -69,8 +70,11 @@ def present_feeds(session: Session, user_id: UUID) -> list[dict]:
         session, user_id, external_ids
     )
     latest_results = _latest_results(session, user_id)
+    rule_feed_ids = rule_repository.read_rule_feed_ids(session, user_id, external_ids)
     return [
-        _present_feed(feed, message_stats, deletion_summaries, latest_results)
+        _present_feed(
+            feed, message_stats, deletion_summaries, latest_results, rule_feed_ids
+        )
         for feed in feeds
     ]
 
@@ -80,6 +84,7 @@ def _present_feed(
     message_stats: dict[int, tuple[int, object]],
     deletion_summaries: dict[int, deletion_repository.DeletionSummary],
     latest_results: dict[int, BacktestResultRow],
+    rule_feed_ids: set[int],
 ) -> dict:
     fetched, oldest = message_stats.get(feed.external_id, (0, None))
     deletion = deletion_summaries.get(
@@ -101,7 +106,8 @@ def _present_feed(
         "score": 0 if deletion.signal_deletion else score,
         "winRate": float(result.win_rate) if result else None,
         "pnl": float(result.pnl) if result else None,
-        "hasRisk": feed.status in {"verified", "analyzed"},
+        "hasRisk": feed.status in {"verified", "analyzed"}
+        or feed.external_id in rule_feed_ids,
         "historyGaps": deletion.history_gaps,
         "signalDeletion": deletion.signal_deletion,
         "deletedCount": deletion.deleted_count,

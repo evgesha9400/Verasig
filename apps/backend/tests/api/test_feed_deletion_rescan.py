@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fakes import FakeSource, FakeTelegramAuth
 
 from verasig.domain.channel import TelegramChannel
+from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
@@ -235,6 +236,32 @@ def test_deletion_rescan_rerun_reports_zero_new_evidence(client, app):
     assert feed["deletedCount"] == 1
 
 
+def test_deletion_rescan_accepts_backfilled_feed_with_saved_rules(client, app):
+    token = _register(client)
+    _connect_and_subscribe(client, app, token)
+    _seed_feed_state(app, token, "backfilled", {2: LabelKind.SIGNAL})
+    user_id = _user_id(token, app)
+    with app.state.session_factory() as session:
+        rule_repository.upsert_filter_rule(
+            session,
+            FilterRule(
+                rule_id="pilot-filter-v1",
+                user_id=user_id,
+                channel_id=_CHANNEL_ID,
+                include_patterns=[r"\bBTC\b"],
+            ),
+        )
+        session.commit()
+
+    body = _run_rescan(client, app, token, {1, 3, 4, 5})
+    feed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert "event: done" in body
+    assert feed["status"] == "backfilled"
+    assert feed["hasRisk"] is True
+    assert feed["signalDeletion"] is True
+
+
 def test_deletion_rescan_empty_live_snapshot_errors_and_writes_nothing(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
@@ -261,7 +288,7 @@ def test_deletion_rescan_blocks_foreign_user(client, app):
     assert response.json()["error"]["code"] == "FEED_NOT_FOUND"
 
 
-def test_deletion_rescan_requires_verified_or_analyzed_feed(client, app):
+def test_deletion_rescan_requires_reviewed_feed_or_saved_rules(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
     _seed_feed_state(app, token, "backfilled", {2: LabelKind.SIGNAL})

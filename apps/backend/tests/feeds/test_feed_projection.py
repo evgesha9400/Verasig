@@ -11,6 +11,7 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
+from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
@@ -160,6 +161,40 @@ def test_feed_summary_derives_counts_flags_score_and_display(db_session):
     assert feed["hasRisk"] is True
     assert feed["initials"] == "PS"
     assert feed["tint"].startswith("var(--viz-")
+
+
+def test_feed_summary_marks_backfilled_feed_with_rules_as_reviewed(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
+    feed_repository.create_feed(
+        db_session,
+        account.id,
+        TelegramChannel(
+            channel_id=7,
+            handle="pilot",
+            title="Pilot Signals",
+            is_private=False,
+            subscriber_count=1234,
+            first_seen_at=_instant(),
+        ),
+        _instant(),
+    )
+    feed_repository.set_status(db_session, account.id, 7, "backfilled")
+    rule_repository.upsert_filter_rule(
+        db_session,
+        FilterRule(
+            rule_id="pilot-filter-v1",
+            user_id=account.id,
+            channel_id=7,
+            include_patterns=[r"\bBTC\b"],
+        ),
+    )
+    db_session.commit()
+
+    feed = present_feeds(db_session, account.id)[0]
+
+    assert feed["status"] == "backfilled"
+    assert feed["hasRisk"] is True
 
 
 def test_feed_summary_treats_unlabelled_candidate_deletion_as_warning(db_session):
