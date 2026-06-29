@@ -52,12 +52,21 @@ export function attemptExtractSignal(input) {
   const directions = detectDirections(clean)
   if (instruments.length === 0 || directions.length === 0) return null
 
-  const prices = detectPrices(clean)
   const fields = extractSignalFields(message)
   const intent = classifyIntent(message.text, fields)
+  // The parser is the classifier: only a message that reads as a NEW signal is a
+  // candidate / template family. Updates, results and commentary are not new
+  // signals — they are surfaced in the audit re-scan, not as signal formats.
+  if (intent !== 'new_signal') return null
+
+  const { templateKey, normalizedTemplate } = normalizeTemplate({ message })
+  // No structural skeleton survived (the message was directional prose, not a
+  // formatted signal) — it is not a parseable signal format.
+  if (!normalizedTemplate.trim()) return null
+
+  const prices = detectPrices(clean)
   const geometry = validatePriceGeometry(fields)
   const confidence = scoreCandidate({ message, fields, directions })
-  const { templateKey, normalizedTemplate } = normalizeTemplate({ message })
   const rejectionReasons = collectRejectionReasons(intent, fields, directions, geometry)
 
   return {
@@ -72,4 +81,16 @@ export function attemptExtractSignal(input) {
     templateKey,
     normalizedTemplate
   }
+}
+
+/**
+ * Intent of any message (instrument/direction not required) — used by the audit
+ * re-scan to bucket non-candidate messages (updates/results) without making them
+ * template families.
+ * @param {import('./types.js').ChatMessage|string} input
+ * @returns {import('./types.js').SignalIntent}
+ */
+export function classifyMessageIntent(input) {
+  const message = asMessage(input)
+  return classifyIntent(message.text, extractSignalFields(message))
 }

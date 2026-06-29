@@ -7,10 +7,9 @@
 import { detectInstruments } from './instruments.js'
 import { detectDirections } from './directions.js'
 import { detectPrices } from './prices.js'
-import { extractSignalFields, hasTradingLabel } from './fields.js'
-import { classifyIntent } from './intent.js'
+import { hasTradingLabel } from './fields.js'
 import { normalizeMessageText } from './text.js'
-import { attemptExtractSignal } from './extract.js'
+import { attemptExtractSignal, classifyMessageIntent } from './extract.js'
 import { mineTemplateGroups } from './mining.js'
 
 const REJECT_PHRASES = [
@@ -28,19 +27,20 @@ const REJECT_PHRASES = [
   'pips'
 ]
 const NON_SIGNAL_INTENTS = new Set(['update', 'result', 'commentary'])
-const PARSEABLE_INTENTS = new Set(['new_signal', 'unknown'])
 
-function dominantInstrument(group) {
+// A family's order type spans every instrument in it; describe the FORMAT, not a
+// sample symbol, so a multi-instrument family is not mislabelled as one coin.
+function dominantOrderType(group) {
   const counts = new Map()
   for (const candidate of group.candidates) {
-    const symbol = candidate.fields.instrument
-    if (symbol) counts.set(symbol, (counts.get(symbol) || 0) + 1)
+    const type = candidate.fields.orderType || 'unknown'
+    counts.set(type, (counts.get(type) || 0) + 1)
   }
-  let best = null
-  let bestCount = 0
-  for (const [symbol, count] of counts) {
+  let best = 'market'
+  let bestCount = -1
+  for (const [type, count] of counts) {
     if (count > bestCount) {
-      best = symbol
+      best = type
       bestCount = count
     }
   }
@@ -70,14 +70,20 @@ function ruleFieldMap(present) {
   return fields
 }
 
-function ruleName(group) {
-  const instrument = dominantInstrument(group) || 'Signal'
+const ORDER_TYPE_LABEL = {
+  market: 'Market',
+  limit: 'Limit',
+  range: 'Range',
+  unknown: 'Signal'
+}
+
+export function formatLabel(group) {
   const present = presentFields(group)
   const parts = ['direction']
   if (present.entry) parts.push('entry')
   if (present.stopLoss) parts.push('SL')
   if (present.takeProfits) parts.push('TP')
-  return `${instrument} · ${parts.join(' + ')}`
+  return `${ORDER_TYPE_LABEL[dominantOrderType(group)]} signal · ${parts.join(' + ')}`
 }
 
 // Sit the threshold a little under the family's average so typical members pass
@@ -94,7 +100,7 @@ export function compileRuleFromTemplate(group) {
   const present = presentFields(group)
   return {
     id: `rule_${group.templateKey.replace(/^tpl_/, '')}`,
-    name: ruleName(group),
+    name: formatLabel(group),
     templateKey: group.templateKey,
     required: ['instrument', 'direction'],
     fields: ruleFieldMap(present),
@@ -138,12 +144,8 @@ function textHasRejectPhrase(rule, candidate) {
 }
 
 // A message that names an instrument XOR a direction, or carries prices next to a
-// trading label without both, is a near miss worth a human glance. An outcome or
-// management post that merely names an instrument ("XAUUSD hit TP1") is noise,
-// not a miss, so it is screened out first.
+// trading label without both, is a near miss worth a human glance.
 function isPotentialMiss(message) {
-  const intent = classifyIntent(message.text, extractSignalFields(message))
-  if (NON_SIGNAL_INTENTS.has(intent)) return false
   const { clean } = normalizeMessageText(message.text)
   const hasInstrument = detectInstruments(clean).length > 0
   const hasDirection = detectDirections(clean).length > 0
@@ -154,28 +156,33 @@ function isPotentialMiss(message) {
   return false
 }
 
+// Candidates are always new signals now; match them to an accepted rule.
 function routeCandidate(candidate, ruleByKey, buckets) {
-  if (NON_SIGNAL_INTENTS.has(candidate.intent)) {
-    buckets.rejected.push(candidate)
-    return
-  }
   const rule = ruleByKey.get(candidate.templateKey)
   if (!rule) {
     buckets.rare.push(candidate)
     return
   }
   if (textHasRejectPhrase(rule, candidate)) {
-    buckets.rejected.push(candidate)
+    buckets.rejected.push({ message: candidate.message, intent: candidate.intent })
     return
   }
-  if (
-    PARSEABLE_INTENTS.has(candidate.intent) &&
-    candidate.confidence >= rule.confidenceThreshold
-  ) {
+  if (candidate.confidence >= rule.confidenceThreshold) {
     buckets.parsed.push(toStructuredSignal(candidate, rule))
     return
   }
   buckets.ambiguous.push(candidate)
+}
+
+// A non-candidate message that reads as an update/result is bucketed as rejected
+// (without becoming a template family); a partial-evidence one is a potential miss.
+function routeNonCandidate(message, buckets) {
+  const intent = classifyMessageIntent(message)
+  if (NON_SIGNAL_INTENTS.has(intent)) {
+    buckets.rejected.push({ message, intent })
+    return
+  }
+  if (isPotentialMiss(message)) buckets.misses.push(message)
 }
 
 /**
@@ -189,7 +196,7 @@ export function applyAcceptedRules(messages, rules) {
   for (const message of messages || []) {
     const candidate = attemptExtractSignal(message)
     if (!candidate) {
-      if (isPotentialMiss(message)) buckets.misses.push(message)
+      routeNonCandidate(message, buckets)
       continue
     }
     routeCandidate(candidate, ruleByKey, buckets)

@@ -72,21 +72,24 @@ describe('attemptExtractSignal — range signal', () => {
   })
 })
 
-describe('attemptExtractSignal — updates and results are kept but flagged', () => {
-  it('keeps a hit-TP message as a result candidate with rejection reasons', () => {
-    const candidate = attemptExtractSignal({ id: 'm3', text: 'XAUUSD BUY hit TP1' })
-    expect(candidate).not.toBeNull()
-    expect(candidate.intent).toBe('result')
-    expect(candidate.rejectionReasons.length).toBeGreaterThan(0)
+describe('attemptExtractSignal — only new signals are candidates', () => {
+  it('returns null for a result (hit TP) — not a new signal', () => {
+    expect(attemptExtractSignal({ id: 'm3', text: 'XAUUSD BUY hit TP1' })).toBeNull()
   })
 
-  it('keeps a stop-move as an update candidate', () => {
-    const candidate = attemptExtractSignal({
-      id: 'm4',
-      text: 'Move SL to BE on gold buy'
-    })
-    expect(candidate.intent).toBe('update')
-    expect(candidate.rejectionReasons.length).toBeGreaterThan(0)
+  it('returns null for an update (stop move) — not a new signal', () => {
+    expect(
+      attemptExtractSignal({ id: 'm4', text: 'Move SL to BE on gold buy' })
+    ).toBeNull()
+  })
+
+  it('returns null for directional commentary with no structure', () => {
+    expect(
+      attemptExtractSignal({
+        id: 'm6',
+        text: 'The whale stays long on BTC across every exchange while volume keeps climbing steadily'
+      })
+    ).toBeNull()
   })
 })
 

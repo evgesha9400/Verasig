@@ -1,4 +1,5 @@
 import { Badge, Button, Card, ConfidenceBar, Icon } from '@verasig/design-system'
+import { formatLabel } from '../../domain/template-mining/index.js'
 import { CandidateExample } from './CandidateExample.jsx'
 import {
   ACTION_LABEL,
@@ -126,8 +127,8 @@ export function TemplateGroupCard({
 
   return (
     <Card
-      title={`${representative.fields.instrument || 'Signal'} · ${representative.fields.direction || '—'}`}
-      subtitle={dateRangeLabel(group.dateRange)}
+      title={formatLabel(group)}
+      subtitle={`${group.count} messages · ${dateRangeLabel(group.dateRange)}`}
       headerActions={statusBadge}
       className={cardClass}
     >

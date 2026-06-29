@@ -18,9 +18,9 @@ const NOISE = [
 describe('mineTemplateGroups', () => {
   const groups = mineTemplateGroups([...SIGNALS, ...RESULTS, ...NOISE])
 
-  it('drops messages that are not signal candidates', () => {
+  it('only forms families from new-signal candidates (results/noise are not families)', () => {
     const total = groups.reduce((sum, group) => sum + group.count, 0)
-    expect(total).toBe(SIGNALS.length + RESULTS.length)
+    expect(total).toBe(SIGNALS.length)
   })
 
   it('groups structurally identical signals into one family', () => {
@@ -37,9 +37,8 @@ describe('mineTemplateGroups', () => {
     expect(signalGroup.status).toBe('unreviewed')
   })
 
-  it('suggests rejecting an update/result family', () => {
-    const resultGroup = groups.find((group) => group.normalizedTemplate.includes('HIT'))
-    expect(resultGroup.suggestedAction).toBe('reject')
+  it('does not turn update/result messages into template families', () => {
+    expect(groups.some((group) => group.normalizedTemplate.includes('HIT'))).toBe(false)
   })
 
   it('computes a date range from message dates', () => {

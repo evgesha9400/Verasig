@@ -119,6 +119,11 @@ export function classifyIntent(text, fields = {}) {
   const structured = structureScore(fields) > 0 || marketMarker
   if (hasInstrument && hasDirection && structured) return 'new_signal'
   if (anyMatch(COMMENTARY_MARKERS, lower) || lower.includes('?')) return 'commentary'
-  if (hasInstrument && hasDirection) return 'new_signal'
+  // A short directional call ("BTC long") with no levels is still a (market)
+  // signal; long prose that merely names an instrument and a direction is
+  // analysis/commentary, not a signal — this is what was flooding the families.
+  const wordCount = lower.split(/\s+/).filter(Boolean).length
+  if (hasInstrument && hasDirection && wordCount <= 3) return 'new_signal'
+  if (hasInstrument && hasDirection) return 'commentary'
   return 'unknown'
 }

@@ -18,10 +18,16 @@ describe('template mining — end to end over the sample dataset', () => {
     expect(groups.length).toBeGreaterThanOrEqual(6)
   })
 
-  it('finds families it suggests accepting and families it suggests rejecting', () => {
+  it('suggests accepting clean signal families and routes updates/results to the audit', () => {
     const actions = new Set(groups.map((group) => group.suggestedAction))
     expect(actions.has('accept')).toBe(true)
-    expect(actions.has('reject')).toBe(true)
+    // Families are signal formats only; updates/results are caught by the audit.
+    const accepted = groups.filter((group) => group.suggestedAction === 'accept')
+    const audit = applyAcceptedRules(
+      SAMPLE_MESSAGES,
+      accepted.map(compileRuleFromTemplate)
+    )
+    expect(audit.rejectedCandidates.length).toBeGreaterThan(0)
   })
 
   it('parses accepted families over the full history with no noise leaking in', () => {

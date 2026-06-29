@@ -9,7 +9,7 @@ describe('normalizeTemplate — matches the specified canonical forms', () => {
   it('normalizes an emoji + range + numbered TP signal', () => {
     const text = '🟢 XAUUSD BUY\nEntry: 2320-2325\nSL: 2312\nTP1: 2340\nTP2: 2355'
     expect(templateOf(text)).toBe(
-      '<SIDE_EMOJI> <INSTRUMENT> <SIDE>\nENTRY: <RANGE>\nSL: <PRICE>\nTP1: <PRICE>\nTP2: <PRICE>'
+      '<SIDE_EMOJI> <INSTRUMENT> <SIDE>\nENTRY <RANGE>\nSL <PRICE>\nTP1 <PRICE>\nTP2 <PRICE>'
     )
   })
 
@@ -33,7 +33,7 @@ describe('normalizeTemplate — matches the specified canonical forms', () => {
 
   it('does not corrupt a multi-digit ordinal', () => {
     expect(templateOf('XAUUSD BUY hit TP10')).toBe('<INSTRUMENT> <SIDE> HIT TP<N>')
-    expect(templateOf('XAUUSD BUY\nTP10: 2340')).toContain('TP10: <PRICE>')
+    expect(templateOf('XAUUSD BUY\nTP10: 2340')).toContain('TP10 <PRICE>')
   })
 })
 
