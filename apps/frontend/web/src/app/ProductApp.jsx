@@ -20,6 +20,7 @@ import { DistillView } from '../features/pipeline/steps/DistillView.jsx'
 import { VerifyView } from '../features/pipeline/steps/VerifyView.jsx'
 import { PaidFeaturePlaceholder } from '../features/pipeline/steps/PaidFeaturePlaceholder.jsx'
 import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
+import { TemplateMiningPage } from '../features/template-mining/TemplateMiningPage.jsx'
 import { SettingsView } from '../features/settings/SettingsView.jsx'
 import { useWorkflowState } from './workflow/useWorkflowState.js'
 import {
@@ -279,6 +280,10 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onDisconnect={() => disconnectBybit()}
       />
     )
+  } else if (nav === 'mining') {
+    title = 'Parser-first Template Mining'
+    subtitle = 'Discover signal formats by parsing, not labelling'
+    body = <TemplateMiningPage feeds={feeds} fireToast={fireToast} />
   } else if (nav === 'settings') {
     title = 'Account settings'
     subtitle = 'Profile, security & subscription'

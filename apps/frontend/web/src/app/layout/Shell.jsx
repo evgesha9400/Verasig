@@ -93,7 +93,8 @@ export function Shell({
   const items = [
     { id: 'sources', label: 'Sources', icon: 'sources' },
     { id: 'signals', label: 'Signals', icon: 'signals' },
-    { id: 'exchanges', label: 'Exchanges', icon: 'exchanges' }
+    { id: 'exchanges', label: 'Exchanges', icon: 'exchanges' },
+    { id: 'mining', label: 'Mining', icon: 'layers' }
   ]
   return (
     <div className="vrs-shell">
