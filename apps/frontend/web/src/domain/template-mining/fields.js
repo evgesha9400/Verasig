@@ -18,7 +18,7 @@ const ENTRY_AT = /@/
 const MARKET_LABEL = /\b(now|cmp|market|current\s*market\s*price|current\s*price)\b/i
 // Russian field labels (Cyrillic is not ASCII-\w, so these are substring tests).
 const STOP_LABEL_RU = /стоп/i
-const TARGET_LABEL_RU = /цел|тейк/i
+const TARGET_LABEL_RU = /цел|тейк|фикс[а-яё]*\s+прибыл[а-яё]*\s+на/i
 const ENTRY_LABEL_RU = /вход/i
 const MARKET_RU = /по\s*рынк/i
 const HAS_WORD = /[\p{L}]{2,}/u

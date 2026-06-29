@@ -79,6 +79,23 @@ describe('real feed — extraction', () => {
   })
 })
 
+describe('real feed — the dominant "Фиксируем прибыль на" target format', () => {
+  const fields = extractSignalFields(
+    `🪙 МОНЕТА: #AAVE/USDT\n📉📈ПОКУПКА: SHORT\n ПЛЕЧО: 18х\n· Вход: 159.81$\n· Фиксируем прибыль на:158.03$, 155.37$, 151.81$\n· Стоп: 172.23$`
+  )
+
+  it('extracts instrument, direction, entry and stop', () => {
+    expect(fields.instrument).toBe('AAVEUSDT')
+    expect(fields.direction).toBe('SELL')
+    expect(fields.entry).toMatchObject({ type: 'single', price: 159.81 })
+    expect(fields.stopLoss).toBe(172.23)
+  })
+
+  it('collects the inline target list under the profit-taking label', () => {
+    expect(fields.takeProfits).toEqual([158.03, 155.37, 151.81])
+  })
+})
+
 describe('real feed — intent', () => {
   it('classifies a full Russian signal as new_signal', () => {
     expect(attemptExtractSignal(REAL_SIGNAL).intent).toBe('new_signal')
