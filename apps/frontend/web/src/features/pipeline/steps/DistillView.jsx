@@ -174,11 +174,7 @@ export function DistillView({
       setLastProgress(lastProgressRef.current)
       setPhase('error')
       handlersRef.current.onError &&
-        handlersRef.current.onError(
-          'rejected',
-          'Distillation failed',
-          nextMessage
-        )
+        handlersRef.current.onError('rejected', 'Distillation failed', nextMessage)
     }
 
     // Read the durable ruleset. An empty ruleset means the job did not really
@@ -207,14 +203,12 @@ export function DistillView({
       if (closed) return
       subscription = handlersRef.current.onStreamProgress(chatId, {
         onProgress: (payload) => {
-          setProgress(
-            (current) => {
-              const next = normalizeProgressPayload(payload, current) || current
-              progressRef.current = next
-              lastProgressRef.current = next
-              return next
-            }
-          )
+          setProgress((current) => {
+            const next = normalizeProgressPayload(payload, current) || current
+            progressRef.current = next
+            lastProgressRef.current = next
+            return next
+          })
         },
         onDone: () => loadRules('The distill job did not complete.'),
         onError: (payload) => {

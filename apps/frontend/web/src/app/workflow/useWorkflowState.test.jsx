@@ -1,9 +1,6 @@
 import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  mergeReviewedFeedState,
-  useWorkflowState
-} from './useWorkflowState.js'
+import { mergeReviewedFeedState, useWorkflowState } from './useWorkflowState.js'
 
 const reviewedFeed = {
   id: 'reviewed-feed',
@@ -239,7 +236,9 @@ describe('useWorkflowState', () => {
     act(() => getWorkflow().setActiveFeedId(feed.id))
     act(() => getWorkflow().routeAfterVerify())
 
-    const verifiedFeed = getWorkflow().feeds.find((candidate) => candidate.id === feed.id)
+    const verifiedFeed = getWorkflow().feeds.find(
+      (candidate) => candidate.id === feed.id
+    )
     expect(verifiedFeed.status).toBe('verified')
     expect(verifiedFeed.hasRisk).toBe(true)
     expect(getWorkflow().screen).toBe('exchange')

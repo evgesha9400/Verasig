@@ -151,9 +151,7 @@ export function useWorkflowState(authToken) {
 
     const sourceState = await readSourceState(authToken)
     setTelegramConnected(sourceState.telegram.connected)
-    setFeeds((currentFeeds) =>
-      mergeReviewedFeedState(currentFeeds, sourceState.feeds)
-    )
+    setFeeds((currentFeeds) => mergeReviewedFeedState(currentFeeds, sourceState.feeds))
     return sourceState
   }
 
@@ -238,9 +236,7 @@ export function useWorkflowState(authToken) {
   }
 
   function fetchNewMessages(feed) {
-    previousBackfillStatusRef.current = isReviewedFeed(feed)
-      ? feed.status
-      : null
+    previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('refresh')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
@@ -253,9 +249,7 @@ export function useWorkflowState(authToken) {
   }
 
   function refetchFullHistory(feed) {
-    previousBackfillStatusRef.current = isReviewedFeed(feed)
-      ? feed.status
-      : null
+    previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('full')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
