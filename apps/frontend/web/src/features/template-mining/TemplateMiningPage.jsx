@@ -3,6 +3,7 @@ import { Button } from '@verasig/design-system'
 import {
   SAMPLE_MESSAGES,
   FEED_MESSAGES,
+  toChatMessages,
   mineTemplateGroups,
   compileRuleFromTemplate,
   applyAcceptedRules
@@ -29,26 +30,35 @@ function parsePasted(text) {
     .map((block, index) => ({ id: `paste-${index + 1}`, text: block }))
 }
 
-function feedDisplayName(feeds) {
-  const apex = feeds?.find((feed) => feed.id === 'apex')
-  return apex?.name || feeds?.[0]?.name || 'the connected feed'
-}
-
-function resolveMessages(source, pasted) {
+// Sample and paste are static, local arrays; the feed source is loaded
+// separately (real stored messages when authenticated, demo seed offline).
+function resolveStaticMessages(source, pasted) {
   if (source === 'sample') return SAMPLE_MESSAGES
   if (source === 'paste') return parsePasted(pasted)
-  return FEED_MESSAGES
+  return []
 }
 
-export function TemplateMiningPage({ feeds, fireToast }) {
+export function TemplateMiningPage({
+  feeds = [],
+  authToken,
+  onListMessages,
+  fireToast
+}) {
   const [source, setSource] = useState('feed')
   const [pasted, setPasted] = useState('')
+  const [feedId, setFeedId] = useState(null)
   const [result, setResult] = useState(null) // { groups, messages }
   const [decisions, setDecisions] = useState({}) // templateKey -> 'accepted' | 'rejected'
   const [expanded, setExpanded] = useState(() => new Set())
+  const [running, setRunning] = useState(false)
 
-  const feedLabel = feedDisplayName(feeds)
-  const messages = useMemo(() => resolveMessages(source, pasted), [source, pasted])
+  const effectiveFeedId = feedId ?? feeds[0]?.id ?? null
+  const selectedFeed =
+    feeds.find((feed) => feed.id === effectiveFeedId) || feeds[0] || null
+  const messages = useMemo(
+    () => resolveStaticMessages(source, pasted),
+    [source, pasted]
+  )
   const pastedCount = useMemo(() => parsePasted(pasted).length, [pasted])
 
   const groups = result?.groups ?? []
@@ -86,24 +96,52 @@ export function TemplateMiningPage({ feeds, fireToast }) {
     }
   }, [result, groups, audit, decisions]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function runMining() {
-    if (messages.length === 0) {
-      fireToast?.(
-        'pending',
-        'Nothing to mine',
-        'Add some messages to this source first.'
-      )
+  function finishMining(minedMessages) {
+    if (!minedMessages || minedMessages.length === 0) {
+      fireToast?.('pending', 'Nothing to mine', 'This source has no messages yet.')
       return
     }
-    const mined = mineTemplateGroups(messages)
-    setResult({ groups: mined, messages })
+    const mined = mineTemplateGroups(minedMessages)
+    setResult({ groups: mined, messages: minedMessages })
     setDecisions({})
     setExpanded(new Set())
     fireToast?.(
       'verified',
       'Template mining complete',
-      `${mined.length} format families from ${messages.length} messages.`
+      `${mined.length} format families from ${minedMessages.length} messages.`
     )
+  }
+
+  // The feed source reuses the messages already stored for the connected feed
+  // (GET /feeds/{id}/messages, the same deck the Label step reads); offline it
+  // falls back to the bundled demo history so the prototype still runs.
+  async function runFeedMining() {
+    const useBackend = Boolean(authToken && onListMessages && effectiveFeedId)
+    if (!useBackend) {
+      finishMining(FEED_MESSAGES)
+      return
+    }
+    setRunning(true)
+    try {
+      const response = await onListMessages(effectiveFeedId)
+      finishMining(toChatMessages(response.messages || []))
+    } catch (error) {
+      fireToast?.(
+        'rejected',
+        'Could not load feed messages',
+        error?.message || 'Try again in a moment.'
+      )
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function runMining() {
+    if (source === 'feed') {
+      void runFeedMining()
+      return
+    }
+    finishMining(resolveStaticMessages(source, pasted))
   }
 
   function decide(templateKey, status) {
@@ -158,11 +196,20 @@ export function TemplateMiningPage({ feeds, fireToast }) {
         onSourceChange={setSource}
         pasted={pasted}
         onPastedChange={setPasted}
-        feedLabel={feedLabel}
-        feedCount={FEED_MESSAGES.length}
+        feeds={feeds}
+        feedId={effectiveFeedId}
+        onFeedChange={setFeedId}
+        selectedFeedName={selectedFeed?.name}
+        authenticated={Boolean(authToken)}
+        demoFeedCount={FEED_MESSAGES.length}
         sampleCount={SAMPLE_MESSAGES.length}
         pastedCount={pastedCount}
-        canRun={messages.length > 0}
+        running={running}
+        canRun={
+          source === 'feed'
+            ? Boolean(effectiveFeedId) || FEED_MESSAGES.length > 0
+            : messages.length > 0
+        }
         onRun={runMining}
       />
 

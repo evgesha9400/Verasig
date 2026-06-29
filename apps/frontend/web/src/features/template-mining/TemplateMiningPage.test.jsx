@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TemplateMiningPage } from './TemplateMiningPage.jsx'
@@ -40,6 +40,34 @@ describe('TemplateMiningPage', () => {
     // The audit ran over the full history.
     expect(screen.getByText('Parsed signals')).toBeTruthy()
     expect(screen.getByText('Rejected updates / results')).toBeTruthy()
+  })
+
+  it('mines the stored messages from the connected feed when authenticated', async () => {
+    const user = userEvent.setup()
+    const messages = [
+      {
+        id: 'f1',
+        date: 'Jun 6',
+        time: '08:42',
+        author: 'Apex',
+        text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355'
+      },
+      { id: 'f2', date: 'Jun 6', time: '09:00', author: 'Apex', text: 'gm team' }
+    ]
+    const onListMessages = vi.fn().mockResolvedValue({ messages })
+    render(
+      <TemplateMiningPage
+        feeds={[{ id: 'apex', name: 'Apex Crypto Calls' }]}
+        authToken="jwt"
+        onListMessages={onListMessages}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /Run template mining/i }))
+
+    expect(onListMessages).toHaveBeenCalledWith('apex')
+    expect(await screen.findByText('Messages scanned')).toBeTruthy()
+    expect(await screen.findAllByText('<INSTRUMENT>')).toBeTruthy()
   })
 
   it('lets a single decision accept a whole family', async () => {

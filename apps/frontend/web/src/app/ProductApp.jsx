@@ -283,7 +283,14 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
   } else if (nav === 'mining') {
     title = 'Parser-first Template Mining'
     subtitle = 'Discover signal formats by parsing, not labelling'
-    body = <TemplateMiningPage feeds={feeds} fireToast={fireToast} />
+    body = (
+      <TemplateMiningPage
+        feeds={feeds}
+        authToken={authToken}
+        onListMessages={(chatId) => listMessages(authToken, chatId)}
+        fireToast={fireToast}
+      />
+    )
   } else if (nav === 'settings') {
     title = 'Account settings'
     subtitle = 'Profile, security & subscription'

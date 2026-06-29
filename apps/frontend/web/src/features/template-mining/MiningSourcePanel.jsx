@@ -1,36 +1,47 @@
-import { Button, Card, Icon, SegmentedControl } from '@verasig/design-system'
+import { Button, Card, Icon, SegmentedControl, Select } from '@verasig/design-system'
 
 /* Verasig — Template Mining: source selector + run trigger.
-   Works fully offline: the connected feed's history, a bundled sample, or pasted
-   text (one message per blank line). */
+   The Telegram-feed source reuses the messages already stored for the connected
+   feed (fetched on run); offline it falls back to the bundled demo history. A
+   sample dataset and a paste box keep the prototype usable with no backend. */
 const SOURCE_OPTIONS = [
   { value: 'feed', label: 'Telegram feed' },
   { value: 'sample', label: 'Sample dataset' },
   { value: 'paste', label: 'Paste messages' }
 ]
 
-function sourceHint(source, feedLabel, feedCount, sampleCount, pastedCount) {
-  if (source === 'feed') {
-    return `${feedCount} messages from ${feedLabel}`
+function feedHint(authenticated, selectedFeedName, demoFeedCount) {
+  const name = selectedFeedName || 'the connected feed'
+  return authenticated
+    ? `Stored messages from ${name}`
+    : `${demoFeedCount} demo messages from ${name}`
+}
+
+function sourceHint(props) {
+  if (props.source === 'feed') {
+    return feedHint(props.authenticated, props.selectedFeedName, props.demoFeedCount)
   }
-  if (source === 'sample') {
-    return `${sampleCount} representative messages across signal, update, result and noise formats`
+  if (props.source === 'sample') {
+    return `${props.sampleCount} representative messages across signal, update, result and noise formats`
   }
+  const { pastedCount } = props
   return `${pastedCount} message${pastedCount === 1 ? '' : 's'} detected — separate each with a blank line`
 }
 
-export function MiningSourcePanel({
-  source,
-  onSourceChange,
-  pasted,
-  onPastedChange,
-  feedLabel,
-  feedCount,
-  sampleCount,
-  pastedCount,
-  canRun,
-  onRun
-}) {
+export function MiningSourcePanel(props) {
+  const {
+    source,
+    onSourceChange,
+    pasted,
+    onPastedChange,
+    feeds,
+    feedId,
+    onFeedChange,
+    running,
+    canRun,
+    onRun
+  } = props
+
   return (
     <Card title="Source" subtitle="Choose what to mine, then run the parser-first pass">
       <div className="vrs-tm-source">
@@ -41,9 +52,15 @@ export function MiningSourcePanel({
             options={SOURCE_OPTIONS}
             label="Message source"
           />
-          <span className="vrs-tm-source__hint">
-            {sourceHint(source, feedLabel, feedCount, sampleCount, pastedCount)}
-          </span>
+          {source === 'feed' && feeds.length > 1 && (
+            <Select
+              label="Feed"
+              value={feedId || ''}
+              onChange={(event) => onFeedChange(event.target.value)}
+              options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
+            />
+          )}
+          <span className="vrs-tm-source__hint">{sourceHint(props)}</span>
         </div>
 
         {source === 'paste' && (
@@ -63,7 +80,8 @@ export function MiningSourcePanel({
             variant="primary"
             iconLeft={<Icon name="sparkles" size={16} />}
             onClick={onRun}
-            disabled={!canRun}
+            loading={running}
+            disabled={!canRun || running}
           >
             Run template mining
           </Button>
