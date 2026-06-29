@@ -91,3 +91,27 @@ describe('classifyIntent — does not over-reject new signals', () => {
     expect(intentOf('Gold buy, hold the position into NY')).toBe('update')
   })
 })
+
+describe('classifyIntent — a complete fresh setup with a management note is a new signal', () => {
+  it('keeps a scalp with a "close half" instruction as new_signal', () => {
+    expect(
+      intentOf(
+        'SCALP ARB/USDT long 1.124\nTight stop 1.092\nTarget 1.190\nClose half at 1.16'
+      )
+    ).toBe('new_signal')
+  })
+
+  it('keeps a market setup with a partial-close note as new_signal', () => {
+    expect(
+      intentOf('BTC LONG NOW\nSL 67400\nTP 69000\nClose half at first target')
+    ).toBe('new_signal')
+  })
+
+  it('still treats a bare close command as an update', () => {
+    expect(intentOf('Close BTC long now')).toBe('update')
+  })
+
+  it('still treats a stop move as an update even with restated levels', () => {
+    expect(intentOf('Move SL to BE on gold buy, entry was 2320')).toBe('update')
+  })
+})

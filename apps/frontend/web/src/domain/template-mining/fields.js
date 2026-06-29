@@ -16,10 +16,29 @@ const TARGET_LABEL = /\b(tp\d*|take\s*profits?|targets?|tgt|partial)\b/i
 const ENTRY_LABEL = /\b(entry|entries|enter|buy\s*zone|sell\s*zone|zone|limit)\b/i
 const ENTRY_AT = /@/
 const MARKET_LABEL = /\b(now|cmp|market|current\s*market\s*price|current\s*price)\b/i
+// Russian field labels (Cyrillic is not ASCII-\w, so these are substring tests).
+const STOP_LABEL_RU = /стоп/i
+const TARGET_LABEL_RU = /цел|тейк/i
+const ENTRY_LABEL_RU = /вход/i
+const MARKET_RU = /по\s*рынк/i
+const HAS_WORD = /[\p{L}]{2,}/u
+
+function isStopLine(line) {
+  return STOP_LABEL.test(line) || STOP_LABEL_RU.test(line)
+}
+function isTargetLine(line) {
+  return TARGET_LABEL.test(line) || TARGET_LABEL_RU.test(line)
+}
+function isEntryLine(line) {
+  return ENTRY_LABEL.test(line) || ENTRY_AT.test(line) || ENTRY_LABEL_RU.test(line)
+}
+function isMarketLine(line) {
+  return MARKET_LABEL.test(line) || MARKET_RU.test(line)
+}
 
 /** True when the text carries any entry / stop / target field label. */
 export function hasTradingLabel(text) {
-  return STOP_LABEL.test(text) || TARGET_LABEL.test(text) || ENTRY_LABEL.test(text)
+  return isStopLine(text) || isTargetLine(text) || isEntryLine(text)
 }
 
 function messageText(message) {
@@ -55,25 +74,47 @@ function pushTargets(targets, prices) {
   }
 }
 
+// A bare target item under a "Targets/Цели" header: a price with no real words
+// (a "1️⃣ 2.5190 💵" line), as opposed to a promo line that merely contains a number.
+function isTargetItemLine(line, prices) {
+  return prices.length > 0 && !HAS_WORD.test(line)
+}
+
 function classifyLine(line, state) {
   const prices = detectPrices(line)
-  if (STOP_LABEL.test(line)) {
+  if (isStopLine(line)) {
+    state.collecting = null
     if (state.stopLoss === null && prices.length > 0) {
       state.stopLoss = prices[0].value ?? prices[0].min
     }
     return
   }
-  if (TARGET_LABEL.test(line)) {
+  if (isTargetLine(line)) {
+    // A "Targets:" / "Цели:" header with no inline price opens collection mode;
+    // the levels arrive on the following lines.
+    state.collecting = 'targets'
     pushTargets(state.takeProfits, prices)
     return
   }
-  if (ENTRY_LABEL.test(line) || ENTRY_AT.test(line)) {
+  if (isEntryLine(line)) {
+    state.collecting = null
     if (!state.entry && prices.length > 0) state.entry = entryFromPrice(prices[0])
+    else if (prices.length === 0 && isMarketLine(line)) state.marketMarker = true
     return
   }
-  if (MARKET_LABEL.test(line)) {
+  if (isMarketLine(line)) {
+    state.collecting = null
     state.marketMarker = true
     return
+  }
+  // While collecting targets, append bare price lines and stop at the first
+  // non-target line (e.g. boilerplate / promos).
+  if (state.collecting === 'targets') {
+    if (isTargetItemLine(line, prices)) {
+      pushTargets(state.takeProfits, prices)
+      return
+    }
+    state.collecting = null
   }
   // Unlabelled line: a price next to the instrument/direction header is the entry.
   const isHeader =
@@ -110,7 +151,8 @@ export function extractSignalFields(message) {
     headerEntry: null,
     marketMarker: false,
     stopLoss: null,
-    takeProfits: []
+    takeProfits: [],
+    collecting: null
   }
   for (const line of lines) classifyLine(line, state)
 

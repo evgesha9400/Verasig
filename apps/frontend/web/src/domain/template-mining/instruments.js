@@ -37,8 +37,75 @@ const ALIASES = {
   MSFT: ['MSFT']
 }
 
+// Bare crypto bases seen in real channels — matched case-sensitively (uppercase)
+// so ordinary words like "Link" do not register as instruments.
+const CRYPTO_TICKERS = new Set([
+  'XRP',
+  'DOGE',
+  'BNB',
+  'ADA',
+  'AVAX',
+  'LINK',
+  'DOT',
+  'MATIC',
+  'POL',
+  'TRX',
+  'LTC',
+  'BCH',
+  'ATOM',
+  'UNI',
+  'TON',
+  'SUI',
+  'TIA',
+  'WIF',
+  'ORDI',
+  'SEI',
+  'ARB',
+  'OP',
+  'INJ',
+  'NEAR',
+  'PEPE',
+  'SHIB',
+  'BONK',
+  'FLOKI',
+  'APT',
+  'FIL',
+  'AAVE',
+  'RNDR',
+  'RENDER',
+  'FET',
+  'ICP',
+  'HBAR',
+  'XLM',
+  'ALGO',
+  'EGLD',
+  'SAND',
+  'MANA',
+  'AXS',
+  'GALA',
+  'FARTCOIN',
+  'NOT',
+  'JUP',
+  'PYTH',
+  'WLD',
+  'ENA',
+  'ONDO'
+])
+
 const DICTIONARY_CONFIDENCE = 0.95
 const PAIR_CONFIDENCE = 0.85
+
+// Russian "Монета:/Монету:" coin label → the ticker that follows. The `d` flag
+// exposes the capture-group span so only the ticker (not the label) is replaced.
+// Allow a #/$ prefix and digits in the ticker so "#1INCH" / "1000PEPE" are caught.
+const COIN_LABEL = /Монет[а-яё]*\s*:?\s*[#$]?([A-Za-z0-9]{2,10})/dgiu
+const BARE_TICKER = /(?<![A-Za-z0-9])([A-Z]{2,8})(?![A-Za-z0-9])/g
+const HAS_LETTER = /[A-Za-z]/
+
+function toUsdt(ticker) {
+  const upper = ticker.toUpperCase()
+  return upper.endsWith('USDT') ? upper : `${upper}USDT`
+}
 
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -63,7 +130,7 @@ function buildAliasRules() {
 
 const ALIAS_RULES = buildAliasRules()
 const CRYPTO_PAIR = new RegExp(
-  `(?<![A-Za-z0-9])([A-Z]{2,6})\\s*/\\s*(${CRYPTO_QUOTES.join('|')})(?![A-Za-z0-9])`,
+  `(?<![A-Za-z0-9])([A-Za-z0-9]{2,8})\\s*/\\s*(${CRYPTO_QUOTES.join('|')})(?![A-Za-z0-9])`,
   'gi'
 )
 const FOREX_PAIR = /(?<![A-Za-z0-9])([A-Za-z]{3})([A-Za-z]{3})(?![A-Za-z0-9])/g
@@ -93,12 +160,15 @@ function collectCryptoPairHits(text, hits) {
   let match
   CRYPTO_PAIR.lastIndex = 0
   while ((match = CRYPTO_PAIR.exec(text)) !== null) {
-    const normalized = `${match[1]}${match[2]}`.toUpperCase()
+    const base = match[1].toUpperCase()
+    const quote = match[2].toUpperCase()
+    // A fiat base, a numbers-only base, or base === quote is not a real pair.
+    if (base === quote || CURRENCY_CODES.has(base) || !HAS_LETTER.test(base)) continue
     pushHit(
       hits,
       match.index,
       match.index + match[0].length,
-      normalized,
+      `${base}${quote}`,
       match[0],
       PAIR_CONFIDENCE
     )
@@ -112,12 +182,39 @@ function collectForexPairHits(text, hits) {
     const base = match[1].toUpperCase()
     const quote = match[2].toUpperCase()
     if (!CURRENCY_CODES.has(base) || !CURRENCY_CODES.has(quote)) continue
+    if (base === quote) continue // USDUSD is not a pair
     pushHit(
       hits,
       match.index,
       match.index + match[0].length,
       `${base}${quote}`,
       match[0],
+      PAIR_CONFIDENCE
+    )
+  }
+}
+
+function collectCoinLabelHits(text, hits) {
+  let match
+  COIN_LABEL.lastIndex = 0
+  while ((match = COIN_LABEL.exec(text)) !== null) {
+    if (!HAS_LETTER.test(match[1])) continue // skip "Монета: 100" style numerics
+    const [start, end] = match.indices[1]
+    pushHit(hits, start, end, toUsdt(match[1]), match[1], DICTIONARY_CONFIDENCE)
+  }
+}
+
+function collectBareTickerHits(text, hits) {
+  let match
+  BARE_TICKER.lastIndex = 0
+  while ((match = BARE_TICKER.exec(text)) !== null) {
+    if (!CRYPTO_TICKERS.has(match[1])) continue
+    pushHit(
+      hits,
+      match.index,
+      match.index + match[0].length,
+      toUsdt(match[1]),
+      match[1],
       PAIR_CONFIDENCE
     )
   }
@@ -150,8 +247,10 @@ export function detectInstruments(text) {
   if (!text) return []
   const hits = []
   collectAliasHits(text, hits)
+  collectCoinLabelHits(text, hits)
   collectCryptoPairHits(text, hits)
   collectForexPairHits(text, hits)
+  collectBareTickerHits(text, hits)
   return dedupeHits(hits).map((hit) => ({
     raw: hit.raw,
     normalized: hit.normalized,

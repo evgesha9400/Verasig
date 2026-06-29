@@ -8,11 +8,19 @@ const EMOJI_CONFIDENCE = 0.4
 
 const BUY_WORDS = ['buy', 'long', 'bullish', 'call', 'calls']
 const SELL_WORDS = ['sell', 'short', 'bearish', 'put', 'puts']
-const BUY_EMOJIS = ['🟢', '⬆', '🚀', '📈']
-const SELL_EMOJIS = ['🔴', '⬇', '📉']
+// Russian: лонг = long/buy, шорт = short/sell.
+const BUY_WORDS_RU = ['лонг']
+const SELL_WORDS_RU = ['шорт']
+const BUY_EMOJIS = ['🟢', '⬆', '🚀', '📈', '🔼']
+const SELL_EMOJIS = ['🔴', '⬇', '📉', '🔽']
 
 function wordMatcher(words) {
   return new RegExp(`\\b(${words.join('|')})\\b`, 'gi')
+}
+
+// `\b` is ASCII-only, so bound Cyrillic words with Unicode letter lookarounds.
+function cyrillicMatcher(words) {
+  return new RegExp(`(?<!\\p{L})(${words.join('|')})(?!\\p{L})`, 'giu')
 }
 
 function emojiMatcher(emojis) {
@@ -23,6 +31,16 @@ function emojiMatcher(emojis) {
 const RULES = [
   { matcher: wordMatcher(BUY_WORDS), normalized: 'BUY', confidence: WORD_CONFIDENCE },
   { matcher: wordMatcher(SELL_WORDS), normalized: 'SELL', confidence: WORD_CONFIDENCE },
+  {
+    matcher: cyrillicMatcher(BUY_WORDS_RU),
+    normalized: 'BUY',
+    confidence: WORD_CONFIDENCE
+  },
+  {
+    matcher: cyrillicMatcher(SELL_WORDS_RU),
+    normalized: 'SELL',
+    confidence: WORD_CONFIDENCE
+  },
   {
     matcher: emojiMatcher(BUY_EMOJIS),
     normalized: 'BUY',

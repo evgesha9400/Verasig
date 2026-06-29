@@ -12,6 +12,9 @@ const TIME = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g
 // The ordinal is a short integer followed by another number — reserve it so it is
 // not read as a take-profit level. A bare "TP 50" (value, no following number) is left alone.
 const TARGET_ORDINAL = /\b(?:tp|tgt|targets?)\s+\d{1,2}\b(?=[\s:]*\d)/gi
+// Keycap-emoji ordinals (1️⃣ 2️⃣ …) prefix numbered target lines; the digit is a
+// label, not a price. Matches digit + optional VS16 + the keycap combiner.
+const KEYCAP = /[0-9]\uFE0F?\u20E3/g
 const SINGLE = new RegExp(`(?<![A-Za-z\\d.,])(${NUMBER})`, 'g')
 const RANGE = new RegExp(
   `(?<![A-Za-z\\d.,])(${NUMBER})\\s*(?:-|to)\\s*(${NUMBER})`,
@@ -36,7 +39,8 @@ export function parseNumber(raw) {
 const TRAILING_UNIT_WORD = /^\s*(pips?|points?|pts|pct|percent)\b/i
 
 function hasUnitSuffix(text, endIndex) {
-  if (/[xX%]/.test(text[endIndex] || '')) return true
+  // x / Latin X / Cyrillic kha (leverage "20X"/"20kha") and % are never price levels.
+  if (/[xX\u0445\u0425%]/.test(text[endIndex] || '')) return true
   return TRAILING_UNIT_WORD.test(text.slice(endIndex))
 }
 
@@ -52,6 +56,7 @@ function blockedSpans(text) {
   const spans = []
   spansOf(TIME, text, spans)
   spansOf(TARGET_ORDINAL, text, spans)
+  spansOf(KEYCAP, text, spans)
   return spans
 }
 

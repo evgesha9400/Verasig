@@ -117,6 +117,13 @@ function collapseBareOrdinals(template) {
   })
 }
 
+// Leverage tokens ("20X", "17X", Cyrillic "20Х") vary per signal but are not
+// structural — collapse them so a format isn't split into one family per leverage.
+const LEVERAGE_TOKEN = /\d+\s*[X\u0425](?![A-Za-z\u0400-\u04FF0-9])/g
+function collapseLeverage(template) {
+  return template.replace(LEVERAGE_TOKEN, '<LEVERAGE>')
+}
+
 export function hashString(text) {
   let hash = 0
   for (let i = 0; i < text.length; i += 1) {
@@ -134,6 +141,6 @@ export function normalizeTemplate(candidate) {
   const { clean } = normalizeMessageText(text)
   const spans = collectSpans(clean)
   const replaced = applySpans(clean, spans).toUpperCase()
-  const normalizedTemplate = collapseBareOrdinals(tidyLines(replaced))
+  const normalizedTemplate = collapseLeverage(collapseBareOrdinals(tidyLines(replaced)))
   return { templateKey: `tpl_${hashString(normalizedTemplate)}`, normalizedTemplate }
 }

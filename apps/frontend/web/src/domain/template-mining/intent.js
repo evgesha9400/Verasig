@@ -19,24 +19,33 @@ const RESULT_MARKERS = [
   /\bin\s+profit\b/,
   /\bsmashed\b/,
   /\bbanked\b/,
-  /[+\-−]\d+(\.\d+)?\s*%/
+  /[+\-−]\d+(\.\d+)?\s*%/,
+  // Russian outcome markers. Deliberately NOT "прибыл"/"фиксир" — those appear in
+  // the new-signal boilerplate "Решение о фиксации прибыли".
+  /результат/i,
+  /заработано/i,
+  /принесла/i
 ]
 const HIT_NEAR_LEVEL = /\bhit\b/
 
-// Position management: an instruction against an open trade. "hold" / "secure"
-// are bound to their management sense so they don't capture entry conditions
-// ("hold above 2300") or price zones ("secure 2300 zone").
-const UPDATE_MARKERS = [
-  /\bmove\s*(sl|stop)\b/,
+// Strong management markers reference an existing position so unambiguously that
+// they win even when the message restates entry/stop/target levels.
+const STRONG_UPDATE_MARKERS = [
+  /\bmove\b[^\n]{0,15}\b(sl|stop)\b/,
   /\bbreak\s*even\b/,
   /\bbreakeven\b/,
   /\bto\s*be\b/,
   /\bcancel(led)?\b/,
   /\bdelete\b/,
-  /\bhold\s+(the\s+)?(trade|position|runner|runners|it|longs?|shorts?)\b/,
   /\baverag(e|ing)\b/,
+  /\b(activated|triggered)\b/
+]
+// Soft markers ("close half", "partial", "hold the position", "secure profit")
+// mean an update ONLY when the message is not itself a complete fresh setup — a
+// scalp that posts entry+stop+target and then says "close half" is a new signal.
+const SOFT_UPDATE_MARKERS = [
+  /\bhold\s+(the\s+)?(trade|position|runner|runners|it|longs?|shorts?)\b/,
   /\bpartial(ly)?\b/,
-  /\b(activated|triggered)\b/,
   /\bclos(e|ing)\b/,
   /\bsecure(d)?\s+(profits?|gains?|partial|the\s+(bag|runner))\b/
 ]
@@ -76,6 +85,21 @@ function structureScore(fields) {
   return score
 }
 
+// A complete fresh trade: instrument + direction + an entry (or market order) +
+// a stop + at least one target. Such a message is a new signal even if it ends
+// with a soft management note like "close half".
+function isCompleteSetup(fields, marketMarker) {
+  return (
+    Boolean(fields.instrument) &&
+    Boolean(fields.direction) &&
+    Boolean(fields.entry || marketMarker) &&
+    fields.stopLoss !== null &&
+    fields.stopLoss !== undefined &&
+    Array.isArray(fields.takeProfits) &&
+    fields.takeProfits.length > 0
+  )
+}
+
 /**
  * @param {string} text
  * @param {Partial<import('./types.js').StructuredSignal>} fields
@@ -85,10 +109,12 @@ export function classifyIntent(text, fields = {}) {
   const { lower } = normalizeMessageText(text)
   const hasInstrument = Boolean(fields.instrument)
   const hasDirection = Boolean(fields.direction)
-  const marketMarker = /\b(now|cmp|market)\b/.test(lower)
+  const marketMarker = /\b(now|cmp|market)\b/.test(lower) || /по\s*рынк/i.test(lower)
 
   if (looksLikeResult(lower)) return 'result'
-  if (anyMatch(UPDATE_MARKERS, lower)) return 'update'
+  if (anyMatch(STRONG_UPDATE_MARKERS, lower)) return 'update'
+  if (isCompleteSetup(fields, marketMarker)) return 'new_signal'
+  if (anyMatch(SOFT_UPDATE_MARKERS, lower)) return 'update'
 
   const structured = structureScore(fields) > 0 || marketMarker
   if (hasInstrument && hasDirection && structured) return 'new_signal'

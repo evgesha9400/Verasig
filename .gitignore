@@ -50,3 +50,8 @@ distill-prompt-audit/
 
 # IDE metadata (JetBrains)
 .idea/
+
+# Template-mining dev-only preview + exported real feed data (not committed)
+apps/frontend/web/dev/realFeedMessages.json
+apps/frontend/web/mining-preview.html
+apps/frontend/web/dev/mining-preview.jsx
