@@ -61,6 +61,17 @@ describe('validatePriceGeometry — suspicious structures are downgraded, not re
     )
     expect(result.isValid).toBe(false)
   })
+
+  it('flags a BUY whose stop sits inside the entry range', () => {
+    const result = validatePriceGeometry(
+      buy({
+        entry: { type: 'range', min: 2320, max: 2325 },
+        stopLoss: 2322,
+        takeProfits: [2340]
+      })
+    )
+    expect(result.isValid).toBe(false)
+  })
 })
 
 describe('validatePriceGeometry — insufficient information is skipped', () => {

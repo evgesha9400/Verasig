@@ -107,12 +107,17 @@ function tidyLines(text) {
 }
 
 // A numbered TP that owns a value keeps its ordinal ("TP1: <PRICE>"); a bare
-// reference collapses to TP<N> so "hit TP1"/"hit TP2" updates group together.
+// reference collapses to TP<N> so "hit TP1"/"hit TP2" updates group together. A
+// function replacer matches the whole ordinal (avoiding the digit-backtracking
+// that corrupted "TP10" into "TP<N>0").
 function collapseBareOrdinals(template) {
-  return template.replace(/\bTP(\d+)(?!:?\s*<PRICE)/g, 'TP<N>')
+  return template.replace(/\bTP\d+\b/g, (match, offset, full) => {
+    const after = full.slice(offset + match.length)
+    return /^:?\s*<PRICE/.test(after) ? match : 'TP<N>'
+  })
 }
 
-function hashString(text) {
+export function hashString(text) {
   let hash = 0
   for (let i = 0; i < text.length; i += 1) {
     hash = (hash * 31 + text.charCodeAt(i)) >>> 0

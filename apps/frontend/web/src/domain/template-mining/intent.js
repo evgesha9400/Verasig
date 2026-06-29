@@ -6,22 +6,26 @@
 
 import { normalizeMessageText } from './text.js'
 
-// Outcome reports: a trade that already played out.
+// Outcome reports: a trade that already played out. "profit" / "pips" only read
+// as an outcome when quantified or verb-bound — bare "take profit" / "profit
+// target" is forward-looking signal copy, not a result.
 const RESULT_MARKERS = [
   /\bclosed\b/,
   /\bstopped(\s*out)?\b/,
   /\brunning\b/,
   /\b(tp\s*hit|sl\s*hit)\b/,
   /\b\d+(\.\d+)?\s*(pips?|points?|pts)\b/,
-  /\bpips?\b/,
-  /\bprofits?\b/,
+  /\b(banked|secured|booked|locked|took)\s+profits?\b/,
+  /\bin\s+profit\b/,
   /\bsmashed\b/,
   /\bbanked\b/,
   /[+\-−]\d+(\.\d+)?\s*%/
 ]
 const HIT_NEAR_LEVEL = /\bhit\b/
 
-// Position management: an instruction against an open trade.
+// Position management: an instruction against an open trade. "hold" / "secure"
+// are bound to their management sense so they don't capture entry conditions
+// ("hold above 2300") or price zones ("secure 2300 zone").
 const UPDATE_MARKERS = [
   /\bmove\s*(sl|stop)\b/,
   /\bbreak\s*even\b/,
@@ -29,12 +33,12 @@ const UPDATE_MARKERS = [
   /\bto\s*be\b/,
   /\bcancel(led)?\b/,
   /\bdelete\b/,
-  /\bhold\b/,
+  /\bhold\s+(the\s+)?(trade|position|runner|runners|it|longs?|shorts?)\b/,
   /\baverag(e|ing)\b/,
   /\bpartial(ly)?\b/,
   /\b(activated|triggered)\b/,
   /\bclos(e|ing)\b/,
-  /\bsecure(d)?\b/
+  /\bsecure(d)?\s+(profits?|gains?|partial|the\s+(bag|runner))\b/
 ]
 
 const COMMENTARY_MARKERS = [
@@ -53,7 +57,7 @@ const COMMENTARY_MARKERS = [
   /\bmay\b/
 ]
 
-const LEVEL_NEARBY = /\b(tp\d?|sl|target)\b/
+const LEVEL_NEARBY = /\b(tp\d*|sl|target)\b/
 
 function anyMatch(markers, text) {
   return markers.some((marker) => marker.test(text))

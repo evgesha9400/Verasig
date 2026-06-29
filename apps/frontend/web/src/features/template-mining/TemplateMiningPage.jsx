@@ -46,7 +46,6 @@ export function TemplateMiningPage({ feeds, fireToast }) {
   const [result, setResult] = useState(null) // { groups, messages }
   const [decisions, setDecisions] = useState({}) // templateKey -> 'accepted' | 'rejected'
   const [expanded, setExpanded] = useState(() => new Set())
-  const [running, setRunning] = useState(false)
 
   const feedLabel = feedDisplayName(feeds)
   const messages = useMemo(() => resolveMessages(source, pasted), [source, pasted])
@@ -96,12 +95,10 @@ export function TemplateMiningPage({ feeds, fireToast }) {
       )
       return
     }
-    setRunning(true)
     const mined = mineTemplateGroups(messages)
     setResult({ groups: mined, messages })
     setDecisions({})
     setExpanded(new Set())
-    setRunning(false)
     fireToast?.(
       'verified',
       'Template mining complete',
@@ -165,7 +162,6 @@ export function TemplateMiningPage({ feeds, fireToast }) {
         feedCount={FEED_MESSAGES.length}
         sampleCount={SAMPLE_MESSAGES.length}
         pastedCount={pastedCount}
-        running={running}
         canRun={messages.length > 0}
         onRun={runMining}
       />

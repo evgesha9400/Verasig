@@ -5,7 +5,13 @@
    their spans reserved so the two levels of a range are never re-read as singles. */
 
 const NUMBER = '(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?[kKmM]?'
-const TIME = /\b\d{1,2}:\d{2}\b/g
+// Clock times, optionally with seconds, so "08:42:15" is reserved whole and its
+// ":15" tail is not read as a price.
+const TIME = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g
+// A numbered target ordinal written apart from its value ("TP 1 2340", "TP 1: 2340").
+// The ordinal is a short integer followed by another number — reserve it so it is
+// not read as a take-profit level. A bare "TP 50" (value, no following number) is left alone.
+const TARGET_ORDINAL = /\b(?:tp|tgt|targets?)\s+\d{1,2}\b(?=[\s:]*\d)/gi
 const SINGLE = new RegExp(`(?<![A-Za-z\\d.,])(${NUMBER})`, 'g')
 const RANGE = new RegExp(
   `(?<![A-Za-z\\d.,])(${NUMBER})\\s*(?:-|to)\\s*(${NUMBER})`,
@@ -24,24 +30,28 @@ export function parseNumber(raw) {
   return parseFloat(numeric) * scale
 }
 
-function trailingChar(text, index) {
-  const rest = text.slice(index).match(/^\s*(\S)/)
-  return rest ? rest[1] : ''
+// Leverage ("10x") and percentages ("2%") only count when glued to the number;
+// a space means the next token is an ordinary word, not a unit. P&L units
+// ("+300 pips") are matched as whole words and so tolerate the space.
+const TRAILING_UNIT_WORD = /^\s*(pips?|points?|pts|pct|percent)\b/i
+
+function hasUnitSuffix(text, endIndex) {
+  if (/[xX%]/.test(text[endIndex] || '')) return true
+  return TRAILING_UNIT_WORD.test(text.slice(endIndex))
 }
 
-// Leverage ("10x") and percentages ("2%") read as numbers but are never price
-// levels, so a number with one of these unit suffixes is dropped.
-function hasUnitSuffix(text, endIndex) {
-  return /[xX%]/.test(trailingChar(text, endIndex))
+function spansOf(regex, text, spans) {
+  let match
+  regex.lastIndex = 0
+  while ((match = regex.exec(text)) !== null) {
+    spans.push([match.index, match.index + match[0].length])
+  }
 }
 
 function blockedSpans(text) {
   const spans = []
-  let match
-  TIME.lastIndex = 0
-  while ((match = TIME.exec(text)) !== null) {
-    spans.push([match.index, match.index + match[0].length])
-  }
+  spansOf(TIME, text, spans)
+  spansOf(TARGET_ORDINAL, text, spans)
   return spans
 }
 

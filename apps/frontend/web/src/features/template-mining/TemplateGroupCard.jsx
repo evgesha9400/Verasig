@@ -149,6 +149,13 @@ export function TemplateGroupCard({
 
       <IntentBar distribution={group.intentDistribution} count={group.count} />
 
+      {group.geometryWarnings > 0 && (
+        <span className="vrs-tm-warn">
+          <Icon name="alert" size={12} />
+          {group.geometryWarnings} of {group.count} have suspicious stop/target geometry
+        </span>
+      )}
+
       <ExtractionSummary candidate={representative} />
 
       <div className="vrs-tm-actions">

@@ -65,3 +65,29 @@ describe('classifyIntent — commentary', () => {
     expect(intentOf('XAUUSD analysis: price may reject from 2330')).toBe('commentary')
   })
 })
+
+describe('classifyIntent — does not over-reject new signals', () => {
+  it('keeps a "take profit" signal as new_signal', () => {
+    expect(intentOf('XAUUSD BUY now, take profit 2340')).toBe('new_signal')
+  })
+
+  it('keeps a "profit target" signal as new_signal', () => {
+    expect(intentOf('XAUUSD BUY now, profit target 2340')).toBe('new_signal')
+  })
+
+  it('keeps a "hold above" entry condition as new_signal', () => {
+    expect(intentOf('Buy gold, will hold above 2300')).toBe('new_signal')
+  })
+
+  it('keeps a "secure zone" signal as new_signal', () => {
+    expect(intentOf('XAUUSD BUY now secure 2300 zone')).toBe('new_signal')
+  })
+
+  it('still treats "secured profit" as a result', () => {
+    expect(intentOf('XAUUSD long secured profit today')).toBe('result')
+  })
+
+  it('still treats "hold the position" as an update', () => {
+    expect(intentOf('Gold buy, hold the position into NY')).toBe('update')
+  })
+})

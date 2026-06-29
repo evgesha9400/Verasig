@@ -71,6 +71,12 @@ describe('extractSignalFields — stop loss', () => {
       extractSignalFields('LONG SOL/USDT 148.5\nRisk 2% of book').stopLoss
     ).toBeNull()
   })
+
+  it('does not read a bare risk-sizing number as a stop', () => {
+    expect(
+      extractSignalFields('XAUUSD buy\nEntry 2320\nRisk 50 Reward 150').stopLoss
+    ).toBeNull()
+  })
 })
 
 describe('extractSignalFields — take profits', () => {
@@ -86,6 +92,11 @@ describe('extractSignalFields — take profits', () => {
   it('reads a target list on one line', () => {
     const fields = extractSignalFields('GOLD long\nTargets 2340 / 2355 / 2370')
     expect(fields.takeProfits).toEqual([2340, 2355, 2370])
+  })
+
+  it('recognises a multi-digit target index like TP10', () => {
+    const fields = extractSignalFields('XAUUSD BUY\nTP1 2340\nTP10 2500')
+    expect(fields.takeProfits).toEqual([2340, 2500])
   })
 })
 

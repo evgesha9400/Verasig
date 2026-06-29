@@ -12,7 +12,7 @@ import { extractSignalFields } from './fields.js'
 import { classifyIntent } from './intent.js'
 import { scoreCandidate } from './scoring.js'
 import { validatePriceGeometry } from './geometry.js'
-import { normalizeTemplate } from './template.js'
+import { normalizeTemplate, hashString } from './template.js'
 
 const INTENT_REASON = {
   update: 'Reads as an update to an open trade, not a new signal.',
@@ -21,7 +21,10 @@ const INTENT_REASON = {
 }
 
 function asMessage(message) {
-  if (typeof message === 'string') return { id: `msg_${message.length}`, text: message }
+  // Hash the content so two distinct same-length strings get distinct ids
+  // (length-based ids collided and corrupted sourceMessageIds provenance).
+  if (typeof message === 'string')
+    return { id: `msg_${hashString(message)}`, text: message }
   return message
 }
 

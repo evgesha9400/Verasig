@@ -102,6 +102,7 @@
  * @property {{from?: string, to?: string}} [dateRange]
  * @property {number} confidenceAvg
  * @property {{new_signal:number, update:number, result:number, commentary:number, unknown:number}} intentDistribution
+ * @property {number} geometryWarnings  candidates in the family with a price-geometry warning
  * @property {'unreviewed'|'accepted'|'rejected'} status
  * @property {'accept'|'review'|'reject'} suggestedAction
  * @property {ParserRule} [compiledRule]

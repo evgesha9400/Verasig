@@ -11,24 +11,26 @@ function resolveFields(input) {
   return input && input.fields ? input.fields : input || {}
 }
 
-function entryReference(entry) {
+// A range entry is two bounds, not a midpoint: a BUY's stop must sit below the
+// WHOLE zone and its targets above it, so a level inside the band is a violation.
+function entryBounds(entry) {
   if (!entry) return null
-  if (entry.type === 'range') return (entry.min + entry.max) / 2
-  if (typeof entry.price === 'number') return entry.price
+  if (entry.type === 'range') return { low: entry.min, high: entry.max }
+  if (typeof entry.price === 'number') return { low: entry.price, high: entry.price }
   return null
 }
 
-function checkAgainstEntry(direction, reference, stopLoss, takeProfits, warnings) {
-  const wantsAbove = direction === 'BUY'
+function checkAgainstEntry(direction, bounds, stopLoss, takeProfits, warnings) {
+  const isBuy = direction === 'BUY'
   if (stopLoss !== null && stopLoss !== undefined) {
-    const stopBelow = stopLoss < reference
-    if (stopBelow !== wantsAbove) {
+    const stopOk = isBuy ? stopLoss < bounds.low : stopLoss > bounds.high
+    if (!stopOk) {
       warnings.push(`Stop loss is on the wrong side of entry for a ${direction}.`)
     }
   }
   for (const target of takeProfits) {
-    const targetAbove = target > reference
-    if (targetAbove !== wantsAbove) {
+    const targetOk = isBuy ? target > bounds.high : target < bounds.low
+    if (!targetOk) {
       warnings.push(
         `Take profit ${target} is on the wrong side of entry for a ${direction}.`
       )
@@ -54,20 +56,20 @@ export function validatePriceGeometry(input) {
   const direction = fields.direction
   const stopLoss = fields.stopLoss ?? null
   const takeProfits = Array.isArray(fields.takeProfits) ? fields.takeProfits : []
-  const reference = entryReference(fields.entry)
+  const bounds = entryBounds(fields.entry)
   const warnings = []
 
   const canCheckAgainstEntry =
-    reference !== null && (stopLoss !== null || takeProfits.length > 0)
+    bounds !== null && (stopLoss !== null || takeProfits.length > 0)
   const canCheckStopVsTargets =
-    reference === null && stopLoss !== null && takeProfits.length > 0
+    bounds === null && stopLoss !== null && takeProfits.length > 0
 
   if (!direction || (!canCheckAgainstEntry && !canCheckStopVsTargets)) {
     return { isValid: true, warnings: [], scoreAdjustment: 0 }
   }
 
   if (canCheckAgainstEntry) {
-    checkAgainstEntry(direction, reference, stopLoss, takeProfits, warnings)
+    checkAgainstEntry(direction, bounds, stopLoss, takeProfits, warnings)
   } else {
     checkStopVsTargets(direction, stopLoss, takeProfits, warnings)
   }

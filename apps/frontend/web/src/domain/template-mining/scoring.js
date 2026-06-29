@@ -11,13 +11,18 @@ import { validatePriceGeometry } from './geometry.js'
 const NORMALIZER = 16 // a clean, fully-structured signal lands high (~0.9) but below saturation
 
 const NEGATIVE_RULES = [
-  { test: (t) => /\bhit\b/.test(t) && /\b(tp\d?|sl|target)\b/.test(t), penalty: -5 },
+  { test: (t) => /\bhit\b/.test(t) && /\b(tp\d*|sl|target)\b/.test(t), penalty: -5 },
   { test: (t) => /\bclosed\b/.test(t), penalty: -5 },
   { test: (t) => /\bclos(e|ing)\b/.test(t), penalty: -4 },
   { test: (t) => /\bmove\s*(sl|stop)\b/.test(t), penalty: -4 },
   { test: (t) => /\b(breakeven|break\s*even|to\s*be)\b/.test(t), penalty: -4 },
   { test: (t) => /\bcancel(led)?\b/.test(t), penalty: -4 },
-  { test: (t) => /\b(profits?|pips?|points?)\b/.test(t), penalty: -3 }
+  // Quantified P&L or "in profit" reads as an outcome; bare "take profit" does not.
+  {
+    test: (t) =>
+      /\b\d+(\.\d+)?\s*(pips?|points?|pts)\b/.test(t) || /\bin\s+profit\b/.test(t),
+    penalty: -3
+  }
 ]
 
 function candidateText(candidate) {

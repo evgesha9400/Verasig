@@ -92,4 +92,23 @@ describe('applyAcceptedRules', () => {
     ]
     expect(everywhere).not.toContain('noise1')
   })
+
+  it('does not surface an instrument-only result post as a potential miss', () => {
+    const result = applyAcceptedRules([{ id: 'o1', text: 'XAUUSD hit TP1' }], [rule])
+    expect(result.potentialMisses.some((m) => m.id === 'o1')).toBe(false)
+  })
+
+  it('does not reject a genuine signal that merely contains a reject substring', () => {
+    const family = [
+      { id: 'c1', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nManage closely' },
+      { id: 'c2', text: 'XAUUSD BUY NOW\nSL 2305\nTP 2330\nManage closely' },
+      { id: 'c3', text: 'XAUUSD BUY NOW\nSL 2300\nTP 2325\nManage closely' }
+    ]
+    const familyRule = compileRuleFromTemplate(
+      mineTemplateGroups(family).find((group) => group.count === family.length)
+    )
+    const result = applyAcceptedRules(family, [familyRule])
+    expect(result.parsedSignals).toHaveLength(family.length)
+    expect(result.rejectedCandidates).toHaveLength(0)
+  })
 })

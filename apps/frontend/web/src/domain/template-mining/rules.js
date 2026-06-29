@@ -7,7 +7,8 @@
 import { detectInstruments } from './instruments.js'
 import { detectDirections } from './directions.js'
 import { detectPrices } from './prices.js'
-import { hasTradingLabel } from './fields.js'
+import { extractSignalFields, hasTradingLabel } from './fields.js'
+import { classifyIntent } from './intent.js'
 import { normalizeMessageText } from './text.js'
 import { attemptExtractSignal } from './extract.js'
 import { mineTemplateGroups } from './mining.js'
@@ -119,14 +120,30 @@ function toStructuredSignal(candidate, rule) {
   }
 }
 
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Match reject phrases on word boundaries (spaces tolerate any whitespace), so
+// "closely"/"pipsqueak" do not trip the bare "close"/"pips" phrases the way a
+// raw substring check would.
+function phraseMatches(phrase, lower) {
+  const body = escapeRegExp(phrase).replace(/\s+/g, '\\s+')
+  return new RegExp(`\\b${body}\\b`, 'i').test(lower)
+}
+
 function textHasRejectPhrase(rule, candidate) {
   const lower = normalizeMessageText(candidate.message.text).lower
-  return rule.rejectIfContains.some((phrase) => lower.includes(phrase))
+  return rule.rejectIfContains.some((phrase) => phraseMatches(phrase, lower))
 }
 
 // A message that names an instrument XOR a direction, or carries prices next to a
-// trading label without both, is a near miss worth a human glance.
+// trading label without both, is a near miss worth a human glance. An outcome or
+// management post that merely names an instrument ("XAUUSD hit TP1") is noise,
+// not a miss, so it is screened out first.
 function isPotentialMiss(message) {
+  const intent = classifyIntent(message.text, extractSignalFields(message))
+  if (NON_SIGNAL_INTENTS.has(intent)) return false
   const { clean } = normalizeMessageText(message.text)
   const hasInstrument = detectInstruments(clean).length > 0
   const hasDirection = detectDirections(clean).length > 0

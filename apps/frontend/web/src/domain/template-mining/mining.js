@@ -9,7 +9,13 @@ import { attemptExtractSignal } from './extract.js'
 const ACCEPT_CONFIDENCE = 0.6
 const ACCEPT_SIGNAL_SHARE = 0.6
 const REJECT_NONSIGNAL_SHARE = 0.5
+const GEOMETRY_REVIEW_SHARE = 0.3
 const MAX_EXAMPLES = 5
+
+// Geometry warnings (raised by validatePriceGeometry, carried on rejectionReasons)
+// must never let a family auto-accept — a broken stop/target placement is a
+// review item even when the messages otherwise parse cleanly.
+const GEOMETRY_WARNING = /wrong side of entry|not (below|above) the targets/i
 
 function emptyIntentDistribution() {
   return { new_signal: 0, update: 0, result: 0, commentary: 0, unknown: 0 }
@@ -51,10 +57,18 @@ function topExamples(candidates) {
     .slice(0, MAX_EXAMPLES)
 }
 
-function suggestAction(distribution, count, confidenceAvg) {
+function geometryWarningCount(candidates) {
+  return candidates.filter((candidate) =>
+    candidate.rejectionReasons.some((reason) => GEOMETRY_WARNING.test(reason))
+  ).length
+}
+
+function suggestAction(distribution, count, confidenceAvg, geometryWarnings) {
   const signalShare = distribution.new_signal / count
   const nonSignalShare =
     (distribution.update + distribution.result + distribution.commentary) / count
+  // A materially geometry-broken family is downgraded to review, never accept.
+  if (geometryWarnings / count > GEOMETRY_REVIEW_SHARE) return 'review'
   if (signalShare >= ACCEPT_SIGNAL_SHARE && confidenceAvg >= ACCEPT_CONFIDENCE) {
     return 'accept'
   }
@@ -68,6 +82,7 @@ function toGroup(templateKey, candidates) {
   const count = candidates.length
   const confidenceAvg = averageConfidence(candidates)
   const distribution = intentDistribution(candidates)
+  const geometryWarnings = geometryWarningCount(candidates)
   return {
     id: templateKey,
     templateKey,
@@ -78,8 +93,9 @@ function toGroup(templateKey, candidates) {
     dateRange: dateRange(candidates),
     confidenceAvg,
     intentDistribution: distribution,
+    geometryWarnings,
     status: 'unreviewed',
-    suggestedAction: suggestAction(distribution, count, confidenceAvg)
+    suggestedAction: suggestAction(distribution, count, confidenceAvg, geometryWarnings)
   }
 }
 

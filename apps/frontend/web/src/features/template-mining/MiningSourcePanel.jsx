@@ -28,7 +28,6 @@ export function MiningSourcePanel({
   feedCount,
   sampleCount,
   pastedCount,
-  running,
   canRun,
   onRun
 }) {
@@ -64,7 +63,6 @@ export function MiningSourcePanel({
             variant="primary"
             iconLeft={<Icon name="sparkles" size={16} />}
             onClick={onRun}
-            loading={running}
             disabled={!canRun}
           >
             Run template mining

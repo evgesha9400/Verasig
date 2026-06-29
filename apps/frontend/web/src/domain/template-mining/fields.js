@@ -9,8 +9,10 @@ import { detectInstruments } from './instruments.js'
 import { detectPrices } from './prices.js'
 import { normalizeMessageText } from './text.js'
 
-const STOP_LABEL = /\b(sl|stop\s*loss|stoploss|stop|invalidation|invalid\b|risk)\b/i
-const TARGET_LABEL = /\b(tp\d?|take\s*profits?|targets?|tgt|partial)\b/i
+// "risk" is intentionally excluded: "Risk 2% / Risk 50 Reward 150" is position-
+// sizing metadata, not a stop level, so it must not capture a stop value.
+const STOP_LABEL = /\b(sl|stop\s*loss|stoploss|stop|invalidation|invalid\b)\b/i
+const TARGET_LABEL = /\b(tp\d*|take\s*profits?|targets?|tgt|partial)\b/i
 const ENTRY_LABEL = /\b(entry|entries|enter|buy\s*zone|sell\s*zone|zone|limit)\b/i
 const ENTRY_AT = /@/
 const MARKET_LABEL = /\b(now|cmp|market|current\s*market\s*price|current\s*price)\b/i

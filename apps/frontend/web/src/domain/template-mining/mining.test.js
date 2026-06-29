@@ -59,3 +59,16 @@ describe('mineTemplateGroups', () => {
     expect(counts).toEqual([...counts].sort((a, b) => b - a))
   })
 })
+
+describe('mineTemplateGroups — geometry-broken families never auto-accept', () => {
+  const broken = [
+    { id: 'g1', text: 'XAUUSD BUY\nEntry 2320\nSL 2340\nTP 2300' },
+    { id: 'g2', text: 'XAUUSD BUY\nEntry 2321\nSL 2341\nTP 2301' }
+  ]
+
+  it('downgrades a stop/target-inverted family to review', () => {
+    const [group] = mineTemplateGroups(broken)
+    expect(group.geometryWarnings).toBe(broken.length)
+    expect(group.suggestedAction).toBe('review')
+  })
+})

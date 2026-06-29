@@ -23,12 +23,10 @@ function Queue({ icon, tone, title, count, rows }) {
     <Card>
       <div className="vrs-tm-queue__head">
         <Icon name={icon} size={15} />
+        <Badge tone={tone} dot aria-hidden="true" />
         <strong style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)' }}>
           {title}
         </strong>
-        <Badge tone={tone} dot>
-          {count}
-        </Badge>
         <span className="vrs-tm-queue__count">{count}</span>
       </div>
       <div className="vrs-tm-queue__list">

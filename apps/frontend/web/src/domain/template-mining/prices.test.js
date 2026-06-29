@@ -73,6 +73,18 @@ describe('detectPrices — exclusions', () => {
     expect(detectPrices('closed at 08:42')).toHaveLength(0))
   it('ignores leverage like 5-10x', () =>
     expect(detectPrices('Leverage 5-10x')).toHaveLength(0))
+  it('ignores P&L units like +300 pips', () =>
+    expect(detectPrices('running +300 pips')).toHaveLength(0))
+  it('ignores point counts like 150 points', () =>
+    expect(detectPrices('closed +150 points')).toHaveLength(0))
+  it('keeps a price followed by a space and a word starting with x/%', () =>
+    expect(values('Entry 2320 Xau zone')).toEqual([2320]))
+  it('ignores a clock time that carries seconds', () =>
+    expect(detectPrices('filled at 08:42:15')).toHaveLength(0))
+  it('skips a separated target ordinal but keeps its value', () =>
+    expect(values('TP 1 2340')).toEqual([2340]))
+  it('keeps a bare target value that is not an ordinal', () =>
+    expect(values('TP 50')).toEqual([50]))
   it('keeps the raw token for display', () => {
     const [price] = detectPrices('SL 2310')
     expect(price.raw).toContain('2310')

@@ -30,6 +30,11 @@ describe('normalizeTemplate — matches the specified canonical forms', () => {
   it('collapses a bare hit-TP update to a structural template', () => {
     expect(templateOf('XAUUSD BUY hit TP1')).toBe('<INSTRUMENT> <SIDE> HIT TP<N>')
   })
+
+  it('does not corrupt a multi-digit ordinal', () => {
+    expect(templateOf('XAUUSD BUY hit TP10')).toBe('<INSTRUMENT> <SIDE> HIT TP<N>')
+    expect(templateOf('XAUUSD BUY\nTP10: 2340')).toContain('TP10: <PRICE>')
+  })
 })
 
 describe('normalizeTemplate — grouping behaviour', () => {
