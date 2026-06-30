@@ -103,7 +103,7 @@ describe('TemplateMiningPage', () => {
         authToken="jwt"
         onListMessages={onListMessages}
         overlay={{
-          instrumentAliases: { 'АПТ': 'APTUSDT' },
+          instrumentAliases: { АПТ: 'APTUSDT' },
           directionTokens: { '🚀': 'BUY' }
         }}
       />

@@ -123,7 +123,11 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       const body = await putParserOverlay(authToken, next)
       setOverlay(body.overlay || next)
     } catch (error) {
-      fireToast('rejected', 'Could not save', error?.message || 'Try again in a moment.')
+      fireToast(
+        'rejected',
+        'Could not save',
+        error?.message || 'Try again in a moment.'
+      )
     }
   }
 

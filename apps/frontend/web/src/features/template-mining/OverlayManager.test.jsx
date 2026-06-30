@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { OverlayManager } from './OverlayManager.jsx'
 
 const OVERLAY = {
-  instrumentAliases: { 'АПТ': 'APTUSDT' },
+  instrumentAliases: { АПТ: 'APTUSDT' },
   directionTokens: { '🚀': 'BUY' },
   rejectPhrases: ['giveaway'],
   templateThresholds: {}
@@ -21,10 +21,10 @@ describe('OverlayManager', () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     render(<OverlayManager overlay={OVERLAY} onSave={onSave} />)
-    await user.click(screen.getByRole('button', { name: /Remove reject phrase giveaway/i }))
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ rejectPhrases: [] })
+    await user.click(
+      screen.getByRole('button', { name: /Remove reject phrase giveaway/i })
     )
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ rejectPhrases: [] }))
   })
 
   it('adding a reject phrase saves the overlay with it', async () => {

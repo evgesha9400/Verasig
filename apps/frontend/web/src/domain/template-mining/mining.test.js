@@ -68,7 +68,7 @@ describe('mineTemplateGroups — overlay teaches unknown coin + token', () => {
       text: 'АПТ 🚀\nEntry: 2.50\nStop: 2.40\nTarget: 2.70'
     }
     const overlay = {
-      instrumentAliases: { 'АПТ': 'APTUSDT' },
+      instrumentAliases: { АПТ: 'APTUSDT' },
       directionTokens: { '🚀': 'BUY' }
     }
 

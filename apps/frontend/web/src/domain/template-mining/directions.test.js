@@ -58,7 +58,11 @@ describe('detectDirections — emojis are lower confidence', () => {
 
 describe('detectDirections — overlay awareness', () => {
   it('recognises a custom direction token at word strength', () => {
-    expect(detectDirections('🚀 entry now').some((h) => h.normalized === 'BUY' && h.confidence === 0.9)).toBe(false)
+    expect(
+      detectDirections('🚀 entry now').some(
+        (h) => h.normalized === 'BUY' && h.confidence === 0.9
+      )
+    ).toBe(false)
 
     const overlay = { directionTokens: { '🚀': 'BUY' } }
     const hits = detectDirections('🚀 entry now', overlay)

@@ -106,7 +106,7 @@ describe('detectInstruments — overlay awareness', () => {
     const without = detectInstruments('АПТ long here')
     expect(without.some((h) => h.normalized === 'APTUSDT')).toBe(false)
 
-    const overlay = { instrumentAliases: { 'АПТ': 'APTUSDT' } }
+    const overlay = { instrumentAliases: { АПТ: 'APTUSDT' } }
     const hits = detectInstruments('АПТ long here', overlay)
     expect(hits.some((h) => h.normalized === 'APTUSDT')).toBe(true)
   })

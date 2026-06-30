@@ -118,7 +118,9 @@ describe('overlay integration', () => {
     const group = {
       templateKey: 'tpl_demo',
       confidenceAvg: 0.9,
-      candidates: [{ fields: { orderType: 'limit', entry: {}, stopLoss: 1, takeProfits: [1] } }]
+      candidates: [
+        { fields: { orderType: 'limit', entry: {}, stopLoss: 1, takeProfits: [1] } }
+      ]
     }
     const base = compileRuleFromTemplate(group)
     const tuned = compileRuleFromTemplate(group, {
@@ -132,7 +134,9 @@ describe('overlay integration', () => {
     const group = {
       templateKey: 'tpl_demo',
       confidenceAvg: 0.9,
-      candidates: [{ fields: { orderType: 'limit', entry: {}, stopLoss: 1, takeProfits: [1] } }]
+      candidates: [
+        { fields: { orderType: 'limit', entry: {}, stopLoss: 1, takeProfits: [1] } }
+      ]
     }
     const rule = compileRuleFromTemplate(group, { rejectPhrases: ['giveaway'] })
     expect(rule.rejectIfContains).toContain('giveaway')

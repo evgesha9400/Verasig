@@ -118,7 +118,8 @@ function classifyLine(line, state, overlay) {
   }
   // Unlabelled line: a price next to the instrument/direction header is the entry.
   const isHeader =
-    detectInstruments(line, overlay).length > 0 || detectDirections(line, overlay).length > 0
+    detectInstruments(line, overlay).length > 0 ||
+    detectDirections(line, overlay).length > 0
   if (isHeader && prices.length > 0 && !state.headerEntry) {
     state.headerEntry = entryFromPrice(prices[0])
   }

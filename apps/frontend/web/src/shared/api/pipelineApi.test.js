@@ -189,7 +189,10 @@ describe('pipelineApi — overlay', () => {
     await putParserOverlay('jwt-token', { rejectPhrases: ['x'] })
     expect(fetch).toHaveBeenCalledWith('http://localhost:8000/parser-overlay', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer jwt-token' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
       body: JSON.stringify({ overlay: { rejectPhrases: ['x'] } })
     })
   })

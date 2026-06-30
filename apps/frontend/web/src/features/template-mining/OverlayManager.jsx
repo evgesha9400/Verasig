@@ -27,7 +27,9 @@ export function OverlayManager({ overlay, onSave }) {
   }
   const addAlias = () => {
     if (!alias.term || !alias.symbol) return
-    save({ instrumentAliases: { ...current.instrumentAliases, [alias.term]: alias.symbol } })
+    save({
+      instrumentAliases: { ...current.instrumentAliases, [alias.term]: alias.symbol }
+    })
     setAlias({ term: '', symbol: '' })
   }
   const addToken = () => {
@@ -58,7 +60,9 @@ export function OverlayManager({ overlay, onSave }) {
         <div className="vrs-tm-overlay__label">Coin aliases</div>
         {Object.entries(current.instrumentAliases).map(([term, symbol]) => (
           <div key={term} className="vrs-tm-overlay__row">
-            <span>{term} → <span>{symbol}</span></span>
+            <span>
+              {term} → <span>{symbol}</span>
+            </span>
             <Button
               variant="ghost"
               size="sm"
