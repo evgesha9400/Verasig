@@ -47,3 +47,11 @@ export function submitVerify(token, chatId, verdicts) {
     body: { verdicts }
   })
 }
+
+export function getParserOverlay(token) {
+  return requestJson(`/parser-overlay`, { token })
+}
+
+export function putParserOverlay(token, overlay) {
+  return requestJson(`/parser-overlay`, { method: 'PUT', token, body: { overlay } })
+}
