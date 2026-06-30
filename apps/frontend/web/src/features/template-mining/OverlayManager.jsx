@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Icon, Input } from '@verasig/design-system'
+import { Button, Icon, Input, Select } from '@verasig/design-system'
 
 const EMPTY = {
   instrumentAliases: {},
@@ -114,14 +114,15 @@ export function OverlayManager({ overlay, onSave }) {
             aria-label="Direction token"
             onChange={(e) => setToken({ ...token, term: e.target.value })}
           />
-          <select
+          <Select
             aria-label="Token side"
             value={token.side}
             onChange={(e) => setToken({ ...token, side: e.target.value })}
-          >
-            <option value="BUY">BUY</option>
-            <option value="SELL">SELL</option>
-          </select>
+            options={[
+              { value: 'BUY', label: 'BUY' },
+              { value: 'SELL', label: 'SELL' }
+            ]}
+          />
           <Button variant="secondary" size="sm" onClick={addToken}>
             Add token
           </Button>

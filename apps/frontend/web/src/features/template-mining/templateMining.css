@@ -555,3 +555,8 @@
 .vrs-tm-overlay__add .vrs-field {
   flex: 1 1 160px;
 }
+/* The BUY/SELL side dropdown is a compact fixed-purpose control, not a free-text
+   field — it stays narrow so the token input keeps the row's growable width. */
+.vrs-tm-overlay__add .vrs-select {
+  flex: 0 1 120px;
+}
