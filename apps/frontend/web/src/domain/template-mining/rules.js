@@ -94,18 +94,23 @@ function deriveThreshold(confidenceAvg) {
 
 /**
  * @param {import('./types.js').TemplateGroup} group
+ * @param {Object} overlay
  * @returns {import('./types.js').ParserRule}
  */
-export function compileRuleFromTemplate(group) {
+export function compileRuleFromTemplate(group, overlay = {}) {
   const present = presentFields(group)
+  const overrideThreshold = overlay?.templateThresholds?.[group.templateKey]
   return {
     id: `rule_${group.templateKey.replace(/^tpl_/, '')}`,
     name: formatLabel(group),
     templateKey: group.templateKey,
     required: ['instrument', 'direction'],
     fields: ruleFieldMap(present),
-    rejectIfContains: [...REJECT_PHRASES],
-    confidenceThreshold: deriveThreshold(group.confidenceAvg)
+    rejectIfContains: [...REJECT_PHRASES, ...(overlay?.rejectPhrases ?? [])],
+    confidenceThreshold:
+      typeof overrideThreshold === 'number'
+        ? overrideThreshold
+        : deriveThreshold(group.confidenceAvg)
   }
 }
 
@@ -145,10 +150,10 @@ function textHasRejectPhrase(rule, candidate) {
 
 // A message that names an instrument XOR a direction, or carries prices next to a
 // trading label without both, is a near miss worth a human glance.
-function isPotentialMiss(message) {
+function isPotentialMiss(message, overlay) {
   const { clean } = normalizeMessageText(message.text)
-  const hasInstrument = detectInstruments(clean).length > 0
-  const hasDirection = detectDirections(clean).length > 0
+  const hasInstrument = detectInstruments(clean, overlay).length > 0
+  const hasDirection = detectDirections(clean, overlay).length > 0
   if (hasInstrument !== hasDirection) return true
   if (!hasInstrument && !hasDirection) {
     return detectPrices(clean).length > 0 && hasTradingLabel(clean)
@@ -176,27 +181,28 @@ function routeCandidate(candidate, ruleByKey, buckets) {
 
 // A non-candidate message that reads as an update/result is bucketed as rejected
 // (without becoming a template family); a partial-evidence one is a potential miss.
-function routeNonCandidate(message, buckets) {
-  const intent = classifyMessageIntent(message)
+function routeNonCandidate(message, buckets, overlay) {
+  const intent = classifyMessageIntent(message, overlay)
   if (NON_SIGNAL_INTENTS.has(intent)) {
     buckets.rejected.push({ message, intent })
     return
   }
-  if (isPotentialMiss(message)) buckets.misses.push(message)
+  if (isPotentialMiss(message, overlay)) buckets.misses.push(message)
 }
 
 /**
  * @param {import('./types.js').ChatMessage[]} messages
  * @param {import('./types.js').ParserRule[]} rules
+ * @param {Object} overlay
  */
-export function applyAcceptedRules(messages, rules) {
+export function applyAcceptedRules(messages, rules, overlay = {}) {
   const ruleByKey = new Map(rules.map((rule) => [rule.templateKey, rule]))
   const buckets = { parsed: [], ambiguous: [], rejected: [], rare: [], misses: [] }
 
   for (const message of messages || []) {
-    const candidate = attemptExtractSignal(message)
+    const candidate = attemptExtractSignal(message, overlay)
     if (!candidate) {
-      routeNonCandidate(message, buckets)
+      routeNonCandidate(message, buckets, overlay)
       continue
     }
     routeCandidate(candidate, ruleByKey, buckets)
@@ -207,7 +213,8 @@ export function applyAcceptedRules(messages, rules) {
     ambiguousCandidates: buckets.ambiguous,
     rejectedCandidates: buckets.rejected,
     rareTemplates: mineTemplateGroups(
-      buckets.rare.map((candidate) => candidate.message)
+      buckets.rare.map((candidate) => candidate.message),
+      overlay
     ),
     potentialMisses: buckets.misses
   }

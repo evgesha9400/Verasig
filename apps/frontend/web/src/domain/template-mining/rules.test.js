@@ -112,3 +112,29 @@ describe('applyAcceptedRules', () => {
     expect(result.rejectedCandidates).toHaveLength(0)
   })
 })
+
+describe('overlay integration', () => {
+  it('lowers a template threshold from the overlay', () => {
+    const group = {
+      templateKey: 'tpl_demo',
+      confidenceAvg: 0.9,
+      candidates: [{ fields: { orderType: 'limit', entry: {}, stopLoss: 1, takeProfits: [1] } }]
+    }
+    const base = compileRuleFromTemplate(group)
+    const tuned = compileRuleFromTemplate(group, {
+      templateThresholds: { tpl_demo: 0.42 }
+    })
+    expect(tuned.confidenceThreshold).toBe(0.42)
+    expect(tuned.confidenceThreshold).not.toBe(base.confidenceThreshold)
+  })
+
+  it('appends overlay reject phrases to a compiled rule', () => {
+    const group = {
+      templateKey: 'tpl_demo',
+      confidenceAvg: 0.9,
+      candidates: [{ fields: { orderType: 'limit', entry: {}, stopLoss: 1, takeProfits: [1] } }]
+    }
+    const rule = compileRuleFromTemplate(group, { rejectPhrases: ['giveaway'] })
+    expect(rule.rejectIfContains).toContain('giveaway')
+  })
+})
