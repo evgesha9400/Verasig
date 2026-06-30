@@ -199,7 +199,56 @@ describe('AuditReview', () => {
     await user.click(screen.getByRole('button', { name: /ambiguous candidate one/i }))
 
     expect(container.querySelector('[data-field="stopLoss"].is-warning')).toBeTruthy()
-    expect(screen.getByText(/Stop loss should sit below entry for a LONG/i)).toBeTruthy()
+    expect(
+      screen.getByText(/Stop loss should sit below entry for a LONG/i)
+    ).toBeTruthy()
+  })
+
+  it('orders parsed rows by confidence, highest first', () => {
+    // Input order is low-then-high; the list must surface the most-likely first,
+    // mirroring the family grid's high→low confidence ordering.
+    const audit = {
+      parsedSignals: [
+        {
+          sourceMessageIds: ['lo'],
+          instrument: 'LOWUSDT',
+          direction: 'SELL',
+          orderType: 'limit',
+          entry: null,
+          stopLoss: null,
+          takeProfits: [],
+          confidence: 0.55,
+          parserRuleId: 'rule_a',
+          intent: 'new_signal'
+        },
+        {
+          sourceMessageIds: ['hi'],
+          instrument: 'HIGHUSDT',
+          direction: 'BUY',
+          orderType: 'limit',
+          entry: null,
+          stopLoss: null,
+          takeProfits: [],
+          confidence: 0.95,
+          parserRuleId: 'rule_a',
+          intent: 'new_signal'
+        }
+      ],
+      ambiguousCandidates: [],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const { container } = render(
+      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+    )
+    const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
+      (node) => node.textContent
+    )
+    const high = texts.findIndex((text) => /HIGHUSDT/.test(text))
+    const low = texts.findIndex((text) => /LOWUSDT/.test(text))
+    expect(high).toBe(0)
+    expect(low).toBeGreaterThan(high)
   })
 
   it('prompts to accept a family when nothing is accepted yet', () => {

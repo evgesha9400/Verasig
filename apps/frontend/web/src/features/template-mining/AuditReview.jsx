@@ -46,10 +46,18 @@ function issueSummary(candidate) {
   }
 }
 
+// Most-likely first: parsed signals and ambiguous candidates are surfaced in
+// descending confidence, mirroring the family grid so the reviewer always reads
+// the strongest matches at the top. Stable, so equal-confidence rows keep their
+// original order.
+function byConfidenceDesc(a, b) {
+  return b.confidence - a.confidence
+}
+
 // Each row is { key, text, template?, templateId?, haystack } — one shape so a
 // single search/filter path serves every bucket.
 function parsedRows(signals, messageById, ruleById) {
-  return signals.map((signal, index) => {
+  return [...signals].sort(byConfidenceDesc).map((signal, index) => {
     const takeProfits = formatTakeProfits(signal.takeProfits)
     const text = [
       `${signal.instrument} ${signal.direction}`,
@@ -74,7 +82,7 @@ function parsedRows(signals, messageById, ruleById) {
 }
 
 function ambiguousRows(candidates, ruleByTemplateKey) {
-  return candidates.map((candidate, index) => {
+  return [...candidates].sort(byConfidenceDesc).map((candidate, index) => {
     const issue = issueSummary(candidate)
     const text = `${firstLine(candidate.message.text)}  ·  ${INTENT_LABEL[candidate.intent]} ${formatConfidence(candidate.confidence)}`
     return {
