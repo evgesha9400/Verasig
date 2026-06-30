@@ -53,6 +53,32 @@ describe('normalizeTemplate — grouping behaviour', () => {
     expect(a.templateKey).toBe(b.templateKey)
   })
 
+  it('combines redundant limit-order text and target count variants', () => {
+    const multiTarget = normalizeTemplate({
+      message: {
+        text: `🪙 МОНЕТА: #AAVE/USDT
+📉📈 ПОКУПКА: SHORT
+ПЛЕЧО: 18х
+ВХОД: 159.81$
+ФИКСИРУЕМ ПРИБЫЛЬ НА: 158.03$, 155.37$, 151.81$
+СТОП: 172.23$`
+      }
+    })
+    const singleTarget = normalizeTemplate({
+      message: {
+        text: `🪙 МОНЕТА: #AAVE/USDT
+📉📈 ПОКУПКА: SHORT LIMIT ORDER
+ПЛЕЧО: 18х
+ВХОД: 159.81$
+ФИКСИРУЕМ ПРИБЫЛЬ НА: 158.03$
+СТОП: 172.23$`
+      }
+    })
+
+    expect(singleTarget.normalizedTemplate).toBe(multiTarget.normalizedTemplate)
+    expect(singleTarget.templateKey).toBe(multiTarget.templateKey)
+  })
+
   it('produces a different template key for a different structure', () => {
     const a = normalizeTemplate({
       message: { text: 'BUY XAUUSD NOW\nSL 2312\nTP 2340' }

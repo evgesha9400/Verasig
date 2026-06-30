@@ -239,6 +239,49 @@ function collapseTargetLines(template) {
   return out.join('\n')
 }
 
+const PRICE_OR_RANGE = /<(?:PRICE|RANGE)>/
+const TARGET_LIST_LABEL = /\b(?:TAKE PROFITS|TARGETS|PARTIAL)\b/
+const TARGET_LIST_LABEL_RU = [
+  'ЦЕЛИ',
+  'ЦЕЛЬ',
+  'ЦЕЛЕЙ',
+  'ТЕЙК',
+  'ТЕЙКИ',
+  'ФИКСИРУЕМ ПРИБЫЛЬ НА'
+]
+const INDEPENDENT_ENTRY_LABEL = /\b(?:ENTRY|ENTRIES|ENTER|ZONE)\b|@/
+
+function lineHasTargetListLabel(line) {
+  return (
+    TARGET_LIST_LABEL.test(line) ||
+    TARGET_LIST_LABEL_RU.some((label) => line.includes(label))
+  )
+}
+
+function lineHasIndependentPricedEntry(line) {
+  if (!PRICE_OR_RANGE.test(line)) return false
+  return INDEPENDENT_ENTRY_LABEL.test(line) || line.includes('ВХОД')
+}
+
+function canonicalizeTargetPriceArity(line) {
+  if (!lineHasTargetListLabel(line)) return line
+  return line.replace(/<PRICE>$/, '<PRICE_LIST>')
+}
+
+function canonicalizeLimitOrderModifier(line, hasIndependentPricedEntry) {
+  if (!hasIndependentPricedEntry || PRICE_OR_RANGE.test(line)) return line
+  return line.replace(/(^|\s)LIMIT ORDER\b/g, '$1').replace(/\s+/g, ' ').trim()
+}
+
+function canonicalizeTemplateFamily(template) {
+  const lines = template.split('\n')
+  const hasIndependentPricedEntry = lines.some(lineHasIndependentPricedEntry)
+  return lines
+    .map((line) => canonicalizeLimitOrderModifier(line, hasIndependentPricedEntry))
+    .map(canonicalizeTargetPriceArity)
+    .join('\n')
+}
+
 // Wildcard non-structural words to <*>, counting how many a line contains. A
 // real field line is known labels + placeholders with at most ONE stray word (a
 // label synonym), which becomes <*>; lines with more stray words are channel
@@ -296,5 +339,6 @@ export function normalizeTemplate(candidate, overlay = {}) {
   let skeleton = collapsePriceRuns(tidyLines(replaced))
   skeleton = collapseLeverage(collapseBareOrdinals(skeleton))
   skeleton = keepStructuralLines(collapseTargetLines(skeleton))
+  skeleton = canonicalizeTemplateFamily(skeleton)
   return { templateKey: `tpl_${hashString(skeleton)}`, normalizedTemplate: skeleton }
 }
