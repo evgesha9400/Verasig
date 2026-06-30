@@ -461,6 +461,10 @@
   display: inline-flex;
   color: var(--text-faint);
 }
+.vrs-tm-review__flag {
+  flex: none;
+  display: inline-flex;
+}
 .vrs-tm-review__row-text {
   flex: 1;
   min-width: 0;

@@ -251,6 +251,40 @@ describe('AuditReview', () => {
     expect(low).toBeGreaterThan(high)
   })
 
+  it('badges a fallback-captured parsed row, but not an exact one', () => {
+    const signal = (id, instrument, confidence, match) => ({
+      sourceMessageIds: [id],
+      instrument,
+      direction: 'BUY',
+      orderType: 'limit',
+      entry: null,
+      stopLoss: null,
+      takeProfits: [],
+      confidence,
+      parserRuleId: 'rule_a',
+      intent: 'new_signal',
+      match
+    })
+    const audit = {
+      parsedSignals: [
+        signal('e', 'BBBUSDT', 0.9, 'exact'),
+        signal('f', 'AAAUSDT', 0.8, 'fallback')
+      ],
+      ambiguousCandidates: [],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const { container } = render(
+      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+    )
+    const rows = [...container.querySelectorAll('.vrs-tm-review__item')]
+    const fallbackRow = rows.find((r) => /AAAUSDT/.test(r.textContent))
+    const exactRow = rows.find((r) => /BBBUSDT/.test(r.textContent))
+    expect(fallbackRow.textContent).toMatch(/fallback/i)
+    expect(exactRow.textContent).not.toMatch(/fallback/i)
+  })
+
   it('prompts to accept a family when nothing is accepted yet', () => {
     render(<AuditReview audit={AUDIT} messages={[]} rules={[]} hasAccepted={false} />)
     expect(screen.getByText(/Accept at least one template family/i)).toBeTruthy()

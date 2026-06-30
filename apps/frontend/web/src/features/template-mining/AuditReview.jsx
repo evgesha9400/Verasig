@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Checkbox, Icon, Input, Select, Tabs } from '@verasig/design-system'
+import { Badge, Checkbox, Icon, Input, Select, Tabs } from '@verasig/design-system'
 import { Pager } from './Pager.jsx'
 import {
   INTENT_LABEL,
@@ -74,6 +74,9 @@ function parsedRows(signals, messageById, ruleById) {
       text,
       template: rule?.name,
       templateId: signal.parserRuleId,
+      // Recovered by a general family it does not exactly match — flag it so the
+      // reviewer can scrutinize looser matches without leaving the Parsed bucket.
+      fallback: signal.match === 'fallback',
       haystack:
         `${text} ${signal.instrument} ${signal.direction} ${sourceText}`.toLowerCase(),
       detail: { kind: 'parsed', signal, messageText: sourceText, template: rule?.name }
@@ -364,6 +367,11 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
                   <span className="vrs-tm-review__row-text" title={row.text}>
                     {row.text}
                   </span>
+                  {row.fallback && (
+                    <span className="vrs-tm-review__flag">
+                      <Badge tone="info">fallback</Badge>
+                    </span>
+                  )}
                   {row.template && (
                     <span className="vrs-tm-review__tmpl" title={row.template}>
                       {row.template}
