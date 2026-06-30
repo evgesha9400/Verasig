@@ -50,10 +50,22 @@
 }
 
 /* ---- metrics ---- */
+/* Eight headline metrics read as a balanced 4×2 block on desktop, collapsing to
+   2 columns then 1 so the row never strands a few cards against empty space. */
 .vrs-tm-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+@media (max-width: 940px) {
+  .vrs-tm-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .vrs-tm-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 .vrs-tm-metric {
   padding: 14px 16px;
@@ -95,22 +107,23 @@
 }
 
 /* ---- template family card ---- */
-.vrs-tm-card {
+/* The card root holds the design-system head + body; let the kit's own padding
+   set the head/body rhythm (no extra root flex gap). Body children are spaced by
+   a flex column INSIDE the padded body so the template, stats, table and actions
+   each get equal breathing room instead of sitting flush. */
+.vrs-tm-card > .vrs-card__pad {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+}
+.vrs-tm-card > .vrs-card__head {
+  align-items: flex-start;
 }
 .vrs-tm-card.is-accepted {
   border-color: color-mix(in srgb, var(--verified-500) 55%, var(--border-default));
 }
 .vrs-tm-card.is-rejected {
   opacity: 0.72;
-}
-.vrs-tm-card__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
 }
 .vrs-tm-tmpl {
   margin: 0;
@@ -280,11 +293,19 @@
 }
 
 /* ---- audit ---- */
+/* Five queues of very uneven height: a 2-column layout pairs them cleanly and
+   keeps the wide rejected/parsed rows readable, instead of a 3-up grid that
+   strands an empty cell beside a tall column. */
 .vrs-tm-audit {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
+}
+@media (max-width: 720px) {
+  .vrs-tm-audit {
+    grid-template-columns: 1fr;
+  }
 }
 .vrs-tm-queue__head {
   display: flex;

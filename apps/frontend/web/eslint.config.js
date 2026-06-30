@@ -5,7 +5,10 @@ import reactHooks from 'eslint-plugin-react-hooks'
 
 export default [
   {
-    ignores: ['dist']
+    // `dev/` holds gitignored, dev-only harnesses (also in .gitignore /
+    // .prettierignore) that drive real exported feed data locally; they are
+    // never shipped or committed, so they are excluded from linting too.
+    ignores: ['dist', 'dev']
   },
   {
     files: ['**/*.{js,jsx}'],

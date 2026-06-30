@@ -68,6 +68,15 @@ function candidateRow(candidate, index) {
   }
 }
 
+// Rejected entries are non-candidate updates/results with no confidence score,
+// so the row shows only the message and its intent — never a "NaN%" suffix.
+function rejectedRow(entry, index) {
+  return {
+    key: `${entry.message.id}-${index}`,
+    text: `${firstLine(entry.message.text)}  ·  ${INTENT_LABEL[entry.intent]}`
+  }
+}
+
 function rareRow(group, index) {
   return {
     key: `${group.templateKey}-${index}`,
@@ -112,7 +121,7 @@ export function AuditPanel({ audit, hasAccepted }) {
         tone="rejected"
         title="Rejected updates / results"
         count={audit.rejectedCandidates.length}
-        rows={audit.rejectedCandidates.map(candidateRow)}
+        rows={audit.rejectedCandidates.map(rejectedRow)}
       />
       <Queue
         icon="layers"

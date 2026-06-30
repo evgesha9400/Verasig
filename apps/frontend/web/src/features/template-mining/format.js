@@ -45,5 +45,6 @@ export function formatPercent(ratio) {
 }
 
 export function formatConfidence(value) {
+  if (!Number.isFinite(value)) return '—'
   return `${Math.round(value * 100)}%`
 }

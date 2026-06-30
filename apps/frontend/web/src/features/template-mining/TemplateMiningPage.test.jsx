@@ -42,6 +42,16 @@ describe('TemplateMiningPage', () => {
     expect(screen.getByText('Rejected updates / results')).toBeTruthy()
   })
 
+  it('never renders NaN in the audit queues', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await runOnSample(user)
+    await user.click(screen.getByRole('button', { name: /Apply suggestions/i }))
+
+    // Rejected rows carry no confidence; they must not surface "NaN%".
+    expect(screen.queryByText(/NaN/)).toBeNull()
+  })
+
   it('mines the stored messages from the connected feed when authenticated', async () => {
     const user = userEvent.setup()
     const messages = [

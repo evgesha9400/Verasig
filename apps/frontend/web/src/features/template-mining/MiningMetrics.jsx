@@ -17,12 +17,18 @@ export function MiningMetrics({ metrics }) {
       <Metric
         label="Messages scanned"
         value={metrics.totalMessages.toLocaleString('en-US')}
+        caption="in this source"
       />
       <Metric
         label="Signal candidates"
         value={metrics.candidates.toLocaleString('en-US')}
+        caption="parsed as signals"
       />
-      <Metric label="Families found" value={metrics.groups} />
+      <Metric
+        label="Families found"
+        value={metrics.groups}
+        caption="distinct formats"
+      />
       <Metric label="Accepted" value={metrics.accepted} caption="format families" />
       <Metric label="Rejected" value={metrics.rejected} caption="noise / updates" />
       <Metric label="Needs review" value={metrics.review} caption="undecided" />
