@@ -13,6 +13,7 @@ import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
 import { CompiledRulesPanel } from './CompiledRulesPanel.jsx'
+import { OverlayManager } from './OverlayManager.jsx'
 import { AuditReview } from './AuditReview.jsx'
 import { formatPercent } from './format.js'
 import './templateMining.css'
@@ -43,7 +44,8 @@ export function TemplateMiningPage({
   authToken,
   onListMessages,
   fireToast,
-  overlay = {}
+  overlay = {},
+  onSaveOverlay
 }) {
   const [source, setSource] = useState('feed')
   const [pasted, setPasted] = useState('')
@@ -271,6 +273,8 @@ export function TemplateMiningPage({
           </section>
 
           <CompiledRulesPanel rules={rules} />
+
+          {onSaveOverlay && <OverlayManager overlay={overlay} onSave={onSaveOverlay} />}
 
           <AuditReview
             audit={
