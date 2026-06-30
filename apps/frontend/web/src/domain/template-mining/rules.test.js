@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyAcceptedRules, compileRuleFromTemplate } from './rules.js'
 import { mineTemplateGroups } from './mining.js'
+import { SAMPLE_MESSAGES } from './sampleMessages.js'
 
 const SIGNALS = [
   { id: 's1', date: '2026-06-01', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
@@ -110,6 +111,50 @@ describe('applyAcceptedRules', () => {
     const result = applyAcceptedRules(family, [familyRule])
     expect(result.parsedSignals).toHaveLength(family.length)
     expect(result.rejectedCandidates).toHaveLength(0)
+  })
+})
+
+describe('no-regression: accept-all keeps exact routing', () => {
+  // When every mined family is accepted, each candidate's exact templateKey is
+  // present, so precedence/fallback can never fire — behaviour equals the old
+  // exact-key router. This golden test gates the precedence wiring.
+  it('routes every candidate by its exact family — no fallback, nothing rare', () => {
+    const rules = mineTemplateGroups(SAMPLE_MESSAGES).map((group) =>
+      compileRuleFromTemplate(group)
+    )
+    const audit = applyAcceptedRules(SAMPLE_MESSAGES, rules)
+    expect(audit.parsedSignals.length).toBeGreaterThan(0)
+    expect(audit.parsedSignals.every((signal) => signal.match === 'exact')).toBe(true)
+    expect(audit.rareTemplates).toHaveLength(0)
+  })
+})
+
+describe('fallback recovery', () => {
+  // A general family whose leading word varies (so it normalizes to a <*> slot).
+  const general = [
+    { id: 'g1', date: '2026-06-01', text: 'Alpha SOLUSDT BUY\nSL 100\nTP 120' },
+    { id: 'g2', date: '2026-06-02', text: 'Beta SOLUSDT BUY\nSL 101\nTP 121' },
+    { id: 'g3', date: '2026-06-03', text: 'Gamma SOLUSDT BUY\nSL 102\nTP 122' }
+  ]
+  const generalRule = compileRuleFromTemplate(
+    mineTemplateGroups(general).find((group) => group.count === general.length)
+  )
+
+  it('recovers a near-miss message via a subsuming general rule, tagged fallback', () => {
+    // "Монета" is a structural word, so this message exactly matches NO accepted
+    // family — but the general <*> family subsumes it and should claim it.
+    const specific = { id: 'spec1', text: 'Монета SOLUSDT BUY\nSL 100\nTP 120' }
+    const audit = applyAcceptedRules([specific], [generalRule])
+    const parsed = audit.parsedSignals.find((s) => s.sourceMessageIds.includes('spec1'))
+    expect(parsed).toBeTruthy()
+    expect(parsed.match).toBe('fallback')
+    expect(parsed.parserRuleId).toBe(generalRule.id)
+  })
+
+  it('tags an exact-family match as exact, not fallback', () => {
+    const audit = applyAcceptedRules(general, [generalRule])
+    expect(audit.parsedSignals).toHaveLength(general.length)
+    for (const signal of audit.parsedSignals) expect(signal.match).toBe('exact')
   })
 })
 

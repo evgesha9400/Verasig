@@ -81,6 +81,7 @@
  * @property {number[]} takeProfits
  * @property {number} confidence
  * @property {string} [parserRuleId]
+ * @property {'exact'|'fallback'} [match]  exact family, or recovered by a general one
  * @property {SignalIntent} intent
  */
 
@@ -125,6 +126,10 @@
  * @property {string} id
  * @property {string} name
  * @property {string} templateKey
+ * @property {string} pattern  the normalized template, matched by subsumption
+ * @property {number} specificity  literal structure score; leads precedence
+ * @property {number} coverage  family size; breaks precedence ties
+ * @property {number} confidenceAvg  family average confidence; breaks ties
  * @property {string[]} required
  * @property {{instrument:string, direction:string, entry?:string, stopLoss?:string, takeProfits?:string}} fields
  * @property {string[]} rejectIfContains

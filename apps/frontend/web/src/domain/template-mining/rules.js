@@ -11,6 +11,8 @@ import { hasTradingLabel } from './fields.js'
 import { normalizeMessageText } from './text.js'
 import { attemptExtractSignal, classifyMessageIntent } from './extract.js'
 import { mineTemplateGroups } from './mining.js'
+import { templateSpecificity } from './specificity.js'
+import { patternSubsumes } from './subsumption.js'
 
 const REJECT_PHRASES = [
   'hit tp',
@@ -100,10 +102,17 @@ function deriveThreshold(confidenceAvg) {
 export function compileRuleFromTemplate(group, overlay = {}) {
   const present = presentFields(group)
   const overrideThreshold = overlay?.templateThresholds?.[group.templateKey]
+  const pattern = group.normalizedTemplate ?? ''
   return {
     id: `rule_${group.templateKey.replace(/^tpl_/, '')}`,
     name: formatLabel(group),
     templateKey: group.templateKey,
+    // The pattern + precedence stats let an accepted family compete to claim
+    // messages: most-specific wins, so a general family only catches leftovers.
+    pattern,
+    specificity: templateSpecificity(pattern),
+    coverage: group.count ?? 0,
+    confidenceAvg: group.confidenceAvg,
     required: ['instrument', 'direction'],
     fields: ruleFieldMap(present),
     rejectIfContains: [...REJECT_PHRASES, ...(overlay?.rejectPhrases ?? [])],
@@ -114,7 +123,46 @@ export function compileRuleFromTemplate(group, overlay = {}) {
   }
 }
 
-function toStructuredSignal(candidate, rule) {
+// Specificity ↓ → confidence ↓ → coverage ↓ → templateKey (stable). Specificity
+// leads so a broad pattern never outranks a specific one regardless of coverage.
+function byPrecedence(a, b) {
+  return (
+    (b.specificity ?? 0) - (a.specificity ?? 0) ||
+    (b.confidenceAvg ?? 0) - (a.confidenceAvg ?? 0) ||
+    (b.coverage ?? 0) - (a.coverage ?? 0) ||
+    (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0)
+  )
+}
+
+/**
+ * Order accepted rules by precedence (does not mutate the input).
+ * @param {import('./types.js').ParserRule[]} rules
+ * @returns {import('./types.js').ParserRule[]}
+ */
+export function orderRulesByPrecedence(rules) {
+  return [...rules].sort(byPrecedence)
+}
+
+/**
+ * Claim a candidate for a rule: its exact family first (the maximally specific
+ * match), else the most-specific precedence-ordered rule whose pattern subsumes
+ * it. Returns { rule, match: 'exact' | 'fallback' } or null.
+ * @param {import('./types.js').Candidate} candidate
+ * @param {Map<string, import('./types.js').ParserRule>} ruleByKey
+ * @param {import('./types.js').ParserRule[]} orderedRules precedence-ordered
+ */
+export function matchCandidate(candidate, ruleByKey, orderedRules) {
+  const exact = ruleByKey.get(candidate.templateKey)
+  if (exact) return { rule: exact, match: 'exact' }
+  for (const rule of orderedRules) {
+    if (patternSubsumes(rule.pattern, candidate.normalizedTemplate)) {
+      return { rule, match: 'fallback' }
+    }
+  }
+  return null
+}
+
+function toStructuredSignal(candidate, rule, match) {
   const fields = candidate.fields
   return {
     sourceMessageIds: [candidate.message.id],
@@ -127,6 +175,9 @@ function toStructuredSignal(candidate, rule) {
     takeProfits: fields.takeProfits ?? [],
     confidence: candidate.confidence,
     parserRuleId: rule.id,
+    // 'exact' = the candidate's own family; 'fallback' = recovered by a more
+    // general accepted family it does not exactly match.
+    match,
     intent: candidate.intent
   }
 }
@@ -161,19 +212,21 @@ function isPotentialMiss(message, overlay) {
   return false
 }
 
-// Candidates are always new signals now; match them to an accepted rule.
-function routeCandidate(candidate, ruleByKey, buckets) {
-  const rule = ruleByKey.get(candidate.templateKey)
-  if (!rule) {
+// Candidates are always new signals now; claim them for the most-specific
+// accepted rule (exact family first, else a subsuming general fallback).
+function routeCandidate(candidate, ruleByKey, orderedRules, buckets) {
+  const matched = matchCandidate(candidate, ruleByKey, orderedRules)
+  if (!matched) {
     buckets.rare.push(candidate)
     return
   }
+  const { rule, match } = matched
   if (textHasRejectPhrase(rule, candidate)) {
     buckets.rejected.push({ message: candidate.message, intent: candidate.intent })
     return
   }
   if (candidate.confidence >= rule.confidenceThreshold) {
-    buckets.parsed.push(toStructuredSignal(candidate, rule))
+    buckets.parsed.push(toStructuredSignal(candidate, rule, match))
     return
   }
   buckets.ambiguous.push(candidate)
@@ -197,6 +250,7 @@ function routeNonCandidate(message, buckets, overlay) {
  */
 export function applyAcceptedRules(messages, rules, overlay = {}) {
   const ruleByKey = new Map(rules.map((rule) => [rule.templateKey, rule]))
+  const orderedRules = orderRulesByPrecedence(rules)
   const buckets = { parsed: [], ambiguous: [], rejected: [], rare: [], misses: [] }
 
   for (const message of messages || []) {
@@ -205,7 +259,7 @@ export function applyAcceptedRules(messages, rules, overlay = {}) {
       routeNonCandidate(message, buckets, overlay)
       continue
     }
-    routeCandidate(candidate, ruleByKey, buckets)
+    routeCandidate(candidate, ruleByKey, orderedRules, buckets)
   }
 
   return {
