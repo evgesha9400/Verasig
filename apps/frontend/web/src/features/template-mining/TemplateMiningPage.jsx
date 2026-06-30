@@ -13,7 +13,7 @@ import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
 import { CompiledRulesPanel } from './CompiledRulesPanel.jsx'
-import { AuditPanel } from './AuditPanel.jsx'
+import { AuditReview } from './AuditReview.jsx'
 import { formatPercent } from './format.js'
 import './templateMining.css'
 
@@ -271,7 +271,7 @@ export function TemplateMiningPage({
 
           <CompiledRulesPanel rules={rules} />
 
-          <AuditPanel
+          <AuditReview
             audit={
               audit || {
                 parsedSignals: [],
@@ -281,6 +281,8 @@ export function TemplateMiningPage({
                 potentialMisses: []
               }
             }
+            messages={result.messages}
+            rules={rules}
             hasAccepted={acceptedGroups.length > 0}
           />
         </>

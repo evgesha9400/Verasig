@@ -311,52 +311,81 @@
   color: var(--accent-text);
 }
 
-/* ---- audit ---- */
-/* Five queues of very uneven height: a 2-column layout pairs them cleanly and
-   keeps the wide rejected/parsed rows readable, instead of a 3-up grid that
-   strands an empty cell beside a tall column. */
-.vrs-tm-audit {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-@media (max-width: 720px) {
-  .vrs-tm-audit {
-    grid-template-columns: 1fr;
-  }
-}
-.vrs-tm-queue__head {
+/* ---- review (full-history result review) ---- */
+.vrs-tm-review {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  gap: 14px;
 }
-.vrs-tm-queue__count {
-  margin-left: auto;
+/* Filter bar: search + template select grow on the left; live count pinned right
+   (models the SignalsView .vrs-sig-filters bar). */
+.vrs-tm-review__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.vrs-tm-review__filters {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.vrs-tm-review__filters .vrs-field {
+  flex: 1 1 260px;
+}
+.vrs-tm-review__filters .vrs-select {
+  flex: 0 1 260px;
+}
+.vrs-tm-review__count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+.vrs-tm-review__count-v {
   font-family: var(--font-mono);
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-weight: var(--fw-medium);
   color: var(--text-strong);
 }
-.vrs-tm-queue__list {
+.vrs-tm-review__count-l {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+.vrs-tm-review__list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.vrs-tm-queue__row {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  line-height: 1.5;
-  color: var(--text-body);
+.vrs-tm-review__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 10px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
+}
+.vrs-tm-review__row-text {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--text-body);
   white-space: pre-wrap;
   word-break: break-word;
 }
-.vrs-tm-queue__more {
+.vrs-tm-review__tmpl {
+  flex: none;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-sans);
   font-size: var(--text-3xs);
   color: var(--text-faint);

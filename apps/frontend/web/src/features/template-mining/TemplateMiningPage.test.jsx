@@ -37,9 +37,9 @@ describe('TemplateMiningPage', () => {
 
     // A deterministic parser rule is compiled and shown verbatim.
     expect(screen.getAllByText(/"confidenceThreshold"/).length).toBeGreaterThan(0)
-    // The audit ran over the full history.
-    expect(screen.getByText('Parsed signals')).toBeTruthy()
-    expect(screen.getByText('Rejected updates / results')).toBeTruthy()
+    // The audit ran over the full history — the review surface shows its tabs.
+    expect(screen.getByRole('tab', { name: /Parsed/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /Rejected/i })).toBeTruthy()
   })
 
   it('never renders NaN in the audit queues', async () => {

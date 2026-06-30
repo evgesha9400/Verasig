@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, ConfidenceBar, Icon } from '@verasig/design-system'
 import { formatLabel } from '../../domain/template-mining/index.js'
 import { CandidateExample } from './CandidateExample.jsx'
+import { Pager } from './Pager.jsx'
 import {
   ACTION_LABEL,
   ACTION_TONE,
@@ -130,8 +131,6 @@ export function TemplateGroupCard({
   const safePage = Math.min(page, pageCount - 1)
   const windowStart = safePage * MESSAGES_PER_PAGE
   const pageItems = ordered.slice(windowStart, windowStart + MESSAGES_PER_PAGE)
-  const atStart = safePage === 0
-  const atEnd = safePage >= pageCount - 1
 
   const representative = group.examples[0]
   const statusBadge =
@@ -224,39 +223,14 @@ export function TemplateGroupCard({
           {pageItems.map((candidate) => (
             <CandidateExample key={candidate.message.id} candidate={candidate} />
           ))}
-          {pageCount > 1 && (
-            <div className="vrs-tm-pager" role="group" aria-label="Message pages">
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-disabled={atStart}
-                iconLeft={<Icon name="chevronLeft" size={14} />}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-              >
-                Prev
-              </Button>
-              <span
-                className="vrs-tm-pager__label"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {windowStart + 1}–{Math.min(windowStart + MESSAGES_PER_PAGE, total)} of{' '}
-                {total}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-disabled={atEnd}
-                iconRight={<Icon name="chevronRight" size={14} />}
-                onClick={() =>
-                  setPage((current) => Math.min(pageCount - 1, current + 1))
-                }
-              >
-                Next
-              </Button>
-            </div>
-          )}
+          <Pager
+            page={safePage}
+            pageCount={pageCount}
+            windowStart={windowStart}
+            pageSize={MESSAGES_PER_PAGE}
+            total={total}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </Card>
