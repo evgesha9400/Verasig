@@ -59,6 +59,27 @@ describe('mineTemplateGroups', () => {
   })
 })
 
+describe('mineTemplateGroups — overlay teaches unknown coin + token', () => {
+  it('mines a signal that only parses once the overlay teaches its coin + token', () => {
+    // 🚀 is a weak built-in BUY emoji; "АПТ" is unknown. Without both as confident
+    // signals this message is not a clean candidate family.
+    const message = {
+      id: 'x1',
+      text: 'АПТ 🚀\nEntry: 2.50\nStop: 2.40\nTarget: 2.70'
+    }
+    const overlay = {
+      instrumentAliases: { 'АПТ': 'APTUSDT' },
+      directionTokens: { '🚀': 'BUY' }
+    }
+
+    const withOverlay = mineTemplateGroups([message], overlay)
+    const instruments = withOverlay.flatMap((g) =>
+      g.candidates.map((c) => c.fields.instrument)
+    )
+    expect(instruments).toContain('APTUSDT')
+  })
+})
+
 describe('mineTemplateGroups — geometry-broken families never auto-accept', () => {
   const broken = [
     { id: 'g1', text: 'XAUUSD BUY\nEntry 2320\nSL 2340\nTP 2300' },

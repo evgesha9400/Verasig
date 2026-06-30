@@ -13,16 +13,16 @@ import { detectPrices } from './prices.js'
 const MARKET_MARKER = /\b(current market price|current price|cmp|market|now)\b/gi
 const LIST_GAP = /^[\s/,]*$/
 
-function instrumentSpans(clean) {
-  return detectInstruments(clean).map((entity) => ({
+function instrumentSpans(clean, overlay) {
+  return detectInstruments(clean, overlay).map((entity) => ({
     start: entity.start,
     end: entity.end,
     token: '<INSTRUMENT>'
   }))
 }
 
-function directionSpans(clean) {
-  return detectDirections(clean).map((entity) => ({
+function directionSpans(clean, overlay) {
+  return detectDirections(clean, overlay).map((entity) => ({
     start: entity.start,
     end: entity.end,
     token: entity.confidence < 0.7 ? '<SIDE_EMOJI>' : '<SIDE>'
@@ -70,10 +70,10 @@ function marketSpans(clean) {
   return spans
 }
 
-function collectSpans(clean) {
+function collectSpans(clean, overlay) {
   const spans = [
-    ...instrumentSpans(clean),
-    ...directionSpans(clean),
+    ...instrumentSpans(clean, overlay),
+    ...directionSpans(clean, overlay),
     ...priceSpans(clean),
     ...marketSpans(clean)
   ].sort((a, b) => a.start - b.start || b.end - a.end)
@@ -282,12 +282,13 @@ export function hashString(text) {
 
 /**
  * @param {import('./types.js').Candidate|{message?: {text?: string}, text?: string}} candidate
+ * @param {object} [overlay={}]
  * @returns {{templateKey: string, normalizedTemplate: string}}
  */
-export function normalizeTemplate(candidate) {
+export function normalizeTemplate(candidate, overlay = {}) {
   const text = candidate.message?.text ?? candidate.text ?? ''
   const { clean } = normalizeMessageText(text)
-  const spans = collectSpans(clean)
+  const spans = collectSpans(clean, overlay)
   const replaced = stripDecoration(applySpans(clean, spans).toUpperCase()).replace(
     SIDE_EMOJI_RUN,
     '<SIDE_EMOJI> '

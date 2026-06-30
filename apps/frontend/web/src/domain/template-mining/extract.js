@@ -43,23 +43,24 @@ function collectRejectionReasons(intent, fields, directions, geometry) {
 
 /**
  * @param {import('./types.js').ChatMessage|string} input
+ * @param {object} [overlay={}]
  * @returns {import('./types.js').Candidate|null}
  */
-export function attemptExtractSignal(input) {
+export function attemptExtractSignal(input, overlay = {}) {
   const message = asMessage(input)
   const { clean } = normalizeMessageText(message.text)
-  const instruments = detectInstruments(clean)
-  const directions = detectDirections(clean)
+  const instruments = detectInstruments(clean, overlay)
+  const directions = detectDirections(clean, overlay)
   if (instruments.length === 0 || directions.length === 0) return null
 
-  const fields = extractSignalFields(message)
+  const fields = extractSignalFields(message, overlay)
   const intent = classifyIntent(message.text, fields)
   // The parser is the classifier: only a message that reads as a NEW signal is a
   // candidate / template family. Updates, results and commentary are not new
   // signals — they are surfaced in the audit re-scan, not as signal formats.
   if (intent !== 'new_signal') return null
 
-  const { templateKey, normalizedTemplate } = normalizeTemplate({ message })
+  const { templateKey, normalizedTemplate } = normalizeTemplate({ message }, overlay)
   // No structural skeleton survived (the message was directional prose, not a
   // formatted signal) — it is not a parseable signal format.
   if (!normalizedTemplate.trim()) return null
@@ -88,9 +89,10 @@ export function attemptExtractSignal(input) {
  * re-scan to bucket non-candidate messages (updates/results) without making them
  * template families.
  * @param {import('./types.js').ChatMessage|string} input
+ * @param {object} [overlay={}]
  * @returns {import('./types.js').SignalIntent}
  */
-export function classifyMessageIntent(input) {
+export function classifyMessageIntent(input, overlay = {}) {
   const message = asMessage(input)
-  return classifyIntent(message.text, extractSignalFields(message))
+  return classifyIntent(message.text, extractSignalFields(message, overlay))
 }

@@ -112,10 +112,13 @@ function sortGroups(groups) {
 
 /**
  * @param {import('./types.js').ChatMessage[]} messages
+ * @param {object} [overlay={}]
  * @returns {import('./types.js').TemplateGroup[]}
  */
-export function mineTemplateGroups(messages) {
-  const candidates = (messages || []).map(attemptExtractSignal).filter(Boolean)
+export function mineTemplateGroups(messages, overlay = {}) {
+  const candidates = (messages || [])
+    .map((message) => attemptExtractSignal(message, overlay))
+    .filter(Boolean)
   const buckets = bucketByTemplate(candidates)
   const groups = [...buckets.entries()].map(([key, list]) => toGroup(key, list))
   return sortGroups(groups)

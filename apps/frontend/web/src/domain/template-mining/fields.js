@@ -45,14 +45,14 @@ function messageText(message) {
   return typeof message === 'string' ? message : message?.text || ''
 }
 
-function primaryInstrument(clean) {
-  return detectInstruments(clean)[0] || null
+function primaryInstrument(clean, overlay) {
+  return detectInstruments(clean, overlay)[0] || null
 }
 
 // A worded direction (high confidence) beats an ambiguous emoji; ties break on
 // position so the header direction wins.
-function primaryDirection(clean) {
-  const directions = detectDirections(clean)
+function primaryDirection(clean, overlay) {
+  const directions = detectDirections(clean, overlay)
   if (directions.length === 0) return null
   return [...directions].sort(
     (a, b) => b.confidence - a.confidence || a.start - b.start
@@ -80,7 +80,7 @@ function isTargetItemLine(line, prices) {
   return prices.length > 0 && !HAS_WORD.test(line)
 }
 
-function classifyLine(line, state) {
+function classifyLine(line, state, overlay) {
   const prices = detectPrices(line)
   if (isStopLine(line)) {
     state.collecting = null
@@ -118,7 +118,7 @@ function classifyLine(line, state) {
   }
   // Unlabelled line: a price next to the instrument/direction header is the entry.
   const isHeader =
-    detectInstruments(line).length > 0 || detectDirections(line).length > 0
+    detectInstruments(line, overlay).length > 0 || detectDirections(line, overlay).length > 0
   if (isHeader && prices.length > 0 && !state.headerEntry) {
     state.headerEntry = entryFromPrice(prices[0])
   }
@@ -139,12 +139,13 @@ function orderTypeFor(entry) {
 
 /**
  * @param {import('./types.js').ChatMessage|string} message
+ * @param {object} [overlay={}]
  * @returns {Partial<import('./types.js').StructuredSignal>}
  */
-export function extractSignalFields(message) {
+export function extractSignalFields(message, overlay = {}) {
   const { clean, lines } = normalizeMessageText(messageText(message))
-  const instrument = primaryInstrument(clean)
-  const direction = primaryDirection(clean)
+  const instrument = primaryInstrument(clean, overlay)
+  const direction = primaryDirection(clean, overlay)
 
   const state = {
     entry: null,
@@ -154,7 +155,7 @@ export function extractSignalFields(message) {
     takeProfits: [],
     collecting: null
   }
-  for (const line of lines) classifyLine(line, state)
+  for (const line of lines) classifyLine(line, state, overlay)
 
   const entry = resolveEntry(state)
   return {
