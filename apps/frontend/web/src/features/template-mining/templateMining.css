@@ -1,8 +1,9 @@
 /* ============================================================
    Verasig — Parser-first Template Mining (prototype page).
    Page-local layout only; design-system primitives bring their
-   own CSS. All values come from design tokens. Classes are
-   prefixed vrs-tm to avoid collisions with the rest of the kit.
+   own CSS. All spacing comes from the --space-* token grid (4px
+   base). Classes are prefixed vrs-tm to avoid collisions with the
+   rest of the kit.
    ============================================================ */
 
 .vrs-tm__intro {
@@ -17,13 +18,13 @@
 .vrs-tm-source {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 .vrs-tm-source__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .vrs-tm-source__hint {
   font-family: var(--font-sans);
@@ -32,9 +33,9 @@
 }
 .vrs-tm-source__area {
   width: 100%;
-  min-height: 132px;
+  min-height: 8rem; /* 128 — on the 4px grid */
   resize: vertical;
-  padding: 12px 14px;
+  padding: var(--space-3) var(--space-4);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.55;
@@ -55,7 +56,7 @@
 .vrs-tm-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: var(--space-4);
 }
 @media (max-width: 940px) {
   .vrs-tm-metrics {
@@ -68,19 +69,25 @@
   }
 }
 .vrs-tm-metric {
-  padding: 14px 16px;
+  padding: var(--space-4);
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 
 /* ---- review section ---- */
+/* Block wrapper for the "Template families" heading + the card grid. */
+.vrs-tm-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
 .vrs-tm-section__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .vrs-tm-section__title {
   font-family: var(--font-display);
@@ -92,29 +99,33 @@
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: var(--space-0-5);
 }
 .vrs-tm-bulk {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .vrs-tm-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 16px;
-  align-items: start;
+  gap: var(--space-4);
+  align-items: stretch;
 }
 
 /* ---- template family card ---- */
-/* The card root holds the design-system head + body; let the kit's own padding
-   set the head/body rhythm (no extra root flex gap). Body children are spaced by
-   a flex column INSIDE the padded body so the template, stats, table and actions
-   each get equal breathing room instead of sitting flush. */
-.vrs-tm-card > .vrs-card__pad {
+/* Cards in a row stretch to a common height; the padded body is a flex column
+   that fills that height so the action row can pin to a shared bottom baseline
+   (margin-top:auto). The kit's own head/body padding sets the outer rhythm. */
+.vrs-tm-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+}
+.vrs-tm-card > .vrs-card__pad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 .vrs-tm-card > .vrs-card__head {
   align-items: flex-start;
@@ -127,7 +138,7 @@
 }
 .vrs-tm-tmpl {
   margin: 0;
-  padding: 12px 14px;
+  padding: var(--space-3) var(--space-4);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.6;
@@ -146,8 +157,12 @@
 .vrs-tm-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: var(--space-3);
   align-items: center;
+}
+.vrs-tm-stats__bar {
+  flex: 1;
+  min-width: 140px;
 }
 .vrs-tm-stat__v {
   font-family: var(--font-mono);
@@ -192,12 +207,13 @@
 .vrs-tm-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-1-5);
 }
 .vrs-tm-legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1-5);
   font-family: var(--font-sans);
   font-size: var(--text-3xs);
   color: var(--text-muted);
@@ -215,7 +231,7 @@
   font-size: var(--text-xs);
 }
 .vrs-tm-kv td {
-  padding: 5px 8px;
+  padding: var(--space-1-5) var(--space-2);
   border-top: 1px solid var(--border-subtle);
   vertical-align: top;
 }
@@ -240,32 +256,39 @@
   font-weight: var(--fw-medium);
 }
 
+/* Action row: decision buttons cluster left, the expand toggle anchors right.
+   margin-top:auto pins the whole row to the card's bottom baseline. */
 .vrs-tm-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+.vrs-tm-actions__expand {
+  margin-left: auto;
 }
 
 .vrs-tm-ex {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-  padding-top: 12px;
+  gap: var(--space-2-5);
+  margin-top: var(--space-1);
+  padding-top: var(--space-3);
   border-top: 1px dashed var(--border-default);
 }
 .vrs-tm-ex__item {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-3);
 }
 /* Pager for the full per-family message list (five messages per page). */
 .vrs-tm-pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-top: 4px;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
 }
 .vrs-tm-pager__label {
   font-family: var(--font-mono);
@@ -280,7 +303,7 @@
 }
 .vrs-tm-ex__msg {
   margin: 0;
-  padding: 10px 12px;
+  padding: var(--space-2-5) var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   line-height: 1.55;
@@ -294,7 +317,7 @@
 .vrs-tm-warn {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-family: var(--font-sans);
   font-size: var(--text-3xs);
   color: var(--pending-500);
@@ -306,20 +329,33 @@
 }
 .vrs-tm-warn__msg {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--space-0-5);
   color: var(--text-muted);
 }
 .vrs-tm-issues {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
 }
 
 /* ---- compiled rules ---- */
+.vrs-tm-rule__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1-5);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+.vrs-tm-rule__name .vrs-icon,
+.vrs-tm-rule__name svg {
+  color: var(--verified-500);
+}
 .vrs-tm-rulejson {
   margin: 0;
-  padding: 14px 16px;
+  padding: var(--space-4);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   line-height: 1.6;
@@ -338,7 +374,7 @@
 .vrs-tm-review {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 /* Filter bar: search + template select grow on the left; live count pinned right
    (models the SignalsView .vrs-sig-filters bar). */
@@ -347,14 +383,14 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .vrs-tm-review__filters {
   display: flex;
   flex: 1;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .vrs-tm-review__filters .vrs-field {
   flex: 1 1 260px;
@@ -384,12 +420,12 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .vrs-tm-review__list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .vrs-tm-review__item {
   display: flex;
@@ -403,8 +439,8 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: var(--space-2-5);
+  padding: var(--space-2) var(--space-2-5);
   font: inherit;
   color: inherit;
   background: var(--surface-sunken);
@@ -451,7 +487,7 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1-5);
   max-width: 24%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -466,8 +502,8 @@
   color: var(--text-muted);
 }
 .vrs-tm-review__detail {
-  margin: 6px 0 2px;
-  padding: 12px;
+  margin: var(--space-1-5) 0 var(--space-0-5);
+  padding: var(--space-3);
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -483,12 +519,12 @@
 .vrs-tm-overlay {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 .vrs-tm-overlay__group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 .vrs-tm-overlay__label {
   font-family: var(--font-sans);
@@ -501,8 +537,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 6px 10px;
+  gap: var(--space-3);
+  padding: var(--space-1-5) var(--space-2-5);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--text-body);
@@ -514,7 +550,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .vrs-tm-overlay__add .vrs-field {
   flex: 1 1 160px;

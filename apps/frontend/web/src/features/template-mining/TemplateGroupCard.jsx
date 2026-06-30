@@ -49,7 +49,7 @@ function IntentBar({ distribution, count }) {
           />
         ))}
       </div>
-      <div className="vrs-tm-legend" style={{ marginTop: 6 }}>
+      <div className="vrs-tm-legend">
         {present.map((intent) => (
           <span key={intent} className="vrs-tm-legend__item">
             <span className={`vrs-tm-legend__dot vrs-tm-intent__seg ${intent}`} />
@@ -164,7 +164,7 @@ export function TemplateGroupCard({
           <div className="vrs-tm-stat__v">{group.count}</div>
           <div className="vrs-tm-stat__l">Messages</div>
         </div>
-        <div style={{ flex: 1, minWidth: 140 }}>
+        <div className="vrs-tm-stats__bar">
           <ConfidenceBar
             value={group.confidenceAvg * 100}
             threshold={65}
@@ -211,6 +211,7 @@ export function TemplateGroupCard({
         <Button
           variant="ghost"
           size="sm"
+          className="vrs-tm-actions__expand"
           iconRight={<Icon name={expanded ? 'arrowUp' : 'arrowDown'} size={14} />}
           onClick={onToggleExamples}
         >

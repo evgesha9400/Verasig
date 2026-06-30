@@ -11,8 +11,10 @@ export function CompiledRulesPanel({ rules }) {
         title="Compiled parser rules"
         subtitle="Deterministic rules from accepted families"
       >
-        <div className="vrs-tm-source__hint">
-          Accept a template family above to compile its parser rule here.
+        <div className="vrs-empty vrs-empty--sm">
+          <div className="vrs-empty__note">
+            Accept a template family above to compile its parser rule here.
+          </div>
         </div>
       </Card>
     )
@@ -31,20 +33,9 @@ export function CompiledRulesPanel({ rules }) {
       <div className="vrs-stack-xs">
         {rules.map((rule) => (
           <div key={rule.id}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 6
-              }}
-            >
-              <Icon name="check" size={14} style={{ color: 'var(--verified-500)' }} />
-              <strong
-                style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)' }}
-              >
-                {rule.name}
-              </strong>
+            <div className="vrs-tm-rule__name">
+              <Icon name="check" size={14} />
+              <strong>{rule.name}</strong>
             </div>
             <pre className="vrs-tm-rulejson">{JSON.stringify(rule, null, 2)}</pre>
           </div>

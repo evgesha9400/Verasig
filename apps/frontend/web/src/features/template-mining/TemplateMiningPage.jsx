@@ -226,10 +226,7 @@ export function TemplateMiningPage({
         <>
           <MiningMetrics metrics={metrics} />
 
-          <section
-            className="vrs-stack-xs"
-            style={{ gap: 16, display: 'flex', flexDirection: 'column' }}
-          >
+          <section className="vrs-tm-section">
             <div className="vrs-tm-section__head">
               <div>
                 <div className="vrs-tm-section__title">Template families</div>
