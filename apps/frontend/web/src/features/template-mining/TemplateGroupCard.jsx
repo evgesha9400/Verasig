@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, ConfidenceBar, Icon } from '@verasig/design-system'
 import { formatLabel } from '../../domain/template-mining/index.js'
 import { CandidateExample } from './CandidateExample.jsx'
@@ -98,6 +99,10 @@ function dateRangeLabel(dateRange) {
   return `${dateRange.from} → ${dateRange.to}`
 }
 
+// Reviewers page through EVERY message in the family — five at a time — to
+// double-check the grouping, not just the top-confidence examples.
+const MESSAGES_PER_PAGE = 5
+
 export function TemplateGroupCard({
   group,
   status,
@@ -107,6 +112,27 @@ export function TemplateGroupCard({
   onReset,
   onToggleExamples
 }) {
+  const [page, setPage] = useState(0)
+
+  // Collapsing the list returns it to the first page for next time.
+  useEffect(() => {
+    if (!expanded) setPage(0)
+  }, [expanded])
+
+  // Highest-confidence first, so page one leads with the same representative the
+  // summary above shows and the cleanest examples come first.
+  const ordered = useMemo(
+    () => [...group.candidates].sort((a, b) => b.confidence - a.confidence),
+    [group.candidates]
+  )
+  const total = ordered.length
+  const pageCount = Math.max(1, Math.ceil(total / MESSAGES_PER_PAGE))
+  const safePage = Math.min(page, pageCount - 1)
+  const windowStart = safePage * MESSAGES_PER_PAGE
+  const pageItems = ordered.slice(windowStart, windowStart + MESSAGES_PER_PAGE)
+  const atStart = safePage === 0
+  const atEnd = safePage >= pageCount - 1
+
   const representative = group.examples[0]
   const statusBadge =
     status === 'accepted' ? (
@@ -189,15 +215,48 @@ export function TemplateGroupCard({
           iconRight={<Icon name={expanded ? 'arrowUp' : 'arrowDown'} size={14} />}
           onClick={onToggleExamples}
         >
-          {expanded ? 'Hide examples' : `Show examples (${group.examples.length})`}
+          {expanded ? 'Hide messages' : `Show all ${group.count} messages`}
         </Button>
       </div>
 
       {expanded && (
         <div className="vrs-tm-ex">
-          {group.examples.map((candidate) => (
+          {pageItems.map((candidate) => (
             <CandidateExample key={candidate.message.id} candidate={candidate} />
           ))}
+          {pageCount > 1 && (
+            <div className="vrs-tm-pager" role="group" aria-label="Message pages">
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-disabled={atStart}
+                iconLeft={<Icon name="chevronLeft" size={14} />}
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+              >
+                Prev
+              </Button>
+              <span
+                className="vrs-tm-pager__label"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {windowStart + 1}–{Math.min(windowStart + MESSAGES_PER_PAGE, total)} of{' '}
+                {total}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-disabled={atEnd}
+                iconRight={<Icon name="chevronRight" size={14} />}
+                onClick={() =>
+                  setPage((current) => Math.min(pageCount - 1, current + 1))
+                }
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </Card>
