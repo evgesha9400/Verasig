@@ -79,6 +79,7 @@ export function attemptExtractSignal(input, overlay = {}) {
     intent,
     confidence,
     rejectionReasons,
+    parserIssues: geometry.issues,
     templateKey,
     normalizedTemplate
   }

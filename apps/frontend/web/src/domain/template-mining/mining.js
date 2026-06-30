@@ -59,6 +59,7 @@ function topExamples(candidates) {
 
 function geometryWarningCount(candidates) {
   return candidates.filter((candidate) =>
+    (candidate.parserIssues || []).length > 0 ||
     candidate.rejectionReasons.some((reason) => GEOMETRY_WARNING.test(reason))
   ).length
 }

@@ -50,7 +50,25 @@ const AUDIT = {
       message: { id: 'c1', text: 'ambiguous candidate one' },
       intent: 'new_signal',
       confidence: 0.4,
-      templateKey: 'tpl_a'
+      templateKey: 'tpl_a',
+      fields: {
+        instrument: 'ARBUSDT',
+        direction: 'BUY',
+        orderType: 'limit',
+        entry: { type: 'single', price: 0.3853 },
+        stopLoss: 0.3853,
+        takeProfits: [0.3901]
+      },
+      rejectionReasons: ['Stop loss should sit below entry for a LONG.'],
+      parserIssues: [
+        {
+          code: 'stop_loss_on_wrong_side',
+          field: 'stopLoss',
+          label: 'Stop loss equals entry',
+          message: 'Stop loss should sit below entry for a LONG.',
+          price: 0.3853
+        }
+      ]
     }
   ],
   rejectedCandidates: [
@@ -167,6 +185,21 @@ describe('AuditReview', () => {
     renderReview()
     await user.type(screen.getByPlaceholderText(/Search results/i), 'zzznomatch')
     expect(screen.getByText(/No results match/i)).toBeTruthy()
+  })
+
+  it('labels ambiguous price-geometry issues and highlights the bad field', async () => {
+    const user = userEvent.setup()
+    const { container } = renderReview()
+
+    await user.click(screen.getByRole('tab', { name: /Ambiguous/i }))
+
+    expect(screen.getByText(/Price geometry issue/i)).toBeTruthy()
+    expect(screen.getByText(/Stop loss equals entry/i)).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /ambiguous candidate one/i }))
+
+    expect(container.querySelector('[data-field="stopLoss"].is-warning')).toBeTruthy()
+    expect(screen.getByText(/Stop loss should sit below entry for a LONG/i)).toBeTruthy()
   })
 
   it('prompts to accept a family when nothing is accepted yet', () => {

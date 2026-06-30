@@ -46,6 +46,43 @@ describe('validatePriceGeometry — valid structures', () => {
 })
 
 describe('validatePriceGeometry — suspicious structures are downgraded, not rejected', () => {
+  it('labels a BUY stop loss that equals entry', () => {
+    const result = validatePriceGeometry(
+      buy({
+        entry: { type: 'single', price: 0.3853 },
+        stopLoss: 0.3853,
+        takeProfits: [0.3901]
+      })
+    )
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'stop_loss_on_wrong_side',
+        field: 'stopLoss',
+        label: 'Stop loss equals entry'
+      })
+    )
+  })
+
+  it('labels a take profit on the wrong side of entry', () => {
+    const result = validatePriceGeometry(
+      sell({
+        entry: { type: 'single', price: 3.4238 },
+        stopLoss: 3.6562,
+        takeProfits: [3.764, 3.3494]
+      })
+    )
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'take_profit_on_wrong_side',
+        field: 'takeProfits',
+        label: 'Take profit above entry for SHORT',
+        price: 3.764
+      })
+    )
+  })
+
   it('flags a BUY with stop above entry and target below entry', () => {
     const result = validatePriceGeometry(
       extractSignalFields('BUY XAUUSD 2320\nSL 2340\nTP 2310')

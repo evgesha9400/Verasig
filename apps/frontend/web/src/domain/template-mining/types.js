@@ -49,6 +49,16 @@
 /** @typedef {'new_signal'|'update'|'result'|'commentary'|'unknown'} SignalIntent */
 
 /**
+ * A structured parser issue that explains why a candidate needs review.
+ * @typedef {Object} ParserIssue
+ * @property {string} code
+ * @property {'stopLoss'|'takeProfits'} field
+ * @property {string} label
+ * @property {string} message
+ * @property {number} [price]
+ */
+
+/**
  * A parsed entry level.
  * @typedef {Object} SignalEntry
  * @property {'single'|'range'|'market'|'unknown'} type
@@ -86,6 +96,7 @@
  * @property {SignalIntent} intent
  * @property {number} confidence
  * @property {string[]} rejectionReasons
+ * @property {ParserIssue[]} parserIssues
  * @property {string} templateKey
  * @property {string} normalizedTemplate
  */

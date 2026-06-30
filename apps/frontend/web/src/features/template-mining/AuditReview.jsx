@@ -8,6 +8,7 @@ import {
   formatPrice,
   formatTakeProfits
 } from './format.js'
+import { CandidateExample } from './CandidateExample.jsx'
 
 /* Verasig — Template Mining: full-history result review.
    Once families are accepted and their rules run over every message, this is
@@ -30,6 +31,19 @@ const TABS = [
 
 function firstLine(text) {
   return (text || '').split('\n')[0]
+}
+
+function candidateIssues(candidate) {
+  return candidate.parserIssues || []
+}
+
+function issueSummary(candidate) {
+  const issues = candidateIssues(candidate)
+  if (issues.length === 0) return null
+  return {
+    kind: 'Price geometry issue',
+    label: issues.map((issue) => issue.label).join(', ')
+  }
 }
 
 // Each row is { key, text, template?, templateId?, haystack } — one shape so a
@@ -61,14 +75,16 @@ function parsedRows(signals, messageById, ruleById) {
 
 function ambiguousRows(candidates, ruleByTemplateKey) {
   return candidates.map((candidate, index) => {
+    const issue = issueSummary(candidate)
     const text = `${firstLine(candidate.message.text)}  ·  ${INTENT_LABEL[candidate.intent]} ${formatConfidence(candidate.confidence)}`
     return {
       key: `${candidate.message.id}-${index}`,
       text,
+      issue,
       templateId: ruleByTemplateKey.get(candidate.templateKey),
       haystack:
-        `${candidate.message.text} ${INTENT_LABEL[candidate.intent]}`.toLowerCase(),
-      detail: { kind: 'text', messageText: candidate.message.text }
+        `${candidate.message.text} ${INTENT_LABEL[candidate.intent]} ${issue?.kind || ''} ${issue?.label || ''}`.toLowerCase(),
+      detail: { kind: 'candidate', candidate }
     }
   })
 }
@@ -106,6 +122,9 @@ function missRows(messages) {
 // A parsed row expands to the original message beside the structured fields;
 // every other row expands to its full original text.
 function RowDetail({ detail }) {
+  if (detail.kind === 'candidate') {
+    return <CandidateExample candidate={detail.candidate} />
+  }
   if (detail.kind !== 'parsed') {
     return <pre className="vrs-tm-ex__msg">{detail.messageText || '—'}</pre>
   }
@@ -341,6 +360,20 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
                     <span className="vrs-tm-review__tmpl" title={row.template}>
                       {row.template}
                     </span>
+                  )}
+                  {row.issue && (
+                    <>
+                      <span className="vrs-tm-review__issue">
+                        <Icon name="alert" size={12} />
+                        {row.issue.kind}
+                      </span>
+                      <span
+                        className="vrs-tm-review__issue-label"
+                        title={row.issue.label}
+                      >
+                        {row.issue.label}
+                      </span>
+                    </>
                   )}
                 </button>
                 {open && (

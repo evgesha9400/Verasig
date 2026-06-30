@@ -232,6 +232,13 @@
   color: var(--text-faint);
   font-family: var(--font-sans);
 }
+.vrs-tm-kv tr.is-warning td {
+  background: color-mix(in srgb, var(--pending-500) 10%, transparent);
+}
+.vrs-tm-kv tr.is-warning td:first-child {
+  color: var(--pending-500);
+  font-weight: var(--fw-medium);
+}
 
 .vrs-tm-actions {
   display: flex;
@@ -291,6 +298,22 @@
   font-family: var(--font-sans);
   font-size: var(--text-3xs);
   color: var(--pending-500);
+}
+.vrs-tm-warn strong {
+  display: block;
+  color: var(--text-strong);
+  font-weight: var(--fw-medium);
+}
+.vrs-tm-warn__msg {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+.vrs-tm-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 /* ---- compiled rules ---- */
@@ -422,6 +445,25 @@
   font-family: var(--font-sans);
   font-size: var(--text-3xs);
   color: var(--text-faint);
+}
+.vrs-tm-review__issue,
+.vrs-tm-review__issue-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 24%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: var(--text-3xs);
+}
+.vrs-tm-review__issue {
+  color: var(--pending-500);
+}
+.vrs-tm-review__issue-label {
+  color: var(--text-muted);
 }
 .vrs-tm-review__detail {
   margin: 6px 0 2px;
