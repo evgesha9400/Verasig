@@ -92,4 +92,25 @@ describe('TemplateMiningPage', () => {
 
     expect(screen.getAllByText('Accepted').length).toBeGreaterThan(0)
   })
+
+  it('threads a provided overlay into mining', async () => {
+    const user = userEvent.setup()
+    const messages = [{ id: 'o1', text: 'АПТ 🚀\nEntry: 2.5\nStop: 2.4\nTarget: 2.7' }]
+    const onListMessages = vi.fn().mockResolvedValue({ messages })
+    render(
+      <TemplateMiningPage
+        feeds={[{ id: 'apex', name: 'Apex' }]}
+        authToken="jwt"
+        onListMessages={onListMessages}
+        overlay={{
+          instrumentAliases: { 'АПТ': 'APTUSDT' },
+          directionTokens: { '🚀': 'BUY' }
+        }}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: /Run template mining/i }))
+    expect(await screen.findByText('Messages scanned')).toBeTruthy()
+    // APTUSDT only appears if the overlay reached the detectors.
+    expect(await screen.findAllByText(/APTUSDT/)).toBeTruthy()
+  })
 })

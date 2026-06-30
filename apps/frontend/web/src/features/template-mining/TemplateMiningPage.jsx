@@ -42,7 +42,8 @@ export function TemplateMiningPage({
   feeds = [],
   authToken,
   onListMessages,
-  fireToast
+  fireToast,
+  overlay = {}
 }) {
   const [source, setSource] = useState('feed')
   const [pasted, setPasted] = useState('')
@@ -68,15 +69,15 @@ export function TemplateMiningPage({
   )
 
   const rules = useMemo(
-    () => acceptedGroups.map(compileRuleFromTemplate),
+    () => acceptedGroups.map((group) => compileRuleFromTemplate(group, overlay)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [acceptedGroups.map((group) => group.templateKey).join('|')]
+    [acceptedGroups.map((group) => group.templateKey).join('|'), overlay]
   )
 
   const audit = useMemo(() => {
     if (!result || rules.length === 0) return null
-    return applyAcceptedRules(result.messages, rules)
-  }, [result, rules])
+    return applyAcceptedRules(result.messages, rules, overlay)
+  }, [result, rules, overlay])
 
   const metrics = useMemo(() => {
     if (!result) return null
@@ -101,7 +102,7 @@ export function TemplateMiningPage({
       fireToast?.('pending', 'Nothing to mine', 'This source has no messages yet.')
       return
     }
-    const mined = mineTemplateGroups(minedMessages)
+    const mined = mineTemplateGroups(minedMessages, overlay)
     setResult({ groups: mined, messages: minedMessages })
     setDecisions({})
     setExpanded(new Set())

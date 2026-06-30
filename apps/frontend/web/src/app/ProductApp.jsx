@@ -37,6 +37,8 @@ import {
   streamDeletionRescanProgress
 } from '../shared/api/feedsApi.js'
 import {
+  getParserOverlay,
+  putParserOverlay,
   getLabelCounts,
   getRules,
   getVerifySamples,
@@ -105,6 +107,20 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     setUser((current) => {
       return { ...current, ...patch }
     })
+  }
+
+  const [overlay, setOverlay] = useState({})
+
+  useEffect(() => {
+    if (!authToken) return
+    getParserOverlay(authToken)
+      .then((body) => setOverlay(body.overlay || {}))
+      .catch(() => {})
+  }, [authToken])
+
+  async function saveOverlay(next) {
+    const body = await putParserOverlay(authToken, next)
+    setOverlay(body.overlay || next)
   }
 
   const {
@@ -290,6 +306,8 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         authToken={authToken}
         onListMessages={(chatId) => listFeedHistory(authToken, chatId)}
         fireToast={fireToast}
+        overlay={overlay}
+        onSaveOverlay={saveOverlay}
       />
     )
   } else if (nav === 'settings') {
