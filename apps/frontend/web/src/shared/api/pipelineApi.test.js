@@ -3,6 +3,7 @@ import {
   getLabelCounts,
   getRules,
   getVerifySamples,
+  listFeedHistory,
   listMessages,
   recordLabel,
   startDistill,
@@ -32,6 +33,23 @@ describe('pipelineApi — label', () => {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
     })
+  })
+
+  it('lists the full feed history for mining (no limit, dedicated endpoint)', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({ messages: [{ id: '1' }, { id: '2' }, { id: '3' }] })
+    )
+
+    const body = await listFeedHistory('jwt-token', '7')
+
+    expect(body.messages).toHaveLength(3)
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/feeds/7/messages/history',
+      {
+        method: 'GET',
+        headers: { Authorization: 'Bearer jwt-token' }
+      }
+    )
   })
 
   it('records a label as an idempotent upsert', async () => {

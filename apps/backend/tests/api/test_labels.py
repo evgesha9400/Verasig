@@ -128,6 +128,25 @@ def test_messages_label_and_counts(client, app):
     }
 
 
+def test_message_history_returns_full_feed_ignoring_labels(client, app):
+    token, user_id = _register(client)
+    _seed_chat(app, user_id)
+    client.post(
+        "/feeds/7/messages/1/label",
+        headers=_auth(token),
+        json={"label": "noise"},
+    )
+
+    history = client.get("/feeds/7/messages/history", headers=_auth(token))
+    sample = client.get("/feeds/7/messages", headers=_auth(token))
+
+    assert history.status_code == 200
+    # Full history keeps every message, including the just-labeled one...
+    assert [message["id"] for message in history.json()["messages"]] == ["1", "2"]
+    # ...whereas the labeling sample drops the labeled message.
+    assert [message["id"] for message in sample.json()["messages"]] == ["2"]
+
+
 def test_label_rejects_unknown_value(client, app):
     token, user_id = _register(client)
     _seed_chat(app, user_id)

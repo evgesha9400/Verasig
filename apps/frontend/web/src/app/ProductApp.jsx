@@ -40,6 +40,7 @@ import {
   getLabelCounts,
   getRules,
   getVerifySamples,
+  listFeedHistory,
   listMessages,
   recordLabel,
   startDistill,
@@ -287,7 +288,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       <TemplateMiningPage
         feeds={feeds}
         authToken={authToken}
-        onListMessages={(chatId) => listMessages(authToken, chatId)}
+        onListMessages={(chatId) => listFeedHistory(authToken, chatId)}
         fireToast={fireToast}
       />
     )

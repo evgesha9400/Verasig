@@ -6,6 +6,12 @@ export function listMessages(token, chatId, limit) {
   return requestJson(`/feeds/${chatId}/messages${query}`, { token })
 }
 
+// The full backfilled history (every message, unfiltered) for the parser-first
+// miner — distinct from listMessages, which returns the bounded labeling deck.
+export function listFeedHistory(token, chatId) {
+  return requestJson(`/feeds/${chatId}/messages/history`, { token })
+}
+
 export function recordLabel(token, chatId, msgId, label) {
   return requestJson(`/feeds/${chatId}/messages/${msgId}/label`, {
     method: 'POST',
