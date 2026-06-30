@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Icon, Input, Select, Tabs } from '@verasig/design-system'
+import { Checkbox, Icon, Input, Select, Tabs } from '@verasig/design-system'
 import { Pager } from './Pager.jsx'
 import {
   INTENT_LABEL,
@@ -53,7 +53,8 @@ function parsedRows(signals, messageById, ruleById) {
       template: rule?.name,
       templateId: signal.parserRuleId,
       haystack:
-        `${text} ${signal.instrument} ${signal.direction} ${sourceText}`.toLowerCase()
+        `${text} ${signal.instrument} ${signal.direction} ${sourceText}`.toLowerCase(),
+      detail: { kind: 'parsed', signal, messageText: sourceText, template: rule?.name }
     }
   })
 }
@@ -66,7 +67,8 @@ function ambiguousRows(candidates, ruleByTemplateKey) {
       text,
       templateId: ruleByTemplateKey.get(candidate.templateKey),
       haystack:
-        `${candidate.message.text} ${INTENT_LABEL[candidate.intent]}`.toLowerCase()
+        `${candidate.message.text} ${INTENT_LABEL[candidate.intent]}`.toLowerCase(),
+      detail: { kind: 'text', messageText: candidate.message.text }
     }
   })
 }
@@ -76,7 +78,8 @@ function rejectedRows(entries) {
     key: `${entry.message.id}-${index}`,
     text: `${firstLine(entry.message.text)}  ·  ${INTENT_LABEL[entry.intent]}`,
     templateId: null,
-    haystack: `${entry.message.text} ${INTENT_LABEL[entry.intent]}`.toLowerCase()
+    haystack: `${entry.message.text} ${INTENT_LABEL[entry.intent]}`.toLowerCase(),
+    detail: { kind: 'text', messageText: entry.message.text }
   }))
 }
 
@@ -85,7 +88,8 @@ function rareRows(groups) {
     key: `${group.templateKey}-${index}`,
     text: `${firstLine(group.normalizedTemplate)}  ·  ${group.count} message${group.count === 1 ? '' : 's'}`,
     templateId: null,
-    haystack: group.normalizedTemplate.toLowerCase()
+    haystack: group.normalizedTemplate.toLowerCase(),
+    detail: { kind: 'text', messageText: group.normalizedTemplate }
   }))
 }
 
@@ -94,8 +98,64 @@ function missRows(messages) {
     key: `${message.id}-${index}`,
     text: firstLine(message.text),
     templateId: null,
-    haystack: (message.text || '').toLowerCase()
+    haystack: (message.text || '').toLowerCase(),
+    detail: { kind: 'text', messageText: message.text }
   }))
+}
+
+// A parsed row expands to the original message beside the structured fields;
+// every other row expands to its full original text.
+function RowDetail({ detail }) {
+  if (detail.kind !== 'parsed') {
+    return <pre className="vrs-tm-ex__msg">{detail.messageText || '—'}</pre>
+  }
+  const signal = detail.signal
+  const takeProfits = formatTakeProfits(signal.takeProfits)
+  return (
+    <div className="vrs-tm-ex__item">
+      <pre className="vrs-tm-ex__msg">
+        {detail.messageText || '— original message unavailable —'}
+      </pre>
+      <table className="vrs-tm-kv">
+        <tbody>
+          <tr>
+            <td>Instrument</td>
+            <td>{signal.instrument || '—'}</td>
+          </tr>
+          <tr>
+            <td>Direction</td>
+            <td>{signal.direction}</td>
+          </tr>
+          <tr>
+            <td>Entry ({signal.orderType})</td>
+            <td>{formatEntry(signal.entry)}</td>
+          </tr>
+          <tr>
+            <td>Stop loss</td>
+            <td className={signal.stopLoss == null ? 'none' : undefined}>
+              {signal.stopLoss == null ? 'none' : formatPrice(signal.stopLoss)}
+            </td>
+          </tr>
+          <tr>
+            <td>Take profits</td>
+            <td className={takeProfits ? undefined : 'none'}>
+              {takeProfits || 'none'}
+            </td>
+          </tr>
+          <tr>
+            <td>Confidence</td>
+            <td>{formatConfidence(signal.confidence)}</td>
+          </tr>
+          {detail.template && (
+            <tr>
+              <td>Template</td>
+              <td>{detail.template}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
@@ -103,6 +163,16 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
   const [query, setQuery] = useState('')
   const [templateId, setTemplateId] = useState('all')
   const [page, setPage] = useState(0)
+  const [openKeys, setOpenKeys] = useState(() => new Set())
+
+  function toggleRow(key) {
+    setOpenKeys((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   const messageById = useMemo(
     () => new Map(messages.map((message) => [message.id, message])),
@@ -180,6 +250,12 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
   const windowStart = safePage * PAGE_SIZE
   const pageRows = filtered.slice(windowStart, windowStart + PAGE_SIZE)
 
+  // "Expand all" toggles every row across the whole filtered set (so paging keeps
+  // them open), and reflects whether they are all currently open.
+  const allOpen = filtered.length > 0 && filtered.every((row) => openKeys.has(row.key))
+  const toggleAll = (checked) =>
+    setOpenKeys(checked ? new Set(filtered.map((row) => row.key)) : new Set())
+
   const templateOptions = [
     { value: 'all', label: 'All templates' },
     ...rules.map((rule) => ({
@@ -230,7 +306,14 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
         </div>
       </div>
 
-      <Tabs value={tab} onChange={setTab} items={tabItems} />
+      <div className="vrs-tm-review__tabsrow">
+        <Tabs value={tab} onChange={setTab} items={tabItems} />
+        <Checkbox
+          label="Expand all"
+          checked={allOpen}
+          onChange={(event) => toggleAll(event.target.checked)}
+        />
+      </div>
 
       {pageRows.length === 0 ? (
         <div className="vrs-empty vrs-empty--sm">
@@ -238,16 +321,36 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
         </div>
       ) : (
         <div className="vrs-tm-review__list">
-          {pageRows.map((row) => (
-            <div key={row.key} className="vrs-tm-review__row">
-              <span className="vrs-tm-review__row-text">{row.text}</span>
-              {row.template && (
-                <span className="vrs-tm-review__tmpl" title={row.template}>
-                  {row.template}
-                </span>
-              )}
-            </div>
-          ))}
+          {pageRows.map((row) => {
+            const open = openKeys.has(row.key)
+            return (
+              <div key={row.key} className="vrs-tm-review__item">
+                <button
+                  type="button"
+                  className="vrs-tm-review__row"
+                  aria-expanded={open}
+                  onClick={() => toggleRow(row.key)}
+                >
+                  <span className="vrs-tm-review__chev">
+                    <Icon name={open ? 'arrowUp' : 'arrowDown'} size={13} />
+                  </span>
+                  <span className="vrs-tm-review__row-text" title={row.text}>
+                    {row.text}
+                  </span>
+                  {row.template && (
+                    <span className="vrs-tm-review__tmpl" title={row.template}>
+                      {row.template}
+                    </span>
+                  )}
+                </button>
+                {open && (
+                  <div className="vrs-tm-review__detail">
+                    <RowDetail detail={row.detail} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 

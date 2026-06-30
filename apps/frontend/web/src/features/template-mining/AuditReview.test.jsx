@@ -138,6 +138,30 @@ describe('AuditReview', () => {
     expect(screen.getByText(/closed in profit/)).toBeTruthy()
   })
 
+  it('keeps rows collapsed by default — the original message is hidden', () => {
+    renderReview()
+    // The parsed one-line summary is shown; the full source message is not.
+    expect(screen.getByText(/SYM1USDT SELL/)).toBeTruthy()
+    expect(screen.queryByText(/Монета SYM1USDT/)).toBeNull()
+  })
+
+  it('expands a parsed row to show the original message and parsed fields', async () => {
+    const user = userEvent.setup()
+    renderReview()
+    await user.click(screen.getByRole('button', { name: /SYM1USDT SELL/ }))
+    // Original message (left) and a parsed-fields table (right) appear.
+    expect(screen.getByText(/Монета SYM1USDT/)).toBeTruthy()
+    expect(screen.getByText('Stop loss')).toBeTruthy()
+  })
+
+  it('expands every visible row via the Expand all checkbox', async () => {
+    const user = userEvent.setup()
+    renderReview()
+    await user.click(screen.getByRole('checkbox', { name: /Expand all/i }))
+    expect(screen.getByText(/Монета SYM1USDT/)).toBeTruthy()
+    expect(screen.getByText(/Монета SYM2USDT/)).toBeTruthy()
+  })
+
   it('shows an empty state when filters match nothing', async () => {
     const user = userEvent.setup()
     renderReview()
