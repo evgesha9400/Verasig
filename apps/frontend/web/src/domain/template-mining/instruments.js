@@ -139,8 +139,8 @@ function pushHit(hits, start, end, normalized, raw, confidence) {
   hits.push({ start, end, normalized, raw, confidence })
 }
 
-function collectAliasHits(text, hits) {
-  for (const rule of ALIAS_RULES) {
+function collectAliasHits(text, hits, rules) {
+  for (const rule of rules) {
     rule.matcher.lastIndex = 0
     let match
     while ((match = rule.matcher.exec(text)) !== null) {
@@ -154,6 +154,20 @@ function collectAliasHits(text, hits) {
       )
     }
   }
+}
+
+// Overlay aliases (user-taught alias -> canonical symbol) join the built-in
+// rules, longest-term first so specific aliases win the overlap dedupe.
+function aliasRulesWith(overlay) {
+  const aliases = overlay?.instrumentAliases
+  if (!aliases || Object.keys(aliases).length === 0) return ALIAS_RULES
+  const extra = Object.entries(aliases).map(([term, normalized]) => ({
+    matcher: aliasMatcher(term),
+    normalized
+  }))
+  return [...extra, ...ALIAS_RULES].sort(
+    (a, b) => b.matcher.source.length - a.matcher.source.length
+  )
 }
 
 function collectCryptoPairHits(text, hits) {
@@ -241,12 +255,13 @@ function dedupeHits(hits) {
 
 /**
  * @param {string} text
+ * @param {object} overlay
  * @returns {import('./types.js').DetectedEntity[]}
  */
-export function detectInstruments(text) {
+export function detectInstruments(text, overlay = {}) {
   if (!text) return []
   const hits = []
-  collectAliasHits(text, hits)
+  collectAliasHits(text, hits, aliasRulesWith(overlay))
   collectCoinLabelHits(text, hits)
   collectCryptoPairHits(text, hits)
   collectForexPairHits(text, hits)

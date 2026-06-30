@@ -14,6 +14,10 @@ const SELL_WORDS_RU = ['шорт']
 const BUY_EMOJIS = ['🟢', '⬆', '🚀', '📈', '🔼']
 const SELL_EMOJIS = ['🔴', '⬇', '📉', '🔽']
 
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function wordMatcher(words) {
   return new RegExp(`\\b(${words.join('|')})\\b`, 'gi')
 }
@@ -26,6 +30,25 @@ function cyrillicMatcher(words) {
 function emojiMatcher(emojis) {
   // Optional VS16 (U+FE0F) lets "⬆️" match the same rule as bare "⬆".
   return new RegExp(`(${emojis.join('|')})️?`, 'g')
+}
+
+// A taught token: letter-bounded when alphabetic (so "up" doesn't hit "upset"),
+// raw when it's an emoji/symbol. Word strength, so it isn't treated as emoji-only.
+function tokenMatcher(token) {
+  const body = escapeRegExp(token)
+  return /^[\p{L}]+$/u.test(token)
+    ? new RegExp(`(?<!\\p{L})${body}(?!\\p{L})`, 'giu')
+    : new RegExp(body, 'g')
+}
+
+function overlayDirectionRules(overlay) {
+  const tokens = overlay?.directionTokens
+  if (!tokens) return []
+  return Object.entries(tokens).map(([token, normalized]) => ({
+    matcher: tokenMatcher(token),
+    normalized,
+    confidence: WORD_CONFIDENCE
+  }))
 }
 
 const RULES = [
@@ -55,12 +78,14 @@ const RULES = [
 
 /**
  * @param {string} text
+ * @param {object} overlay
  * @returns {import('./types.js').DetectedEntity[]}
  */
-export function detectDirections(text) {
+export function detectDirections(text, overlay = {}) {
   if (!text) return []
+  const rules = [...RULES, ...overlayDirectionRules(overlay)]
   const hits = []
-  for (const rule of RULES) {
+  for (const rule of rules) {
     rule.matcher.lastIndex = 0
     let match
     while ((match = rule.matcher.exec(text)) !== null) {

@@ -100,3 +100,14 @@ describe('detectInstruments — guards', () => {
     expect(result.filter((entity) => entity.normalized === 'BTCUSDT')).toHaveLength(1)
   })
 })
+
+describe('detectInstruments — overlay awareness', () => {
+  it('recognises a custom alias from the overlay', () => {
+    const without = detectInstruments('АПТ long here')
+    expect(without.some((h) => h.normalized === 'APTUSDT')).toBe(false)
+
+    const overlay = { instrumentAliases: { 'АПТ': 'APTUSDT' } }
+    const hits = detectInstruments('АПТ long here', overlay)
+    expect(hits.some((h) => h.normalized === 'APTUSDT')).toBe(true)
+  })
+})
