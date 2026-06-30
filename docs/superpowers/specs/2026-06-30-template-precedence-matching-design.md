@@ -45,9 +45,28 @@ subsumption between skeletons is well-defined and tractable.
 - A non-`<*>` token in P must **equal** the token in S.
 - A `<*>` in P matches **exactly one** token in S (mirrors how `<*>` is
   generated — at most one stray word, runs already collapsed).
+- A placeholder in P matches the same placeholder in S **or any placeholder it
+  subsumes** per the hierarchy in §4.1a (decision: generalization is in scope).
 - Exact equality (`P === S`) is the special, maximal case (today's behaviour).
-- v1 scope: placeholders match only the **same** placeholder (no `<PRICE_LIST>`
-  ⊇ `<PRICE>` generalization). Listed as an open decision (§8).
+
+### 4.1a Placeholder subsumption hierarchy (decided: generalize)
+
+A more-general placeholder in the **rule** matches a more-specific one in the
+**message**:
+
+| General (rule) | Subsumes (message) | Rationale |
+|---|---|---|
+| `<PRICE_LIST>` | `<PRICE>` | a list of one price is still a list |
+| `<SIDE>` | `<SIDE_EMOJI>` | an emoji side is a weaker spelling of a side |
+| `<*>` | any single word | existing stray-word wildcard |
+
+- Subsumption is **one-directional**: a `<PRICE>` rule does NOT match a
+  `<PRICE_LIST>` message (specific rule, general message → no claim).
+- Generalizing always **lowers** specificity (§4.2), so the exact family still
+  wins over a generalizing fallback — consistent with specificity-first.
+- **Remaining sub-decision:** `<RANGE> ⊇ <PRICE>`? A range is an entry *zone*,
+  semantically distinct from a single level. **Proposed: keep distinct in v1**
+  (flagged in §8).
 
 ### 4.2 Specificity score (higher = more specific = wins)
 
@@ -93,8 +112,9 @@ specificity ↓  →  confidenceAvg ↓  →  coverage(count) ↓  →  template
      candidate's `normalizedTemplate`.
   3. else → "rare" (unchanged).
 - Threshold + reject-phrase checks unchanged (`rules.js:171-179`).
-- Tag each parsed signal `match: 'exact' | 'fallback'` + `parserRuleId` for audit
-  provenance.
+- Tag each parsed signal `match: 'exact' | 'fallback'` + `parserRuleId`. The
+  audit keeps fallback matches in the **Parsed** bucket with a `fallback` **badge**
+  on the row (decided §8.5) — one bucket, provenance visible.
 
 Blast radius: contained to `rules.js` + `types.js`. `mineTemplateGroups` and
 review UI semantics are untouched — families are still discovered by exact key.
@@ -109,14 +129,16 @@ review UI semantics are untouched — families are still discovered by exact key
 | Fallback inflates false positives | Per-rule `confidenceThreshold` still gates; fallback matches flagged for review; optional stricter fallback threshold (§8) |
 | Reviewer confusion (why did X parse?) | Audit row shows claiming rule + `exact/fallback` badge |
 
-## 8 · Open decisions (resolve at review)
+## 8 · Decisions
 
-1. `<*>` arity: exactly-one token (proposed) vs zero-or-more.
-2. Placeholder generalization: should `<PRICE_LIST>` subsume `<PRICE>`,
-   `<SIDE>` subsume `<SIDE_EMOJI>`? (Proposed: **no** in v1.)
-3. Fallback confidence: reuse the rule's threshold (proposed) vs a stricter bar.
-4. Specificity weight `w` and whether `<SIDE_EMOJI>` counts as half a placeholder.
-5. Audit: new dedicated "fallback-captured" bucket, or just a badge on parsed?
+| # | Decision | Status |
+|---|---|---|
+| 8.2 | Placeholder generalization: `<PRICE_LIST>⊇<PRICE>`, `<SIDE>⊇<SIDE_EMOJI>` | ✅ **yes** (§4.1a) |
+| 8.5 | Fallback matches → badge on the **Parsed** row, no extra bucket | ✅ **decided** (§6) |
+| 8.1 | `<*>` arity: exactly-one token vs zero-or-more | proposed: **exactly-one** |
+| 8.3 | Fallback confidence: reuse rule threshold vs stricter bar | proposed: **reuse** |
+| 8.4 | Specificity weight `w`; does `<SIDE_EMOJI>` count as half a placeholder | open (tune in impl) |
+| 8.6 | `<RANGE> ⊇ <PRICE>` in the hierarchy | proposed: **keep distinct** in v1 |
 
 ## 9 · Testing strategy (TDD)
 
@@ -126,6 +148,11 @@ review UI semantics are untouched — families are still discovered by exact key
   family is captured by a general accepted family (was "rare").
 - **Greedy-capture guard:** a high-coverage general family does NOT steal a
   specific family's messages.
+- **Placeholder generalization:** a `<PRICE_LIST>` rule captures a `<PRICE>`
+  message; a `<SIDE>` rule captures a `<SIDE_EMOJI>` message; the reverse does
+  NOT match; `<RANGE>` and `<PRICE>` stay distinct.
+- **Fallback badge:** a fallback-captured signal renders in Parsed tagged
+  `fallback`; an exact one is not.
 - **Determinism:** identical input → identical assignment across runs.
 - **No regression:** with no overlapping patterns, output equals today's
   exact-key result (golden test over `realFeedMessages` / sample).
