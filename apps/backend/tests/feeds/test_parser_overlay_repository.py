@@ -1,11 +1,9 @@
+from datetime import datetime, timezone
 from uuid import uuid4
-
-from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.features.accounts import repository as account_repository
 from verasig.features.parser_overlay.repository import read_overlay, upsert_overlay
-from datetime import datetime, timezone
 
 
 def _account():
