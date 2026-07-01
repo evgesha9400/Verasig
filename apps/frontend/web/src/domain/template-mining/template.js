@@ -10,6 +10,7 @@ import { detectInstruments } from './instruments.js'
 import { detectDirections, isEmojiDirection } from './directions.js'
 import { detectPrices } from './prices.js'
 import { byStartThenLongest } from './intervals.js'
+import { candidateText } from './scoring.js'
 
 const MARKET_MARKER = /\b(current market price|current price|cmp|market|now)\b/gi
 const LIST_GAP = /^[\s/,]*$/
@@ -334,8 +335,7 @@ export function hashString(text) {
  * @returns {{templateKey: string, normalizedTemplate: string}}
  */
 export function normalizeTemplate(candidate, overlay = {}, detections = {}) {
-  const text = candidate.message?.text ?? candidate.text ?? ''
-  const { clean } = normalizeMessageText(text)
+  const { clean } = normalizeMessageText(candidateText(candidate))
   const spans = collectSpans(clean, overlay, detections)
   const replaced = stripDecoration(applySpans(clean, spans).toUpperCase()).replace(
     SIDE_EMOJI_RUN,

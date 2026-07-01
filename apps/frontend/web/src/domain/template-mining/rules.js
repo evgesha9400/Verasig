@@ -6,8 +6,9 @@
 
 import { detectPrices } from './prices.js'
 import { hasTradingLabel } from './fields.js'
-import { escapeRegExp, normalizeMessageText } from './text.js'
+import { escapeRegExp } from './text.js'
 import { analyzeMessage, attemptExtractSignal } from './extract.js'
+import { hasStopLoss, hasTakeProfits } from './intent.js'
 import { mineTemplateGroups } from './mining.js'
 import { templateSpecificity } from './specificity.js'
 import { patternSubsumes } from './subsumption.js'
@@ -48,13 +49,8 @@ function presentFields(group) {
   const candidates = group.candidates
   return {
     entry: candidates.some((candidate) => Boolean(candidate.fields.entry)),
-    stopLoss: candidates.some(
-      (candidate) =>
-        candidate.fields.stopLoss !== null && candidate.fields.stopLoss !== undefined
-    ),
-    takeProfits: candidates.some(
-      (candidate) => (candidate.fields.takeProfits?.length ?? 0) > 0
-    )
+    stopLoss: candidates.some((candidate) => hasStopLoss(candidate.fields)),
+    takeProfits: candidates.some((candidate) => hasTakeProfits(candidate.fields))
   }
 }
 
@@ -197,8 +193,10 @@ function rejectPhraseMatchers(rule) {
   )
 }
 
-function textHasRejectPhrase(rule, candidate) {
-  const lower = normalizeMessageText(candidate.message.text).lower
+// Reuses attemptExtractSignal's cached analysis for this exact (message,
+// overlay) pair instead of re-normalizing the message text from scratch.
+function textHasRejectPhrase(rule, candidate, overlay) {
+  const { lower } = analyzeMessage(candidate.message, overlay)
   return rejectPhraseMatchers(rule).some((matcher) => matcher.test(lower))
 }
 
@@ -216,14 +214,14 @@ function isPotentialMiss({ clean, instruments, directions }) {
 
 // Candidates are always new signals now; claim them for the most-specific
 // accepted rule (exact family first, else a subsuming general fallback).
-function routeCandidate(candidate, ruleByKey, orderedRules, buckets) {
+function routeCandidate(candidate, ruleByKey, orderedRules, buckets, overlay) {
   const matched = matchCandidate(candidate, ruleByKey, orderedRules)
   if (!matched) {
     buckets.rare.push(candidate)
     return
   }
   const { rule, match } = matched
-  if (textHasRejectPhrase(rule, candidate)) {
+  if (textHasRejectPhrase(rule, candidate, overlay)) {
     buckets.rejected.push({ message: candidate.message, intent: candidate.intent })
     return
   }
@@ -264,7 +262,7 @@ export function applyAcceptedRules(messages, rules, overlay = {}) {
       routeNonCandidate(message, buckets, overlay)
       continue
     }
-    routeCandidate(candidate, ruleByKey, orderedRules, buckets)
+    routeCandidate(candidate, ruleByKey, orderedRules, buckets, overlay)
   }
 
   return {

@@ -77,11 +77,13 @@ function looksLikeResult(text) {
   return HIT_NEAR_LEVEL.test(text) && LEVEL_NEARBY.test(text)
 }
 
-function hasStopLoss(fields) {
+/** @param {Partial<import('./types.js').StructuredSignal>} fields */
+export function hasStopLoss(fields) {
   return fields.stopLoss !== null && fields.stopLoss !== undefined
 }
 
-function hasTakeProfits(fields) {
+/** @param {Partial<import('./types.js').StructuredSignal>} fields */
+export function hasTakeProfits(fields) {
   return Array.isArray(fields.takeProfits) && fields.takeProfits.length > 0
 }
 

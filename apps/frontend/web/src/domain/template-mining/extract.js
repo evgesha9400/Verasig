@@ -66,7 +66,7 @@ function cached(cache, message, overlay, compute) {
 
 function computeAnalysis(message, overlay) {
   const normalized = normalizeMessageText(message.text)
-  const { clean } = normalized
+  const { clean, lower } = normalized
   const instruments = detectInstruments(clean, overlay)
   const directions = detectDirections(clean, overlay)
   const fields = extractSignalFields(message, overlay, {
@@ -75,7 +75,7 @@ function computeAnalysis(message, overlay) {
     normalized
   })
   const intent = classifyIntent(message.text, fields)
-  return { clean, instruments, directions, fields, intent }
+  return { clean, lower, instruments, directions, fields, intent }
 }
 
 /**
@@ -84,7 +84,7 @@ function computeAnalysis(message, overlay) {
  * detection) is built from.
  * @param {import('./types.js').ChatMessage} message
  * @param {object} [overlay={}]
- * @returns {{clean: string, instruments: import('./types.js').DetectedEntity[], directions: import('./types.js').DetectedEntity[], fields: object, intent: import('./types.js').SignalIntent}}
+ * @returns {{clean: string, lower: string, instruments: import('./types.js').DetectedEntity[], directions: import('./types.js').DetectedEntity[], fields: object, intent: import('./types.js').SignalIntent}}
  */
 export function analyzeMessage(message, overlay = {}) {
   return cached(analysisCache, message, overlay, computeAnalysis)

@@ -7,6 +7,7 @@
 import { normalizeMessageText } from './text.js'
 import { detectDirections, isEmojiOnlyDirection } from './directions.js'
 import { validatePriceGeometry } from './geometry.js'
+import { hasStopLoss, hasTakeProfits } from './intent.js'
 
 const NORMALIZER = 16 // a clean, fully-structured signal lands high (~0.9) but below saturation
 
@@ -25,7 +26,8 @@ const NEGATIVE_RULES = [
   }
 ]
 
-function candidateText(candidate) {
+/** @param {import('./types.js').Candidate|{message?: {text?: string}, text?: string}} candidate */
+export function candidateText(candidate) {
   return candidate.message?.text ?? candidate.text ?? ''
 }
 
@@ -45,8 +47,8 @@ function positiveScore(fields, lower, lineCount) {
   if (fields.direction) score += 3
   if (fields.entry) score += 2
   if (/\b(now|cmp|market)\b/.test(lower)) score += 1
-  if (fields.stopLoss !== null && fields.stopLoss !== undefined) score += 2
-  if (fields.takeProfits && fields.takeProfits.length > 0) score += 2
+  if (hasStopLoss(fields)) score += 2
+  if (hasTakeProfits(fields)) score += 2
   if (lineCount <= 6 && fields.direction && hasStructuredPrices(fields)) score += 1
   return score
 }

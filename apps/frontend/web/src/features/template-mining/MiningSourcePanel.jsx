@@ -17,14 +17,16 @@ function feedHint(authenticated, selectedFeedName, demoFeedCount) {
     : `${demoFeedCount} demo messages from ${name}`
 }
 
-function sourceHint(props) {
-  if (props.source === 'feed') {
-    return feedHint(props.authenticated, props.selectedFeedName, props.demoFeedCount)
+function sourceHint(
+  source,
+  { authenticated, selectedFeedName, demoFeedCount, sampleCount, pastedCount }
+) {
+  if (source === 'feed') {
+    return feedHint(authenticated, selectedFeedName, demoFeedCount)
   }
-  if (props.source === 'sample') {
-    return `${props.sampleCount} representative messages across signal, update, result and noise formats`
+  if (source === 'sample') {
+    return `${sampleCount} representative messages across signal, update, result and noise formats`
   }
-  const { pastedCount } = props
   return `${pastedCount} message${pastedCount === 1 ? '' : 's'} detected — separate each with a blank line`
 }
 
@@ -60,7 +62,7 @@ export function MiningSourcePanel(props) {
               options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
             />
           )}
-          <span className="vrs-tm-source__hint">{sourceHint(props)}</span>
+          <span className="vrs-tm-source__hint">{sourceHint(source, props)}</span>
         </div>
 
         {source === 'paste' && (
