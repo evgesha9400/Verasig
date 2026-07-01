@@ -29,6 +29,18 @@ function OverlayRow({ label, removeLabel, onRemove }) {
   )
 }
 
+// The shell every taught-entry group shares: a label over its rows and "add"
+// controls. What's inside (the rows, the add form) differs per group and is
+// passed as children rather than forced into a one-size-fits-all row renderer.
+function OverlayGroup({ label, children }) {
+  return (
+    <div className="vrs-tm-overlay__group">
+      <div className="vrs-tm-overlay__label">{label}</div>
+      {children}
+    </div>
+  )
+}
+
 export function OverlayManager({ overlay, onSave }) {
   const current = normalize(overlay)
   const [alias, setAlias] = useState({ term: '', symbol: '' })
@@ -42,17 +54,21 @@ export function OverlayManager({ overlay, onSave }) {
     delete next[key]
     save({ [mapName]: next })
   }
+  const addMapEntry = (mapName, key, value, resetState) => {
+    save({ [mapName]: { ...current[mapName], [key]: value } })
+    resetState()
+  }
   const addAlias = () => {
     if (!alias.term || !alias.symbol) return
-    save({
-      instrumentAliases: { ...current.instrumentAliases, [alias.term]: alias.symbol }
-    })
-    setAlias({ term: '', symbol: '' })
+    addMapEntry('instrumentAliases', alias.term, alias.symbol, () =>
+      setAlias({ term: '', symbol: '' })
+    )
   }
   const addToken = () => {
     if (!token.term) return
-    save({ directionTokens: { ...current.directionTokens, [token.term]: token.side } })
-    setToken({ term: '', side: 'BUY' })
+    addMapEntry('directionTokens', token.term, token.side, () =>
+      setToken({ term: '', side: 'BUY' })
+    )
   }
   const addPhrase = () => {
     if (!phrase.trim()) return
@@ -73,8 +89,7 @@ export function OverlayManager({ overlay, onSave }) {
         </div>
       </div>
 
-      <div className="vrs-tm-overlay__group">
-        <div className="vrs-tm-overlay__label">Coin aliases</div>
+      <OverlayGroup label="Coin aliases">
         {Object.entries(current.instrumentAliases).map(([term, symbol]) => (
           <OverlayRow
             key={term}
@@ -104,10 +119,9 @@ export function OverlayManager({ overlay, onSave }) {
             Add alias
           </Button>
         </div>
-      </div>
+      </OverlayGroup>
 
-      <div className="vrs-tm-overlay__group">
-        <div className="vrs-tm-overlay__label">Direction tokens</div>
+      <OverlayGroup label="Direction tokens">
         {Object.entries(current.directionTokens).map(([term, side]) => (
           <OverlayRow
             key={term}
@@ -140,10 +154,9 @@ export function OverlayManager({ overlay, onSave }) {
             Add token
           </Button>
         </div>
-      </div>
+      </OverlayGroup>
 
-      <div className="vrs-tm-overlay__group">
-        <div className="vrs-tm-overlay__label">Reject phrases</div>
+      <OverlayGroup label="Reject phrases">
         {current.rejectPhrases.map((value) => (
           <OverlayRow
             key={value}
@@ -163,7 +176,7 @@ export function OverlayManager({ overlay, onSave }) {
             Add reject phrase
           </Button>
         </div>
-      </div>
+      </OverlayGroup>
     </section>
   )
 }

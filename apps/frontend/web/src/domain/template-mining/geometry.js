@@ -38,48 +38,60 @@ function relationToEntry(value, bounds) {
   return 'inside'
 }
 
-function stopLossEntryLabel(direction, relation) {
-  if (relation === 'equal') return 'Stop loss equals entry'
-  if (relation === 'inside') {
-    return `Stop loss inside entry range for ${sideLabel(direction)}`
-  }
-  return direction === 'BUY'
-    ? 'Stop loss above entry for LONG'
-    : 'Stop loss below entry for SHORT'
+// The wrong-side word is always the opposite of the expected side, so a
+// single labeler serves both stop-loss and take-profit issues.
+function oppositeSide(side) {
+  return side === 'below' ? 'above' : 'below'
 }
 
-function takeProfitEntryLabel(direction, relation) {
-  if (relation === 'equal') return 'Take profit equals entry'
+function entryRelationLabel(subject, direction, relation, expectedSide) {
+  if (relation === 'equal') return `${subject} equals entry`
   if (relation === 'inside') {
-    return `Take profit inside entry range for ${sideLabel(direction)}`
+    return `${subject} inside entry range for ${sideLabel(direction)}`
   }
-  return direction === 'BUY'
-    ? 'Take profit below entry for LONG'
-    : 'Take profit above entry for SHORT'
+  return `${subject} ${oppositeSide(expectedSide)} entry for ${sideLabel(direction)}`
+}
+
+function entryIssue(code, field, subject, direction, bounds, value, expectedSide) {
+  const label = entryRelationLabel(
+    subject,
+    direction,
+    relationToEntry(value, bounds),
+    expectedSide
+  )
+  return {
+    code,
+    field,
+    label,
+    message: `${label}. ${subject} should sit ${expectedSide} entry for a ${sideLabel(direction)}.`,
+    price: value
+  }
 }
 
 function stopLossEntryIssue(direction, bounds, stopLoss) {
-  const label = stopLossEntryLabel(direction, relationToEntry(stopLoss, bounds))
   const expected = direction === 'BUY' ? 'below' : 'above'
-  return {
-    code: ISSUE.STOP_LOSS_ON_WRONG_SIDE,
-    field: 'stopLoss',
-    label,
-    message: `${label}. Stop loss should sit ${expected} entry for a ${sideLabel(direction)}.`,
-    price: stopLoss
-  }
+  return entryIssue(
+    ISSUE.STOP_LOSS_ON_WRONG_SIDE,
+    'stopLoss',
+    'Stop loss',
+    direction,
+    bounds,
+    stopLoss,
+    expected
+  )
 }
 
 function takeProfitEntryIssue(direction, bounds, target) {
-  const label = takeProfitEntryLabel(direction, relationToEntry(target, bounds))
   const expected = direction === 'BUY' ? 'above' : 'below'
-  return {
-    code: ISSUE.TAKE_PROFIT_ON_WRONG_SIDE,
-    field: 'takeProfits',
-    label,
-    message: `${label}. Take profit should sit ${expected} entry for a ${sideLabel(direction)}.`,
-    price: target
-  }
+  return entryIssue(
+    ISSUE.TAKE_PROFIT_ON_WRONG_SIDE,
+    'takeProfits',
+    'Take profit',
+    direction,
+    bounds,
+    target,
+    expected
+  )
 }
 
 function stopLossTargetIssue(direction, stopLoss) {
@@ -110,12 +122,10 @@ function checkAgainstEntry(direction, bounds, stopLoss, takeProfits, issues) {
 }
 
 function checkStopVsTargets(direction, stopLoss, takeProfits, issues) {
-  if (direction === 'BUY' && stopLoss >= Math.min(...takeProfits)) {
-    issues.push(stopLossTargetIssue(direction, stopLoss))
-  }
-  if (direction === 'SELL' && stopLoss <= Math.max(...takeProfits)) {
-    issues.push(stopLossTargetIssue(direction, stopLoss))
-  }
+  const isBuy = direction === 'BUY'
+  const boundary = isBuy ? Math.min(...takeProfits) : Math.max(...takeProfits)
+  const violated = isBuy ? stopLoss >= boundary : stopLoss <= boundary
+  if (violated) issues.push(stopLossTargetIssue(direction, stopLoss))
 }
 
 /**

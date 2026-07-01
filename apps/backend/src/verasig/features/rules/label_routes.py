@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from verasig.features.feeds.message_views import read_history
 from verasig.features.rules.labeling import (
     label_counts,
     labeling_sample,
@@ -25,17 +24,6 @@ def messages(
                 session, subscription.user_id, int(external_id), limit
             )
         }
-
-
-# The full backfilled history (every message, unfiltered) for the parser-first
-# miner, which classifies messages itself rather than reading the labeling deck.
-@router.get("/messages/history")
-def message_history(
-    request: Request,
-    subscription=Depends(require_feed),
-) -> dict:
-    with request.app.state.session_factory() as session:
-        return {"messages": read_history(session, subscription)}
 
 
 @router.post("/messages/{msg_id}/label", status_code=status.HTTP_204_NO_CONTENT)

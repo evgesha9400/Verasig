@@ -25,6 +25,7 @@ from verasig.features.feeds.feed_job_progress import (
     should_publish_count,
 )
 from verasig.features.feeds.feed_views import present_feeds
+from verasig.features.feeds.message_views import read_history
 from verasig.features.feeds.schemas import BackfillStartIn, FeedCreateIn
 from verasig.features.rules import repository as rule_repository
 from verasig.features.sources.telegram_adapter import read_connection
@@ -102,6 +103,17 @@ def delete_feed(
         feed_repository.delete_feed(session, _subscription.user_id, int(external_id))
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# The full backfilled history (every message, unfiltered) for the parser-first
+# miner, which classifies messages itself rather than reading the labeling deck.
+@router.get("/{external_id}/messages/history")
+def message_history(
+    request: Request,
+    subscription=Depends(require_feed),
+) -> dict:
+    with request.app.state.session_factory() as session:
+        return {"messages": read_history(session, subscription)}
 
 
 @router.post("/{external_id}/backfill", status_code=status.HTTP_202_ACCEPTED)

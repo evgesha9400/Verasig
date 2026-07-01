@@ -7,7 +7,8 @@
    symbols extend the maps below without touching the matching logic. */
 
 import { escapeRegExp } from './text.js'
-import { intervalsOverlap } from './intervals.js'
+import { byStartThenLongest, overlapsAny } from './intervals.js'
+import { weakMemo } from './weakMemo.js'
 
 const CURRENCY_CODES = new Set(['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD'])
 
@@ -116,6 +117,11 @@ function aliasMatcher(term) {
   return new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(term)}(?![A-Za-z0-9])`, 'gi')
 }
 
+// Longer aliases first so "BTCUSDT" wins over the "BTC" substring rule.
+function byLongestMatcherFirst(a, b) {
+  return b.matcher.source.length - a.matcher.source.length
+}
+
 function buildAliasRules() {
   const rules = []
   for (const [normalized, terms] of Object.entries(ALIASES)) {
@@ -123,8 +129,7 @@ function buildAliasRules() {
       rules.push({ matcher: aliasMatcher(term), normalized })
     }
   }
-  // Longer aliases first so "BTCUSDT" wins over the "BTC" substring rule.
-  return rules.sort((a, b) => b.matcher.source.length - a.matcher.source.length)
+  return rules.sort(byLongestMatcherFirst)
 }
 
 const ALIAS_RULES = buildAliasRules()
@@ -159,18 +164,13 @@ const overlayAliasRulesCache = new WeakMap()
 function aliasRulesWith(overlay) {
   const aliases = overlay?.instrumentAliases
   if (!aliases || Object.keys(aliases).length === 0) return ALIAS_RULES
-  let rules = overlayAliasRulesCache.get(overlay)
-  if (!rules) {
+  return weakMemo(overlayAliasRulesCache, overlay, () => {
     const extra = Object.entries(aliases).map(([term, normalized]) => ({
       matcher: aliasMatcher(term),
       normalized
     }))
-    rules = [...extra, ...ALIAS_RULES].sort(
-      (a, b) => b.matcher.source.length - a.matcher.source.length
-    )
-    overlayAliasRulesCache.set(overlay, rules)
-  }
-  return rules
+    return [...extra, ...ALIAS_RULES].sort(byLongestMatcherFirst)
+  })
 }
 
 function collectCryptoPairHits(text, hits) {
@@ -240,21 +240,15 @@ function collectBareTickerHits(text, hits) {
   }
 }
 
-function overlaps(hit, accepted) {
-  return accepted.some((other) =>
-    intervalsOverlap(hit.start, hit.end, other.start, other.end)
-  )
-}
-
 // Earliest span wins; later overlapping or duplicate-symbol hits are dropped so
 // each symbol surfaces once.
 function dedupeHits(hits) {
-  const ordered = [...hits].sort((a, b) => a.start - b.start || b.end - a.end)
+  const ordered = [...hits].sort(byStartThenLongest)
   const accepted = []
   const seenSymbols = new Set()
   for (const hit of ordered) {
     if (seenSymbols.has(hit.normalized)) continue
-    if (overlaps(hit, accepted)) continue
+    if (overlapsAny(hit.start, hit.end, accepted, (h) => [h.start, h.end])) continue
     accepted.push(hit)
     seenSymbols.add(hit.normalized)
   }

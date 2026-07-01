@@ -11,6 +11,7 @@ import {
 } from './format.js'
 import { CandidateExample } from './CandidateExample.jsx'
 import { SignalFieldRow } from './SignalFieldRow.jsx'
+import { toggleInSet } from './toggleSet.js'
 
 /* Verasig — Template Mining: full-history result review.
    Once families are accepted and their rules run over every message, this is
@@ -225,12 +226,7 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
   const [openKeys, setOpenKeys] = useState(() => new Set())
 
   function toggleRow(key) {
-    setOpenKeys((current) => {
-      const next = new Set(current)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    setOpenKeys((current) => toggleInSet(current, key))
   }
 
   const messageById = useMemo(

@@ -13,6 +13,7 @@ import { classifyIntent } from './intent.js'
 import { scoreCandidate } from './scoring.js'
 import { validatePriceGeometry } from './geometry.js'
 import { normalizeTemplate, hashString } from './template.js'
+import { weakMemo } from './weakMemo.js'
 
 function asMessage(message) {
   // Hash the content so two distinct same-length strings get distinct ids
@@ -40,6 +41,55 @@ function collectRejectionReasons(intent, fields, directions, geometry) {
   return reasons
 }
 
+// Mining (family discovery) and auditing (routing the full history against
+// accepted rules) both extract every message — and re-run on every accept/
+// reject decision. A message's detectors/fields/intent depend only on its own
+// text and the overlay, so cache the analysis per (message, overlay) pair
+// rather than recomputing it on every pass over the same history — including
+// the audit's non-candidate routing, which needs the same intent and detector
+// output a rejected candidate already computed and discarded.
+const analysisCache = new WeakMap()
+const candidateCache = new WeakMap()
+
+function isCacheableMessage(message) {
+  return typeof message === 'object' && message !== null
+}
+
+function cached(cache, message, overlay, compute) {
+  if (!isCacheableMessage(message)) return compute(message, overlay)
+  const cacheForMessage = weakMemo(cache, message, () => new WeakMap())
+  if (cacheForMessage.has(overlay)) return cacheForMessage.get(overlay)
+  const value = compute(message, overlay)
+  cacheForMessage.set(overlay, value)
+  return value
+}
+
+function computeAnalysis(message, overlay) {
+  const normalized = normalizeMessageText(message.text)
+  const { clean } = normalized
+  const instruments = detectInstruments(clean, overlay)
+  const directions = detectDirections(clean, overlay)
+  const fields = extractSignalFields(message, overlay, {
+    instruments,
+    directions,
+    normalized
+  })
+  const intent = classifyIntent(message.text, fields)
+  return { clean, instruments, directions, fields, intent }
+}
+
+/**
+ * Detectors, extracted fields and intent for any message — the shared analysis
+ * every downstream step (candidacy, non-candidate routing, potential-miss
+ * detection) is built from.
+ * @param {import('./types.js').ChatMessage} message
+ * @param {object} [overlay={}]
+ * @returns {{clean: string, instruments: import('./types.js').DetectedEntity[], directions: import('./types.js').DetectedEntity[], fields: object, intent: import('./types.js').SignalIntent}}
+ */
+export function analyzeMessage(message, overlay = {}) {
+  return cached(analysisCache, message, overlay, computeAnalysis)
+}
+
 /**
  * @param {import('./types.js').ChatMessage|string} input
  * @param {object} [overlay={}]
@@ -47,24 +97,30 @@ function collectRejectionReasons(intent, fields, directions, geometry) {
  */
 export function attemptExtractSignal(input, overlay = {}) {
   const message = asMessage(input)
-  const { clean } = normalizeMessageText(message.text)
-  const instruments = detectInstruments(clean, overlay)
-  const directions = detectDirections(clean, overlay)
-  if (instruments.length === 0 || directions.length === 0) return null
+  return cached(candidateCache, message, overlay, computeCandidate)
+}
 
-  const fields = extractSignalFields(message, overlay)
-  const intent = classifyIntent(message.text, fields)
+function computeCandidate(message, overlay) {
+  const { clean, instruments, directions, fields, intent } = analyzeMessage(
+    message,
+    overlay
+  )
+  if (instruments.length === 0 || directions.length === 0) return null
   // The parser is the classifier: only a message that reads as a NEW signal is a
   // candidate / template family. Updates, results and commentary are not new
   // signals — they are surfaced in the audit re-scan, not as signal formats.
   if (intent !== 'new_signal') return null
 
-  const { templateKey, normalizedTemplate } = normalizeTemplate({ message }, overlay)
+  const prices = detectPrices(clean)
+  const { templateKey, normalizedTemplate } = normalizeTemplate({ message }, overlay, {
+    instruments,
+    directions,
+    prices
+  })
   // No structural skeleton survived (the message was directional prose, not a
   // formatted signal) — it is not a parseable signal format.
   if (!normalizedTemplate.trim()) return null
 
-  const prices = detectPrices(clean)
   const geometry = validatePriceGeometry(fields)
   const confidence = scoreCandidate({ message, fields, directions, geometry })
   const rejectionReasons = collectRejectionReasons(intent, fields, directions, geometry)
@@ -82,17 +138,4 @@ export function attemptExtractSignal(input, overlay = {}) {
     templateKey,
     normalizedTemplate
   }
-}
-
-/**
- * Intent of any message (instrument/direction not required) — used by the audit
- * re-scan to bucket non-candidate messages (updates/results) without making them
- * template families.
- * @param {import('./types.js').ChatMessage|string} input
- * @param {object} [overlay={}]
- * @returns {import('./types.js').SignalIntent}
- */
-export function classifyMessageIntent(input, overlay = {}) {
-  const message = asMessage(input)
-  return classifyIntent(message.text, extractSignalFields(message, overlay))
 }

@@ -45,18 +45,16 @@ function messageText(message) {
   return typeof message === 'string' ? message : message?.text || ''
 }
 
-function primaryInstrument(clean, overlay) {
-  return detectInstruments(clean, overlay)[0] || null
+function primaryInstrument(clean, overlay, instruments) {
+  return (instruments ?? detectInstruments(clean, overlay))[0] || null
 }
 
 // A worded direction (high confidence) beats an ambiguous emoji; ties break on
 // position so the header direction wins.
-function primaryDirection(clean, overlay) {
-  const directions = detectDirections(clean, overlay)
-  if (directions.length === 0) return null
-  return [...directions].sort(
-    (a, b) => b.confidence - a.confidence || a.start - b.start
-  )[0]
+function primaryDirection(clean, overlay, directions) {
+  const list = directions ?? detectDirections(clean, overlay)
+  if (list.length === 0) return null
+  return [...list].sort((a, b) => b.confidence - a.confidence || a.start - b.start)[0]
 }
 
 function entryFromPrice(price) {
@@ -141,12 +139,14 @@ function orderTypeFor(entry) {
 /**
  * @param {import('./types.js').ChatMessage|string} message
  * @param {object} [overlay={}]
+ * @param {{instruments?: import('./types.js').DetectedEntity[], directions?: import('./types.js').DetectedEntity[], normalized?: import('./types.js').NormalizedText}} [detections] already-detected entities/normalized text to reuse instead of redoing the work
  * @returns {Partial<import('./types.js').StructuredSignal>}
  */
-export function extractSignalFields(message, overlay = {}) {
-  const { clean, lines } = normalizeMessageText(messageText(message))
-  const instrument = primaryInstrument(clean, overlay)
-  const direction = primaryDirection(clean, overlay)
+export function extractSignalFields(message, overlay = {}, detections = {}) {
+  const { clean, lines } =
+    detections.normalized ?? normalizeMessageText(messageText(message))
+  const instrument = primaryInstrument(clean, overlay, detections.instruments)
+  const direction = primaryDirection(clean, overlay, detections.directions)
 
   const state = {
     entry: null,

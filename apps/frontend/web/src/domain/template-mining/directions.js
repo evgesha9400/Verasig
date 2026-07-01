@@ -4,6 +4,7 @@
    order so the scorer can tell "emoji-only" signals apart from worded ones. */
 
 import { escapeRegExp } from './text.js'
+import { weakMemo } from './weakMemo.js'
 
 const WORD_CONFIDENCE = 0.9
 const EMOJI_CONFIDENCE = 0.4
@@ -93,12 +94,10 @@ const overlayRulesCache = new WeakMap()
 
 function rulesFor(overlay) {
   if (!overlay?.directionTokens) return RULES
-  let rules = overlayRulesCache.get(overlay)
-  if (!rules) {
-    rules = [...RULES, ...overlayDirectionRules(overlay)]
-    overlayRulesCache.set(overlay, rules)
-  }
-  return rules
+  return weakMemo(overlayRulesCache, overlay, () => [
+    ...RULES,
+    ...overlayDirectionRules(overlay)
+  ])
 }
 
 /**

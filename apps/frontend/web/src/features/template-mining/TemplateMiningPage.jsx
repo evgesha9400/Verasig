@@ -16,6 +16,7 @@ import { CompiledRulesPanel } from './CompiledRulesPanel.jsx'
 import { OverlayManager } from './OverlayManager.jsx'
 import { AuditReview } from './AuditReview.jsx'
 import { formatPercent } from './format.js'
+import { toggleInSet } from './toggleSet.js'
 import './templateMining.css'
 
 /* Verasig — Parser-first Template Mining (prototype page).
@@ -64,13 +65,19 @@ export function TemplateMiningPage({
   )
   const pastedCount = useMemo(() => parsePasted(pasted).length, [pasted])
 
-  const groups = result?.groups ?? []
-  const statusFor = (templateKey) => decisions[templateKey] || 'unreviewed'
-  const acceptedGroups = useMemo(
-    () => groups.filter((group) => statusFor(group.templateKey) === 'accepted'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groups, decisions]
-  )
+  const groups = useMemo(() => result?.groups ?? [], [result])
+
+  // One pass over groups sorts every family into its decision bucket, so the
+  // family grid, the metrics counts and the audit gate all read off the same
+  // computation instead of each re-filtering groups by status separately.
+  const groupsByStatus = useMemo(() => {
+    const buckets = { accepted: [], rejected: [], unreviewed: [] }
+    for (const group of groups) {
+      buckets[decisions[group.templateKey] || 'unreviewed'].push(group)
+    }
+    return buckets
+  }, [groups, decisions])
+  const acceptedGroups = groupsByStatus.accepted
 
   const acceptedTemplateKeys = useMemo(
     () => acceptedGroups.map((group) => group.templateKey).join('|'),
@@ -96,14 +103,12 @@ export function TemplateMiningPage({
       candidates,
       groups: groups.length,
       accepted: acceptedGroups.length,
-      rejected: groups.filter((group) => statusFor(group.templateKey) === 'rejected')
-        .length,
-      review: groups.filter((group) => statusFor(group.templateKey) === 'unreviewed')
-        .length,
+      rejected: groupsByStatus.rejected.length,
+      review: groupsByStatus.unreviewed.length,
       parsedSignals,
       coverage: candidates > 0 ? formatPercent(parsedSignals / candidates) : '0%'
     }
-  }, [result, groups, audit, decisions]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [result, groups, audit, acceptedGroups, groupsByStatus])
 
   function finishMining(minedMessages) {
     if (!minedMessages || minedMessages.length === 0) {
@@ -121,9 +126,10 @@ export function TemplateMiningPage({
     )
   }
 
-  // The feed source reuses the messages already stored for the connected feed
-  // (GET /feeds/{id}/messages, the same deck the Label step reads); offline it
-  // falls back to the bundled demo history so the prototype still runs.
+  // The feed source loads the full backfilled history for the connected feed
+  // (GET /feeds/{id}/messages/history — every message, unlike the bounded deck
+  // the Label step reads); offline it falls back to the bundled demo history
+  // so the prototype still runs.
   async function runFeedMining() {
     const useBackend = Boolean(authToken && onListMessages && effectiveFeedId)
     if (!useBackend) {
@@ -150,7 +156,7 @@ export function TemplateMiningPage({
       void runFeedMining()
       return
     }
-    finishMining(resolveStaticMessages(source, pasted))
+    finishMining(messages)
   }
 
   function decide(templateKey, status) {
@@ -175,12 +181,7 @@ export function TemplateMiningPage({
   }
 
   function toggleExamples(templateKey) {
-    setExpanded((current) => {
-      const next = new Set(current)
-      if (next.has(templateKey)) next.delete(templateKey)
-      else next.add(templateKey)
-      return next
-    })
+    setExpanded((current) => toggleInSet(current, templateKey))
   }
 
   const activeStage = !result
@@ -263,7 +264,7 @@ export function TemplateMiningPage({
                   <TemplateGroupCard
                     key={group.templateKey}
                     group={group}
-                    status={statusFor(group.templateKey)}
+                    status={decisions[group.templateKey] || 'unreviewed'}
                     expanded={expanded.has(group.templateKey)}
                     onAccept={() => decide(group.templateKey, 'accepted')}
                     onReject={() => decide(group.templateKey, 'rejected')}

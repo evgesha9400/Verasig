@@ -77,11 +77,19 @@ function looksLikeResult(text) {
   return HIT_NEAR_LEVEL.test(text) && LEVEL_NEARBY.test(text)
 }
 
+function hasStopLoss(fields) {
+  return fields.stopLoss !== null && fields.stopLoss !== undefined
+}
+
+function hasTakeProfits(fields) {
+  return Array.isArray(fields.takeProfits) && fields.takeProfits.length > 0
+}
+
 function structureScore(fields) {
   let score = 0
   if (fields.entry) score += 1
-  if (fields.stopLoss !== null && fields.stopLoss !== undefined) score += 1
-  if (Array.isArray(fields.takeProfits) && fields.takeProfits.length > 0) score += 1
+  if (hasStopLoss(fields)) score += 1
+  if (hasTakeProfits(fields)) score += 1
   return score
 }
 
@@ -93,10 +101,8 @@ function isCompleteSetup(fields, marketMarker) {
     Boolean(fields.instrument) &&
     Boolean(fields.direction) &&
     Boolean(fields.entry || marketMarker) &&
-    fields.stopLoss !== null &&
-    fields.stopLoss !== undefined &&
-    Array.isArray(fields.takeProfits) &&
-    fields.takeProfits.length > 0
+    hasStopLoss(fields) &&
+    hasTakeProfits(fields)
   )
 }
 

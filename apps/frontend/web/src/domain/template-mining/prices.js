@@ -4,7 +4,7 @@
    clock times ("08:42") and leverage ("5-10x"). Ranges are scanned first and
    their spans reserved so the two levels of a range are never re-read as singles. */
 
-import { intervalsOverlap } from './intervals.js'
+import { overlapsAny } from './intervals.js'
 
 const NUMBER = '(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?[kKmM]?'
 // Clock times, optionally with seconds, so "08:42:15" is reserved whole and its
@@ -62,12 +62,6 @@ function blockedSpans(text) {
   return spans
 }
 
-function overlaps(start, end, spans) {
-  return spans.some(([spanStart, spanEnd]) =>
-    intervalsOverlap(start, end, spanStart, spanEnd)
-  )
-}
-
 function collectRanges(text, blocked, reserved, prices) {
   let match
   RANGE.lastIndex = 0
@@ -76,7 +70,7 @@ function collectRanges(text, blocked, reserved, prices) {
     // Reserve the span unconditionally so a rejected range (leverage like
     // "5-10x") still suppresses its two numbers from the single-level scan.
     reserved.push([match.index, end])
-    if (overlaps(match.index, end, blocked) || hasUnitSuffix(text, end)) continue
+    if (overlapsAny(match.index, end, blocked) || hasUnitSuffix(text, end)) continue
     const a = parseNumber(match[1])
     const b = parseNumber(match[2])
     prices.push({
@@ -96,7 +90,10 @@ function collectSingles(text, blocked, reserved, prices) {
   while ((match = SINGLE.exec(text)) !== null) {
     const end = match.index + match[0].length
     const index = match.index
-    if (overlaps(index, index + 1, blocked) || overlaps(index, index + 1, reserved)) {
+    if (
+      overlapsAny(index, index + 1, blocked) ||
+      overlapsAny(index, index + 1, reserved)
+    ) {
       continue
     }
     if (hasUnitSuffix(text, end)) continue

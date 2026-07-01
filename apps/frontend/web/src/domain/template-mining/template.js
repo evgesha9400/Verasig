@@ -9,20 +9,21 @@ import { normalizeMessageText, toCleanLines } from './text.js'
 import { detectInstruments } from './instruments.js'
 import { detectDirections, isEmojiDirection } from './directions.js'
 import { detectPrices } from './prices.js'
+import { byStartThenLongest } from './intervals.js'
 
 const MARKET_MARKER = /\b(current market price|current price|cmp|market|now)\b/gi
 const LIST_GAP = /^[\s/,]*$/
 
-function instrumentSpans(clean, overlay) {
-  return detectInstruments(clean, overlay).map((entity) => ({
+function instrumentSpans(clean, overlay, instruments) {
+  return (instruments ?? detectInstruments(clean, overlay)).map((entity) => ({
     start: entity.start,
     end: entity.end,
     token: '<INSTRUMENT>'
   }))
 }
 
-function directionSpans(clean, overlay) {
-  return detectDirections(clean, overlay).map((entity) => ({
+function directionSpans(clean, overlay, directions) {
+  return (directions ?? detectDirections(clean, overlay)).map((entity) => ({
     start: entity.start,
     end: entity.end,
     token: isEmojiDirection(entity) ? '<SIDE_EMOJI>' : '<SIDE>'
@@ -31,8 +32,8 @@ function directionSpans(clean, overlay) {
 
 // Consecutive single levels separated only by list punctuation become one
 // <PRICE_LIST>; a range is always its own <RANGE>; a lone level is a <PRICE>.
-function priceSpans(clean) {
-  const prices = detectPrices(clean)
+function priceSpans(clean, prices) {
+  prices = prices ?? detectPrices(clean)
   const spans = []
   let group = []
   const flush = () => {
@@ -70,13 +71,17 @@ function marketSpans(clean) {
   return spans
 }
 
-function collectSpans(clean, overlay) {
+// `detections` lets a caller that already ran the detectors (attemptExtractSignal
+// checks instrument/direction hits before it gets here) pass them through instead
+// of paying for a second detection pass over the same text.
+function collectSpans(clean, overlay, detections = {}) {
+  const { instruments, directions, prices } = detections
   const spans = [
-    ...instrumentSpans(clean, overlay),
-    ...directionSpans(clean, overlay),
-    ...priceSpans(clean),
+    ...instrumentSpans(clean, overlay, instruments),
+    ...directionSpans(clean, overlay, directions),
+    ...priceSpans(clean, prices),
     ...marketSpans(clean)
-  ].sort((a, b) => a.start - b.start || b.end - a.end)
+  ].sort(byStartThenLongest)
 
   const accepted = []
   let cursor = -1
@@ -325,12 +330,13 @@ export function hashString(text) {
 /**
  * @param {import('./types.js').Candidate|{message?: {text?: string}, text?: string}} candidate
  * @param {object} [overlay={}]
+ * @param {{instruments?: import('./types.js').DetectedEntity[], directions?: import('./types.js').DetectedEntity[], prices?: import('./types.js').DetectedPrice[]}} [detections] already-detected entities to reuse instead of re-running the detectors
  * @returns {{templateKey: string, normalizedTemplate: string}}
  */
-export function normalizeTemplate(candidate, overlay = {}) {
+export function normalizeTemplate(candidate, overlay = {}, detections = {}) {
   const text = candidate.message?.text ?? candidate.text ?? ''
   const { clean } = normalizeMessageText(text)
-  const spans = collectSpans(clean, overlay)
+  const spans = collectSpans(clean, overlay, detections)
   const replaced = stripDecoration(applySpans(clean, spans).toUpperCase()).replace(
     SIDE_EMOJI_RUN,
     '<SIDE_EMOJI> '

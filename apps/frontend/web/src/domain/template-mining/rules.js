@@ -4,15 +4,14 @@
    a parsed signal, an ambiguous candidate, a rejected update/result, a rare
    unaccepted format, or a partial-evidence potential miss. No LLM is involved. */
 
-import { detectInstruments } from './instruments.js'
-import { detectDirections } from './directions.js'
 import { detectPrices } from './prices.js'
 import { hasTradingLabel } from './fields.js'
 import { escapeRegExp, normalizeMessageText } from './text.js'
-import { attemptExtractSignal, classifyMessageIntent } from './extract.js'
+import { analyzeMessage, attemptExtractSignal } from './extract.js'
 import { mineTemplateGroups } from './mining.js'
 import { templateSpecificity } from './specificity.js'
 import { patternSubsumes } from './subsumption.js'
+import { weakMemo } from './weakMemo.js'
 
 const REJECT_PHRASES = [
   'hit tp',
@@ -38,27 +37,25 @@ function dominantOrderType(group) {
     const type = candidate.fields.orderType || 'unknown'
     counts.set(type, (counts.get(type) || 0) + 1)
   }
-  let best = 'market'
-  let bestCount = -1
-  for (const [type, count] of counts) {
-    if (count > bestCount) {
-      best = type
-      bestCount = count
-    }
-  }
-  return best
+  const [type] = [...counts].reduce(
+    (best, entry) => (entry[1] > best[1] ? entry : best),
+    ['market', -1]
+  )
+  return type
 }
 
 function presentFields(group) {
-  const present = { entry: false, stopLoss: false, takeProfits: false }
-  for (const candidate of group.candidates) {
-    if (candidate.fields.entry) present.entry = true
-    if (candidate.fields.stopLoss !== null && candidate.fields.stopLoss !== undefined) {
-      present.stopLoss = true
-    }
-    if ((candidate.fields.takeProfits?.length ?? 0) > 0) present.takeProfits = true
+  const candidates = group.candidates
+  return {
+    entry: candidates.some((candidate) => Boolean(candidate.fields.entry)),
+    stopLoss: candidates.some(
+      (candidate) =>
+        candidate.fields.stopLoss !== null && candidate.fields.stopLoss !== undefined
+    ),
+    takeProfits: candidates.some(
+      (candidate) => (candidate.fields.takeProfits?.length ?? 0) > 0
+    )
   }
-  return present
 }
 
 function ruleFieldMap(present) {
@@ -195,12 +192,9 @@ function phraseRegExp(phrase) {
 const rejectPhraseMatchersByRule = new WeakMap()
 
 function rejectPhraseMatchers(rule) {
-  let matchers = rejectPhraseMatchersByRule.get(rule)
-  if (!matchers) {
-    matchers = rule.rejectIfContains.map(phraseRegExp)
-    rejectPhraseMatchersByRule.set(rule, matchers)
-  }
-  return matchers
+  return weakMemo(rejectPhraseMatchersByRule, rule, () =>
+    rule.rejectIfContains.map(phraseRegExp)
+  )
 }
 
 function textHasRejectPhrase(rule, candidate) {
@@ -210,10 +204,9 @@ function textHasRejectPhrase(rule, candidate) {
 
 // A message that names an instrument XOR a direction, or carries prices next to a
 // trading label without both, is a near miss worth a human glance.
-function isPotentialMiss(message, overlay) {
-  const { clean } = normalizeMessageText(message.text)
-  const hasInstrument = detectInstruments(clean, overlay).length > 0
-  const hasDirection = detectDirections(clean, overlay).length > 0
+function isPotentialMiss({ clean, instruments, directions }) {
+  const hasInstrument = instruments.length > 0
+  const hasDirection = directions.length > 0
   if (hasInstrument !== hasDirection) return true
   if (!hasInstrument && !hasDirection) {
     return detectPrices(clean).length > 0 && hasTradingLabel(clean)
@@ -243,13 +236,16 @@ function routeCandidate(candidate, ruleByKey, orderedRules, buckets) {
 
 // A non-candidate message that reads as an update/result is bucketed as rejected
 // (without becoming a template family); a partial-evidence one is a potential miss.
+// Reuses attemptExtractSignal's analysis — it already ran the detectors, field
+// extraction and intent classification for this message and discarded them on
+// the non-candidate path, so there's no need to redo that work here.
 function routeNonCandidate(message, buckets, overlay) {
-  const intent = classifyMessageIntent(message, overlay)
-  if (NON_SIGNAL_INTENTS.has(intent)) {
-    buckets.rejected.push({ message, intent })
+  const analysis = analyzeMessage(message, overlay)
+  if (NON_SIGNAL_INTENTS.has(analysis.intent)) {
+    buckets.rejected.push({ message, intent: analysis.intent })
     return
   }
-  if (isPotentialMiss(message, overlay)) buckets.misses.push(message)
+  if (isPotentialMiss(analysis)) buckets.misses.push(message)
 }
 
 /**

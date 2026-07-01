@@ -112,6 +112,7 @@ const MESSAGES_PER_PAGE = 5
 
 const STATUS_TONE = { accepted: 'verified', rejected: 'rejected' }
 const STATUS_LABEL = { accepted: 'Accepted', rejected: 'Rejected' }
+const STATUS_CLASS = { accepted: 'is-accepted', rejected: 'is-rejected' }
 
 export function TemplateGroupCard({
   group,
@@ -130,10 +131,12 @@ export function TemplateGroupCard({
   }, [expanded])
 
   // Highest-confidence first, so page one leads with the same representative the
-  // summary above shows and the cleanest examples come first.
+  // summary above shows and the cleanest examples come first. Only worth sorting
+  // once the reviewer actually expands the family — most cards never are.
   const ordered = useMemo(
-    () => [...group.candidates].sort((a, b) => b.confidence - a.confidence),
-    [group.candidates]
+    () =>
+      expanded ? [...group.candidates].sort((a, b) => b.confidence - a.confidence) : [],
+    [group.candidates, expanded]
   )
   const total = ordered.length
   const pageCount = Math.max(1, Math.ceil(total / MESSAGES_PER_PAGE))
@@ -153,7 +156,7 @@ export function TemplateGroupCard({
     </Badge>
   )
 
-  const cardClass = `vrs-tm-card ${status === 'accepted' ? 'is-accepted' : ''} ${status === 'rejected' ? 'is-rejected' : ''}`
+  const cardClass = `vrs-tm-card ${STATUS_CLASS[status] || ''}`.trim()
 
   return (
     <Card
