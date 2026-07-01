@@ -52,5 +52,6 @@ distill-prompt-audit/
 
 # Template-mining dev-only preview + exported real feed data (not committed)
 apps/frontend/web/dev/realFeedMessages.json
+apps/frontend/web/dev/index.html
 apps/frontend/web/mining-preview.html
 apps/frontend/web/dev/mining-preview.jsx
