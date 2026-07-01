@@ -101,10 +101,8 @@ export function attemptExtractSignal(input, overlay = {}) {
 }
 
 function computeCandidate(message, overlay) {
-  const { clean, lower, lines, instruments, directions, fields, intent } = analyzeMessage(
-    message,
-    overlay
-  )
+  const { clean, lower, lines, instruments, directions, fields, intent } =
+    analyzeMessage(message, overlay)
   if (instruments.length === 0 || directions.length === 0) return null
   // The parser is the classifier: only a message that reads as a NEW signal is a
   // candidate / template family. Updates, results and commentary are not new
@@ -122,7 +120,14 @@ function computeCandidate(message, overlay) {
   if (!normalizedTemplate.trim()) return null
 
   const geometry = validatePriceGeometry(fields)
-  const confidence = scoreCandidate({ message, fields, directions, geometry, lower, lines })
+  const confidence = scoreCandidate({
+    message,
+    fields,
+    directions,
+    geometry,
+    lower,
+    lines
+  })
   const rejectionReasons = collectRejectionReasons(intent, fields, directions, geometry)
 
   return {

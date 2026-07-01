@@ -108,7 +108,13 @@ function stopLossTargetIssue(direction, stopLoss) {
     code: isBuy ? ISSUE.STOP_LOSS_NOT_BELOW_TARGETS : ISSUE.STOP_LOSS_NOT_ABOVE_TARGETS,
     field: 'stopLoss',
     label,
-    message: sideRequirementMessage(label, 'Stop loss', expected, direction, 'take profits'),
+    message: sideRequirementMessage(
+      label,
+      'Stop loss',
+      expected,
+      direction,
+      'take profits'
+    ),
     price: stopLoss
   }
 }
