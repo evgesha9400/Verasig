@@ -204,9 +204,9 @@ describe('AuditReview', () => {
     ).toBeTruthy()
   })
 
-  it('orders parsed rows by confidence, highest first', () => {
-    // Input order is low-then-high; the list must surface the most-likely first,
-    // mirroring the family grid's high→low confidence ordering.
+  it('orders parsed rows within one family by confidence, highest first', () => {
+    // Same rule → coverage ties → the confidence tiebreak surfaces the strongest
+    // extraction first (input order is low-then-high).
     const audit = {
       parsedSignals: [
         {
@@ -249,6 +249,46 @@ describe('AuditReview', () => {
     const low = texts.findIndex((text) => /LOWUSDT/.test(text))
     expect(high).toBe(0)
     expect(low).toBeGreaterThan(high)
+  })
+
+  it('groups parsed rows by template coverage — the biggest family first', () => {
+    // The most-covering template's signals lead, even when a smaller family has a
+    // higher-confidence signal. This is the visible "most-likely template first".
+    const sig = (id, instrument, ruleId, confidence) => ({
+      sourceMessageIds: [id],
+      instrument,
+      direction: 'BUY',
+      orderType: 'limit',
+      entry: null,
+      stopLoss: null,
+      takeProfits: [],
+      confidence,
+      parserRuleId: ruleId,
+      intent: 'new_signal',
+      match: 'exact'
+    })
+    const audit = {
+      parsedSignals: [
+        sig('s1', 'ZZZUSDT', 'rule_b', 0.99), // small family, highest confidence
+        sig('b1', 'AAAUSDT', 'rule_a', 0.6),
+        sig('b2', 'BBBUSDT', 'rule_a', 0.6) // big family (2 signals), lower confidence
+      ],
+      ambiguousCandidates: [],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const { container } = render(
+      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+    )
+    const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
+      (node) => node.textContent
+    )
+    const bigFamily = texts.findIndex((text) => /AAAUSDT/.test(text))
+    const smallFamily = texts.findIndex((text) => /ZZZUSDT/.test(text))
+    // Big family (more coverage) leads despite the small family's higher confidence.
+    expect(smallFamily).toBeGreaterThan(bigFamily)
+    expect(smallFamily).toBe(2)
   })
 
   it('badges a fallback-captured parsed row, but not an exact one', () => {

@@ -46,42 +46,56 @@ function issueSummary(candidate) {
   }
 }
 
-// Most-likely first: parsed signals and ambiguous candidates are surfaced in
-// descending confidence, mirroring the family grid so the reviewer always reads
-// the strongest matches at the top. Stable, so equal-confidence rows keep their
-// original order.
+// Confidence, highest first. Stable, so equal-confidence rows keep their order.
 function byConfidenceDesc(a, b) {
   return b.confidence - a.confidence
 }
 
+// Parsed signals lead with the most-covering template — the family that parsed the
+// most messages in this backtest — then by confidence within a family. This is the
+// visible "apply the most-likely template first", matching the family grid and the
+// compiled-rules order (all coverage-first).
+function byCoverageThenConfidence(countByRule) {
+  return (a, b) =>
+    (countByRule.get(b.parserRuleId) || 0) - (countByRule.get(a.parserRuleId) || 0) ||
+    b.confidence - a.confidence
+}
+
 // Each row is { key, text, template?, templateId?, haystack } — one shape so a
 // single search/filter path serves every bucket.
-function parsedRows(signals, messageById, ruleById) {
-  return [...signals].sort(byConfidenceDesc).map((signal, index) => {
-    const takeProfits = formatTakeProfits(signal.takeProfits)
-    const text = [
-      `${signal.instrument} ${signal.direction}`,
-      `entry ${formatEntry(signal.entry)}`,
-      signal.stopLoss == null ? null : `SL ${formatPrice(signal.stopLoss)}`,
-      takeProfits ? `TP ${takeProfits}` : null
-    ]
-      .filter(Boolean)
-      .join(' · ')
-    const sourceText = messageById.get(signal.sourceMessageIds[0])?.text || ''
-    const rule = ruleById.get(signal.parserRuleId)
-    return {
-      key: `${signal.sourceMessageIds.join('-')}-${index}`,
-      text,
-      template: rule?.name,
-      templateId: signal.parserRuleId,
-      // Recovered by a general family it does not exactly match — flag it so the
-      // reviewer can scrutinize looser matches without leaving the Parsed bucket.
-      fallback: signal.match === 'fallback',
-      haystack:
-        `${text} ${signal.instrument} ${signal.direction} ${sourceText}`.toLowerCase(),
-      detail: { kind: 'parsed', signal, messageText: sourceText, template: rule?.name }
-    }
-  })
+function parsedRows(signals, messageById, ruleById, countByRule) {
+  return [...signals]
+    .sort(byCoverageThenConfidence(countByRule))
+    .map((signal, index) => {
+      const takeProfits = formatTakeProfits(signal.takeProfits)
+      const text = [
+        `${signal.instrument} ${signal.direction}`,
+        `entry ${formatEntry(signal.entry)}`,
+        signal.stopLoss == null ? null : `SL ${formatPrice(signal.stopLoss)}`,
+        takeProfits ? `TP ${takeProfits}` : null
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      const sourceText = messageById.get(signal.sourceMessageIds[0])?.text || ''
+      const rule = ruleById.get(signal.parserRuleId)
+      return {
+        key: `${signal.sourceMessageIds.join('-')}-${index}`,
+        text,
+        template: rule?.name,
+        templateId: signal.parserRuleId,
+        // Recovered by a general family it does not exactly match — flag it so the
+        // reviewer can scrutinize looser matches without leaving the Parsed bucket.
+        fallback: signal.match === 'fallback',
+        haystack:
+          `${text} ${signal.instrument} ${signal.direction} ${sourceText}`.toLowerCase(),
+        detail: {
+          kind: 'parsed',
+          signal,
+          messageText: sourceText,
+          template: rule?.name
+        }
+      }
+    })
 }
 
 function ambiguousRows(candidates, ruleByTemplateKey) {
@@ -214,20 +228,9 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
     [rules]
   )
 
-  const rowsByTab = useMemo(
-    () => ({
-      parsed: parsedRows(audit.parsedSignals, messageById, ruleById),
-      ambiguous: ambiguousRows(audit.ambiguousCandidates, ruleByTemplateKey),
-      rejected: rejectedRows(audit.rejectedCandidates),
-      rare: rareRows(audit.rareTemplates),
-      misses: missRows(audit.potentialMisses)
-    }),
-    [audit, messageById, ruleById, ruleByTemplateKey]
-  )
-
-  // Accepted families are named by FORMAT, so several can share one display name.
-  // Tag each option with how many signals it parsed — a useful, distinguishing
-  // discriminator so the dropdown options are not indistinguishable.
+  // How many signals each accepted rule parsed in this backtest — its coverage.
+  // Drives both the parsed-row ordering (most-covering family first) and the
+  // template-filter labels (several families can share one display name).
   const parsedCountByRule = useMemo(() => {
     const counts = new Map()
     for (const signal of audit.parsedSignals) {
@@ -235,6 +238,17 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
     }
     return counts
   }, [audit])
+
+  const rowsByTab = useMemo(
+    () => ({
+      parsed: parsedRows(audit.parsedSignals, messageById, ruleById, parsedCountByRule),
+      ambiguous: ambiguousRows(audit.ambiguousCandidates, ruleByTemplateKey),
+      rejected: rejectedRows(audit.rejectedCandidates),
+      rare: rareRows(audit.rareTemplates),
+      misses: missRows(audit.potentialMisses)
+    }),
+    [audit, messageById, ruleById, ruleByTemplateKey, parsedCountByRule]
+  )
 
   const activeTab = TABS.find((entry) => entry.id === tab)
   const templateEnabled = activeTab.templated && rules.length > 0
