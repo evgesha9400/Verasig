@@ -32,13 +32,10 @@ def messages(
 @router.get("/messages/history")
 def message_history(
     request: Request,
-    external_id: str,
     subscription=Depends(require_feed),
 ) -> dict:
     with request.app.state.session_factory() as session:
-        return {
-            "messages": read_history(session, subscription.user_id, int(external_id))
-        }
+        return {"messages": read_history(session, subscription)}
 
 
 @router.post("/messages/{msg_id}/label", status_code=status.HTTP_204_NO_CONTENT)

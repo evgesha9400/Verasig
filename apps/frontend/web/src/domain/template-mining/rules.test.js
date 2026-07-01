@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyAcceptedRules, compileRuleFromTemplate } from './rules.js'
 import { mineTemplateGroups } from './mining.js'
-import { SAMPLE_MESSAGES } from './sampleMessages.js'
-
-const SIGNALS = [
-  { id: 's1', date: '2026-06-01', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
-  { id: 's2', date: '2026-06-02', text: 'XAUUSD BUY NOW\nSL 2305\nTP 2330\nTP 2350' },
-  { id: 's3', date: '2026-06-03', text: 'XAUUSD BUY NOW\nSL 2300\nTP 2325\nTP 2345' }
-]
+import { SAMPLE_MESSAGES, SIGNAL_FAMILY as SIGNALS } from './sampleMessages.js'
 
 function signalGroup() {
   return mineTemplateGroups(SIGNALS).find((group) => group.count === SIGNALS.length)

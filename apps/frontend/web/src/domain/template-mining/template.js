@@ -5,9 +5,9 @@
    same shape but different symbols and numbers collapse to one templateKey, so
    the user reviews format families instead of individual messages. */
 
-import { normalizeMessageText } from './text.js'
+import { normalizeMessageText, toCleanLines } from './text.js'
 import { detectInstruments } from './instruments.js'
-import { detectDirections } from './directions.js'
+import { detectDirections, isEmojiDirection } from './directions.js'
 import { detectPrices } from './prices.js'
 
 const MARKET_MARKER = /\b(current market price|current price|cmp|market|now)\b/gi
@@ -25,7 +25,7 @@ function directionSpans(clean, overlay) {
   return detectDirections(clean, overlay).map((entity) => ({
     start: entity.start,
     end: entity.end,
-    token: entity.confidence < 0.7 ? '<SIDE_EMOJI>' : '<SIDE>'
+    token: isEmojiDirection(entity) ? '<SIDE_EMOJI>' : '<SIDE>'
   }))
 }
 
@@ -99,11 +99,7 @@ function applySpans(clean, spans) {
 }
 
 function tidyLines(text) {
-  return text
-    .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter((line) => line.length > 0)
-    .join('\n')
+  return toCleanLines(text).join('\n')
 }
 
 // A numbered TP that owns a value keeps its ordinal ("TP1: <PRICE>"); a bare
@@ -270,7 +266,10 @@ function canonicalizeTargetPriceArity(line) {
 
 function canonicalizeLimitOrderModifier(line, hasIndependentPricedEntry) {
   if (!hasIndependentPricedEntry || PRICE_OR_RANGE.test(line)) return line
-  return line.replace(/(^|\s)LIMIT ORDER\b/g, '$1').replace(/\s+/g, ' ').trim()
+  return line
+    .replace(/(^|\s)LIMIT ORDER\b/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function canonicalizeTemplateFamily(template) {

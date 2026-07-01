@@ -25,11 +25,16 @@ function stripThousandsSeparators(text) {
   return current
 }
 
-function toCleanLines(text) {
+export function toCleanLines(text) {
   return text
     .split(/\r?\n/)
     .map((line) => line.replace(/[ \t]+/g, ' ').trim())
     .filter((line) => line.length > 0)
+}
+
+/** Escape regex metacharacters so a literal string can be embedded in a pattern. */
+export function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**

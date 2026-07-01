@@ -3,6 +3,7 @@ import { Badge, Button, Card, ConfidenceBar, Icon } from '@verasig/design-system
 import { formatLabel } from '../../domain/template-mining/index.js'
 import { CandidateExample } from './CandidateExample.jsx'
 import { Pager } from './Pager.jsx'
+import { SignalFieldRow } from './SignalFieldRow.jsx'
 import {
   ACTION_LABEL,
   ACTION_TONE,
@@ -67,28 +68,33 @@ function ExtractionSummary({ candidate }) {
   return (
     <table className="vrs-tm-kv">
       <tbody>
-        <tr>
-          <td>Instrument</td>
-          <td>{fields.instrument || '—'}</td>
-        </tr>
-        <tr>
-          <td>Direction</td>
-          <td>{fields.direction || '—'}</td>
-        </tr>
-        <tr>
-          <td>Entry ({fields.orderType})</td>
-          <td>{formatEntry(fields.entry)}</td>
-        </tr>
-        <tr>
-          <td>Stop loss</td>
-          <td className={fields.stopLoss == null ? 'none' : undefined}>
-            {fields.stopLoss == null ? 'none' : formatPrice(fields.stopLoss)}
-          </td>
-        </tr>
-        <tr>
-          <td>Take profits</td>
-          <td className={takeProfits ? undefined : 'none'}>{takeProfits || 'none'}</td>
-        </tr>
+        <SignalFieldRow
+          label="Instrument"
+          value={fields.instrument || '—'}
+          field="instrument"
+        />
+        <SignalFieldRow
+          label="Direction"
+          value={fields.direction || '—'}
+          field="direction"
+        />
+        <SignalFieldRow
+          label={`Entry (${fields.orderType})`}
+          value={formatEntry(fields.entry)}
+          field="entry"
+        />
+        <SignalFieldRow
+          label="Stop loss"
+          value={fields.stopLoss == null ? 'none' : formatPrice(fields.stopLoss)}
+          muted={fields.stopLoss == null}
+          field="stopLoss"
+        />
+        <SignalFieldRow
+          label="Take profits"
+          value={takeProfits || 'none'}
+          muted={!takeProfits}
+          field="takeProfits"
+        />
       </tbody>
     </table>
   )
@@ -103,6 +109,9 @@ function dateRangeLabel(dateRange) {
 // Reviewers page through EVERY message in the family — five at a time — to
 // double-check the grouping, not just the top-confidence examples.
 const MESSAGES_PER_PAGE = 5
+
+const STATUS_TONE = { accepted: 'verified', rejected: 'rejected' }
+const STATUS_LABEL = { accepted: 'Accepted', rejected: 'Rejected' }
 
 export function TemplateGroupCard({
   group,
@@ -133,20 +142,16 @@ export function TemplateGroupCard({
   const pageItems = ordered.slice(windowStart, windowStart + MESSAGES_PER_PAGE)
 
   const representative = group.examples[0]
-  const statusBadge =
-    status === 'accepted' ? (
-      <Badge tone="verified" dot>
-        Accepted
-      </Badge>
-    ) : status === 'rejected' ? (
-      <Badge tone="rejected" dot>
-        Rejected
-      </Badge>
-    ) : (
-      <Badge tone={ACTION_TONE[group.suggestedAction]}>
-        {ACTION_LABEL[group.suggestedAction]}
-      </Badge>
-    )
+  const decidedLabel = STATUS_LABEL[status]
+  const statusBadge = decidedLabel ? (
+    <Badge tone={STATUS_TONE[status]} dot>
+      {decidedLabel}
+    </Badge>
+  ) : (
+    <Badge tone={ACTION_TONE[group.suggestedAction]}>
+      {ACTION_LABEL[group.suggestedAction]}
+    </Badge>
+  )
 
   const cardClass = `vrs-tm-card ${status === 'accepted' ? 'is-accepted' : ''} ${status === 'rejected' ? 'is-rejected' : ''}`
 

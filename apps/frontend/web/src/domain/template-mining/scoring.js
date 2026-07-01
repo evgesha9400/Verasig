@@ -5,7 +5,7 @@
    precise probability — so thresholds matter more than exact values. */
 
 import { normalizeMessageText } from './text.js'
-import { detectDirections } from './directions.js'
+import { detectDirections, isEmojiOnlyDirection } from './directions.js'
 import { validatePriceGeometry } from './geometry.js'
 
 const NORMALIZER = 16 // a clean, fully-structured signal lands high (~0.9) but below saturation
@@ -33,9 +33,10 @@ function candidateDirections(candidate, text) {
   return candidate.directions ?? detectDirections(text)
 }
 
-function isEmojiOnlyDirection(directions) {
-  if (directions.length === 0) return false
-  return directions.every((entity) => entity.confidence < 0.7)
+function hasStructuredPrices(fields) {
+  return Boolean(
+    fields.entry || fields.stopLoss !== null || (fields.takeProfits?.length ?? 0) > 0
+  )
 }
 
 function positiveScore(fields, lower, lineCount) {
@@ -46,19 +47,15 @@ function positiveScore(fields, lower, lineCount) {
   if (/\b(now|cmp|market)\b/.test(lower)) score += 1
   if (fields.stopLoss !== null && fields.stopLoss !== undefined) score += 2
   if (fields.takeProfits && fields.takeProfits.length > 0) score += 2
-  const hasStructure =
-    fields.entry || fields.stopLoss !== null || (fields.takeProfits?.length ?? 0) > 0
-  if (lineCount <= 6 && fields.direction && hasStructure) score += 1
+  if (lineCount <= 6 && fields.direction && hasStructuredPrices(fields)) score += 1
   return score
 }
 
 function negativeScore(fields, lower, directions) {
   let score = 0
   for (const rule of NEGATIVE_RULES) if (rule.test(lower)) score += rule.penalty
-  const hasPrices =
-    fields.entry || fields.stopLoss !== null || (fields.takeProfits?.length ?? 0) > 0
   const hasMarket = /\b(now|cmp|market)\b/.test(lower)
-  if (!hasPrices && !hasMarket) score -= 1
+  if (!hasStructuredPrices(fields) && !hasMarket) score -= 1
   if (isEmojiOnlyDirection(directions)) score -= 1
   return score
 }
@@ -76,11 +73,12 @@ export function scoreCandidate(candidate) {
   const fields = candidate.fields || {}
   const { lower, lines } = normalizeMessageText(text)
   const directions = candidateDirections(candidate, text)
+  const geometry = candidate.geometry ?? validatePriceGeometry(fields)
 
   const raw =
     positiveScore(fields, lower, lines.length) +
     negativeScore(fields, lower, directions) +
-    validatePriceGeometry(fields).scoreAdjustment
+    geometry.scoreAdjustment
 
   return clamp01(raw / NORMALIZER)
 }

@@ -58,9 +58,10 @@ function topExamples(candidates) {
 }
 
 function geometryWarningCount(candidates) {
-  return candidates.filter((candidate) =>
-    (candidate.parserIssues || []).length > 0 ||
-    candidate.rejectionReasons.some((reason) => GEOMETRY_WARNING.test(reason))
+  return candidates.filter(
+    (candidate) =>
+      (candidate.parserIssues || []).length > 0 ||
+      candidate.rejectionReasons.some((reason) => GEOMETRY_WARNING.test(reason))
   ).length
 }
 
@@ -78,6 +79,18 @@ function suggestAction(distribution, count, confidenceAvg, geometryWarnings) {
 }
 
 const ACTION_RANK = { review: 0, accept: 1, reject: 2 }
+
+// The family grid, compiled-rules order and the audit review all rank
+// candidates/rows the same way: whichever covers more messages leads, ties
+// broken by confidence. Shared so the policy lives in exactly one place.
+export function byCoverageThenConfidence(coverageOf, confidenceOf) {
+  return (a, b) => coverageOf(b) - coverageOf(a) || confidenceOf(b) - confidenceOf(a)
+}
+
+const byGroupCoverage = byCoverageThenConfidence(
+  (group) => group.count,
+  (group) => group.confidenceAvg
+)
 
 function toGroup(templateKey, candidates) {
   const count = candidates.length
@@ -105,8 +118,7 @@ function toGroup(templateKey, candidates) {
 function sortGroups(groups) {
   return groups.sort(
     (a, b) =>
-      b.count - a.count ||
-      b.confidenceAvg - a.confidenceAvg ||
+      byGroupCoverage(a, b) ||
       ACTION_RANK[a.suggestedAction] - ACTION_RANK[b.suggestedAction]
   )
 }

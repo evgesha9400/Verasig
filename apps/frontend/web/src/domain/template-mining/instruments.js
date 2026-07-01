@@ -6,6 +6,9 @@
    Dictionaries are intentionally data, not code — channel- or broker-specific
    symbols extend the maps below without touching the matching logic. */
 
+import { escapeRegExp } from './text.js'
+import { intervalsOverlap } from './intervals.js'
+
 const CURRENCY_CODES = new Set(['AUD', 'CAD', 'CHF', 'EUR', 'GBP', 'JPY', 'NZD', 'USD'])
 
 const CRYPTO_QUOTES = ['USDT', 'USDC', 'USD', 'PERP', 'BTC', 'ETH']
@@ -107,10 +110,6 @@ function toUsdt(ticker) {
   return upper.endsWith('USDT') ? upper : `${upper}USDT`
 }
 
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 // `\b` fails before symbols like "&" or "/", so bound matches with explicit
 // non-alphanumeric lookarounds that still treat the edge of the string as a boundary.
 function aliasMatcher(term) {
@@ -135,39 +134,43 @@ const CRYPTO_PAIR = new RegExp(
 )
 const FOREX_PAIR = /(?<![A-Za-z0-9])([A-Za-z]{3})([A-Za-z]{3})(?![A-Za-z0-9])/g
 
-function pushHit(hits, start, end, normalized, raw, confidence) {
-  hits.push({ start, end, normalized, raw, confidence })
-}
-
 function collectAliasHits(text, hits, rules) {
   for (const rule of rules) {
     rule.matcher.lastIndex = 0
     let match
     while ((match = rule.matcher.exec(text)) !== null) {
-      pushHit(
-        hits,
-        match.index,
-        match.index + match[0].length,
-        rule.normalized,
-        match[0],
-        DICTIONARY_CONFIDENCE
-      )
+      hits.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        normalized: rule.normalized,
+        raw: match[0],
+        confidence: DICTIONARY_CONFIDENCE
+      })
     }
   }
 }
 
 // Overlay aliases (user-taught alias -> canonical symbol) join the built-in
 // rules, longest-term first so specific aliases win the overlap dedupe.
+// Compiling + sorting is wasted work once the overlay is unchanged (it is the
+// same object for every message in a mining run) — cache per overlay.
+const overlayAliasRulesCache = new WeakMap()
+
 function aliasRulesWith(overlay) {
   const aliases = overlay?.instrumentAliases
   if (!aliases || Object.keys(aliases).length === 0) return ALIAS_RULES
-  const extra = Object.entries(aliases).map(([term, normalized]) => ({
-    matcher: aliasMatcher(term),
-    normalized
-  }))
-  return [...extra, ...ALIAS_RULES].sort(
-    (a, b) => b.matcher.source.length - a.matcher.source.length
-  )
+  let rules = overlayAliasRulesCache.get(overlay)
+  if (!rules) {
+    const extra = Object.entries(aliases).map(([term, normalized]) => ({
+      matcher: aliasMatcher(term),
+      normalized
+    }))
+    rules = [...extra, ...ALIAS_RULES].sort(
+      (a, b) => b.matcher.source.length - a.matcher.source.length
+    )
+    overlayAliasRulesCache.set(overlay, rules)
+  }
+  return rules
 }
 
 function collectCryptoPairHits(text, hits) {
@@ -178,14 +181,13 @@ function collectCryptoPairHits(text, hits) {
     const quote = match[2].toUpperCase()
     // A fiat base, a numbers-only base, or base === quote is not a real pair.
     if (base === quote || CURRENCY_CODES.has(base) || !HAS_LETTER.test(base)) continue
-    pushHit(
-      hits,
-      match.index,
-      match.index + match[0].length,
-      `${base}${quote}`,
-      match[0],
-      PAIR_CONFIDENCE
-    )
+    hits.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      normalized: `${base}${quote}`,
+      raw: match[0],
+      confidence: PAIR_CONFIDENCE
+    })
   }
 }
 
@@ -197,14 +199,13 @@ function collectForexPairHits(text, hits) {
     const quote = match[2].toUpperCase()
     if (!CURRENCY_CODES.has(base) || !CURRENCY_CODES.has(quote)) continue
     if (base === quote) continue // USDUSD is not a pair
-    pushHit(
-      hits,
-      match.index,
-      match.index + match[0].length,
-      `${base}${quote}`,
-      match[0],
-      PAIR_CONFIDENCE
-    )
+    hits.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      normalized: `${base}${quote}`,
+      raw: match[0],
+      confidence: PAIR_CONFIDENCE
+    })
   }
 }
 
@@ -214,7 +215,13 @@ function collectCoinLabelHits(text, hits) {
   while ((match = COIN_LABEL.exec(text)) !== null) {
     if (!HAS_LETTER.test(match[1])) continue // skip "Монета: 100" style numerics
     const [start, end] = match.indices[1]
-    pushHit(hits, start, end, toUsdt(match[1]), match[1], DICTIONARY_CONFIDENCE)
+    hits.push({
+      start,
+      end,
+      normalized: toUsdt(match[1]),
+      raw: match[1],
+      confidence: DICTIONARY_CONFIDENCE
+    })
   }
 }
 
@@ -223,19 +230,20 @@ function collectBareTickerHits(text, hits) {
   BARE_TICKER.lastIndex = 0
   while ((match = BARE_TICKER.exec(text)) !== null) {
     if (!CRYPTO_TICKERS.has(match[1])) continue
-    pushHit(
-      hits,
-      match.index,
-      match.index + match[0].length,
-      toUsdt(match[1]),
-      match[1],
-      PAIR_CONFIDENCE
-    )
+    hits.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      normalized: toUsdt(match[1]),
+      raw: match[1],
+      confidence: PAIR_CONFIDENCE
+    })
   }
 }
 
 function overlaps(hit, accepted) {
-  return accepted.some((other) => hit.start < other.end && other.start < hit.end)
+  return accepted.some((other) =>
+    intervalsOverlap(hit.start, hit.end, other.start, other.end)
+  )
 }
 
 // Earliest span wins; later overlapping or duplicate-symbol hits are dropped so

@@ -49,9 +49,12 @@ def test_overlay_is_per_account(client):
         json={"overlay": {"rejectPhrases": ["closed"]}},
     )
 
-    assert client.get("/parser-overlay", headers=_auth(other)).json()["overlay"][
-        "rejectPhrases"
-    ] == []
+    assert (
+        client.get("/parser-overlay", headers=_auth(other)).json()["overlay"][
+            "rejectPhrases"
+        ]
+        == []
+    )
 
 
 def test_overlay_requires_auth(client):

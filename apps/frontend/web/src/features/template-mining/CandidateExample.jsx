@@ -6,28 +6,13 @@ import {
   formatPrice,
   formatTakeProfits
 } from './format.js'
+import { SignalFieldRow } from './SignalFieldRow.jsx'
 
 /* Verasig — Template Mining: one worked example.
    The raw Telegram message beside the structured object the parser produced, plus
    any geometry / intent warnings — so a reviewer can audit the extraction itself. */
-function rowClass({ muted, warning }) {
-  return [muted ? 'is-muted' : null, warning ? 'is-warning' : null]
-    .filter(Boolean)
-    .join(' ')
-}
-
 function issueFields(candidate) {
   return new Set((candidate.parserIssues || []).map((issue) => issue.field))
-}
-
-function Row({ label, value, muted, field, warning }) {
-  const className = rowClass({ muted, warning })
-  return (
-    <tr className={className || undefined} data-field={field}>
-      <td>{label}</td>
-      <td className={muted ? 'none' : undefined}>{value}</td>
-    </tr>
-  )
 }
 
 function IssueList({ candidate }) {
@@ -72,26 +57,30 @@ export function CandidateExample({ candidate }) {
       <div>
         <table className="vrs-tm-kv">
           <tbody>
-            <Row
+            <SignalFieldRow
               label="Instrument"
               value={fields.instrument || 'none'}
               muted={!fields.instrument}
               field="instrument"
             />
-            <Row
+            <SignalFieldRow
               label="Direction"
               value={fields.direction || 'none'}
               muted={!fields.direction}
               field="direction"
             />
-            <Row label="Order type" value={fields.orderType} field="orderType" />
-            <Row
+            <SignalFieldRow
+              label="Order type"
+              value={fields.orderType}
+              field="orderType"
+            />
+            <SignalFieldRow
               label="Entry"
               value={formatEntry(fields.entry)}
               muted={!fields.entry}
               field="entry"
             />
-            <Row
+            <SignalFieldRow
               label="Stop loss"
               value={
                 fields.stopLoss !== null && fields.stopLoss !== undefined
@@ -102,15 +91,19 @@ export function CandidateExample({ candidate }) {
               field="stopLoss"
               warning={fieldsWithIssues.has('stopLoss')}
             />
-            <Row
+            <SignalFieldRow
               label="Take profits"
               value={takeProfits || 'none'}
               muted={!takeProfits}
               field="takeProfits"
               warning={fieldsWithIssues.has('takeProfits')}
             />
-            <Row label="Intent" value={INTENT_LABEL[candidate.intent]} field="intent" />
-            <Row
+            <SignalFieldRow
+              label="Intent"
+              value={INTENT_LABEL[candidate.intent]}
+              field="intent"
+            />
+            <SignalFieldRow
               label="Confidence"
               value={formatConfidence(candidate.confidence)}
               field="confidence"

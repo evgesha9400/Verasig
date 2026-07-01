@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mineTemplateGroups } from './mining.js'
+import { SIGNAL_FAMILY as SIGNALS } from './sampleMessages.js'
 
-const SIGNALS = [
-  { id: 's1', date: '2026-06-01', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
-  { id: 's2', date: '2026-06-02', text: 'XAUUSD BUY NOW\nSL 2305\nTP 2330\nTP 2350' },
-  { id: 's3', date: '2026-06-03', text: 'XAUUSD BUY NOW\nSL 2300\nTP 2325\nTP 2345' }
-]
 const RESULTS = [
   { id: 'r1', date: '2026-06-01', text: 'XAUUSD BUY hit TP1' },
   { id: 'r2', date: '2026-06-02', text: 'EURUSD SELL hit TP1' }

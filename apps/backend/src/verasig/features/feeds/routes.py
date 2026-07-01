@@ -140,9 +140,7 @@ def _deletion_rescan_job_key(user_id, external_id: int) -> str:
 
 def _has_saved_rules(session, feed) -> bool:
     return bool(
-        rule_repository.read_rule_feed_ids(
-            session, feed.user_id, [feed.external_id]
-        )
+        rule_repository.read_rule_feed_ids(session, feed.user_id, [feed.external_id])
     )
 
 

@@ -8,7 +8,7 @@ import { detectInstruments } from './instruments.js'
 import { detectDirections } from './directions.js'
 import { detectPrices } from './prices.js'
 import { hasTradingLabel } from './fields.js'
-import { normalizeMessageText } from './text.js'
+import { escapeRegExp, normalizeMessageText } from './text.js'
 import { attemptExtractSignal, classifyMessageIntent } from './extract.js'
 import { mineTemplateGroups } from './mining.js'
 import { templateSpecificity } from './specificity.js'
@@ -182,21 +182,30 @@ function toStructuredSignal(candidate, rule, match) {
   }
 }
 
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 // Match reject phrases on word boundaries (spaces tolerate any whitespace), so
 // "closely"/"pipsqueak" do not trip the bare "close"/"pips" phrases the way a
 // raw substring check would.
-function phraseMatches(phrase, lower) {
+function phraseRegExp(phrase) {
   const body = escapeRegExp(phrase).replace(/\s+/g, '\\s+')
-  return new RegExp(`\\b${body}\\b`, 'i').test(lower)
+  return new RegExp(`\\b${body}\\b`, 'i')
+}
+
+// A rule's reject phrases are fixed once it is compiled, so compile their
+// regexes once per rule rather than once per candidate the rule matches.
+const rejectPhraseMatchersByRule = new WeakMap()
+
+function rejectPhraseMatchers(rule) {
+  let matchers = rejectPhraseMatchersByRule.get(rule)
+  if (!matchers) {
+    matchers = rule.rejectIfContains.map(phraseRegExp)
+    rejectPhraseMatchersByRule.set(rule, matchers)
+  }
+  return matchers
 }
 
 function textHasRejectPhrase(rule, candidate) {
   const lower = normalizeMessageText(candidate.message.text).lower
-  return rule.rejectIfContains.some((phrase) => phraseMatches(phrase, lower))
+  return rejectPhraseMatchers(rule).some((matcher) => matcher.test(lower))
 }
 
 // A message that names an instrument XOR a direction, or carries prices next to a

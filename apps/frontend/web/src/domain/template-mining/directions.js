@@ -3,8 +3,13 @@
    a coloured circle is ambiguous out of context. Both are returned in source
    order so the scorer can tell "emoji-only" signals apart from worded ones. */
 
+import { escapeRegExp } from './text.js'
+
 const WORD_CONFIDENCE = 0.9
 const EMOJI_CONFIDENCE = 0.4
+// Below word strength — the boundary the scorer/normalizer use to tell an
+// emoji-inferred direction apart from one the author actually wrote out.
+const EMOJI_CONFIDENCE_CEILING = 0.7
 
 const BUY_WORDS = ['buy', 'long', 'bullish', 'call', 'calls']
 const SELL_WORDS = ['sell', 'short', 'bearish', 'put', 'puts']
@@ -14,8 +19,14 @@ const SELL_WORDS_RU = ['шорт']
 const BUY_EMOJIS = ['🟢', '⬆', '🚀', '📈', '🔼']
 const SELL_EMOJIS = ['🔴', '⬇', '📉', '🔽']
 
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** @param {import('./types.js').DetectedEntity} entity */
+export function isEmojiDirection(entity) {
+  return entity.confidence < EMOJI_CONFIDENCE_CEILING
+}
+
+/** @param {import('./types.js').DetectedEntity[]} directions */
+export function isEmojiOnlyDirection(directions) {
+  return directions.length > 0 && directions.every(isEmojiDirection)
 }
 
 function wordMatcher(words) {
@@ -76,6 +87,20 @@ const RULES = [
   }
 ]
 
+// Compiling overlay-token regexes is wasted work once the overlay is unchanged
+// (it is the same object for every message in a mining run) — cache per overlay.
+const overlayRulesCache = new WeakMap()
+
+function rulesFor(overlay) {
+  if (!overlay?.directionTokens) return RULES
+  let rules = overlayRulesCache.get(overlay)
+  if (!rules) {
+    rules = [...RULES, ...overlayDirectionRules(overlay)]
+    overlayRulesCache.set(overlay, rules)
+  }
+  return rules
+}
+
 /**
  * @param {string} text
  * @param {object} overlay
@@ -83,7 +108,7 @@ const RULES = [
  */
 export function detectDirections(text, overlay = {}) {
   if (!text) return []
-  const rules = [...RULES, ...overlayDirectionRules(overlay)]
+  const rules = rulesFor(overlay)
   const hits = []
   for (const rule of rules) {
     rule.matcher.lastIndex = 0

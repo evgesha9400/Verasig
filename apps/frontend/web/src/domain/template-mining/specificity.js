@@ -5,8 +5,7 @@
    always normalized skeletons (template.js), where stray words are already <*>,
    so every bare word token is structural. */
 
-// <*> wildcard, <PLACEHOLDER>, or a structural word (letters/digits).
-const TOKEN = /<\*>|<[A-Z_]+>|[\p{L}\p{N}]+/gu
+import { TOKEN } from './skeletonTokens.js'
 
 /**
  * @param {string} skeleton normalized template

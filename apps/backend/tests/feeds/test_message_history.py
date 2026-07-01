@@ -114,7 +114,8 @@ def test_read_history_returns_every_message_regardless_of_label_or_candidacy(
     record_label(db_session, account.id, 7, 1, LabelKind.NOISE)
     db_session.commit()
 
-    history = read_history(db_session, account.id, 7)
+    channel = feed_repository.read_feed(db_session, account.id, 7)
+    history = read_history(db_session, channel)
 
     # Every stored message is present, oldest first — including the labeled one
     # (1) and the non-candidate one (2), which the labeling sample would omit.

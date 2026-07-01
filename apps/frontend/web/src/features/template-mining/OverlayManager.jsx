@@ -12,6 +12,23 @@ function normalize(overlay) {
   return { ...EMPTY, ...(overlay || {}) }
 }
 
+// A taught entry (alias, direction token, or reject phrase) plus its remove
+// button — the one row shape every group in this manager lists.
+function OverlayRow({ label, removeLabel, onRemove }) {
+  return (
+    <div className="vrs-tm-overlay__row">
+      <span>{label}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label={removeLabel}
+        iconLeft={<Icon name="x" size={13} />}
+        onClick={onRemove}
+      />
+    </div>
+  )
+}
+
 export function OverlayManager({ overlay, onSave }) {
   const current = normalize(overlay)
   const [alias, setAlias] = useState({ term: '', symbol: '' })
@@ -59,18 +76,16 @@ export function OverlayManager({ overlay, onSave }) {
       <div className="vrs-tm-overlay__group">
         <div className="vrs-tm-overlay__label">Coin aliases</div>
         {Object.entries(current.instrumentAliases).map(([term, symbol]) => (
-          <div key={term} className="vrs-tm-overlay__row">
-            <span>
-              {term} → <span>{symbol}</span>
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Remove alias ${term}`}
-              iconLeft={<Icon name="x" size={13} />}
-              onClick={() => removeKey('instrumentAliases', term)}
-            />
-          </div>
+          <OverlayRow
+            key={term}
+            label={
+              <>
+                {term} → <span>{symbol}</span>
+              </>
+            }
+            removeLabel={`Remove alias ${term}`}
+            onRemove={() => removeKey('instrumentAliases', term)}
+          />
         ))}
         <div className="vrs-tm-overlay__add">
           <Input
@@ -94,18 +109,16 @@ export function OverlayManager({ overlay, onSave }) {
       <div className="vrs-tm-overlay__group">
         <div className="vrs-tm-overlay__label">Direction tokens</div>
         {Object.entries(current.directionTokens).map(([term, side]) => (
-          <div key={term} className="vrs-tm-overlay__row">
-            <span>
-              {term} → {side}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Remove direction token ${term}`}
-              iconLeft={<Icon name="x" size={13} />}
-              onClick={() => removeKey('directionTokens', term)}
-            />
-          </div>
+          <OverlayRow
+            key={term}
+            label={
+              <>
+                {term} → {side}
+              </>
+            }
+            removeLabel={`Remove direction token ${term}`}
+            onRemove={() => removeKey('directionTokens', term)}
+          />
         ))}
         <div className="vrs-tm-overlay__add">
           <Input
@@ -132,16 +145,12 @@ export function OverlayManager({ overlay, onSave }) {
       <div className="vrs-tm-overlay__group">
         <div className="vrs-tm-overlay__label">Reject phrases</div>
         {current.rejectPhrases.map((value) => (
-          <div key={value} className="vrs-tm-overlay__row">
-            <span>{value}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Remove reject phrase ${value}`}
-              iconLeft={<Icon name="x" size={13} />}
-              onClick={() => removePhrase(value)}
-            />
-          </div>
+          <OverlayRow
+            key={value}
+            label={value}
+            removeLabel={`Remove reject phrase ${value}`}
+            onRemove={() => removePhrase(value)}
+          />
         ))}
         <div className="vrs-tm-overlay__add">
           <Input

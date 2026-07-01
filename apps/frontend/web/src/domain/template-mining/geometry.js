@@ -89,9 +89,7 @@ function stopLossTargetIssue(direction, stopLoss) {
     : 'Stop loss not above take profits for SHORT'
   const expected = isBuy ? 'below' : 'above'
   return {
-    code: isBuy
-      ? ISSUE.STOP_LOSS_NOT_BELOW_TARGETS
-      : ISSUE.STOP_LOSS_NOT_ABOVE_TARGETS,
+    code: isBuy ? ISSUE.STOP_LOSS_NOT_BELOW_TARGETS : ISSUE.STOP_LOSS_NOT_ABOVE_TARGETS,
     field: 'stopLoss',
     label,
     message: `${label}. Stop loss should sit ${expected} take profits for a ${sideLabel(direction)}.`,

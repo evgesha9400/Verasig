@@ -5,8 +5,7 @@
    one-directional (pattern ⊇ message) and structural: same lines, same token
    count per line, each pattern token matching its message token. */
 
-// <*> wildcard, <PLACEHOLDER>, or a structural word.
-const TOKEN = /<\*>|<[A-Z_]+>|[\p{L}\p{N}]+/gu
+import { TOKEN } from './skeletonTokens.js'
 
 // A general placeholder (key) matches the more-specific placeholders it covers.
 // One-directional: <PRICE_LIST> covers <PRICE>, but not the reverse. <RANGE> is

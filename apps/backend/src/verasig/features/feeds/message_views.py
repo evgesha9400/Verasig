@@ -3,7 +3,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from verasig.features.feeds import feed_repository
 from verasig.shared.time import format_short, format_time
 from verasig.storage.models import FeedRow, RawMessageRow
 
@@ -44,11 +43,11 @@ def read_replies_by_message_id(
     return {reply.external_message_id: reply for reply in replies}
 
 
-def read_history(session: Session, user_id: UUID, channel_id: int) -> list[dict]:
+def read_history(session: Session, channel: FeedRow) -> list[dict]:
     """Every stored message for a feed, oldest first — the full backfilled
     history, unfiltered by label or candidacy. The parser-first miner runs its
     own candidate detection, so it needs the raw history, not the labeling deck."""
-    channel = feed_repository.read_feed(session, user_id, channel_id)
+    user_id, channel_id = channel.user_id, channel.external_id
     rows = session.scalars(
         select(RawMessageRow)
         .where(

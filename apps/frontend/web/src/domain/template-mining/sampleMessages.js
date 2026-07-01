@@ -9,6 +9,16 @@ function message(date, text) {
   return { id: `sample-${sequence}`, date, sender: 'channel', text }
 }
 
+// A minimal signal family — three messages, one format — shared by mining.js
+// and rules.js unit tests that need one clean accepted family without pulling
+// in the full bundled history.
+/** @type {import('./types.js').ChatMessage[]} */
+export const SIGNAL_FAMILY = [
+  { id: 's1', date: '2026-06-01', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
+  { id: 's2', date: '2026-06-02', text: 'XAUUSD BUY NOW\nSL 2305\nTP 2330\nTP 2350' },
+  { id: 's3', date: '2026-06-03', text: 'XAUUSD BUY NOW\nSL 2300\nTP 2325\nTP 2345' }
+]
+
 /** @type {import('./types.js').ChatMessage[]} */
 export const SAMPLE_MESSAGES = [
   // Family A — XAUUSD market order, two take profits

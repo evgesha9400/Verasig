@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Checkbox, Icon, Input, Select, Tabs } from '@verasig/design-system'
+import { byCoverageThenConfidence } from '../../domain/template-mining/index.js'
 import { Pager } from './Pager.jsx'
 import {
   INTENT_LABEL,
@@ -9,6 +10,7 @@ import {
   formatTakeProfits
 } from './format.js'
 import { CandidateExample } from './CandidateExample.jsx'
+import { SignalFieldRow } from './SignalFieldRow.jsx'
 
 /* Verasig — Template Mining: full-history result review.
    Once families are accepted and their rules run over every message, this is
@@ -33,12 +35,8 @@ function firstLine(text) {
   return (text || '').split('\n')[0]
 }
 
-function candidateIssues(candidate) {
-  return candidate.parserIssues || []
-}
-
 function issueSummary(candidate) {
-  const issues = candidateIssues(candidate)
+  const issues = candidate.parserIssues || []
   if (issues.length === 0) return null
   return {
     kind: 'Price geometry issue',
@@ -46,20 +44,16 @@ function issueSummary(candidate) {
   }
 }
 
-// Two-field order shared by the parsed and ambiguous tabs: the row whose template
-// parsed the most messages in this backtest leads (most-likely template first),
-// then confidence within a template. `coverageOf` reads each row's template count.
-// Matches the family grid and compiled-rules order (all coverage-first).
-function byCoverageThenConfidence(coverageOf) {
-  return (a, b) => coverageOf(b) - coverageOf(a) || b.confidence - a.confidence
-}
+const confidenceOf = (row) => row.confidence
 
 // Each row is { key, text, template?, templateId?, haystack } — one shape so a
-// single search/filter path serves every bucket.
+// single search/filter path serves every bucket. The row whose template parsed
+// the most messages in this backtest leads (most-likely template first), then
+// confidence within a template — matches the family grid and compiled-rules order.
 function parsedRows(signals, messageById, ruleById, countByRule) {
   const coverageOf = (signal) => countByRule.get(signal.parserRuleId) || 0
   return [...signals]
-    .sort(byCoverageThenConfidence(coverageOf))
+    .sort(byCoverageThenConfidence(coverageOf, confidenceOf))
     .map((signal, index) => {
       const takeProfits = formatTakeProfits(signal.takeProfits)
       const text = [
@@ -96,7 +90,7 @@ function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
   const coverageOf = (candidate) =>
     countByRule.get(ruleByTemplateKey.get(candidate.templateKey)) || 0
   return [...candidates]
-    .sort(byCoverageThenConfidence(coverageOf))
+    .sort(byCoverageThenConfidence(coverageOf, confidenceOf))
     .map((candidate, index) => {
       const issue = issueSummary(candidate)
       const text = `${firstLine(candidate.message.text)}  ·  ${INTENT_LABEL[candidate.intent]} ${formatConfidence(candidate.confidence)}`
@@ -112,34 +106,45 @@ function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
     })
 }
 
-function rejectedRows(entries) {
-  return entries.map((entry, index) => ({
-    key: `${entry.message.id}-${index}`,
-    text: `${firstLine(entry.message.text)}  ·  ${INTENT_LABEL[entry.intent]}`,
+// The rejected/rare/miss buckets share one row shape — only how each item
+// supplies its key/summary/search text/detail text differs.
+function textRows(items, { keyOf, textOf, haystackOf, messageTextOf }) {
+  return items.map((item, index) => ({
+    key: `${keyOf(item)}-${index}`,
+    text: textOf(item),
     templateId: null,
-    haystack: `${entry.message.text} ${INTENT_LABEL[entry.intent]}`.toLowerCase(),
-    detail: { kind: 'text', messageText: entry.message.text }
+    haystack: haystackOf(item).toLowerCase(),
+    detail: { kind: 'text', messageText: messageTextOf(item) }
   }))
+}
+
+function rejectedRows(entries) {
+  return textRows(entries, {
+    keyOf: (entry) => entry.message.id,
+    textOf: (entry) =>
+      `${firstLine(entry.message.text)}  ·  ${INTENT_LABEL[entry.intent]}`,
+    haystackOf: (entry) => `${entry.message.text} ${INTENT_LABEL[entry.intent]}`,
+    messageTextOf: (entry) => entry.message.text
+  })
 }
 
 function rareRows(groups) {
-  return groups.map((group, index) => ({
-    key: `${group.templateKey}-${index}`,
-    text: `${firstLine(group.normalizedTemplate)}  ·  ${group.count} message${group.count === 1 ? '' : 's'}`,
-    templateId: null,
-    haystack: group.normalizedTemplate.toLowerCase(),
-    detail: { kind: 'text', messageText: group.normalizedTemplate }
-  }))
+  return textRows(groups, {
+    keyOf: (group) => group.templateKey,
+    textOf: (group) =>
+      `${firstLine(group.normalizedTemplate)}  ·  ${group.count} message${group.count === 1 ? '' : 's'}`,
+    haystackOf: (group) => group.normalizedTemplate,
+    messageTextOf: (group) => group.normalizedTemplate
+  })
 }
 
 function missRows(messages) {
-  return messages.map((message, index) => ({
-    key: `${message.id}-${index}`,
-    text: firstLine(message.text),
-    templateId: null,
-    haystack: (message.text || '').toLowerCase(),
-    detail: { kind: 'text', messageText: message.text }
-  }))
+  return textRows(messages, {
+    keyOf: (message) => message.id,
+    textOf: (message) => firstLine(message.text),
+    haystackOf: (message) => message.text || '',
+    messageTextOf: (message) => message.text
+  })
 }
 
 // A parsed row expands to the original message beside the structured fields;
@@ -160,42 +165,54 @@ function RowDetail({ detail }) {
       </pre>
       <table className="vrs-tm-kv">
         <tbody>
-          <tr>
-            <td>Instrument</td>
-            <td>{signal.instrument || '—'}</td>
-          </tr>
-          <tr>
-            <td>Direction</td>
-            <td>{signal.direction}</td>
-          </tr>
-          <tr>
-            <td>Entry ({signal.orderType})</td>
-            <td>{formatEntry(signal.entry)}</td>
-          </tr>
-          <tr>
-            <td>Stop loss</td>
-            <td className={signal.stopLoss == null ? 'none' : undefined}>
-              {signal.stopLoss == null ? 'none' : formatPrice(signal.stopLoss)}
-            </td>
-          </tr>
-          <tr>
-            <td>Take profits</td>
-            <td className={takeProfits ? undefined : 'none'}>
-              {takeProfits || 'none'}
-            </td>
-          </tr>
-          <tr>
-            <td>Confidence</td>
-            <td>{formatConfidence(signal.confidence)}</td>
-          </tr>
+          <SignalFieldRow
+            label="Instrument"
+            value={signal.instrument || '—'}
+            field="instrument"
+          />
+          <SignalFieldRow
+            label="Direction"
+            value={signal.direction}
+            field="direction"
+          />
+          <SignalFieldRow
+            label={`Entry (${signal.orderType})`}
+            value={formatEntry(signal.entry)}
+            field="entry"
+          />
+          <SignalFieldRow
+            label="Stop loss"
+            value={signal.stopLoss == null ? 'none' : formatPrice(signal.stopLoss)}
+            muted={signal.stopLoss == null}
+            field="stopLoss"
+          />
+          <SignalFieldRow
+            label="Take profits"
+            value={takeProfits || 'none'}
+            muted={!takeProfits}
+            field="takeProfits"
+          />
+          <SignalFieldRow
+            label="Confidence"
+            value={formatConfidence(signal.confidence)}
+            field="confidence"
+          />
           {detail.template && (
-            <tr>
-              <td>Template</td>
-              <td>{detail.template}</td>
-            </tr>
+            <SignalFieldRow label="Template" value={detail.template} field="template" />
           )}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function ReviewHead({ subtitle }) {
+  return (
+    <div className="vrs-tm-section__head">
+      <div>
+        <div className="vrs-tm-section__title">Review results</div>
+        <div className="vrs-tm-section__sub">{subtitle}</div>
+      </div>
     </div>
   )
 }
@@ -237,20 +254,32 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
     return counts
   }, [audit])
 
-  const rowsByTab = useMemo(
-    () => ({
-      parsed: parsedRows(audit.parsedSignals, messageById, ruleById, parsedCountByRule),
-      ambiguous: ambiguousRows(
+  // Tab badges only need a count per bucket, not its fully built (and sorted,
+  // formatted) rows — so they read the raw audit arrays directly.
+  const tabCounts = {
+    parsed: audit.parsedSignals.length,
+    ambiguous: audit.ambiguousCandidates.length,
+    rejected: audit.rejectedCandidates.length,
+    rare: audit.rareTemplates.length,
+    misses: audit.potentialMisses.length
+  }
+
+  // Only the active tab's rows are ever rendered, so only build that bucket.
+  const activeRows = useMemo(() => {
+    if (tab === 'parsed') {
+      return parsedRows(audit.parsedSignals, messageById, ruleById, parsedCountByRule)
+    }
+    if (tab === 'ambiguous') {
+      return ambiguousRows(
         audit.ambiguousCandidates,
         ruleByTemplateKey,
         parsedCountByRule
-      ),
-      rejected: rejectedRows(audit.rejectedCandidates),
-      rare: rareRows(audit.rareTemplates),
-      misses: missRows(audit.potentialMisses)
-    }),
-    [audit, messageById, ruleById, ruleByTemplateKey, parsedCountByRule]
-  )
+      )
+    }
+    if (tab === 'rejected') return rejectedRows(audit.rejectedCandidates)
+    if (tab === 'rare') return rareRows(audit.rareTemplates)
+    return missRows(audit.potentialMisses)
+  }, [tab, audit, messageById, ruleById, ruleByTemplateKey, parsedCountByRule])
 
   const activeTab = TABS.find((entry) => entry.id === tab)
   const templateEnabled = activeTab.templated && rules.length > 0
@@ -258,12 +287,12 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return rowsByTab[tab].filter(
+    return activeRows.filter(
       (row) =>
         (!needle || row.haystack.includes(needle)) &&
         (effectiveTemplate === 'all' || row.templateId === effectiveTemplate)
     )
-  }, [rowsByTab, tab, query, effectiveTemplate])
+  }, [activeRows, query, effectiveTemplate])
 
   // Any filter change returns the list to the first page.
   useEffect(() => {
@@ -273,14 +302,7 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
   if (!hasAccepted) {
     return (
       <section className="vrs-tm-review">
-        <div className="vrs-tm-section__head">
-          <div>
-            <div className="vrs-tm-section__title">Review results</div>
-            <div className="vrs-tm-section__sub">
-              Run the accepted rules over the full history
-            </div>
-          </div>
-        </div>
+        <ReviewHead subtitle="Run the accepted rules over the full history" />
         <div className="vrs-empty vrs-empty--sm">
           <div className="vrs-empty__note">
             Accept at least one template family to run its parser over every message and
@@ -312,19 +334,12 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
   const tabItems = TABS.map((entry) => ({
     id: entry.id,
     label: entry.label,
-    count: rowsByTab[entry.id].length
+    count: tabCounts[entry.id]
   }))
 
   return (
     <section className="vrs-tm-review">
-      <div className="vrs-tm-section__head">
-        <div>
-          <div className="vrs-tm-section__title">Review results</div>
-          <div className="vrs-tm-section__sub">
-            Search and filter every message the parser sorted
-          </div>
-        </div>
-      </div>
+      <ReviewHead subtitle="Search and filter every message the parser sorted" />
 
       <div className="vrs-tm-review__bar">
         <div className="vrs-tm-review__filters">

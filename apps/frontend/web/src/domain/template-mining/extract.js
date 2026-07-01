@@ -6,19 +6,13 @@
 
 import { normalizeMessageText } from './text.js'
 import { detectInstruments } from './instruments.js'
-import { detectDirections } from './directions.js'
+import { detectDirections, isEmojiOnlyDirection } from './directions.js'
 import { detectPrices } from './prices.js'
 import { extractSignalFields } from './fields.js'
 import { classifyIntent } from './intent.js'
 import { scoreCandidate } from './scoring.js'
 import { validatePriceGeometry } from './geometry.js'
 import { normalizeTemplate, hashString } from './template.js'
-
-const INTENT_REASON = {
-  update: 'Reads as an update to an open trade, not a new signal.',
-  result: 'Reads as a trade result, not a new signal.',
-  commentary: 'Reads as commentary, not a tradeable signal.'
-}
 
 function asMessage(message) {
   // Hash the content so two distinct same-length strings get distinct ids
@@ -28,13 +22,18 @@ function asMessage(message) {
   return message
 }
 
-function isEmojiOnlyDirection(directions) {
-  return directions.length > 0 && directions.every((entity) => entity.confidence < 0.7)
+function intentRejectionReason(intent) {
+  if (intent === 'update')
+    return 'Reads as an update to an open trade, not a new signal.'
+  if (intent === 'result') return 'Reads as a trade result, not a new signal.'
+  if (intent === 'commentary') return 'Reads as commentary, not a tradeable signal.'
+  return null
 }
 
 function collectRejectionReasons(intent, fields, directions, geometry) {
   const reasons = [...geometry.warnings]
-  if (INTENT_REASON[intent]) reasons.push(INTENT_REASON[intent])
+  const intentReason = intentRejectionReason(intent)
+  if (intentReason) reasons.push(intentReason)
   if (isEmojiOnlyDirection(directions)) {
     reasons.push('Direction is inferred from an emoji only.')
   }
@@ -67,7 +66,7 @@ export function attemptExtractSignal(input, overlay = {}) {
 
   const prices = detectPrices(clean)
   const geometry = validatePriceGeometry(fields)
-  const confidence = scoreCandidate({ message, fields, directions })
+  const confidence = scoreCandidate({ message, fields, directions, geometry })
   const rejectionReasons = collectRejectionReasons(intent, fields, directions, geometry)
 
   return {

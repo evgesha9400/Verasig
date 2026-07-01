@@ -4,6 +4,8 @@
    clock times ("08:42") and leverage ("5-10x"). Ranges are scanned first and
    their spans reserved so the two levels of a range are never re-read as singles. */
 
+import { intervalsOverlap } from './intervals.js'
+
 const NUMBER = '(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?[kKmM]?'
 // Clock times, optionally with seconds, so "08:42:15" is reserved whole and its
 // ":15" tail is not read as a price.
@@ -60,12 +62,10 @@ function blockedSpans(text) {
   return spans
 }
 
-function within(index, spans) {
-  return spans.some(([start, end]) => index >= start && index < end)
-}
-
 function overlaps(start, end, spans) {
-  return spans.some(([spanStart, spanEnd]) => start < spanEnd && spanStart < end)
+  return spans.some(([spanStart, spanEnd]) =>
+    intervalsOverlap(start, end, spanStart, spanEnd)
+  )
 }
 
 function collectRanges(text, blocked, reserved, prices) {
@@ -95,7 +95,10 @@ function collectSingles(text, blocked, reserved, prices) {
   SINGLE.lastIndex = 0
   while ((match = SINGLE.exec(text)) !== null) {
     const end = match.index + match[0].length
-    if (within(match.index, blocked) || within(match.index, reserved)) continue
+    const index = match.index
+    if (overlaps(index, index + 1, blocked) || overlaps(index, index + 1, reserved)) {
+      continue
+    }
     if (hasUnitSuffix(text, end)) continue
     prices.push({
       raw: match[0],

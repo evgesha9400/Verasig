@@ -4,13 +4,14 @@ BACKEND_DIR := apps/backend
 BACKEND_ENV_FILE := $(BACKEND_DIR)/.env
 COMPOSE := docker compose --env-file $(BACKEND_ENV_FILE)
 FRONTEND_DIR := apps/frontend
+DEV_PORTS := 8000 5173
 
 .PHONY: help doctor env \
         install install-backend install-frontend \
         check format format-check lint test build build-image \
         backend-format backend-format-check backend-lint backend-test \
         frontend-format frontend-format-check frontend-lint frontend-test frontend-build \
-        dev dev-frontend \
+        dev dev-down dev-frontend \
         db-up db-down migrate health serve \
         up down logs clean clean-all
 
@@ -85,12 +86,37 @@ build-image: env ## Build backend Docker image
 
 # Development
 
-dev: env db-up migrate ## DB in Docker; backend + frontend locally with hot reload
+dev: env ## DB in Docker; backend + frontend locally with hot reload
+	$(MAKE) --no-print-directory dev-down
+	$(MAKE) --no-print-directory db-up
+	$(MAKE) --no-print-directory migrate
 	@echo "API -> http://localhost:8000   Web -> http://localhost:5173   (Ctrl-C stops both)"
-	@trap 'kill 0' INT TERM EXIT; \
-	$(MAKE) -C $(BACKEND_DIR) serve & \
-	$(MAKE) -C $(FRONTEND_DIR) dev & \
-	wait
+	@trap 'status=$$?; $(MAKE) --no-print-directory dev-down >/dev/null 2>&1; trap - INT TERM EXIT; exit $$status' INT TERM EXIT; \
+	$(MAKE) -C $(BACKEND_DIR) serve & backend_pid=$$!; \
+	$(MAKE) -C $(FRONTEND_DIR) dev & frontend_pid=$$!; \
+	while :; do \
+		if ! kill -0 $$backend_pid 2>/dev/null; then \
+			wait $$backend_pid || status=$$?; \
+			kill $$frontend_pid 2>/dev/null || true; \
+			wait $$frontend_pid 2>/dev/null || true; \
+			exit $${status:-0}; \
+		fi; \
+		if ! kill -0 $$frontend_pid 2>/dev/null; then \
+			wait $$frontend_pid || status=$$?; \
+			kill $$backend_pid 2>/dev/null || true; \
+			wait $$backend_pid 2>/dev/null || true; \
+			exit $${status:-0}; \
+		fi; \
+		sleep 1; \
+	done
+
+dev-down: ## Stop local backend/frontend host dev processes
+	@pkill -f 'uvicorn verasig.entrypoints.api:create_app_from_env' 2>/dev/null || true
+	@pkill -f 'npm run dev --workspace verasig-web' 2>/dev/null || true
+	@for port in $(DEV_PORTS); do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null || true); \
+		if [ -n "$$pids" ]; then kill $$pids; fi; \
+	done
 
 dev-frontend: ## Start unified frontend dev server
 	$(MAKE) -C $(FRONTEND_DIR) dev
@@ -116,6 +142,7 @@ up: env ## Start DB, migrations, backend API, and frontend
 	$(COMPOSE) up --build frontend
 
 down: env ## Stop and remove local services
+	$(MAKE) --no-print-directory dev-down
 	$(COMPOSE) down
 
 logs: env ## Follow local service logs

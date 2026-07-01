@@ -66,14 +66,20 @@ export function TemplateMiningPage({
 
   const groups = result?.groups ?? []
   const statusFor = (templateKey) => decisions[templateKey] || 'unreviewed'
-  const acceptedGroups = groups.filter(
-    (group) => statusFor(group.templateKey) === 'accepted'
+  const acceptedGroups = useMemo(
+    () => groups.filter((group) => statusFor(group.templateKey) === 'accepted'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groups, decisions]
   )
 
+  const acceptedTemplateKeys = useMemo(
+    () => acceptedGroups.map((group) => group.templateKey).join('|'),
+    [acceptedGroups]
+  )
   const rules = useMemo(
     () => acceptedGroups.map((group) => compileRuleFromTemplate(group, overlay)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [acceptedGroups.map((group) => group.templateKey).join('|'), overlay]
+    [acceptedTemplateKeys, overlay]
   )
 
   const audit = useMemo(() => {

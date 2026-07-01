@@ -34,7 +34,6 @@ prototype/uploads/
 IDEAS.md
 
 # Local tool state
-.impeccable/live/
 .playwright-mcp/
 graphify-out/
 graphify-out/.graphify_python

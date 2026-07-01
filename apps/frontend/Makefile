@@ -3,7 +3,7 @@
 WEB_WORKSPACE := verasig-web
 DESIGN_SYSTEM_WORKSPACE := @verasig/design-system
 
-.PHONY: help doctor install format format-check lint test test-web \
+.PHONY: help doctor install ensure-install format format-check lint test test-web \
         test-design-system build build-web dev clean clean-all
 
 help: ## Show frontend targets
@@ -16,6 +16,10 @@ doctor: ## Verify frontend developer tools
 
 install: ## Install frontend workspace dependencies
 	npm ci
+
+ensure-install: ## Install frontend dependencies when local tools are missing
+	@command -v npm >/dev/null
+	@if [ ! -x node_modules/.bin/vite ]; then npm ci; fi
 
 format: ## Format frontend workspace files
 	npm run format
@@ -39,7 +43,7 @@ build: build-web ## Build unified frontend app
 build-web: ## Build unified frontend app
 	npm run build --workspace $(WEB_WORKSPACE)
 
-dev: ## Start unified frontend dev server
+dev: ensure-install ## Start unified frontend dev server
 	npm run dev --workspace $(WEB_WORKSPACE)
 
 clean: ## Remove safe frontend generated artifacts
