@@ -46,26 +46,20 @@ function issueSummary(candidate) {
   }
 }
 
-// Confidence, highest first. Stable, so equal-confidence rows keep their order.
-function byConfidenceDesc(a, b) {
-  return b.confidence - a.confidence
-}
-
-// Parsed signals lead with the most-covering template — the family that parsed the
-// most messages in this backtest — then by confidence within a family. This is the
-// visible "apply the most-likely template first", matching the family grid and the
-// compiled-rules order (all coverage-first).
-function byCoverageThenConfidence(countByRule) {
-  return (a, b) =>
-    (countByRule.get(b.parserRuleId) || 0) - (countByRule.get(a.parserRuleId) || 0) ||
-    b.confidence - a.confidence
+// Two-field order shared by the parsed and ambiguous tabs: the row whose template
+// parsed the most messages in this backtest leads (most-likely template first),
+// then confidence within a template. `coverageOf` reads each row's template count.
+// Matches the family grid and compiled-rules order (all coverage-first).
+function byCoverageThenConfidence(coverageOf) {
+  return (a, b) => coverageOf(b) - coverageOf(a) || b.confidence - a.confidence
 }
 
 // Each row is { key, text, template?, templateId?, haystack } — one shape so a
 // single search/filter path serves every bucket.
 function parsedRows(signals, messageById, ruleById, countByRule) {
+  const coverageOf = (signal) => countByRule.get(signal.parserRuleId) || 0
   return [...signals]
-    .sort(byCoverageThenConfidence(countByRule))
+    .sort(byCoverageThenConfidence(coverageOf))
     .map((signal, index) => {
       const takeProfits = formatTakeProfits(signal.takeProfits)
       const text = [
@@ -98,20 +92,24 @@ function parsedRows(signals, messageById, ruleById, countByRule) {
     })
 }
 
-function ambiguousRows(candidates, ruleByTemplateKey) {
-  return [...candidates].sort(byConfidenceDesc).map((candidate, index) => {
-    const issue = issueSummary(candidate)
-    const text = `${firstLine(candidate.message.text)}  ·  ${INTENT_LABEL[candidate.intent]} ${formatConfidence(candidate.confidence)}`
-    return {
-      key: `${candidate.message.id}-${index}`,
-      text,
-      issue,
-      templateId: ruleByTemplateKey.get(candidate.templateKey),
-      haystack:
-        `${candidate.message.text} ${INTENT_LABEL[candidate.intent]} ${issue?.kind || ''} ${issue?.label || ''}`.toLowerCase(),
-      detail: { kind: 'candidate', candidate }
-    }
-  })
+function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
+  const coverageOf = (candidate) =>
+    countByRule.get(ruleByTemplateKey.get(candidate.templateKey)) || 0
+  return [...candidates]
+    .sort(byCoverageThenConfidence(coverageOf))
+    .map((candidate, index) => {
+      const issue = issueSummary(candidate)
+      const text = `${firstLine(candidate.message.text)}  ·  ${INTENT_LABEL[candidate.intent]} ${formatConfidence(candidate.confidence)}`
+      return {
+        key: `${candidate.message.id}-${index}`,
+        text,
+        issue,
+        templateId: ruleByTemplateKey.get(candidate.templateKey),
+        haystack:
+          `${candidate.message.text} ${INTENT_LABEL[candidate.intent]} ${issue?.kind || ''} ${issue?.label || ''}`.toLowerCase(),
+        detail: { kind: 'candidate', candidate }
+      }
+    })
 }
 
 function rejectedRows(entries) {
@@ -242,7 +240,11 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
   const rowsByTab = useMemo(
     () => ({
       parsed: parsedRows(audit.parsedSignals, messageById, ruleById, parsedCountByRule),
-      ambiguous: ambiguousRows(audit.ambiguousCandidates, ruleByTemplateKey),
+      ambiguous: ambiguousRows(
+        audit.ambiguousCandidates,
+        ruleByTemplateKey,
+        parsedCountByRule
+      ),
       rejected: rejectedRows(audit.rejectedCandidates),
       rare: rareRows(audit.rareTemplates),
       misses: missRows(audit.potentialMisses)

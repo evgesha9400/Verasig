@@ -291,6 +291,63 @@ describe('AuditReview', () => {
     expect(smallFamily).toBe(2)
   })
 
+  it('orders ambiguous rows by template coverage, then confidence', async () => {
+    // Same two-field order as the parsed tab: the candidate whose template parsed
+    // more messages leads, even when a smaller-template candidate is more confident.
+    const user = userEvent.setup()
+    const parsed = (id, ruleId) => ({
+      sourceMessageIds: [id],
+      instrument: 'X',
+      direction: 'BUY',
+      orderType: 'limit',
+      entry: null,
+      stopLoss: null,
+      takeProfits: [],
+      confidence: 0.8,
+      parserRuleId: ruleId,
+      intent: 'new_signal',
+      match: 'exact'
+    })
+    const candidate = (id, text, templateKey, confidence) => ({
+      message: { id, text },
+      intent: 'new_signal',
+      confidence,
+      templateKey,
+      fields: {},
+      rejectionReasons: [],
+      parserIssues: []
+    })
+    const audit = {
+      // rule_big parsed 2, rule_small parsed 1 → rule_big has more coverage.
+      parsedSignals: [
+        parsed('p1', 'rule_big'),
+        parsed('p2', 'rule_big'),
+        parsed('p3', 'rule_small')
+      ],
+      ambiguousCandidates: [
+        candidate('c1', 'small template high confidence', 'tpl_small', 0.99),
+        candidate('c2', 'big template low confidence', 'tpl_big', 0.5)
+      ],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const rules = [
+      { id: 'rule_big', name: 'Big', templateKey: 'tpl_big' },
+      { id: 'rule_small', name: 'Small', templateKey: 'tpl_small' }
+    ]
+    const { container } = render(
+      <AuditReview audit={audit} messages={[]} rules={rules} hasAccepted={true} />
+    )
+    await user.click(screen.getByRole('tab', { name: /Ambiguous/i }))
+    const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
+      (node) => node.textContent
+    )
+    const big = texts.findIndex((text) => /big template/.test(text))
+    const small = texts.findIndex((text) => /small template/.test(text))
+    expect(big).toBeLessThan(small)
+  })
+
   it('badges a fallback-captured parsed row, but not an exact one', () => {
     const signal = (id, instrument, confidence, match) => ({
       sourceMessageIds: [id],
