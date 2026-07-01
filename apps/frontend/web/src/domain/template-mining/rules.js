@@ -9,7 +9,7 @@ import { hasTradingLabel } from './fields.js'
 import { escapeRegExp } from './text.js'
 import { analyzeMessage, attemptExtractSignal } from './extract.js'
 import { hasStopLoss, hasTakeProfits } from './intent.js'
-import { mineTemplateGroups } from './mining.js'
+import { mineTemplateGroups, byCoverageThenConfidence } from './mining.js'
 import { templateSpecificity } from './specificity.js'
 import { patternSubsumes } from './subsumption.js'
 import { weakMemo } from './weakMemo.js'
@@ -118,11 +118,15 @@ export function compileRuleFromTemplate(group, overlay = {}) {
 
 // Specificity ↓ → confidence ↓ → coverage ↓ → templateKey (stable). Specificity
 // leads so a broad pattern never outranks a specific one regardless of coverage.
+const byConfidenceThenCoverage = byCoverageThenConfidence(
+  (rule) => rule.confidenceAvg ?? 0,
+  (rule) => rule.coverage ?? 0
+)
+
 function byPrecedence(a, b) {
   return (
     (b.specificity ?? 0) - (a.specificity ?? 0) ||
-    (b.confidenceAvg ?? 0) - (a.confidenceAvg ?? 0) ||
-    (b.coverage ?? 0) - (a.coverage ?? 0) ||
+    byConfidenceThenCoverage(a, b) ||
     (a.templateKey < b.templateKey ? -1 : a.templateKey > b.templateKey ? 1 : 0)
   )
 }

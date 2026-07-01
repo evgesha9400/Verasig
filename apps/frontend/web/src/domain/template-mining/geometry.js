@@ -52,6 +52,10 @@ function entryRelationLabel(subject, direction, relation, expectedSide) {
   return `${subject} ${oppositeSide(expectedSide)} entry for ${sideLabel(direction)}`
 }
 
+function sideRequirementMessage(label, subject, expectedSide, direction, reference) {
+  return `${label}. ${subject} should sit ${expectedSide} ${reference} for a ${sideLabel(direction)}.`
+}
+
 function entryIssue(code, field, subject, direction, bounds, value, expectedSide) {
   const label = entryRelationLabel(
     subject,
@@ -63,7 +67,7 @@ function entryIssue(code, field, subject, direction, bounds, value, expectedSide
     code,
     field,
     label,
-    message: `${label}. ${subject} should sit ${expectedSide} entry for a ${sideLabel(direction)}.`,
+    message: sideRequirementMessage(label, subject, expectedSide, direction, 'entry'),
     price: value
   }
 }
@@ -104,7 +108,7 @@ function stopLossTargetIssue(direction, stopLoss) {
     code: isBuy ? ISSUE.STOP_LOSS_NOT_BELOW_TARGETS : ISSUE.STOP_LOSS_NOT_ABOVE_TARGETS,
     field: 'stopLoss',
     label,
-    message: `${label}. Stop loss should sit ${expected} take profits for a ${sideLabel(direction)}.`,
+    message: sideRequirementMessage(label, 'Stop loss', expected, direction, 'take profits'),
     price: stopLoss
   }
 }

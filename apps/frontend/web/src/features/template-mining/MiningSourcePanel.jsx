@@ -30,20 +30,23 @@ function sourceHint(
   return `${pastedCount} message${pastedCount === 1 ? '' : 's'} detected — separate each with a blank line`
 }
 
-export function MiningSourcePanel(props) {
-  const {
-    source,
-    onSourceChange,
-    pasted,
-    onPastedChange,
-    feeds,
-    feedId,
-    onFeedChange,
-    running,
-    canRun,
-    onRun
-  } = props
-
+export function MiningSourcePanel({
+  source,
+  onSourceChange,
+  pasted,
+  onPastedChange,
+  feeds,
+  feedId,
+  onFeedChange,
+  running,
+  canRun,
+  onRun,
+  authenticated,
+  selectedFeedName,
+  demoFeedCount,
+  sampleCount,
+  pastedCount
+}) {
   return (
     <Card title="Source" subtitle="Choose what to mine, then run the parser-first pass">
       <div className="vrs-tm-source">
@@ -62,7 +65,15 @@ export function MiningSourcePanel(props) {
               options={feeds.map((feed) => ({ value: feed.id, label: feed.name }))}
             />
           )}
-          <span className="vrs-tm-source__hint">{sourceHint(source, props)}</span>
+          <span className="vrs-tm-source__hint">
+            {sourceHint(source, {
+              authenticated,
+              selectedFeedName,
+              demoFeedCount,
+              sampleCount,
+              pastedCount
+            })}
+          </span>
         </div>
 
         {source === 'paste' && (

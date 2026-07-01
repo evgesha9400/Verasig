@@ -15,32 +15,31 @@ function issueFields(candidate) {
   return new Set((candidate.parserIssues || []).map((issue) => issue.field))
 }
 
-function IssueList({ candidate }) {
-  if ((candidate.parserIssues || []).length > 0) {
-    return (
-      <div className="vrs-tm-issues">
-        {candidate.parserIssues.map((issue) => (
-          <span
-            key={`${issue.code}-${issue.field}-${issue.price ?? issue.label}`}
-            className="vrs-tm-warn"
-          >
-            <Icon name="alert" size={12} />
-            <span>
-              <strong>{issue.label}</strong>
-              <span className="vrs-tm-warn__msg">{issue.message}</span>
-            </span>
-          </span>
-        ))}
-      </div>
-    )
+function issueWarnings(candidate) {
+  const parserIssues = candidate.parserIssues || []
+  if (parserIssues.length > 0) {
+    return parserIssues.map((issue) => ({
+      key: `${issue.code}-${issue.field}-${issue.price ?? issue.label}`,
+      content: (
+        <span>
+          <strong>{issue.label}</strong>
+          <span className="vrs-tm-warn__msg">{issue.message}</span>
+        </span>
+      )
+    }))
   }
-  if (candidate.rejectionReasons.length === 0) return null
+  return candidate.rejectionReasons.map((reason) => ({ key: reason, content: reason }))
+}
+
+function IssueList({ candidate }) {
+  const warnings = issueWarnings(candidate)
+  if (warnings.length === 0) return null
   return (
     <div className="vrs-tm-issues">
-      {candidate.rejectionReasons.map((reason) => (
-        <span key={reason} className="vrs-tm-warn">
+      {warnings.map(({ key, content }) => (
+        <span key={key} className="vrs-tm-warn">
           <Icon name="alert" size={12} />
-          {reason}
+          {content}
         </span>
       ))}
     </div>
@@ -82,12 +81,8 @@ export function CandidateExample({ candidate }) {
             />
             <SignalFieldRow
               label="Stop loss"
-              value={
-                fields.stopLoss !== null && fields.stopLoss !== undefined
-                  ? formatPrice(fields.stopLoss)
-                  : 'none'
-              }
-              muted={fields.stopLoss === null || fields.stopLoss === undefined}
+              value={fields.stopLoss == null ? 'none' : formatPrice(fields.stopLoss)}
+              muted={fields.stopLoss == null}
               field="stopLoss"
               warning={fieldsWithIssues.has('stopLoss')}
             />

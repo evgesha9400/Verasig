@@ -35,28 +35,31 @@ function candidateDirections(candidate, text) {
   return candidate.directions ?? detectDirections(text)
 }
 
-function hasStructuredPrices(fields) {
-  return Boolean(
-    fields.entry || fields.stopLoss !== null || (fields.takeProfits?.length ?? 0) > 0
-  )
+function candidateNormalized(candidate, text) {
+  return candidate.lower !== undefined
+    ? { lower: candidate.lower, lines: candidate.lines }
+    : normalizeMessageText(text)
 }
 
-function positiveScore(fields, lower, lineCount) {
+function hasStructuredPrices(fields) {
+  return Boolean(fields.entry || hasStopLoss(fields) || hasTakeProfits(fields))
+}
+
+function positiveScore(fields, lower, hasMarket, lineCount) {
   let score = 0
   if (fields.instrument) score += 3
   if (fields.direction) score += 3
   if (fields.entry) score += 2
-  if (/\b(now|cmp|market)\b/.test(lower)) score += 1
+  if (hasMarket) score += 1
   if (hasStopLoss(fields)) score += 2
   if (hasTakeProfits(fields)) score += 2
   if (lineCount <= 6 && fields.direction && hasStructuredPrices(fields)) score += 1
   return score
 }
 
-function negativeScore(fields, lower, directions) {
+function negativeScore(fields, lower, hasMarket, directions) {
   let score = 0
   for (const rule of NEGATIVE_RULES) if (rule.test(lower)) score += rule.penalty
-  const hasMarket = /\b(now|cmp|market)\b/.test(lower)
   if (!hasStructuredPrices(fields) && !hasMarket) score -= 1
   if (isEmojiOnlyDirection(directions)) score -= 1
   return score
@@ -73,13 +76,14 @@ function clamp01(value) {
 export function scoreCandidate(candidate) {
   const text = candidateText(candidate)
   const fields = candidate.fields || {}
-  const { lower, lines } = normalizeMessageText(text)
+  const { lower, lines } = candidateNormalized(candidate, text)
   const directions = candidateDirections(candidate, text)
   const geometry = candidate.geometry ?? validatePriceGeometry(fields)
+  const hasMarket = /\b(now|cmp|market)\b/.test(lower)
 
   const raw =
-    positiveScore(fields, lower, lines.length) +
-    negativeScore(fields, lower, directions) +
+    positiveScore(fields, lower, hasMarket, lines.length) +
+    negativeScore(fields, lower, hasMarket, directions) +
     geometry.scoreAdjustment
 
   return clamp01(raw / NORMALIZER)

@@ -173,32 +173,23 @@ function aliasRulesWith(overlay) {
   })
 }
 
-function collectCryptoPairHits(text, hits) {
-  let match
-  CRYPTO_PAIR.lastIndex = 0
-  while ((match = CRYPTO_PAIR.exec(text)) !== null) {
-    const base = match[1].toUpperCase()
-    const quote = match[2].toUpperCase()
-    // A fiat base, a numbers-only base, or base === quote is not a real pair.
-    if (base === quote || CURRENCY_CODES.has(base) || !HAS_LETTER.test(base)) continue
-    hits.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      normalized: `${base}${quote}`,
-      raw: match[0],
-      confidence: PAIR_CONFIDENCE
-    })
-  }
+// A fiat base, a numbers-only base, or base === quote is not a real crypto pair.
+function isValidCryptoPair(base, quote) {
+  return base !== quote && !CURRENCY_CODES.has(base) && HAS_LETTER.test(base)
 }
 
-function collectForexPairHits(text, hits) {
+// Both sides must be known currency codes and distinct — USDUSD is not a pair.
+function isValidForexPair(base, quote) {
+  return CURRENCY_CODES.has(base) && CURRENCY_CODES.has(quote) && base !== quote
+}
+
+function collectPairHits(regex, text, hits, isValidPair) {
   let match
-  FOREX_PAIR.lastIndex = 0
-  while ((match = FOREX_PAIR.exec(text)) !== null) {
+  regex.lastIndex = 0
+  while ((match = regex.exec(text)) !== null) {
     const base = match[1].toUpperCase()
     const quote = match[2].toUpperCase()
-    if (!CURRENCY_CODES.has(base) || !CURRENCY_CODES.has(quote)) continue
-    if (base === quote) continue // USDUSD is not a pair
+    if (!isValidPair(base, quote)) continue
     hits.push({
       start: match.index,
       end: match.index + match[0].length,
@@ -265,8 +256,8 @@ export function detectInstruments(text, overlay = {}) {
   const hits = []
   collectAliasHits(text, hits, aliasRulesWith(overlay))
   collectCoinLabelHits(text, hits)
-  collectCryptoPairHits(text, hits)
-  collectForexPairHits(text, hits)
+  collectPairHits(CRYPTO_PAIR, text, hits, isValidCryptoPair)
+  collectPairHits(FOREX_PAIR, text, hits, isValidForexPair)
   collectBareTickerHits(text, hits)
   return dedupeHits(hits).map((hit) => ({
     raw: hit.raw,

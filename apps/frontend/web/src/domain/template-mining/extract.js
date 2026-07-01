@@ -66,7 +66,7 @@ function cached(cache, message, overlay, compute) {
 
 function computeAnalysis(message, overlay) {
   const normalized = normalizeMessageText(message.text)
-  const { clean, lower } = normalized
+  const { clean, lower, lines } = normalized
   const instruments = detectInstruments(clean, overlay)
   const directions = detectDirections(clean, overlay)
   const fields = extractSignalFields(message, overlay, {
@@ -75,7 +75,7 @@ function computeAnalysis(message, overlay) {
     normalized
   })
   const intent = classifyIntent(message.text, fields)
-  return { clean, lower, instruments, directions, fields, intent }
+  return { clean, lower, lines, instruments, directions, fields, intent }
 }
 
 /**
@@ -84,7 +84,7 @@ function computeAnalysis(message, overlay) {
  * detection) is built from.
  * @param {import('./types.js').ChatMessage} message
  * @param {object} [overlay={}]
- * @returns {{clean: string, lower: string, instruments: import('./types.js').DetectedEntity[], directions: import('./types.js').DetectedEntity[], fields: object, intent: import('./types.js').SignalIntent}}
+ * @returns {{clean: string, lower: string, lines: string[], instruments: import('./types.js').DetectedEntity[], directions: import('./types.js').DetectedEntity[], fields: object, intent: import('./types.js').SignalIntent}}
  */
 export function analyzeMessage(message, overlay = {}) {
   return cached(analysisCache, message, overlay, computeAnalysis)
@@ -101,7 +101,7 @@ export function attemptExtractSignal(input, overlay = {}) {
 }
 
 function computeCandidate(message, overlay) {
-  const { clean, instruments, directions, fields, intent } = analyzeMessage(
+  const { clean, lower, lines, instruments, directions, fields, intent } = analyzeMessage(
     message,
     overlay
   )
@@ -122,7 +122,7 @@ function computeCandidate(message, overlay) {
   if (!normalizedTemplate.trim()) return null
 
   const geometry = validatePriceGeometry(fields)
-  const confidence = scoreCandidate({ message, fields, directions, geometry })
+  const confidence = scoreCandidate({ message, fields, directions, geometry, lower, lines })
   const rejectionReasons = collectRejectionReasons(intent, fields, directions, geometry)
 
   return {

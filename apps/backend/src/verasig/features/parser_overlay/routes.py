@@ -27,4 +27,4 @@ def put_overlay(
     with request.app.state.session_factory() as session:
         upsert_overlay(session, user.id, config)
         session.commit()
-    return ParserOverlayBody(overlay=ParserOverlayData(**config))
+    return payload
