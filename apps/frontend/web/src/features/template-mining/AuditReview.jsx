@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Checkbox, Icon, Input, Select, Tabs } from '@verasig/design-system'
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Icon,
+  Input,
+  Select,
+  Tabs
+} from '@verasig/design-system'
 import { byCoverageThenConfidence } from '../../domain/template-mining/index.js'
 import { Pager } from './Pager.jsx'
 import {
@@ -207,18 +215,26 @@ function RowDetail({ detail }) {
   )
 }
 
-function ReviewHead({ subtitle }) {
+function ReviewHead({ subtitle, actions }) {
   return (
     <div className="vrs-tm-section__head">
       <div>
         <div className="vrs-tm-section__title">Review results</div>
         <div className="vrs-tm-section__sub">{subtitle}</div>
       </div>
+      {actions && <div className="vrs-tm-bulk">{actions}</div>}
     </div>
   )
 }
 
-export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
+export function AuditReview({
+  audit,
+  messages = [],
+  rules = [],
+  hasAccepted,
+  onFinish,
+  onKeepVerified
+}) {
   const [tab, setTab] = useState('parsed')
   const [query, setQuery] = useState('')
   const [templateId, setTemplateId] = useState('all')
@@ -335,7 +351,21 @@ export function AuditReview({ audit, messages = [], rules = [], hasAccepted }) {
 
   return (
     <section className="vrs-tm-review">
-      <ReviewHead subtitle="Search and filter every message the parser sorted" />
+      <ReviewHead
+        subtitle="Search and filter every message the parser sorted"
+        actions={
+          <>
+            {onKeepVerified && (
+              <Button variant="primary" size="sm" onClick={onKeepVerified}>
+                Keep verified
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" onClick={onFinish}>
+              Confirm &amp; route to Exchange
+            </Button>
+          </>
+        }
+      />
 
       <div className="vrs-tm-review__bar">
         <div className="vrs-tm-review__filters">

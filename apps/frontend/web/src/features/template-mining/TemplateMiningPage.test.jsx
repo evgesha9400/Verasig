@@ -110,6 +110,9 @@ describe('TemplateMiningPage', () => {
     )
     await user.click(screen.getByRole('button', { name: /Run template mining/i }))
     expect(await screen.findByText('Messages scanned')).toBeTruthy()
+    // The extraction table (where APTUSDT would render) is behind the card's
+    // expand toggle; open it before checking the overlay reached the detectors.
+    await user.click(await screen.findByRole('button', { name: /Show all/i }))
     // APTUSDT only appears if the overlay reached the detectors.
     expect(await screen.findAllByText(/APTUSDT/)).toBeTruthy()
   })

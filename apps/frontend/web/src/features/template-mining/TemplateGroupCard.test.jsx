@@ -158,3 +158,26 @@ describe('TemplateGroupCard message list', () => {
     expect(status.textContent).toMatch(/1\s*[–-]\s*5 of 7/)
   })
 })
+
+describe('TemplateGroupCard decluttering', () => {
+  function groupWithWarnings(messageCount) {
+    const group = makeGroup(messageCount)
+    return { ...group, geometryWarnings: 2 }
+  }
+
+  it('hides the intent bar, geometry warning, and extraction table when collapsed', () => {
+    const { container } = renderCard(groupWithWarnings(7), { expanded: false })
+    expect(container.querySelector('.vrs-tm-legend')).toBeNull()
+    expect(screen.queryByText(/suspicious stop\/target geometry/i)).toBeNull()
+    expect(screen.queryByText('Instrument')).toBeNull()
+  })
+
+  it('shows the intent bar, geometry warning, and extraction table when expanded', () => {
+    const { container } = renderCard(groupWithWarnings(7), { expanded: true })
+    expect(container.querySelector('.vrs-tm-legend')).toBeTruthy()
+    expect(screen.getByText(/suspicious stop\/target geometry/i)).toBeTruthy()
+    // The representative ExtractionSummary table plus one row per paginated
+    // CandidateExample both carry an "Instrument" label — assert at least one exists.
+    expect(screen.getAllByText('Instrument').length).toBeGreaterThan(0)
+  })
+})

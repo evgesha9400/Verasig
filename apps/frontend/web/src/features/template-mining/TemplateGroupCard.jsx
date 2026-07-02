@@ -181,17 +181,6 @@ export function TemplateGroupCard({
         </div>
       </div>
 
-      <IntentBar distribution={group.intentDistribution} count={group.count} />
-
-      {group.geometryWarnings > 0 && (
-        <span className="vrs-tm-warn">
-          <Icon name="alert" size={12} />
-          {group.geometryWarnings} of {group.count} have suspicious stop/target geometry
-        </span>
-      )}
-
-      <ExtractionSummary candidate={representative} />
-
       <div className="vrs-tm-actions">
         <Button
           variant={status === 'accepted' ? 'secondary' : 'primary'}
@@ -229,6 +218,18 @@ export function TemplateGroupCard({
 
       {expanded && (
         <div className="vrs-tm-ex">
+          <IntentBar distribution={group.intentDistribution} count={group.count} />
+
+          {group.geometryWarnings > 0 && (
+            <span className="vrs-tm-warn">
+              <Icon name="alert" size={12} />
+              {group.geometryWarnings} of {group.count} have suspicious stop/target
+              geometry
+            </span>
+          )}
+
+          <ExtractionSummary candidate={representative} />
+
           {pageItems.map((candidate) => (
             <CandidateExample key={candidate.message.id} candidate={candidate} />
           ))}

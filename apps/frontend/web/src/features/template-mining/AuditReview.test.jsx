@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuditReview } from './AuditReview.jsx'
@@ -80,9 +80,15 @@ const AUDIT = {
   potentialMisses: [{ id: 'p1', text: 'chart review for LTC' }]
 }
 
-function renderReview() {
+function renderReview(extraProps = {}) {
   return render(
-    <AuditReview audit={AUDIT} messages={MESSAGES} rules={RULES} hasAccepted={true} />
+    <AuditReview
+      audit={AUDIT}
+      messages={MESSAGES}
+      rules={RULES}
+      hasAccepted={true}
+      {...extraProps}
+    />
   )
 }
 
@@ -386,5 +392,55 @@ describe('AuditReview', () => {
     render(<AuditReview audit={AUDIT} messages={[]} rules={[]} hasAccepted={false} />)
     expect(screen.getByText(/Accept at least one template family/i)).toBeTruthy()
     expect(screen.queryByRole('tab', { name: /Parsed/i })).toBeNull()
+  })
+
+  it('renders no gate buttons in the empty state, even when handlers are passed', () => {
+    render(
+      <AuditReview
+        audit={AUDIT}
+        messages={[]}
+        rules={[]}
+        hasAccepted={false}
+        onFinish={vi.fn()}
+        onKeepVerified={vi.fn()}
+      />
+    )
+    expect(
+      screen.queryByRole('button', { name: /Confirm & route to Exchange/i })
+    ).toBeNull()
+    expect(screen.queryByRole('button', { name: /Keep verified/i })).toBeNull()
+  })
+
+  it('always renders "Confirm & route to Exchange" once accepted, and calls onFinish', async () => {
+    const user = userEvent.setup()
+    const onFinish = vi.fn()
+    renderReview({ onFinish })
+    await user.click(
+      screen.getByRole('button', { name: /Confirm & route to Exchange/i })
+    )
+    expect(onFinish).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders "Keep verified" only when onKeepVerified is provided, and calls it', async () => {
+    const user = userEvent.setup()
+    const onKeepVerified = vi.fn()
+    renderReview({ onKeepVerified })
+    const keepButton = screen.getByRole('button', { name: /Keep verified/i })
+    await user.click(keepButton)
+    expect(onKeepVerified).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits "Keep verified" when onKeepVerified is not provided', () => {
+    renderReview()
+    expect(screen.queryByRole('button', { name: /Keep verified/i })).toBeNull()
+  })
+
+  it('renders no errors when neither onFinish nor onKeepVerified is passed', async () => {
+    const user = userEvent.setup()
+    renderReview()
+    await user.click(
+      screen.getByRole('button', { name: /Confirm & route to Exchange/i })
+    )
+    expect(screen.queryByRole('button', { name: /Keep verified/i })).toBeNull()
   })
 })
