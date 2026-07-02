@@ -140,17 +140,44 @@ describe('useWorkflowState', () => {
     expect(workflow.toast.msg).toContain('Verification is still saved')
   })
 
-  it('sends reviewed feeds to Label only when Review labels is chosen', () => {
+  it('reopens reviewed feeds in Mining when Review templates is chosen', () => {
     const getWorkflow = renderWorkflow()
     const feed = { ...reviewedFeed, status: 'analyzed' }
 
     act(() => getWorkflow().upsertFeed(feed))
-    act(() => getWorkflow().reviewLabels(feed))
+    act(() => getWorkflow().reopenMining(feed))
 
     const workflow = getWorkflow()
 
     expect(workflow.activeFeedId).toBe(feed.id)
-    expect(workflow.screen).toBe('label')
+    expect(workflow.screen).toBe('mining')
+  })
+
+  it('confirms stepping back to Mining only from a later pipeline step', () => {
+    const getWorkflow = renderWorkflow()
+
+    // From a step positioned after Mining (Exchange), stepping back to Mining
+    // opens the confirmation dialog rather than jumping straight back.
+    act(() => getWorkflow().setScreen('exchange'))
+    act(() => getWorkflow().requestStepBack('mining'))
+
+    let workflow = getWorkflow()
+    expect(workflow.backTarget).toBe('mining')
+    expect(workflow.screen).toBe('exchange')
+
+    act(() => getWorkflow().confirmStepBack())
+    workflow = getWorkflow()
+    expect(workflow.backTarget).toBe(null)
+    expect(workflow.screen).toBe('mining')
+    expect(workflow.toast.title).toBe('Back to Mining')
+
+    // From a step at or before Mining, stepping back navigates with no dialog.
+    act(() => getWorkflow().setScreen('mining'))
+    act(() => getWorkflow().requestStepBack('backfill'))
+
+    workflow = getWorkflow()
+    expect(workflow.backTarget).toBe(null)
+    expect(workflow.screen).toBe('backfill')
   })
 
   it('keeps reviewed local status when a refreshed feed briefly returns backfilled', () => {

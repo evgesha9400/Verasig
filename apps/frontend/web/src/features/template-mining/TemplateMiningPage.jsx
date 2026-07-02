@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@verasig/design-system'
 import {
   SAMPLE_MESSAGES,
@@ -8,7 +8,6 @@ import {
   compileRuleFromTemplate,
   applyAcceptedRules
 } from '../../domain/template-mining/index.js'
-import { MiningPipelineRibbon } from './MiningPipelineRibbon.jsx'
 import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
@@ -19,10 +18,18 @@ import { formatPercent } from './format.js'
 import { toggleInSet } from './toggleSet.js'
 import './templateMining.css'
 
-/* Verasig — Parser-first Template Mining (prototype page).
-   Orchestrates the deterministic, local pipeline: load history → mine families →
-   review format families → compile rules → audit the full history. All business
-   logic lives in domain/template-mining; this component only holds UI state. */
+/* Verasig — Parser-first Template Mining (pipeline wizard step).
+   Runs the deterministic, local pipeline against the active feed on entry: load
+   history → mine families → review format families → compile rules → audit the
+   full history. All business logic lives in domain/template-mining; this
+   component only holds UI state. Rules and audit recompute reactively from the
+   decisions state, so revisiting the step is safe with no remount. */
+
+const STAGES = [
+  { id: 'mine', label: 'Mine' },
+  { id: 'review', label: 'Review' },
+  { id: 'confirm', label: 'Confirm' }
+]
 
 function parsePasted(text) {
   return text
@@ -40,25 +47,41 @@ function resolveStaticMessages(source, pasted) {
   return []
 }
 
+function StageIndicator({ activeId }) {
+  const activeIndex = STAGES.findIndex((stage) => stage.id === activeId)
+  return (
+    <div className="vrs-tm-stages">
+      {STAGES.map((stage, index) => (
+        <span
+          key={stage.id}
+          className={`vrs-tm-stage ${index === activeIndex ? 'is-active' : ''} ${
+            index < activeIndex ? 'is-done' : ''
+          }`}
+        >
+          {stage.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export function TemplateMiningPage({
-  feeds = [],
+  activeFeed,
   authToken,
   onListMessages,
   fireToast,
   overlay = {},
-  onSaveOverlay
+  onSaveOverlay,
+  onFinish,
+  onKeepVerified
 }) {
-  const [source, setSource] = useState('feed')
+  const [source, setSource] = useState('sample')
   const [pasted, setPasted] = useState('')
-  const [feedId, setFeedId] = useState(null)
   const [result, setResult] = useState(null) // { groups, messages }
   const [decisions, setDecisions] = useState({}) // templateKey -> 'accepted' | 'rejected'
   const [expanded, setExpanded] = useState(() => new Set())
-  const [running, setRunning] = useState(false)
+  const [running, setRunning] = useState(true)
 
-  const effectiveFeedId = feedId ?? feeds[0]?.id ?? null
-  const selectedFeed =
-    feeds.find((feed) => feed.id === effectiveFeedId) || feeds[0] || null
   const messages = useMemo(
     () => resolveStaticMessages(source, pasted),
     [source, pasted]
@@ -126,36 +149,53 @@ export function TemplateMiningPage({
     )
   }
 
-  // The feed source loads the full backfilled history for the connected feed
-  // (GET /feeds/{id}/messages/history — every message, unlike the bounded deck
-  // the Label step reads); offline it falls back to the bundled demo history
-  // so the prototype still runs.
-  async function runFeedMining() {
-    const useBackend = Boolean(authToken && onListMessages && effectiveFeedId)
-    if (!useBackend) {
-      finishMining(FEED_MESSAGES)
-      return
-    }
-    setRunning(true)
-    try {
-      const response = await onListMessages(effectiveFeedId)
-      finishMining(toChatMessages(response.messages || []))
-    } catch (error) {
-      fireToast?.(
-        'rejected',
-        'Could not load feed messages',
-        error?.message || 'Try again in a moment.'
-      )
-    } finally {
-      setRunning(false)
-    }
-  }
+  // The auto-run effect reads mining callbacks through a ref so a parent
+  // re-render handing down fresh closures never restarts it (and never re-mines,
+  // which would drop the reviewer's decisions).
+  const runRef = useRef({ finishMining, fireToast, onListMessages, authToken })
+  runRef.current = { finishMining, fireToast, onListMessages, authToken }
 
-  function runMining() {
-    if (source === 'feed') {
-      void runFeedMining()
-      return
+  // The feed source loads the full backfilled history for the connected feed
+  // (GET /feeds/{id}/messages/history — every message); offline it falls back to
+  // the bundled demo history so the prototype still runs. Auto-runs on entry and
+  // whenever the active feed changes — no button click in the primary path.
+  useEffect(() => {
+    const feedId = activeFeed?.id ?? null
+    const { finishMining: mine, fireToast: toast, onListMessages: list, authToken: token } =
+      runRef.current
+
+    if (!(token && list && feedId)) {
+      setRunning(true)
+      mine(FEED_MESSAGES)
+      setRunning(false)
+      return undefined
     }
+
+    let active = true
+    setRunning(true)
+    Promise.resolve(list(feedId))
+      .then((response) => {
+        if (active) mine(toChatMessages(response.messages || []))
+      })
+      .catch((error) => {
+        if (active)
+          toast?.(
+            'rejected',
+            'Could not load feed messages',
+            error?.message || 'Try again in a moment.'
+          )
+      })
+      .finally(() => {
+        if (active) setRunning(false)
+      })
+    return () => {
+      active = false
+    }
+    // Keyed on the active feed only; callbacks are read through runRef so an
+    // overlay or callback identity change never re-mines and drops decisions.
+  }, [activeFeed?.id])
+
+  function runStaticMining() {
     finishMining(messages)
   }
 
@@ -184,49 +224,42 @@ export function TemplateMiningPage({
     setExpanded((current) => toggleInSet(current, templateKey))
   }
 
-  const activeStage = !result
-    ? 'messages'
-    : acceptedGroups.length > 0
-      ? 'audit'
-      : 'review'
+  const activeStage =
+    running || !result ? 'mine' : acceptedGroups.length > 0 ? 'confirm' : 'review'
 
   return (
     <div className="vrs-page vrs-tm">
-      <p className="vrs-tm__intro">
-        Discover Telegram trading-signal formats by parsing messages into structured
-        signal objects, grouping them into templates, and verifying format families
-        instead of labelling thousands of individual messages. The parser is the
-        classifier — everything here runs locally and deterministically, with no LLM.
-      </p>
+      <StageIndicator activeId={activeStage} />
 
-      <MiningPipelineRibbon activeId={activeStage} />
+      <details className="vrs-tm-altsource">
+        <summary>Use sample or pasted messages instead</summary>
+        <MiningSourcePanel
+          source={source}
+          onSourceChange={setSource}
+          pasted={pasted}
+          onPastedChange={setPasted}
+          feeds={[]}
+          feedId={null}
+          onFeedChange={() => {}}
+          selectedFeedName={activeFeed?.name}
+          authenticated={Boolean(authToken)}
+          demoFeedCount={FEED_MESSAGES.length}
+          sampleCount={SAMPLE_MESSAGES.length}
+          pastedCount={pastedCount}
+          running={running}
+          canRun={messages.length > 0}
+          onRun={runStaticMining}
+        />
+      </details>
 
-      <MiningSourcePanel
-        source={source}
-        onSourceChange={setSource}
-        pasted={pasted}
-        onPastedChange={setPasted}
-        feeds={feeds}
-        feedId={effectiveFeedId}
-        onFeedChange={setFeedId}
-        selectedFeedName={selectedFeed?.name}
-        authenticated={Boolean(authToken)}
-        demoFeedCount={FEED_MESSAGES.length}
-        sampleCount={SAMPLE_MESSAGES.length}
-        pastedCount={pastedCount}
-        running={running}
-        canRun={
-          source === 'feed'
-            ? Boolean(effectiveFeedId) || FEED_MESSAGES.length > 0
-            : messages.length > 0
-        }
-        onRun={runMining}
-      />
-
-      {!result ? (
+      {running && !result ? (
+        <div className="vrs-empty vrs-empty--sm">
+          <div className="vrs-empty__note">Mining the connected feed…</div>
+        </div>
+      ) : !result ? (
         <div className="vrs-empty vrs-empty--sm">
           <div className="vrs-empty__note">
-            Pick a source and run the miner to discover signal-format families.
+            No messages to mine yet — connect and backfill a feed first.
           </div>
         </div>
       ) : (
@@ -293,6 +326,8 @@ export function TemplateMiningPage({
             messages={result.messages}
             rules={rules}
             hasAccepted={acceptedGroups.length > 0}
+            onFinish={onFinish}
+            onKeepVerified={onKeepVerified}
           />
         </>
       )}

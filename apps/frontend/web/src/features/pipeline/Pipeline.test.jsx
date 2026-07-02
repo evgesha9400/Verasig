@@ -5,27 +5,25 @@ import { Pipeline } from './Pipeline.jsx'
 
 describe('Pipeline stepper', () => {
   it('renders all step labels', () => {
-    render(<Pipeline current="label" />)
+    render(<Pipeline current="mining" />)
     PIPELINE_STEPS.forEach(({ label }) => {
       expect(screen.getByText(label)).toBeTruthy()
     })
   })
 
   it('marks steps before current as done', () => {
-    const { container } = render(<Pipeline current="distill" />)
+    const { container } = render(<Pipeline current="exchange" />)
     const steps = container.querySelectorAll('.vrs-pipe__step')
     expect(steps[0].classList.contains('is-done')).toBe(true) // backfill
-    expect(steps[1].classList.contains('is-done')).toBe(true) // label
-    expect(steps[2].classList.contains('is-active')).toBe(true) // distill
+    expect(steps[1].classList.contains('is-done')).toBe(true) // mining
+    expect(steps[2].classList.contains('is-active')).toBe(true) // exchange
   })
 
-  it('exports PIPELINE_STEPS with 7 entries', () => {
-    expect(PIPELINE_STEPS).toHaveLength(7)
+  it('exports PIPELINE_STEPS with 5 entries', () => {
+    expect(PIPELINE_STEPS).toHaveLength(5)
     expect(PIPELINE_STEPS.map((s) => s.id)).toEqual([
       'backfill',
-      'label',
-      'distill',
-      'verify',
+      'mining',
       'exchange',
       'risk',
       'backtest'

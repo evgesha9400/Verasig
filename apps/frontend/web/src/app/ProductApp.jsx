@@ -15,9 +15,6 @@ import { TelegramSetup } from '../features/sources/TelegramSetup.jsx'
 import { FeedsView } from '../features/sources/FeedsView.jsx'
 import { SignalsView } from '../features/signals/SignalsView.jsx'
 import { BackfillView } from '../features/pipeline/steps/BackfillView.jsx'
-import { LabelView } from '../features/pipeline/steps/LabelView.jsx'
-import { DistillView } from '../features/pipeline/steps/DistillView.jsx'
-import { VerifyView } from '../features/pipeline/steps/VerifyView.jsx'
 import { PaidFeaturePlaceholder } from '../features/pipeline/steps/PaidFeaturePlaceholder.jsx'
 import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
 import { TemplateMiningPage } from '../features/template-mining/TemplateMiningPage.jsx'
@@ -39,15 +36,7 @@ import {
 import {
   getParserOverlay,
   putParserOverlay,
-  getLabelCounts,
-  getRules,
-  getVerifySamples,
-  listFeedHistory,
-  listMessages,
-  recordLabel,
-  startDistill,
-  streamDistillProgress,
-  submitVerify
+  listFeedHistory
 } from '../shared/api/pipelineApi.js'
 import './app.css'
 
@@ -138,8 +127,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     telegramConnected,
     feeds,
     activeFeed,
-    verifyAttempt,
-    setVerifyAttempt,
     setScreen,
     bybitConnected,
     toast,
@@ -156,7 +143,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     resumeFeed,
     fetchNewMessages,
     refetchFullHistory,
-    reviewLabels,
+    reopenMining,
     removeFeed,
     checkGaps: previewCheckGaps,
     stopAfterVerify,
@@ -305,19 +292,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onDisconnect={() => disconnectBybit()}
       />
     )
-  } else if (nav === 'mining') {
-    title = 'Parser-first Template Mining'
-    subtitle = 'Discover signal formats by parsing, not labelling'
-    body = (
-      <TemplateMiningPage
-        feeds={feeds}
-        authToken={authToken}
-        onListMessages={(chatId) => listFeedHistory(authToken, chatId)}
-        fireToast={fireToast}
-        overlay={overlay}
-        onSaveOverlay={saveOverlay}
-      />
-    )
   } else if (nav === 'settings') {
     title = 'Account settings'
     subtitle = 'Profile, security & subscription'
@@ -368,7 +342,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onResume={resumeFeed}
         onFetchNew={fetchNewMessages}
         onRefetchFull={refetchFullHistory}
-        onReviewLabels={reviewLabels}
+        onReviewTemplates={reopenMining}
         onRemove={handleRemoveFeed}
         onViewDeleted={goToDeletedSignals}
         onCheckGaps={handleCheckGaps}
@@ -384,9 +358,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
 
     const stepTitles = {
       backfill: ['Backfill', 'Pulling message history'],
-      label: ['Label', 'Teach Verasig what a signal looks like'],
-      distill: ['Distill', 'Generating filter rules'],
-      verify: ['Verify', 'Confirm the rules hold'],
+      mining: ['Mining', 'Discover signal formats and confirm the ruleset'],
       exchange: ['Exchange', 'Route verified signals'],
       risk: ['Execution', 'Size, entry and exit for every verified signal'],
       backtest: ['Backtest', 'Simulating performance'],
@@ -410,55 +382,20 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onError={handleBackfillError}
         />
       )
-    } else if (screen === 'label') {
+    } else if (screen === 'mining') {
       body = (
-        <LabelView
-          chatId={activeFeed.id}
-          onListMessages={(chatId) => listMessages(authToken, chatId)}
-          onGetCounts={(chatId) => getLabelCounts(authToken, chatId)}
-          onRecordLabel={(chatId, msgId, label) =>
-            recordLabel(authToken, chatId, msgId, label)
-          }
-          onDistill={() => setScreen('distill')}
-          onError={(tone, title, msg) => fireToast(tone, title, msg)}
-          key={`label-${verifyAttempt}`}
-        />
-      )
-    } else if (screen === 'distill') {
-      body = (
-        <DistillView
-          chatId={activeFeed.id}
-          onStartDistill={(chatId) => startDistill(authToken, chatId)}
-          onStreamProgress={(chatId, handlers) =>
-            streamDistillProgress(authToken, chatId, handlers)
-          }
-          onGetRules={(chatId) => getRules(authToken, chatId)}
-          onComplete={() => setScreen('verify')}
-          onError={(tone, title, msg) => fireToast(tone, title, msg)}
-        />
-      )
-    } else if (screen === 'verify') {
-      body = (
-        <VerifyView
-          key={`verify-${verifyAttempt}`}
-          chatId={activeFeed.id}
-          onGetSamples={(chatId) => getVerifySamples(authToken, chatId)}
-          onSubmit={(chatId, verdicts) => submitVerify(authToken, chatId, verdicts)}
-          onPass={routeAfterVerify}
-          onStop={() => {
+        <TemplateMiningPage
+          activeFeed={activeFeed}
+          authToken={authToken}
+          onListMessages={(chatId) => listFeedHistory(authToken, chatId)}
+          fireToast={fireToast}
+          overlay={overlay}
+          onSaveOverlay={saveOverlay}
+          onFinish={routeAfterVerify}
+          onKeepVerified={() => {
             stopAfterVerify()
             void refreshSources().catch(() => {})
           }}
-          onLoop={() => {
-            setVerifyAttempt((a) => a + 1)
-            setScreen('label')
-            fireToast(
-              'pending',
-              'Refining rules',
-              "Label a few more, then we'll re-verify."
-            )
-          }}
-          onError={(tone, title, msg) => fireToast(tone, title, msg)}
         />
       )
     } else if (
@@ -543,8 +480,8 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       <Dialog
         open={!!backTarget}
         onClose={() => setBackTarget(null)}
-        title="Go back to Label?"
-        description="Changing labels invalidates the distilled ruleset."
+        title="Go back to Mining?"
+        description="Revisiting Mining means the compiled ruleset may change."
         icon={<Icon name="alert" size={19} />}
         footer={
           <>
@@ -552,13 +489,13 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
               Stay here
             </Button>
             <Button variant="primary" size="sm" onClick={confirmStepBack}>
-              Go back to Label
+              Go back to Mining
             </Button>
           </>
         }
       >
-        Your existing labels are kept, but Distill and Verify will run again before
-        signals can route. Exchange and execution settings are unaffected.
+        Your family decisions are kept, but the compiled rules and audit will refresh.
+        Exchange and execution settings are unaffected.
       </Dialog>
 
       {toast && (
