@@ -11,9 +11,11 @@ We are **not modifying or removing** `label_routes.py`, `distill_routes.py`,
 `verify_routes.py`, or `rule_distiller.py`
 (`apps/backend/src/verasig/features/rules/`), because
 `apps/backend/src/verasig/features/signals/deterministic_parser.py` and
-`extract_service.py` still consume the `ParserRule`/`FilterRule` records those
-flows persist, and live signal extraction depends on that data continuing to
-exist and to be servable. Deleting or altering the producers would risk the
+`extract_service.py` still consume the `ParserRule` records those flows
+persist (and, upstream, `apps/backend/src/verasig/features/feeds/candidate_derivation.py`/
+`candidate_filter.py` still consume the `FilterRule` records for candidate
+gating), and live signal extraction depends on that data continuing to exist
+and to be servable. Deleting or altering the producers would risk the
 consumers with no replacement in place. This ADR exists so a future reader
 finds those four backend files with no caller and understands why: the
 frontend entry points were retired on purpose, not by oversight, and the
