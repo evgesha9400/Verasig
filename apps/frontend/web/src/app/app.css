@@ -4,7 +4,6 @@
    ============================================================ */
 :root {
   --vrs-pad: 28px;
-  --vrs-rail-w: clamp(288px, 24vw, 400px);
 }
 [data-density='compact'] {
   --vrs-pad: 18px;
@@ -324,19 +323,6 @@
 }
 [data-wide='center'] .vrs-pipe {
   justify-content: center;
-}
-
-/* When a view has a persistent right rail (e.g. Label), the topbar title and the
-   stepper must center over the work area — not the full main width — so they line
-   up above the card. Reserve the rail's width on the right of those two rows. */
-[data-rail='on'] .vrs-top {
-  padding-right: calc(var(--vrs-pad) + var(--vrs-rail-w));
-}
-[data-rail='on'] .vrs-pipe {
-  padding-right: calc(var(--vrs-pad) + var(--vrs-rail-w));
-}
-[data-rail='on'] .vrs-top__actions {
-  right: calc(var(--vrs-pad) + var(--vrs-rail-w));
 }
 
 /* ---- Section heads ---- */
@@ -813,308 +799,11 @@ button.vrs-pipe__step:active {
   transform: scale(0.992);
 }
 
-/* ---- Label / classify (swipe) ---- */
-.vrs-label {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--vrs-rail-w);
-  gap: 0;
-  height: 100%;
-  min-height: 540px;
-}
-.vrs-deck {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 24px;
-  overflow: hidden;
-  background: radial-gradient(
-    120% 90% at 50% -10%,
-    color-mix(in srgb, var(--surface-raised) 60%, transparent),
-    transparent 60%
-  );
-  min-height: 0;
-}
-/* Fills the space above the controls and centres the card; this is what lets
-   the card stretch vertically while the controls + legend pin to the bottom. */
-.vrs-deck__viewport {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.vrs-deck__stage {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: min(440px, 100%);
-  max-width: 100%;
-  max-height: 100%;
-  min-height: 0;
-}
-.vrs-card-msg {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-card);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  will-change: transform;
-}
-/* Top card sits in normal flow so the stage hugs its content (capped at the
-   viewport height); the background peek card stays absolute and fills behind. */
-.vrs-card-msg--top {
-  position: relative;
-  inset: auto;
-  width: 100%;
-  min-height: min(220px, 38vh);
-}
-.vrs-card-msg__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.vrs-card-msg__av {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-on-accent);
-  flex: none;
-}
-.vrs-card-msg__who {
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-strong);
-}
-.vrs-card-msg__time {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  color: var(--text-faint);
-  margin-left: auto;
-}
-.vrs-card-msg__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 20px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.vrs-card-msg__text {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  line-height: 1.65;
-  color: var(--text-body);
-  white-space: pre-wrap;
-}
-.vrs-card-msg__media {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--surface-sunken);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 30px;
-  color: var(--text-faint);
-}
-.vrs-card-msg__media svg {
-  width: 34px;
-  height: 34px;
-}
-.vrs-card-msg__media span {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.vrs-card-msg.is-signal {
-  border-color: color-mix(in srgb, var(--signal-500) 60%, transparent);
-  box-shadow: var(--glow-soft), var(--shadow-lg);
-}
-.vrs-card-msg.is-noise {
-  border-color: color-mix(in srgb, var(--rejected-500) 55%, transparent);
-  box-shadow:
-    0 0 26px var(--rejected-bg),
-    var(--shadow-lg);
-}
-.vrs-card-stamp {
-  position: absolute;
-  top: 22px;
-  padding: 6px 14px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 2px solid;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-.vrs-card-stamp.signal {
-  right: 22px;
-  color: var(--signal-500);
-  border-color: var(--signal-500);
-  transform: rotate(11deg);
-}
-.vrs-card-stamp.noise {
-  left: 22px;
-  color: var(--rejected-500);
-  border-color: var(--rejected-500);
-  transform: rotate(-11deg);
-}
-/* State cards (loading / empty / error / done) sit in normal flow too, so the
-   stage gets a height; a comfortable floor keeps them from looking cramped. */
-.vrs-card-bg {
-  position: relative;
-  width: 100%;
-  min-height: min(340px, 48vh);
-  border-radius: var(--radius-xl);
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-}
-
-.vrs-swipe-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 4px;
-}
-.vrs-swipe-key {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-}
-.vrs-swipe-key--nav {
-  width: 44px;
-  height: 44px;
-}
-.vrs-swipe-key--no {
-  color: var(--rejected-500);
-}
-.vrs-deck__nav {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-.vrs-deck__hint {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  font-weight: 300;
-  color: var(--text-faint);
-  letter-spacing: 0.04em;
-  text-align: center;
-}
-.vrs-deck__hint kbd {
-  font-family: var(--font-mono);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-xs);
-  padding: 1px 5px;
-  color: var(--text-muted);
-  margin: 0 1px;
-}
-
-/* label rail */
-.vrs-rail {
-  border-left: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
-  padding: 22px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  overflow-y: auto;
-}
-.vrs-rail__h {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.vrs-rail__counts {
-  display: flex;
-  gap: 12px;
-}
-.vrs-count-card {
-  flex: 1;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--surface-card);
-}
-.vrs-count-card__v {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xl);
-  font-weight: var(--fw-light);
-  font-feature-settings: 'tnum' 1;
-  line-height: 1;
-}
-.vrs-count-card__l {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-top: 8px;
-}
-.vrs-count-card.signal .vrs-count-card__v {
-  color: var(--signal-500);
-}
-.vrs-count-card.noise .vrs-count-card__v {
-  color: var(--rejected-500);
-}
-.vrs-rail__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.vrs-rail__plabel {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  color: var(--text-muted);
-}
-.vrs-mini-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--surface-raised);
-  overflow: hidden;
-}
-.vrs-mini-track > span {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--signal-glow);
-  transition: width var(--dur-base) var(--ease-out);
-}
 .vrs-rail__note {
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
   color: var(--text-faint);
   line-height: var(--lh-body);
-}
-.vrs-rail__done {
-  margin-top: auto;
 }
 
 /* ---- Distill / Verify generic centered states ---- */
@@ -1201,92 +890,7 @@ button.vrs-pipe__step:active {
   justify-content: center;
 }
 
-/* ---- Verify: next-step choice (continue to backtest, or stop verified) ---- */
-.vrs-next {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  margin-top: 2px;
-}
-.vrs-next-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  width: 100%;
-  padding: 18px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--surface-card);
-  text-align: left;
-}
-.vrs-next-option.is-primary {
-  border-color: var(--accent);
-  box-shadow:
-    0 0 0 1px var(--accent),
-    var(--glow-soft, 0 0 24px var(--accent-quiet));
-}
-.vrs-next-option__ic {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-raised);
-  color: var(--text-muted);
-}
-.vrs-next-option.is-primary .vrs-next-option__ic {
-  background: var(--accent-quiet);
-  color: var(--accent-text);
-}
-.vrs-next-option__body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.vrs-next-option__t {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  font-weight: var(--fw-semibold);
-  color: var(--text-strong);
-}
-.vrs-next-option__d {
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  line-height: var(--lh-body);
-}
-.vrs-next-option > svg:last-child {
-  flex: none;
-  color: var(--text-faint);
-  margin-top: 9px;
-}
-.vrs-next-option.is-primary > svg:last-child {
-  color: var(--accent-text);
-}
 /* ---- Distill rules ---- */
-.vrs-rules {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.vrs-rule {
-  display: grid;
-  grid-template-columns: 26px 1fr auto;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
-}
 .vrs-rule__ic {
   width: 26px;
   height: 26px;
@@ -1296,24 +900,6 @@ button.vrs-pipe__step:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-.vrs-rule__lbl {
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-strong);
-}
-.vrs-rule__detail {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.vrs-rule__match {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--accent-text);
-  font-feature-settings: 'tnum' 1;
 }
 
 /* ---- Verify ---- */
@@ -1759,20 +1345,6 @@ button.vrs-pipe__step:active {
   }
   .vrs-sb {
     display: none;
-  }
-  .vrs-label {
-    grid-template-columns: 1fr;
-  }
-  .vrs-rail {
-    display: none;
-  }
-  /* rail is hidden here — drop the reserved offset so the header recenters */
-  [data-rail='on'] .vrs-top,
-  [data-rail='on'] .vrs-pipe {
-    padding-right: var(--vrs-pad);
-  }
-  [data-rail='on'] .vrs-top__actions {
-    right: var(--vrs-pad);
   }
 }
 
@@ -2463,38 +2035,6 @@ button.vrs-pipe__step:active {
   }
 }
 
-/* ---- Label / Verify cards: reply quote + update affordances ---- */
-.vrs-card-reply {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 11px;
-  border-left: 2px solid var(--info-500);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: var(--surface-sunken);
-  color: var(--info-500);
-}
-.vrs-card-reply svg {
-  flex: none;
-  margin-top: 2px;
-}
-.vrs-card-reply__body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.vrs-card-reply__who {
-  font-family: var(--font-sans);
-  font-size: var(--text-3xs);
-  font-weight: var(--fw-semibold);
-  color: var(--info-500);
-}
-.vrs-card-reply__txt {
-  font-family: var(--font-mono);
-  font-size: var(--text-3xs);
-  color: var(--text-muted);
-}
 .vrs-autolink {
   display: inline-flex;
   align-items: center;
@@ -2506,36 +2046,6 @@ button.vrs-pipe__step:active {
   font-family: var(--font-mono);
   font-size: var(--text-3xs);
   white-space: nowrap;
-}
-.vrs-card-msg.is-mod {
-  border-color: color-mix(in srgb, var(--info-500) 55%, transparent);
-  box-shadow:
-    0 0 24px color-mix(in srgb, var(--info-500) 14%, transparent),
-    var(--shadow-lg);
-}
-
-/* rail note — derived update count (replies labelled as signals) */
-.vrs-rail__derived {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--info-500) 26%, var(--border-default));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--info-bg) 55%, transparent);
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
-  line-height: var(--lh-body);
-}
-.vrs-rail__derived svg {
-  flex: none;
-  color: var(--info-500);
-  margin-top: 1px;
-}
-.vrs-rail__derived strong {
-  color: var(--info-500);
-  font-weight: var(--fw-semibold);
 }
 
 /* verify — parsed update panel on the card */

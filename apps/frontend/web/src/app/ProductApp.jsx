@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Button,
   IconButton,
@@ -171,22 +171,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     const root = document.documentElement
     root.setAttribute('data-density', 'regular')
     root.setAttribute('data-wide', 'center')
-  }, [])
-
-  // Any view that renders a persistent right rail (Label, Verify, …) needs the
-  // topbar + stepper to center over the work area, not the full main width.
-  // The rail can appear/disappear from a child component's INTERNAL state change
-  // (e.g. Verify's pass/fail screens) without App re-rendering, so a render-time
-  // check goes stale. Watch the DOM itself: recompute on every subtree mutation.
-  useLayoutEffect(() => {
-    const update = () => {
-      const hasRail = !!document.querySelector('.vrs-scroll .vrs-rail')
-      document.documentElement.setAttribute('data-rail', hasRail ? 'on' : 'off')
-    }
-    update()
-    const mo = new MutationObserver(update)
-    mo.observe(document.body, { childList: true, subtree: true })
-    return () => mo.disconnect()
   }, [])
 
   let title = 'Sources'
