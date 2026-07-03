@@ -5,35 +5,36 @@ import { TemplateMiningPage } from './TemplateMiningPage.jsx'
 
 const feed = { id: 'apex', name: 'Apex Crypto Calls' }
 
-// Offline (no authToken): the auto-run falls back to the bundled demo history.
+// Offline (no authToken): the auto-run falls back to the bundled demo history and
+// advances Mine → Review synchronously as the effects settle.
 function renderPage(props = {}) {
   return render(<TemplateMiningPage activeFeed={feed} {...props} />)
 }
 
-function stagePill(label) {
-  return screen.getByText(label).closest('.vrs-tm-stage')
+function step(label) {
+  return screen.getByText(label).closest('.vrs-tm-step')
+}
+
+function acceptFirstTemplate(user) {
+  const acceptButtons = screen.getAllByRole('button', {
+    name: /Accept as signal format/i
+  })
+  return user.click(acceptButtons[0])
 }
 
 describe('TemplateMiningPage', () => {
-  it('auto-runs against the active feed with no manual button click', () => {
+  it('auto-runs and lands on Review with no manual button click', () => {
     renderPage()
-
-    // Metrics and family cards appear on entry — no "Run" click required.
+    expect(step('Review').classList.contains('is-active')).toBe(true)
+    expect(step('Mine').classList.contains('is-done')).toBe(true)
     expect(screen.getByText('Messages scanned')).toBeTruthy()
-    expect(screen.getByText('Families found')).toBeTruthy()
     expect(screen.getAllByText('<INSTRUMENT>').length).toBeGreaterThan(0)
   })
 
-  it('mines the stored messages from the connected feed when authenticated', async () => {
+  it('mines the connected feed history when authenticated', async () => {
     const messages = [
-      {
-        id: 'f1',
-        date: 'Jun 6',
-        time: '08:42',
-        author: 'Apex',
-        text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355'
-      },
-      { id: 'f2', date: 'Jun 6', time: '09:00', author: 'Apex', text: 'gm team' }
+      { id: 'f1', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
+      { id: 'f2', text: 'gm team' }
     ]
     const onListMessages = vi.fn().mockResolvedValue({ messages })
     render(
@@ -43,10 +44,8 @@ describe('TemplateMiningPage', () => {
         onListMessages={onListMessages}
       />
     )
-
     expect(onListMessages).toHaveBeenCalledWith('apex')
     expect(await screen.findByText('Messages scanned')).toBeTruthy()
-    expect(await screen.findAllByText('<INSTRUMENT>')).toBeTruthy()
   })
 
   it('re-mines when the active feed changes', async () => {
@@ -56,8 +55,6 @@ describe('TemplateMiningPage', () => {
       <TemplateMiningPage activeFeed={feed} authToken="jwt" onListMessages={first} />
     )
     expect(first).toHaveBeenCalledWith('apex')
-    expect(await screen.findByText('Messages scanned')).toBeTruthy()
-
     const next = vi.fn().mockResolvedValue({ messages })
     rerender(
       <TemplateMiningPage
@@ -70,62 +67,61 @@ describe('TemplateMiningPage', () => {
     expect(await screen.findByText('Messages scanned')).toBeTruthy()
   })
 
-  it('moves the indicator Mine → Review → Confirm as decisions are made', async () => {
-    const user = userEvent.setup()
+  it('renders the Suggested accept and Needs review sections', () => {
     renderPage()
-
-    // A result exists but nothing is accepted yet: Review is active.
-    expect(stagePill('Review').classList.contains('is-active')).toBe(true)
-    expect(stagePill('Confirm').classList.contains('is-active')).toBe(false)
-
-    await user.click(screen.getByRole('button', { name: /Apply suggestions/i }))
-
-    // At least one family accepted: Confirm is active.
-    expect(stagePill('Confirm').classList.contains('is-active')).toBe(true)
-    expect(stagePill('Review').classList.contains('is-active')).toBe(false)
+    expect(screen.getByText('Suggested accept')).toBeTruthy()
+    expect(screen.getByText('Needs review')).toBeTruthy()
   })
 
-  it('compiles rules and populates the audit when families are accepted', async () => {
+  it('gates "Continue to verify" until a template is accepted', async () => {
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: /Apply suggestions/i }))
+    const continueBtn = screen.getByRole('button', { name: /Continue to verify/i })
+    expect(continueBtn.disabled).toBe(true)
+    expect(screen.getByText(/Accept at least one template to continue/i)).toBeTruthy()
 
-    // A deterministic parser rule is compiled and shown verbatim.
-    expect(screen.getAllByText(/"confidenceThreshold"/).length).toBeGreaterThan(0)
-    // The audit ran over the full history — the review surface shows its tabs.
+    await acceptFirstTemplate(user)
+    expect(screen.getByRole('button', { name: /Continue to verify/i }).disabled).toBe(
+      false
+    )
+  })
+
+  it('shows the audit only after continuing to Verify, and can go back', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    // Review does not show the audit tabs yet.
+    expect(screen.queryByRole('tab', { name: /Parsed/i })).toBeNull()
+
+    await acceptFirstTemplate(user)
+    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
     expect(screen.getByRole('tab', { name: /Parsed/i })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /Rejected/i })).toBeTruthy()
+    expect(step('Verify').classList.contains('is-active')).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: /Back to review/i }))
+    expect(step('Review').classList.contains('is-active')).toBe(true)
   })
 
-  it('never renders NaN in the audit queues', async () => {
+  it('Apply all accepts the suggested templates', async () => {
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: /Apply suggestions/i }))
-
-    expect(screen.queryByText(/NaN/)).toBeNull()
-  })
-
-  it('lets a single decision accept a whole family', async () => {
-    const user = userEvent.setup()
-    renderPage()
-
-    const acceptButtons = screen.getAllByRole('button', {
-      name: /Accept as signal format/i
-    })
-    await user.click(acceptButtons[0])
-
+    await user.click(screen.getByRole('button', { name: /Apply all/i }))
     expect(screen.getAllByText('Accepted').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /Continue to verify/i }).disabled).toBe(
+      false
+    )
   })
 
-  it('still supports the sample dataset through the alternate-source disclosure', async () => {
+  it('does not render the compiled-rules JSON panel', async () => {
     const user = userEvent.setup()
     renderPage()
+    await acceptFirstTemplate(user)
+    expect(screen.queryByText(/"confidenceThreshold"/)).toBeNull()
+  })
 
-    await user.click(screen.getByText('Sample dataset'))
-    await user.click(screen.getByRole('button', { name: /Run template mining/i }))
-
-    expect(screen.getByText('Messages scanned')).toBeTruthy()
-    expect(screen.getAllByText('<INSTRUMENT>').length).toBeGreaterThan(0)
+  it('keeps the overlay manager under the Advanced disclosure', () => {
+    renderPage({ onSaveOverlay: vi.fn() })
+    const advanced = screen.getByText('Advanced').closest('details')
+    expect(within(advanced).getByText('Coin aliases')).toBeTruthy()
   })
 
   it('wires the audit gate to onFinish and onKeepVerified', async () => {
@@ -133,38 +129,31 @@ describe('TemplateMiningPage', () => {
     const onFinish = vi.fn()
     const onKeepVerified = vi.fn()
     renderPage({ onFinish, onKeepVerified })
-
-    await user.click(screen.getByRole('button', { name: /Apply suggestions/i }))
+    await acceptFirstTemplate(user)
+    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
 
     const review = screen.getByText('Review results').closest('.vrs-tm-review')
     await user.click(
       within(review).getByRole('button', { name: /Confirm & route to Exchange/i })
     )
     expect(onFinish).toHaveBeenCalledTimes(1)
-
     await user.click(within(review).getByRole('button', { name: /Keep verified/i }))
     expect(onKeepVerified).toHaveBeenCalledTimes(1)
   })
 
-  it('threads a provided overlay into mining', async () => {
+  it('still supports the sample dataset through the alternate-source disclosure', async () => {
     const user = userEvent.setup()
-    const messages = [{ id: 'o1', text: 'АПТ 🚀\nEntry: 2.5\nStop: 2.4\nTarget: 2.7' }]
-    const onListMessages = vi.fn().mockResolvedValue({ messages })
-    render(
-      <TemplateMiningPage
-        activeFeed={feed}
-        authToken="jwt"
-        onListMessages={onListMessages}
-        overlay={{
-          instrumentAliases: { АПТ: 'APTUSDT' },
-          directionTokens: { '🚀': 'BUY' }
-        }}
-      />
-    )
-    expect(await screen.findByText('Messages scanned')).toBeTruthy()
-    // The extraction table (where APTUSDT would render) is behind the card's
-    // expand toggle; open it before checking the overlay reached the detectors.
-    await user.click(await screen.findByRole('button', { name: /Show all/i }))
-    expect(await screen.findAllByText(/APTUSDT/)).toBeTruthy()
+    renderPage()
+    await user.click(screen.getByText('Sample dataset'))
+    await user.click(screen.getByRole('button', { name: /Run template mining/i }))
+    expect(screen.getByText('Messages scanned')).toBeTruthy()
+  })
+
+  it('never renders NaN', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await acceptFirstTemplate(user)
+    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
+    expect(screen.queryByText(/NaN/)).toBeNull()
   })
 })

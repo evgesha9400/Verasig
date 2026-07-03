@@ -6,16 +6,18 @@
    rest of the kit.
    ============================================================ */
 
-/* ---- stage indicator ---- */
-/* A compact three-pill Mine → Review → Confirm marker for the reviewer's state
-   inside this step; the outer Pipeline stepper already shows "Mining" one level
-   up, so this stays intentionally minimal. */
-.vrs-tm-stages {
+/* ---- sub-step bar (Mine → Review → Verify) ---- */
+/* One-at-a-time wizard sub-steps inside the Mining step. Only Review is
+   reachable by click (going back from Verify); Mine is a process step. */
+.vrs-tm-steps {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
-.vrs-tm-stage {
+.vrs-tm-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
@@ -23,13 +25,36 @@
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
+  cursor: default;
 }
-.vrs-tm-stage.is-done {
+.vrs-tm-step:not(:disabled) {
+  cursor: pointer;
+}
+.vrs-tm-step:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.vrs-tm-step__n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  background: var(--surface-card);
+  color: var(--text-muted);
+}
+.vrs-tm-step.is-done {
   color: var(--text-body);
 }
-.vrs-tm-stage.is-active {
+.vrs-tm-step.is-active {
   color: var(--accent-text);
   border-color: var(--accent);
+}
+.vrs-tm-step.is-active .vrs-tm-step__n {
+  background: var(--accent);
+  color: var(--text-on-accent);
 }
 
 /* ---- alternate source disclosure (dev/demo affordance) ---- */
@@ -372,35 +397,36 @@
   margin-top: var(--space-2);
 }
 
-/* ---- compiled rules ---- */
-.vrs-tm-rule__name {
+/* ---- advanced disclosure (overlay manager) ---- */
+.vrs-tm-advanced > summary {
+  cursor: pointer;
+  width: fit-content;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+.vrs-tm-advanced > summary:hover {
+  color: var(--text-body);
+}
+
+/* ---- review footer (continue to verify) ---- */
+.vrs-tm-footer {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1-5);
-  font-size: var(--text-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--text-strong);
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
-.vrs-tm-rule__name .vrs-icon,
-.vrs-tm-rule__name svg {
-  color: var(--verified-500);
+.vrs-tm-footer__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
 }
-.vrs-tm-rulejson {
-  margin: 0;
-  padding: var(--space-4);
-  font-family: var(--font-mono);
+.vrs-tm-footer__hint {
+  font-family: var(--font-sans);
   font-size: var(--text-2xs);
-  line-height: 1.6;
-  white-space: pre;
-  overflow-x: auto;
-  color: var(--text-body);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-}
-.vrs-tm-rulejson .k {
-  color: var(--accent-text);
+  color: var(--text-muted);
 }
 
 /* ---- review (full-history result review) ---- */
