@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { BackfillView } from './BackfillView.jsx'
 
-const chat = {
+const feed = {
   id: '7',
   name: 'Pilot Signals',
   tag: '@pilot',
@@ -24,7 +24,7 @@ describe('BackfillView', () => {
 
     render(
       <BackfillView
-        chat={chat}
+        feed={feed}
         onStart={onStart}
         onStream={onStream}
         onCancel={() => {}}
@@ -78,7 +78,7 @@ describe('BackfillView', () => {
 
     const { rerender } = render(
       <BackfillView
-        chat={chat}
+        feed={feed}
         onStart={onStart}
         onStream={onStream}
         onCancel={noop}
@@ -91,7 +91,7 @@ describe('BackfillView', () => {
 
     rerender(
       <BackfillView
-        chat={{ ...chat, fetched: 5000, lastDate: 'Jun 1, 2026' }}
+        feed={{ ...feed, fetched: 5000, lastDate: 'Jun 1, 2026' }}
         onStart={onStart}
         onStream={onStream}
         onCancel={noop}
@@ -107,7 +107,7 @@ describe('BackfillView', () => {
   it('renders an empty oldest-date placeholder until the backend reports a date', () => {
     render(
       <BackfillView
-        chat={chat}
+        feed={feed}
         onStart={vi.fn().mockResolvedValue()}
         onStream={() => ({ close: vi.fn() })}
         onCancel={() => {}}

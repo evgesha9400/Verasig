@@ -32,7 +32,7 @@ function simulatedDateLabels() {
 
 /* Verasig prototype — backfill infinite loader */
 export function BackfillView({
-  chat,
+  feed,
   onCancel = () => {},
   onComplete = () => {},
   onError = () => {},
@@ -40,11 +40,11 @@ export function BackfillView({
   onStream,
   onCancelBackfill
 }) {
-  const [count, setCount] = useState(chat.fetched || 0)
-  const [date, setDate] = useState(displayDate(chat.lastDate))
+  const [count, setCount] = useState(feed.fetched || 0)
+  const [date, setDate] = useState(displayDate(feed.lastDate))
   const [logLine, setLogLine] = useState('Opening MTProto session…')
-  const countRef = useRef(chat.fetched || 0)
-  const dateRef = useRef(chat.lastDate || null)
+  const countRef = useRef(feed.fetched || 0)
+  const dateRef = useRef(feed.lastDate || null)
   const handlersRef = useRef({
     onCancel,
     onCancelBackfill,
@@ -68,10 +68,10 @@ export function BackfillView({
   const hasBackendBackfill = !!onStart && !!onStream
 
   useEffect(() => {
-    countRef.current = chat.fetched || 0
-    dateRef.current = chat.lastDate || null
-    setCount(chat.fetched || 0)
-    setDate(displayDate(chat.lastDate))
+    countRef.current = feed.fetched || 0
+    dateRef.current = feed.lastDate || null
+    setCount(feed.fetched || 0)
+    setDate(displayDate(feed.lastDate))
     setLogLine('Opening MTProto session…')
 
     if (hasBackendBackfill) {
@@ -80,9 +80,9 @@ export function BackfillView({
 
       async function startBackendBackfill() {
         try {
-          await handlersRef.current.onStart(chat.id)
+          await handlersRef.current.onStart(feed.id)
           if (closed) return
-          subscription = handlersRef.current.onStream(chat.id, {
+          subscription = handlersRef.current.onStream(feed.id, {
             onProgress: (progress) => {
               const nextCount = progress.fetched ?? countRef.current
               countRef.current = nextCount
@@ -146,7 +146,7 @@ export function BackfillView({
     }
 
     // Simulated, accelerating backfill that completes after a believable run.
-    const TARGET = (chat.fetched || 0) + 9800 + Math.floor(Math.random() * 3000)
+    const TARGET = (feed.fetched || 0) + 9800 + Math.floor(Math.random() * 3000)
     let doneTimer = null
     const dates = simulatedDateLabels()
     const logs = [
@@ -193,16 +193,16 @@ export function BackfillView({
       clearInterval(logTick)
       clearTimeout(doneTimer)
     }
-    // Keyed on chat.id only: chat.fetched/chat.lastDate are seed values captured
-    // when the active chat changes. They keep updating as the backend streams
+    // Keyed on feed.id only: feed.fetched/feed.lastDate are seed values captured
+    // when the active feed changes. They keep updating as the backend streams
     // progress, and re-running here would tear down the live stream mid-backfill.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat.id, hasBackendBackfill])
+  }, [feed.id, hasBackendBackfill])
 
   async function cancelBackfill() {
     try {
       if (handlersRef.current.onCancelBackfill) {
-        await handlersRef.current.onCancelBackfill(chat.id)
+        await handlersRef.current.onCancelBackfill(feed.id)
       }
       handlersRef.current.onCancel(countRef.current, storedDate(dateRef.current))
     } catch (error) {
@@ -239,9 +239,9 @@ export function BackfillView({
       </svg>
 
       <div>
-        <div className="vrs-bf-title">Backfilling {chat.name}</div>
+        <div className="vrs-bf-title">Backfilling {feed.name}</div>
         <div className="vrs-bf-sub" style={{ marginTop: 6 }}>
-          Pulling the full message history from {chat.tag}. This can take a while — you
+          Pulling the full message history from {feed.tag}. This can take a while — you
           can leave and come back.
         </div>
       </div>

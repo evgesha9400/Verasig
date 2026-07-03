@@ -16,7 +16,7 @@ import { OverlayManager } from './OverlayManager.jsx'
 import { AuditReview } from './AuditReview.jsx'
 import { formatPercent } from './format.js'
 import { toggleInSet } from './toggleSet.js'
-import './templateMining.css'
+import './template-mining.css'
 
 /* Verasig — Parser-first Template Mining (pipeline wizard step).
    Runs the deterministic, local pipeline against the active feed on entry: load

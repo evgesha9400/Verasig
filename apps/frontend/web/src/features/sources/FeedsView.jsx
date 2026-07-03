@@ -250,7 +250,7 @@ export function FeedsView({
   function rightSide(c) {
     if (c.status === 'verified' || (c.status === 'backfilled' && c.hasRisk)) {
       return (
-        <div className="vrs-chat-right">
+        <div className="vrs-feed-right">
           <Button
             variant="primary"
             size="sm"
@@ -266,7 +266,7 @@ export function FeedsView({
     if (c.status === 'analyzed') {
       const scam = c.signalDeletion
       return (
-        <div className="vrs-chat-right">
+        <div className="vrs-feed-right">
           <div className={`vrs-score ${scam ? 'vrs-score--zero' : ''}`}>
             <span className="vrs-score__v">{scam ? 0 : c.score}</span>
             <span className="vrs-score__l">Quality</span>
@@ -285,8 +285,8 @@ export function FeedsView({
     }
     if (c.status === 'cancelled' || c.status === 'failed') {
       return (
-        <div className="vrs-chat-right">
-          <div className="vrs-chat-progress">
+        <div className="vrs-feed-right">
+          <div className="vrs-feed-progress">
             <span>{fmtNum(c.fetched)} fetched</span>
             <span>{c.lastDate ? `through ${c.lastDate}` : 'no date yet'}</span>
           </div>
@@ -304,8 +304,8 @@ export function FeedsView({
     }
     if (c.status === 'backfilled') {
       return (
-        <div className="vrs-chat-right">
-          <div className="vrs-chat-progress">{fmtNum(c.fetched)} messages</div>
+        <div className="vrs-feed-right">
+          <div className="vrs-feed-progress">{fmtNum(c.fetched)} messages</div>
           <Button
             variant="primary"
             size="sm"
@@ -319,7 +319,7 @@ export function FeedsView({
       )
     }
     return (
-      <div className="vrs-chat-right">
+      <div className="vrs-feed-right">
         <Button
           variant="secondary"
           size="sm"
@@ -367,12 +367,12 @@ export function FeedsView({
       )}
       <div className="vrs-stack-sm">
         {feeds.map((c) => (
-          <div key={c.id} className="vrs-chat-row">
-            <span className="vrs-chat-av" style={{ background: c.tint }}>
+          <div key={c.id} className="vrs-feed-row">
+            <span className="vrs-feed-av" style={{ background: c.tint }}>
               {c.initials}
             </span>
-            <div className="vrs-chat-main">
-              <div className="vrs-chat-name">
+            <div className="vrs-feed-main">
+              <div className="vrs-feed-name">
                 {c.name} {statusBadge(c)}
                 {c.historyGaps &&
                   !c.signalDeletion &&
@@ -390,7 +390,7 @@ export function FeedsView({
                   />
                 )}
               </div>
-              <div className="vrs-chat-meta">
+              <div className="vrs-feed-meta">
                 <span>{c.tag}</span>
                 <span className="dot" />
                 <span>

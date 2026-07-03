@@ -355,7 +355,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     if (screen === 'backfill') {
       body = (
         <BackfillView
-          chat={activeFeed}
+          feed={activeFeed}
           onStart={(chatId) => startBackfillJob(authToken, chatId, backfillMode)}
           onStream={(chatId, handlers) =>
             streamBackfillProgress(authToken, chatId, handlers)

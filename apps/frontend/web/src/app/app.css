@@ -508,7 +508,7 @@
 }
 
 /* ---- Chat list ---- */
-.vrs-chat-row {
+.vrs-feed-row {
   display: grid;
   grid-template-columns: 44px 1fr auto;
   align-items: center;
@@ -521,7 +521,7 @@
     border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
 }
-.vrs-chat-av {
+.vrs-feed-av {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
@@ -533,10 +533,10 @@
   font-weight: 600;
   color: var(--text-on-accent);
 }
-.vrs-chat-main {
+.vrs-feed-main {
   min-width: 0;
 }
-.vrs-chat-name {
+.vrs-feed-name {
   font-family: var(--font-sans);
   font-size: var(--text-md);
   font-weight: var(--fw-semibold);
@@ -545,7 +545,7 @@
   align-items: center;
   gap: 9px;
 }
-.vrs-chat-meta {
+.vrs-feed-meta {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -554,18 +554,18 @@
   font-size: var(--text-3xs);
   color: var(--text-muted);
 }
-.vrs-chat-meta .dot {
+.vrs-feed-meta .dot {
   width: 3px;
   height: 3px;
   border-radius: 50%;
   background: var(--text-faint);
 }
-.vrs-chat-right {
+.vrs-feed-right {
   display: flex;
   align-items: center;
   gap: 14px;
 }
-.vrs-chat-progress {
+.vrs-feed-progress {
   display: inline-flex;
   flex-direction: column;
   gap: 2px;

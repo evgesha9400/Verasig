@@ -62,7 +62,7 @@ function vxPlan({ entryMode, levels, weighting, mult, tpMode, exitSrc, ownSl, ow
 
 function VxLadderRow({ tone, role, price, size, dim, note, tie }) {
   return (
-    <div className={`vrs-ladder__row vx-tie ${tie || ''} ${dim ? 'is-dim' : ''}`}>
+    <div className={`vrs-ladder__row vrs-ex-tie ${tie || ''} ${dim ? 'is-dim' : ''}`}>
       <span className={`vrs-ladder__node vrs-ladder__node--${tone}`}></span>
       <span className="vrs-ladder__role">{role}</span>
       <span className="vrs-ladder__price">
@@ -95,7 +95,7 @@ function VxPreview({
         <span className="vrs-plan-card__sym">{s.symbol}</span>
         <span className="vrs-plan-card__id">{s.id}</span>
       </div>
-      <div className={`vx-prev-size vx-tie ${tie('size')}`}>
+      <div className={`vrs-ex-prev-size vrs-ex-tie ${tie('size')}`}>
         <span className="vrs-ladder__statlabel">Size</span>
         <span className="vrs-ladder__statval">{sizeSum}</span>
       </div>
@@ -111,7 +111,7 @@ function VxPreview({
             tie={tie('exit')}
           />
         ))}
-        <div className={`vrs-ladder__zone vx-tie ${tie('entry')}`}>
+        <div className={`vrs-ladder__zone vrs-ex-tie ${tie('entry')}`}>
           <div className="vrs-ladder__zonehead">
             <span className="vrs-ladder__zonelabel">
               Entry zone · {vxFmt(s.rangeTop)} – {vxFmt(s.rangeBottom)}
@@ -140,11 +140,11 @@ function VxPreview({
           tie={tie('exit')}
         />
         <div className="vrs-ladder__stats">
-          <div className={`vrs-ladder__stat vx-tie ${tie('entry')}`}>
+          <div className={`vrs-ladder__stat vrs-ex-tie ${tie('entry')}`}>
             <span className="vrs-ladder__statlabel">Avg entry</span>
             <span className="vrs-ladder__statval">{vxFmt(plan.avg)}</span>
           </div>
-          <div className={`vrs-ladder__stat vx-tie ${tie('exit')}`}>
+          <div className={`vrs-ladder__stat vrs-ex-tie ${tie('exit')}`}>
             <span className="vrs-ladder__statlabel">Entry → SL</span>
             <span className="vrs-ladder__statval">{plan.slPct.toFixed(1)}%</span>
           </div>
@@ -164,12 +164,12 @@ function VxRadio({ on, onClick, title, desc }) {
     <RadioCard
       as="div"
       selected={on}
-      className={`vx-radio ${on ? 'is-on' : ''}`}
+      className={`vrs-ex-radio ${on ? 'is-on' : ''}`}
       onClick={onClick}
     >
       <div>
-        <div className="vx-radio__t">{title}</div>
-        {desc && <div className="vx-radio__d">{desc}</div>}
+        <div className="vrs-ex-radio__t">{title}</div>
+        {desc && <div className="vrs-ex-radio__d">{desc}</div>}
       </div>
     </RadioCard>
   )
@@ -309,7 +309,7 @@ export function ExecutionView({
         ]}
       />
     ) : (
-      <div className="vx-radiogrp">
+      <div className="vrs-ex-radiogrp">
         <VxRadio
           on={exitSrc === 'signal'}
           onClick={() => setExitSrc('signal')}
@@ -337,7 +337,7 @@ export function ExecutionView({
         ]}
       />
     ) : (
-      <div className="vx-radiogrp">
+      <div className="vrs-ex-radiogrp">
         <VxRadio
           on={missing === 'fallback'}
           onClick={() => setMissing('fallback')}
@@ -357,14 +357,14 @@ export function ExecutionView({
       {exitSrc === 'signal' ? (
         <>
           {hasRisk && (
-            <div className="vx-note vx-note--ok">
+            <div className="vrs-ex-note vrs-ex-note--ok">
               <Icon name="check" size={13} />
-              <span className="vx-note__txt">
+              <span className="vrs-ex-note__txt">
                 92% of this feed’s signals post a stop-loss and at least one target.
               </span>
             </div>
           )}
-          <div className="vx-grouplabel">If a signal omits a stop or target</div>
+          <div className="vrs-ex-grouplabel">If a signal omits a stop or target</div>
           {missingControl}
           {missing === 'fallback' ? (
             <div className="vrs-form__row" style={{ width: '100%', maxWidth: 420 }}>
@@ -387,7 +387,7 @@ export function ExecutionView({
               Bybit.
             </div>
           )}
-          <div className="vx-grouplabel">Across multiple targets</div>
+          <div className="vrs-ex-grouplabel">Across multiple targets</div>
           <Tabs
             variant="pill"
             value={tpMode}
@@ -424,9 +424,9 @@ export function ExecutionView({
             </div>
           </div>
           {followAuthor && beAfterTp1 && (
-            <div className="vx-note vx-note--info">
+            <div className="vrs-ex-note vrs-ex-note--info">
               <Icon name="alert" size={13} />
-              <span className="vx-note__txt">
+              <span className="vrs-ex-note__txt">
                 If these disagree, the tighter stop wins — an author update can tighten
                 your stop, but never loosen it back below break-even.
               </span>
@@ -500,40 +500,40 @@ export function ExecutionView({
   let main
   if (layout === 'flow') {
     main = (
-      <div className="vx-flow">
+      <div className="vrs-ex-flow">
         {secs.map((s) => (
           <div
             key={s.id}
-            className={`vx-flow__sec ${hot === s.id ? 'is-hot' : ''}`}
+            className={`vrs-ex-flow__sec ${hot === s.id ? 'is-hot' : ''}`}
             {...hover(s.id)}
           >
-            <span className="vx-num">{s.n}</span>
-            <div className="vx-flow__head">
-              <span className="vx-flow__title">{s.title}</span>
+            <span className="vrs-ex-num">{s.n}</span>
+            <div className="vrs-ex-flow__head">
+              <span className="vrs-ex-flow__title">{s.title}</span>
             </div>
-            <div className="vx-flow__hint">{s.hint}</div>
-            <div className="vx-flow__body">{s.body}</div>
+            <div className="vrs-ex-flow__hint">{s.hint}</div>
+            <div className="vrs-ex-flow__body">{s.body}</div>
           </div>
         ))}
       </div>
     )
   } else if (layout === 'ledger') {
     main = (
-      <div className="vx-ledger">
+      <div className="vrs-ex-ledger">
         {secs.map((s) => (
           <div
             key={s.id}
-            className={`vx-ledger__row ${hot === s.id ? 'is-hot' : ''}`}
+            className={`vrs-ex-ledger__row ${hot === s.id ? 'is-hot' : ''}`}
             {...hover(s.id)}
           >
-            <div className="vx-ledger__label">
-              <div className="vx-ledger__title">
-                <span className="vx-num">{s.n}</span>
+            <div className="vrs-ex-ledger__label">
+              <div className="vrs-ex-ledger__title">
+                <span className="vrs-ex-num">{s.n}</span>
                 {s.title}
               </div>
-              <div className="vx-ledger__hint">{s.hint}</div>
+              <div className="vrs-ex-ledger__hint">{s.hint}</div>
             </div>
-            <div className="vx-ledger__body">{s.body}</div>
+            <div className="vrs-ex-ledger__body">{s.body}</div>
           </div>
         ))}
       </div>
@@ -542,16 +542,16 @@ export function ExecutionView({
     main = secs.map((s) => (
       <div
         key={s.id}
-        className={`vx-card ${hot === s.id ? 'is-hot' : ''}`}
+        className={`vrs-ex-card ${hot === s.id ? 'is-hot' : ''}`}
         {...hover(s.id)}
       >
-        <div className="vx-card__head">
-          <span className="vx-num">{s.n}</span>
-          <span className="vx-card__title">{s.title}</span>
-          <span className="vx-card__sum">{s.sum}</span>
+        <div className="vrs-ex-card__head">
+          <span className="vrs-ex-num">{s.n}</span>
+          <span className="vrs-ex-card__title">{s.title}</span>
+          <span className="vrs-ex-card__sum">{s.sum}</span>
         </div>
-        <div className="vx-card__body">
-          <div className="vx-hint">{s.hint}</div>
+        <div className="vrs-ex-card__body">
+          <div className="vrs-ex-hint">{s.hint}</div>
           {s.body}
         </div>
       </div>
@@ -559,7 +559,7 @@ export function ExecutionView({
   }
 
   return (
-    <div className="vrs-page vrs-fade-in vx-page" style={{ paddingTop: 40 }}>
+    <div className="vrs-page vrs-fade-in vrs-ex-page" style={{ paddingTop: 40 }}>
       <div className="vrs-setup__hero" style={{ alignItems: 'flex-start' }}>
         <span
           className="vrs-rule__ic"
@@ -578,8 +578,8 @@ export function ExecutionView({
         </div>
       </div>
 
-      <div className="vx-grid">
-        <div className="vx-col">
+      <div className="vrs-ex-grid">
+        <div className="vrs-ex-col">
           {main}
           <div className="vrs-form__actions">
             <Button
@@ -592,7 +592,7 @@ export function ExecutionView({
             </Button>
           </div>
         </div>
-        <aside className="vx-aside">
+        <aside className="vrs-ex-aside">
           <VxPreview
             plan={plan}
             hot={hot}
