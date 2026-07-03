@@ -17,8 +17,16 @@ A stream a user follows through a `Source` — **user-owned**, keyed by `user_id
 _Avoid_: subscription, chat, channel cache.
 
 **Fetch new messages**:
-Resume capture for a `Feed` from its current cursor. It updates captured messages and deletion evidence, but does **not** invalidate existing labels, verification, or analysis by default; re-labeling and re-verification are user-initiated through **Review labels**.
+Resume capture for a `Feed` from its current cursor. It updates captured messages and deletion evidence, but does **not** invalidate existing labels, verification, or analysis by default; re-labeling and re-verification are user-initiated through **Review labels**. Contrast **Re-fetch full history**, which starts capture over from scratch.
 _Avoid_: re-label, re-verify, reset.
+
+**Re-fetch full history**:
+Start a `Feed`'s capture over as a new generation ([ADR 0014](../adr/0014-full-refetch-wipes-and-recaptures.md)). It first secures deletion evidence (a mandatory pre-wipe `Rescan`, aborting on an empty live snapshot), then atomically wipes the feed's captured messages and cascaded derived rows and clears the cursor, then recaptures at the chosen **History depth**. The message counter restarts at zero. `DeletedSignalEvidence`, distilled/mined rules, and backfill-run history survive; golden labels (tied to the wiped messages) do not. This is the only way to deepen a shallow capture. Append-only capture ([ADR 0001](../adr/0001-two-layer-raw-capture.md)) still holds **within** a generation.
+_Avoid_: reset (that is feed delete), rebackfill-as-no-op (the old FULL semantics).
+
+**History depth**:
+How far back a fresh capture reaches: `6m`, `1y` (default), or `all`. Applied only to a fresh capture (NULL cursor) — a resume is cursor-bound and ignores it. Deepening later is a **Re-fetch full history**, not a resume. Stored per `Feed`.
+_Avoid_: range, window, lookback (unqualified).
 
 **TelegramChannel**:
 The Telegram adapter's domain view of a `Feed` — a monitored public or private channel a provider posts signals to, identified by its Telegram channel id. Persisted as a user-owned `feed` row (`external_id`); the in-code object keeps `channel_id`.
@@ -66,15 +74,27 @@ _Avoid_: merged signal, final signal.
 ### Parsing rules
 
 **FilterRule**:
-A declarative, versioned, provider-specific **inclusion** rule (recall-first include/exclude patterns) deciding whether a `RawTelegramMessage` is a `RawSignalEvent`. Distilled from signal `GoldenLabel.label`s; shares a regex engine with `ParserRule` but is a distinct entity — it decides inclusion, the parser maps fields.
-_Avoid_: candidate regex, keyword list (those are the cold-start seed, not the distilled rule).
+A declarative, versioned, provider-specific **inclusion** rule (recall-first include/exclude patterns) deciding whether a `RawTelegramMessage` is a `RawSignalEvent`. Produced by **Mining confirm** (from accepted `Template family`s) or the legacy `Distillation loop` (from signal `GoldenLabel.label`s); mined rules carry an empty `distilled_from_label_ids`. Shares a regex engine with `ParserRule` but is a distinct entity — it decides inclusion, the parser maps fields.
+_Avoid_: candidate regex, keyword list (those are the cold-start seed, not the persisted rule).
 
 **ParserRule**:
-A declarative, versioned, provider-specific **extraction** rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch. Distilled from labelled signal text via human-assisted distillation; `GoldenLabel.expected` fields tighten deterministic validation when present.
+A declarative, versioned, provider-specific **extraction** rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch (server-side only — never accepted from the Mining wire). Produced by **Mining confirm** or the legacy `Distillation loop`; `GoldenLabel.expected` fields tighten deterministic validation when present.
 _Avoid_: parser, regex, grammar.
 
 **Distillation loop**:
-The human-assisted labeling cycle: operator classifies messages → AI distills both a `FilterRule` (from labels) and `ParserRule`s (from labelled signal text, tightened by `expected` fields when present) → backend validation applies the rules against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus.
+The **legacy** human-assisted labeling cycle: operator classifies messages → AI distills both a `FilterRule` (from labels) and `ParserRule`s (from labelled signal text, tightened by `expected` fields when present) → backend validation applies the rules against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus. Superseded in the product by **Template mining** ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)); both write the same rule tables.
+
+**Template mining**:
+The parser-first alternative to the `Distillation loop`: the browser runs the deterministic parser over a `Feed`'s captured messages, groups them into `Template family`s, and lets the operator accept or reject each family. Replaced the Label/Distill/Verify screens ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)).
+_Avoid_: distillation, labeling (that is the legacy loop).
+
+**Template family**:
+A group of a `Feed`'s messages sharing one normalized format (a signal template), mined by **Template mining**. Accepting a family validates every message in it at once; one decision, not per-message labels.
+_Avoid_: cluster, group (unqualified).
+
+**Mining confirm**:
+Committing the accepted `Template family`s: the browser compiles them into a `FilterRule` + `ParserRule`s and POSTs them; the backend persists the ruleset (replacing the feed's prior version), re-derives candidates and extraction, recomputes deletion-evidence candidacy from the rules, and marks the `Feed` **verified** ([ADR 0015](../adr/0015-mining-confirm-persists-rules-and-rederives.md)). This is when Mining decisions become authoritative for live extraction and scoring.
+_Avoid_: verify, distill, save.
 
 **Golden corpus**:
 The operator-labeled set of messages (signal / not-signal + expected fields) used as ground truth for parser precision and recall.
@@ -97,8 +117,8 @@ Only deletions of **signal** messages feed a provider's `ProviderScore`; deletin
 _Avoid_: deletion, removed message.
 
 **Rescan**:
-Re-reading a `TelegramChannel`'s **current** live message set and comparing it to what we captured, to find `DeletedSignalEvidence`. The capture layer is append-only, so a deletion is only visible by this live comparison — never by re-reading our own store.
-_Avoid_: re-backfill (that is capture, which never re-reads), refetch.
+Re-reading a `TelegramChannel`'s **current** live message set and comparing it to what we captured, to find `DeletedSignalEvidence`. The capture layer is append-only, so a deletion is only visible by this live comparison — never by re-reading our own store. A **Re-fetch full history** runs a Rescan first, to secure evidence before it wipes.
+_Avoid_: refetch (capture re-reads its own store only as part of **Re-fetch full history**).
 
 ### Scoring
 
