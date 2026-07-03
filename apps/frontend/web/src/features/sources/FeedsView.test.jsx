@@ -443,6 +443,54 @@ describe('FeedsView', () => {
   })
 })
 
+describe('FeedsView deletion visibility', () => {
+  function renderWith(props) {
+    return render(
+      <FeedsView
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+        {...props}
+      />
+    )
+  }
+
+  it('shows how many deleted messages were signals', () => {
+    renderWith({
+      feeds: [
+        { id: 'x', name: 'X', initials: 'X', status: 'analyzed', score: 0, deletedCount: 4, deletedSignalCount: 2 }
+      ]
+    })
+    expect(screen.getByText('4 deleted · 2 signals')).toBeTruthy()
+  })
+
+  it('omits the signal suffix when no deletion is a signal', () => {
+    renderWith({
+      feeds: [
+        { id: 'x', name: 'X', initials: 'X', status: 'analyzed', score: 9, deletedCount: 3, deletedSignalCount: 0 }
+      ]
+    })
+    expect(screen.getByText('3 deleted')).toBeTruthy()
+  })
+
+  it('shows a live scanned count while checking gaps', () => {
+    renderWith({
+      feeds: [
+        { id: 'x', name: 'X', initials: 'X', status: 'verified', deletedCount: 0 }
+      ],
+      checkingGapFeedId: 'x',
+      rescanScanned: 1200
+    })
+    expect(screen.getByText(/checking · 1\.2K scanned/i)).toBeTruthy()
+  })
+})
+
 describe('FeedsView history depth', () => {
   const newFeed = { id: 'nf', name: 'New Feed', initials: 'NF', status: 'new' }
 

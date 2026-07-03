@@ -55,8 +55,11 @@ function fmtNum(n) {
   return String(n)
 }
 
-function deletedText(count) {
-  return `${fmtNum(count)} deleted`
+function deletedText(feed) {
+  const base = `${fmtNum(feed.deletedCount)} deleted`
+  const signals = feed.deletedSignalCount || 0
+  if (signals === 0) return base
+  return `${base} · ${signals} signal${signals === 1 ? '' : 's'}`
 }
 
 function isReviewedFeed(feed) {
@@ -75,6 +78,7 @@ export function FeedsView({
   onViewDeleted,
   onCheckGaps,
   checkingGapFeedId,
+  rescanScanned,
   onBacktest,
   onAddFeed
 }) {
@@ -413,10 +417,16 @@ export function FeedsView({
                   />
                   {fmtNum(c.subscribers)} subscribers
                 </span>
+                {checkingGapFeedId === c.id && rescanScanned != null && (
+                  <>
+                    <span className="dot" />
+                    <span>checking · {fmtNum(rescanScanned)} scanned</span>
+                  </>
+                )}
                 {c.deletedCount > 0 && (
                   <>
                     <span className="dot" />
-                    <span>{deletedText(c.deletedCount)}</span>
+                    <span>{deletedText(c)}</span>
                   </>
                 )}
                 {c.status === 'analyzed' && !c.signalDeletion && (

@@ -87,6 +87,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
 
   const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
   const [checkingGapFeedId, setCheckingGapFeedId] = useState(null)
+  const [rescanScanned, setRescanScanned] = useState(null)
 
   useEffect(() => {
     setUser(mergeUserDefaults(sessionUser))
@@ -214,17 +215,23 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     }
 
     setCheckingGapFeedId(feed.id)
+    setRescanScanned(null)
 
     try {
       await startDeletionRescan(authToken, feed.id)
       streamDeletionRescanProgress(authToken, feed.id, {
+        onProgress: (progress) => {
+          if (progress.scanned != null) setRescanScanned(progress.scanned)
+        },
         onDone: (result) => {
           setCheckingGapFeedId(null)
+          setRescanScanned(null)
           void refreshSources().catch(() => {})
           showDeletionRescanToast(feed, result)
         },
         onError: (error) => {
           setCheckingGapFeedId(null)
+          setRescanScanned(null)
           fireToast(
             'rejected',
             'Check gaps failed',
@@ -332,6 +339,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onViewDeleted={goToDeletedSignals}
         onCheckGaps={handleCheckGaps}
         checkingGapFeedId={checkingGapFeedId}
+        rescanScanned={rescanScanned}
         onBacktest={backtestFeed}
         onAddFeed={addTelegramFeed}
       />
