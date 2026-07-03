@@ -109,10 +109,12 @@ def _many_messages(count: int) -> list[RawTelegramMessage]:
 
 
 class SlowSource(FakeSource):
-    async def backfill_batches(self, channel_id, after_message_id, batch_size):
+    async def backfill_batches(
+        self, channel_id, after_message_id, batch_size, since=None
+    ):
         await asyncio.sleep(0.2)
         async for batch in super().backfill_batches(
-            channel_id, after_message_id, batch_size
+            channel_id, after_message_id, batch_size, since=since
         ):
             yield batch
 
@@ -168,6 +170,53 @@ def test_backfill_job_streams_progress_and_counts_unlabelled_deletion(client, ap
     assert listed.json()["feeds"][0]["status"] == "backfilled"
     assert listed.json()["feeds"][0]["signalDeletion"] is False
     assert listed.json()["feeds"][0]["deletedCount"] == 1
+
+
+def test_backfill_persists_selected_history_depth(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    started = client.post(
+        "/feeds/7/backfill",
+        headers=_auth(token),
+        json={"mode": "resume", "depth": "6m"},
+    )
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert started.status_code == 202
+    assert listed["historyDepth"] == "6m"
+
+
+def test_backfill_defaults_history_depth_to_one_year(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert listed["historyDepth"] == "1y"
+
+
+def test_backfill_rejects_unknown_history_depth(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 3})
+    _connect_and_subscribe(client, app, token, source)
+
+    response = client.post(
+        "/feeds/7/backfill", headers=_auth(token), json={"depth": "2y"}
+    )
+
+    assert response.status_code == 422
 
 
 def test_backfill_duplicate_start_and_cancel(client, app):

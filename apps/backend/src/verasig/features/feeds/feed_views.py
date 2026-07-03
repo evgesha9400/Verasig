@@ -101,6 +101,7 @@ def _present_feed(
         "initials": feed_initials(feed.title),
         "tint": feed_tint(feed.title),
         "status": feed.status,
+        "historyDepth": feed.history_depth,
         "fetched": fetched,
         "lastDate": format_long(oldest) if oldest else None,
         "score": 0 if deletion.signal_deletion else score,

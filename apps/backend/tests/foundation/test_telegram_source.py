@@ -309,6 +309,40 @@ async def test_numeric_channel_resolution_reuses_joined_dialog_entity_for_reads(
     assert client.iter_dialog_calls == 1
 
 
+async def test_backfill_batches_forwards_offset_date_and_min_id():
+    entity = _entity(entity_id=7, title="Private Signals", username=None)
+    client = FakeTelethonClient(
+        messages_by_channel={entity: [FakeTelethonMessage(11)]},
+        dialogs=[_dialog(entity)],
+    )
+    source = TelethonSource(client)
+    await source.resolve_channel(7)
+
+    since = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _ = [batch async for batch in source.backfill_batches(7, 42, 200, since=since)]
+
+    _channel_arg, kwargs = client.iter_calls[0]
+    assert kwargs["min_id"] == 42
+    assert kwargs["offset_date"] == since
+    assert kwargs["reverse"] is True
+
+
+async def test_backfill_batches_without_since_bounds_nothing_by_date():
+    entity = _entity(entity_id=7, title="Private Signals", username=None)
+    client = FakeTelethonClient(
+        messages_by_channel={entity: [FakeTelethonMessage(11)]},
+        dialogs=[_dialog(entity)],
+    )
+    source = TelethonSource(client)
+    await source.resolve_channel(7)
+
+    _ = [batch async for batch in source.backfill_batches(7, None, 200)]
+
+    _channel_arg, kwargs = client.iter_calls[0]
+    assert kwargs["offset_date"] is None
+    assert kwargs["min_id"] == 0
+
+
 async def test_live_message_ids_reports_scan_progress():
     messages = [FakeTelethonMessage(message_id) for message_id in (10, 11, 12)]
     client = FakeTelethonClient(messages_by_channel={7: messages})

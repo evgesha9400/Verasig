@@ -44,6 +44,17 @@ def _messages(count: int) -> list[RawTelegramMessage]:
     ]
 
 
+def _dated_message(message_id: int, posted_at: datetime) -> RawTelegramMessage:
+    return RawTelegramMessage(
+        channel_id=1,
+        message_id=message_id,
+        posted_at=posted_at,
+        captured_at=posted_at,
+        has_media=False,
+        raw_payload={"id": message_id},
+    )
+
+
 def _account() -> UserAccount:
     return UserAccount(
         id=uuid4(),
@@ -74,6 +85,39 @@ async def test_backfill_persists_all_messages(session_factory):
     assert result.captured_through_external_message_id == 5
     with session_factory() as db_session:
         assert message_repository.count_messages(db_session, user_id, 1) == 5
+
+
+async def test_backfill_with_since_captures_only_messages_after_cutoff(session_factory):
+    user_id = _seed_account(session_factory)
+    old = _dated_message(1, datetime(2025, 1, 1, tzinfo=timezone.utc))
+    recent = _dated_message(2, datetime(2026, 6, 1, tzinfo=timezone.utc))
+    source = FakeSource(_channel(), [old, recent])
+    since = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    result = await backfill(
+        source, user_id, "@pilot", session_factory, batch_size=5, since=since
+    )
+
+    assert source.requested_sinces[0] == since
+    assert result.inserted == 1
+    with session_factory() as db_session:
+        assert message_repository.count_messages(db_session, user_id, 1) == 1
+
+
+async def test_backfill_ignores_since_when_cursor_present(session_factory):
+    user_id = _seed_account(session_factory)
+    await backfill(
+        FakeSource(_channel(), _messages(3)), user_id, "@pilot", session_factory, 5
+    )
+    resumed = FakeSource(_channel(), _messages(5))
+    future_cutoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
+
+    result = await backfill(
+        resumed, user_id, "@pilot", session_factory, batch_size=5, since=future_cutoff
+    )
+
+    assert resumed.requested_sinces[0] is None  # suppressed: cursor already set
+    assert result.inserted == 2  # messages 4,5 captured, unaffected by the cutoff
 
 
 async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):

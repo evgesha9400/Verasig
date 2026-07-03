@@ -92,6 +92,7 @@ class FakeSource:
         self.before_batch = before_batch
         self.resolve_error = resolve_error
         self.requested_afters: list[int | None] = []
+        self.requested_sinces: list[object] = []
         self.yielded_ids: list[int] = []
 
     async def __aenter__(self) -> "FakeSource":
@@ -106,11 +107,20 @@ class FakeSource:
         return self.channel
 
     async def backfill_batches(
-        self, _channel_id: int, after_message_id: int | None, batch_size: int
+        self,
+        _channel_id: int,
+        after_message_id: int | None,
+        batch_size: int,
+        since=None,
     ) -> AsyncIterator[list[RawTelegramMessage]]:
         self.requested_afters.append(after_message_id)
+        self.requested_sinces.append(since)
         after = after_message_id or 0
-        pending = [m for m in self.messages if m.message_id > after]
+        pending = [
+            m
+            for m in self.messages
+            if m.message_id > after and (since is None or m.posted_at > since)
+        ]
         yielded = 0
         for index, start in enumerate(range(0, len(pending), batch_size)):
             if self.fail_after_batch is not None and index == self.fail_after_batch:

@@ -55,7 +55,10 @@ def _gap_ids(stored_ids: set[int], live_message_ids: set[int]) -> list[int]:
     universe = stored_ids | live_message_ids
     if not universe:
         return []
-    span = range(min(universe), max(universe) + 1)
+    # Floor the span at the oldest captured id: slots below it are pre-capture
+    # (a depth-limited backfill starts partway in), never our deletions to claim.
+    lower = min(stored_ids) if stored_ids else min(universe)
+    span = range(lower, max(universe) + 1)
     return [
         mid for mid in span if mid not in stored_ids and mid not in live_message_ids
     ]

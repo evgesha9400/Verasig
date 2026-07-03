@@ -125,13 +125,14 @@ async def start_backfill(
 ) -> dict:
     channel_id = int(external_id)
     mode = payload.mode if payload else BackfillMode.RESUME
+    depth = payload.depth if payload else None
 
     def make_source():
         with request.app.state.session_factory() as session:
             return _require_connected_source(request, session, subscription.user_id)
 
     run = request.app.state.backfill_jobs.start(
-        subscription.user_id, channel_id, make_source, mode
+        subscription.user_id, channel_id, make_source, mode, depth
     )
     return {"jobId": str(run.id)}
 

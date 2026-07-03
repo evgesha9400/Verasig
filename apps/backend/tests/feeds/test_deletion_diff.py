@@ -72,6 +72,14 @@ def test_gap_absent_from_both_is_suspected_without_content():
         assert gap.detected_at == _DETECTED_AT
 
 
+def test_gap_below_oldest_stored_message_is_not_suspected():
+    # depth-limited capture starts at id 5; id 1 is still live but below our
+    # capture floor, so the 2-4 slots are pre-window and must NOT be SUSPECTED
+    stored = [_message(5, "fifth"), _message(6, "sixth")]
+    evidence = _detect(stored, live_ids={1, 5, 6}, candidate_ids=set())
+    assert evidence == []
+
+
 def test_still_present_id_is_never_flagged_even_if_never_captured():
     # id 3 is live (present now) though never captured; only id 2 (in neither) flags
     evidence = _detect([_message(1, "first")], live_ids={1, 3}, candidate_ids=set())

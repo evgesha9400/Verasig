@@ -140,12 +140,18 @@ class TelethonSource(TelegramSource):
         return matches[0]
 
     async def backfill_batches(
-        self, channel_id: int, after_message_id: int | None, batch_size: int
+        self,
+        channel_id: int,
+        after_message_id: int | None,
+        batch_size: int,
+        since: datetime | None = None,
     ) -> AsyncIterator[list[RawTelegramMessage]]:
+        # reverse=True streams oldest->newest; offset_date bounds the oldest end
+        # (Telethon returns messages strictly after `since`), composing with min_id.
         batch: list[RawTelegramMessage] = []
         entity = self._read_entity(channel_id)
         messages = self._client.iter_messages(
-            entity, reverse=True, min_id=after_message_id or 0
+            entity, reverse=True, min_id=after_message_id or 0, offset_date=since
         )
         async for message in messages:  # Telethon auto-sleeps short flood-waits
             batch.append(self._to_raw_message(channel_id, message))

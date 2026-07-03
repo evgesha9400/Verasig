@@ -29,6 +29,15 @@ class BackfillResult:
     captured_through_external_message_id: int | None
 
 
+def _effective_since(cursor: int | None, since: datetime | None) -> datetime | None:
+    """Apply the depth cutoff only to a fresh capture; a resume is cursor-bound.
+
+    Deepening an existing capture is a `Re-fetch full history` (which clears the
+    cursor first), never a resume, so `since` is ignored while a cursor is set.
+    """
+    return since if cursor is None else None
+
+
 async def backfill(
     source: TelegramSource,
     user_id: UUID,
@@ -36,19 +45,24 @@ async def backfill(
     session_factory: sessionmaker,
     batch_size: int,
     on_batch: Callable[[int, datetime], None] | None = None,
+    since: datetime | None = None,
 ) -> BackfillResult:
     external_id, cursor = await _register_feed(
         source, user_id, reference, session_factory
     )
+    effective_since = _effective_since(cursor, since)
     logger.info(
         "backfill stream: user=%s external_id=%s resuming after_message_id=%s "
-        "(None means from the beginning)",
+        "(None means from the beginning) since=%s",
         user_id,
         external_id,
         cursor,
+        effective_since,
     )
     inserted = 0
-    async for batch in source.backfill_batches(external_id, cursor, batch_size):
+    async for batch in source.backfill_batches(
+        external_id, cursor, batch_size, since=effective_since
+    ):
         inserted += _persist_batch(session_factory, user_id, external_id, batch)
         if on_batch and batch:
             on_batch(inserted, min(message.posted_at for message in batch))

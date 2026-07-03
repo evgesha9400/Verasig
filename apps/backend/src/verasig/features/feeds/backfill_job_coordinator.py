@@ -29,6 +29,7 @@ from verasig.features.feeds.feed_job_progress import (
     scan_phase,
     should_publish_count,
 )
+from verasig.features.feeds.history_depth import HistoryDepth, depth_cutoff
 from verasig.foundation.jobs.registry import (
     JobAlreadyRunningError,
     JobPublisher,
@@ -75,8 +76,14 @@ class BackfillJobCoordinator:
         channel_id: int,
         make_source: Callable[[], TelegramSource],
         mode: BackfillMode = BackfillMode.RESUME,
+        depth: HistoryDepth | None = None,
     ) -> BackfillJobRun:
-        logger.info("backfill.start requested: channel=%s mode=%s", channel_id, mode)
+        logger.info(
+            "backfill.start requested: channel=%s mode=%s depth=%s",
+            channel_id,
+            mode,
+            depth,
+        )
         idempotent = self._read_idempotent_run(user_id, channel_id, mode)
         if idempotent is not None:
             logger.info(
@@ -89,6 +96,7 @@ class BackfillJobCoordinator:
             )
             return idempotent
 
+        self._persist_depth(user_id, channel_id, depth)
         if mode is BackfillMode.FULL:
             self._reset_cursor(user_id, channel_id)
 
@@ -231,6 +239,21 @@ class BackfillJobCoordinator:
             return latest
         return None
 
+    def _persist_depth(
+        self, user_id: UUID, channel_id: int, depth: HistoryDepth | None
+    ) -> None:
+        if depth is None:
+            return
+        with self._session_factory() as session:
+            feed_repository.set_history_depth(session, user_id, channel_id, depth)
+            session.commit()
+
+    def _capture_cutoff(self, user_id: UUID, channel_id: int) -> datetime | None:
+        """The oldest `posted_at` a fresh capture should reach, per the feed depth."""
+        with self._session_factory() as session:
+            depth = feed_repository.read_history_depth(session, user_id, channel_id)
+        return depth_cutoff(depth, _now())
+
     def _reset_cursor(self, user_id: UUID, channel_id: int) -> None:
         with self._session_factory() as session:
             previous = feed_repository.read_cursor(session, user_id, channel_id)
@@ -296,6 +319,7 @@ class BackfillJobCoordinator:
                     self._session_factory,
                     self._batch_size,
                     on_batch=on_batch,
+                    since=self._capture_cutoff(user_id, channel_id),
                 )
                 logger.info(
                     "backfill.run stream done: run=%s channel=%s inserted=%s cursor=%s",
