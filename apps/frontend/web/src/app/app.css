@@ -712,6 +712,30 @@
   max-width: 90vw;
 }
 
+/* ---- Backfill stage strip (Securing → Fetching → Indexing → Deletion scan) ---- */
+.vrs-bf-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.vrs-bf-stage {
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+.vrs-bf-stage.is-done {
+  color: var(--text-body);
+}
+.vrs-bf-stage.is-active {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
 /* ---- Pipeline stepper ---- */
 .vrs-pipe {
   display: flex;

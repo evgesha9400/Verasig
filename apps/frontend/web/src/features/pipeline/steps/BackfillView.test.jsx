@@ -104,6 +104,51 @@ describe('BackfillView', () => {
     expect(onStream).toHaveBeenCalledTimes(1)
   })
 
+  it('seeds the counter at zero for a full re-fetch (wipe & recapture)', () => {
+    render(
+      <BackfillView
+        feed={{ ...feed, fetched: 9000, lastDate: 'Jun 1, 2026' }}
+        mode="full"
+        onStart={vi.fn().mockResolvedValue()}
+        onStream={() => ({ close: vi.fn() })}
+        onComplete={() => {}}
+      />
+    )
+    expect(screen.queryByText('9,000')).toBeNull()
+    expect(screen.getByText('0')).toBeTruthy()
+  })
+
+  it('advances the stage strip from the streamed stage field', async () => {
+    const onStart = vi.fn().mockResolvedValue()
+    let streamHandlers
+    const onStream = vi.fn((_id, handlers) => {
+      streamHandlers = handlers
+      return { close: vi.fn() }
+    })
+    render(
+      <BackfillView
+        feed={feed}
+        onStart={onStart}
+        onStream={onStream}
+        onComplete={() => {}}
+      />
+    )
+    await waitFor(() => expect(onStart).toHaveBeenCalled())
+
+    act(() => {
+      streamHandlers.onProgress({
+        fetched: 200,
+        stage: 'rescan',
+        phase: 'Checking deleted messages...'
+      })
+    })
+
+    expect(screen.getByText('Deletion scan').classList.contains('is-active')).toBe(true)
+    expect(screen.getByText('Fetching history').classList.contains('is-done')).toBe(
+      true
+    )
+  })
+
   it('renders an empty oldest-date placeholder until the backend reports a date', () => {
     render(
       <BackfillView

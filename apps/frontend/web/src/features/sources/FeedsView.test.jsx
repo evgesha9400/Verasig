@@ -464,7 +464,15 @@ describe('FeedsView deletion visibility', () => {
   it('shows how many deleted messages were signals', () => {
     renderWith({
       feeds: [
-        { id: 'x', name: 'X', initials: 'X', status: 'analyzed', score: 0, deletedCount: 4, deletedSignalCount: 2 }
+        {
+          id: 'x',
+          name: 'X',
+          initials: 'X',
+          status: 'analyzed',
+          score: 0,
+          deletedCount: 4,
+          deletedSignalCount: 2
+        }
       ]
     })
     expect(screen.getByText('4 deleted · 2 signals')).toBeTruthy()
@@ -473,7 +481,15 @@ describe('FeedsView deletion visibility', () => {
   it('omits the signal suffix when no deletion is a signal', () => {
     renderWith({
       feeds: [
-        { id: 'x', name: 'X', initials: 'X', status: 'analyzed', score: 9, deletedCount: 3, deletedSignalCount: 0 }
+        {
+          id: 'x',
+          name: 'X',
+          initials: 'X',
+          status: 'analyzed',
+          score: 9,
+          deletedCount: 3,
+          deletedSignalCount: 0
+        }
       ]
     })
     expect(screen.getByText('3 deleted')).toBeTruthy()

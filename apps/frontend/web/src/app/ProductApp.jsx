@@ -365,6 +365,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       body = (
         <BackfillView
           feed={activeFeed}
+          mode={backfillMode}
           onStart={(chatId) =>
             startBackfillJob(authToken, chatId, backfillMode, backfillDepth)
           }

@@ -30,9 +30,38 @@ function simulatedDateLabels() {
   })
 }
 
+// Coarse capture stages the strip shows, driven by the SSE `stage` field
+// (falls back to the log line for the free-text detail).
+const CAPTURE_STAGES = [
+  { id: 'capture', label: 'Fetching history' },
+  { id: 'index', label: 'Indexing' },
+  { id: 'rescan', label: 'Deletion scan' }
+]
+const SECURE_STAGE = { id: 'secure', label: 'Securing evidence' }
+
+function StageStrip({ stage, isFull }) {
+  const stages = isFull ? [SECURE_STAGE, ...CAPTURE_STAGES] : CAPTURE_STAGES
+  const activeIndex = stages.findIndex((item) => item.id === stage)
+  return (
+    <div className="vrs-bf-stages">
+      {stages.map((item, index) => (
+        <span
+          key={item.id}
+          className={`vrs-bf-stage ${index === activeIndex ? 'is-active' : ''} ${
+            index < activeIndex ? 'is-done' : ''
+          }`.trim()}
+        >
+          {item.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /* Verasig prototype — backfill infinite loader */
 export function BackfillView({
   feed,
+  mode,
   onCancel = () => {},
   onComplete = () => {},
   onError = () => {},
@@ -40,11 +69,17 @@ export function BackfillView({
   onStream,
   onCancelBackfill
 }) {
-  const [count, setCount] = useState(feed.fetched || 0)
-  const [date, setDate] = useState(displayDate(feed.lastDate))
+  // A full re-fetch wipes and recaptures (ADR 0014), so its counter starts at 0
+  // rather than the stale pre-wipe total.
+  const isFull = mode === 'full'
+  const seedCount = isFull ? 0 : feed.fetched || 0
+  const seedDate = isFull ? null : feed.lastDate || null
+  const [count, setCount] = useState(seedCount)
+  const [date, setDate] = useState(displayDate(seedDate))
   const [logLine, setLogLine] = useState('Opening MTProto session…')
-  const countRef = useRef(feed.fetched || 0)
-  const dateRef = useRef(feed.lastDate || null)
+  const [stage, setStage] = useState('capture')
+  const countRef = useRef(seedCount)
+  const dateRef = useRef(seedDate)
   const handlersRef = useRef({
     onCancel,
     onCancelBackfill,
@@ -68,11 +103,12 @@ export function BackfillView({
   const hasBackendBackfill = !!onStart && !!onStream
 
   useEffect(() => {
-    countRef.current = feed.fetched || 0
-    dateRef.current = feed.lastDate || null
-    setCount(feed.fetched || 0)
-    setDate(displayDate(feed.lastDate))
+    countRef.current = isFull ? 0 : feed.fetched || 0
+    dateRef.current = isFull ? null : feed.lastDate || null
+    setCount(isFull ? 0 : feed.fetched || 0)
+    setDate(displayDate(isFull ? null : feed.lastDate))
     setLogLine('Opening MTProto session…')
+    setStage(isFull ? 'secure' : 'capture')
 
     if (hasBackendBackfill) {
       let closed = false
@@ -92,6 +128,7 @@ export function BackfillView({
                 setDate(displayDate(progress.lastDate))
               }
               if (progress.phase) setLogLine(progress.phase)
+              if (progress.stage) setStage(progress.stage)
             },
             onDone: (result) => {
               const total = result.fetched ?? countRef.current
@@ -262,6 +299,7 @@ export function BackfillView({
         </div>
       </div>
 
+      <StageStrip stage={stage} isFull={isFull} />
       <div className="vrs-bf-track" />
       <div className="vrs-bf-log">{logLine}</div>
 
