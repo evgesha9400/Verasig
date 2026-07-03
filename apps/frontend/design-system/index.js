@@ -1,6 +1,7 @@
 export { Avatar } from './src/components/core/Avatar.jsx'
 export { Badge } from './src/components/core/Badge.jsx'
 export { Button } from './src/components/core/Button.jsx'
+export { SplitButton } from './src/components/core/SplitButton.jsx'
 export { IconButton } from './src/components/core/IconButton.jsx'
 export { TextLink } from './src/components/core/TextLink.jsx'
 export { SegmentedControl } from './src/components/core/SegmentedControl.jsx'
