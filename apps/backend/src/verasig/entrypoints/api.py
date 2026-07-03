@@ -14,6 +14,7 @@ from verasig.features.risk import routes as risk_routes
 from verasig.features.rules import (
     distill_routes,
     label_routes,
+    mining_routes,
     verify_routes,
 )
 from verasig.features.rules.rule_distiller import AnthropicDistiller
@@ -51,6 +52,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     simulation_routes.router,
     label_routes.router,
     distill_routes.router,
+    mining_routes.router,
     verify_routes.router,
     risk_routes.router,
     signal_routes.router,

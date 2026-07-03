@@ -7,6 +7,29 @@ from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.extract_service import ExtractService
 
 
+def rematerialize_signal_outcomes(
+    session: Session, user_id: UUID, channel_id: int
+) -> tuple[int, int]:
+    """Re-extract EVERY event with the feed's current parser rules (ADR 0015).
+
+    Used after Mining Confirm changes the ruleset: `record_outcome` upserts by
+    (user_id, event_id) and flips winner/loser + drift, so a full re-run is
+    idempotent. Returns (extracted, unrecognized) counts.
+    """
+    events = event_repository.read_signal_events(session, user_id, channel_id)
+    parser_rules = rule_repository.read_parser_rules(session, channel_id, user_id)
+    service = ExtractService(parser_rules)
+    extracted = unrecognized = 0
+    for event in events:
+        outcome = service.extract(event)
+        outcome_repository.record_outcome(session, outcome, user_id)
+        if outcome.signal is not None:
+            extracted += 1
+        else:
+            unrecognized += 1
+    return extracted, unrecognized
+
+
 def materialize_missing_signal_outcomes(
     session: Session, user_id: UUID, channel_id: int
 ) -> None:

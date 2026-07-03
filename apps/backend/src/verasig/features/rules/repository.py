@@ -6,7 +6,7 @@ Domain rules/labels speak `channel_id`/`message_id`; storage speaks
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -107,6 +107,42 @@ def read_rule_feed_ids(
         for channel_id in [*filter_ids, *parser_ids]
         if channel_id is not None
     }
+
+
+def next_rule_version(session: Session, user_id: UUID, channel_id: int) -> int:
+    """One past the highest version across both rule tables for this feed.
+
+    Mining Confirm replaces a feed's rules by bumping the version and deleting
+    the prior rows, so no stale version can shadow the re-mined ruleset.
+    """
+    filter_max = session.scalar(
+        select(func.max(FilterRuleRow.version)).where(
+            FilterRuleRow.user_id == user_id, FilterRuleRow.external_id == channel_id
+        )
+    )
+    parser_max = session.scalar(
+        select(func.max(ParserRuleRow.version)).where(
+            ParserRuleRow.user_id == user_id, ParserRuleRow.external_id == channel_id
+        )
+    )
+    return max(filter_max or 0, parser_max or 0) + 1
+
+
+def delete_feed_rules(
+    session: Session, user_id: UUID, channel_id: int
+) -> tuple[int, int]:
+    """Remove all of a feed's filter + parser rules; returns (filters, parsers)."""
+    filters = session.execute(
+        delete(FilterRuleRow).where(
+            FilterRuleRow.user_id == user_id, FilterRuleRow.external_id == channel_id
+        )
+    ).rowcount
+    parsers = session.execute(
+        delete(ParserRuleRow).where(
+            ParserRuleRow.user_id == user_id, ParserRuleRow.external_id == channel_id
+        )
+    ).rowcount
+    return filters, parsers
 
 
 def upsert_parser_rules(session: Session, rules: list[ParserRule]) -> None:

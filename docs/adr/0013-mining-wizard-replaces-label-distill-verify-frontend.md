@@ -57,3 +57,15 @@ backend was deliberately left alone as a separate, deferred piece of work.
   superseded** — the human-assisted distillation loop they describe is still
   the mechanism actually feeding live extraction — but their frontend entry
   points (the Label/Distill/Verify screens) are now dead.
+
+## Amendment — superseded consequence (see [ADR 0015](0015-mining-confirm-persists-rules-and-rederives.md))
+
+The consequence above that "Mining's compiled rules exist only in frontend
+memory … and are **not persisted to the backend at all**" is **no longer true**.
+[ADR 0015](0015-mining-confirm-persists-rules-and-rederives.md) adds the
+follow-up this ADR called out as out of scope: a Mining Confirm endpoint
+persists the compiled `FilterRule` / `ParserRule`s into the existing rule
+tables, re-derives extraction and deletion-evidence candidacy, and marks the
+feed `verified` server-side. Live extraction now reflects the operator's Mining
+decisions, and the distillation loop is the *legacy* rule producer. The
+`label` / `distill` / `verify` routes remain dead code as this ADR describes.

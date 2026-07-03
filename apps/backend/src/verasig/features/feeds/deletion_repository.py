@@ -4,6 +4,7 @@ The domain `DeletedSignalEvidence` speaks `channel_id`/`message_id`; storage
 speaks `external_id`/`external_message_id` and is user-owned.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -75,6 +76,35 @@ def _row_to_deletion(row: DeletedSignalEvidenceRow) -> DeletedSignalEvidence:
         detected_at=row.detected_at,
         was_signal_candidate=row.was_signal_candidate,
     )
+
+
+def update_evidence_candidacy(
+    session: Session,
+    user_id: UUID,
+    external_id: int,
+    decide: Callable[[int, str | None], bool],
+) -> int:
+    """Recompute `was_signal_candidate` for CONFIRMED evidence from `decide`.
+
+    `decide(message_id, original_text)` is rule-authoritative (ADR 0015). Only
+    CONFIRMED rows carry text; post-wipe they have no surviving `raw_message`, so
+    `decide` must fall back to the retained `original_text`. Returns rows changed.
+    """
+    rows = session.scalars(
+        select(DeletedSignalEvidenceRow).where(
+            DeletedSignalEvidenceRow.user_id == user_id,
+            DeletedSignalEvidenceRow.external_id == external_id,
+            DeletedSignalEvidenceRow.confidence == "CONFIRMED",
+        )
+    ).all()
+    changed = 0
+    for row in rows:
+        decided = decide(row.external_message_id, row.original_text)
+        if row.was_signal_candidate != decided:
+            row.was_signal_candidate = decided
+            changed += 1
+    session.flush()
+    return changed
 
 
 def read_deletion_evidence(
