@@ -48,6 +48,7 @@ _FEED_STATUS = (
     "status IN ('new', 'backfilling', 'backfilled', 'verified', "
     "'analyzed', 'cancelled', 'failed')"
 )
+_FEED_HISTORY_DEPTH = "history_depth IN ('6m', '1y', 'all')"
 
 
 class FeedRow(Base):
@@ -59,7 +60,10 @@ class FeedRow(Base):
     """
 
     __tablename__ = "feed"
-    __table_args__ = (CheckConstraint(_FEED_STATUS, name="ck_feed_status"),)
+    __table_args__ = (
+        CheckConstraint(_FEED_STATUS, name="ck_feed_status"),
+        CheckConstraint(_FEED_HISTORY_DEPTH, name="ck_feed_history_depth"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), primary_key=True
@@ -72,6 +76,9 @@ class FeedRow(Base):
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="new")
+    history_depth: Mapped[str] = mapped_column(
+        String, nullable=False, server_default="1y"
+    )
     verify_attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     captured_through_external_message_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True

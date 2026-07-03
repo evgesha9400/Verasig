@@ -26,6 +26,7 @@ from verasig.domain.channel_reference import (
     parse_channel_reference,
 )
 from verasig.domain.source import TELEGRAM
+from verasig.features.feeds.history_depth import HistoryDepth
 from verasig.features.sources import source_repository
 from verasig.storage.models import FeedRow
 
@@ -162,6 +163,25 @@ def set_status(
     if row is None:
         return None
     row.status = status
+    session.flush()
+    return row
+
+
+def read_history_depth(
+    session: Session, user_id: UUID, external_id: int
+) -> HistoryDepth:
+    """The feed's chosen capture depth; defaults to one year when unknown."""
+    row = read_feed(session, user_id, external_id)
+    return HistoryDepth(row.history_depth) if row else HistoryDepth.ONE_YEAR
+
+
+def set_history_depth(
+    session: Session, user_id: UUID, external_id: int, depth: HistoryDepth
+) -> FeedRow | None:
+    row = read_feed(session, user_id, external_id)
+    if row is None:
+        return None
+    row.history_depth = depth.value
     session.flush()
     return row
 

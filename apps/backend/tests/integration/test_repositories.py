@@ -17,6 +17,7 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.feeds.history_depth import HistoryDepth
 from verasig.features.risk import repository as risk_repository
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
@@ -220,6 +221,53 @@ def test_feed_repository_round_trips_and_purges_capture_on_delete(db_session):
     assert message_repository.count_messages(db_session, account.id, 1) == 0
     assert feed_repository.read_cursor(db_session, account.id, 1) is None
     assert rule_repository.read_labels(db_session, 1, account.id) == []
+
+
+def test_feed_defaults_to_one_year_history_depth(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
+    feed_repository.create_feed(db_session, account.id, _channel(), _instant())
+    db_session.commit()
+
+    assert (
+        feed_repository.read_history_depth(db_session, account.id, 1)
+        is HistoryDepth.ONE_YEAR
+    )
+
+
+def test_set_history_depth_round_trips(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
+    feed_repository.create_feed(db_session, account.id, _channel(), _instant())
+    db_session.commit()
+
+    feed_repository.set_history_depth(
+        db_session, account.id, 1, HistoryDepth.SIX_MONTHS
+    )
+    db_session.commit()
+
+    assert (
+        feed_repository.read_history_depth(db_session, account.id, 1)
+        is HistoryDepth.SIX_MONTHS
+    )
+
+
+def test_upsert_feed_metadata_preserves_history_depth(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    insert_source(db_session, account.id)
+    feed_repository.create_feed(db_session, account.id, _channel(), _instant())
+    feed_repository.set_history_depth(db_session, account.id, 1, HistoryDepth.ALL)
+    db_session.commit()
+
+    feed_repository.upsert_feed_metadata(
+        db_session, account.id, _channel(title="Renamed"), _instant()
+    )
+    db_session.commit()
+
+    assert (
+        feed_repository.read_history_depth(db_session, account.id, 1)
+        is HistoryDepth.ALL
+    )
 
 
 def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session):
