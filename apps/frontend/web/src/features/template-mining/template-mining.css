@@ -429,6 +429,18 @@
   color: var(--text-muted);
 }
 
+/* ---- examples dialog (all messages in one template) ---- */
+.vrs-tm-exdialog {
+  max-width: 760px;
+}
+.vrs-tm-exdialog .vrs-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 70vh;
+  overflow: auto;
+}
+
 /* ---- review (full-history result review) ---- */
 .vrs-tm-review {
   display: flex;

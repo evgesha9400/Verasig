@@ -12,10 +12,10 @@ import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { MiningStepBar } from './MiningStepBar.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
+import { TemplateExamplesDialog } from './TemplateExamplesDialog.jsx'
 import { OverlayManager } from './OverlayManager.jsx'
 import { AuditReview } from './AuditReview.jsx'
 import { formatPercent } from './format.js'
-import { toggleInSet } from './toggleSet.js'
 import './template-mining.css'
 
 /* Verasig — Parser-first Template Mining (pipeline wizard step).
@@ -87,7 +87,7 @@ export function TemplateMiningPage({
   const [pasted, setPasted] = useState('')
   const [result, setResult] = useState(null) // { groups, messages }
   const [internalDecisions, setInternalDecisions] = useState({})
-  const [expanded, setExpanded] = useState(() => new Set())
+  const [examplesFor, setExamplesFor] = useState(null) // open template's key
   const [running, setRunning] = useState(true)
   const [subStep, setSubStep] = useState('mine') // 'mine' | 'review' | 'verify'
 
@@ -164,7 +164,7 @@ export function TemplateMiningPage({
     const mined = mineTemplateGroups(minedMessages, overlay)
     setResult({ groups: mined, messages: minedMessages })
     setDecisions({})
-    setExpanded(new Set())
+    setExamplesFor(null)
     fireToast?.(
       'verified',
       'Template mining complete',
@@ -250,22 +250,21 @@ export function TemplateMiningPage({
     setDecisions(next)
   }
 
-  function toggleExamples(templateKey) {
-    setExpanded((current) => toggleInSet(current, templateKey))
-  }
-
   function goToVerify() {
     if (acceptedGroups.length > 0) setSubStep('verify')
   }
 
   const cardProps = (group) => ({
     status: decisions[group.templateKey] || 'unreviewed',
-    expanded: expanded.has(group.templateKey),
     onAccept: () => decide(group.templateKey, 'accepted'),
     onReject: () => decide(group.templateKey, 'rejected'),
     onReset: () => resetDecision(group.templateKey),
-    onToggleExamples: () => toggleExamples(group.templateKey)
+    onShowExamples: () => setExamplesFor(group.templateKey)
   })
+
+  const examplesGroup = examplesFor
+    ? groups.find((group) => group.templateKey === examplesFor)
+    : null
 
   return (
     <div className="vrs-page vrs-tm">
@@ -387,6 +386,20 @@ export function TemplateMiningPage({
           />
         </>
       )}
+
+      <TemplateExamplesDialog
+        group={examplesGroup}
+        open={Boolean(examplesGroup)}
+        onClose={() => setExamplesFor(null)}
+        status={
+          examplesGroup
+            ? decisions[examplesGroup.templateKey] || 'unreviewed'
+            : 'unreviewed'
+        }
+        onAccept={() => examplesGroup && decide(examplesGroup.templateKey, 'accepted')}
+        onReject={() => examplesGroup && decide(examplesGroup.templateKey, 'rejected')}
+        onReset={() => examplesGroup && resetDecision(examplesGroup.templateKey)}
+      />
     </div>
   )
 }

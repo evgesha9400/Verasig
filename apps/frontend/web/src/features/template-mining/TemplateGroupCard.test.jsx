@@ -3,58 +3,18 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
 
-/* The expanded message list pages through EVERY message in a family (5 per page),
-   not just the top examples — so a reviewer can double-check the whole grouping. */
-
-function makeCandidate(index, confidence = 0.9) {
-  return {
-    message: { id: `m${index}`, text: `MSG-${index} body`, date: 'Jun 1' },
-    instruments: [],
-    directions: [],
-    prices: [],
-    fields: {
-      instrument: 'BTCUSDT',
-      direction: 'BUY',
-      orderType: 'market',
-      entry: null,
-      stopLoss: null,
-      takeProfits: []
-    },
-    intent: 'new_signal',
-    confidence,
-    rejectionReasons: [],
-    templateKey: 'tpl_x',
-    normalizedTemplate: 'BUY <INSTRUMENT>'
-  }
-}
-
-function groupFromCandidates(candidates) {
-  return {
-    id: 'tpl_x',
-    templateKey: 'tpl_x',
-    normalizedTemplate: 'BUY <INSTRUMENT>',
-    candidates,
-    examples: [...candidates].sort((a, b) => b.confidence - a.confidence).slice(0, 5),
-    count: candidates.length,
-    dateRange: { from: 'Jun 1', to: 'Jun 2' },
-    confidenceAvg: 0.85,
-    intentDistribution: {
-      new_signal: candidates.length,
-      update: 0,
-      result: 0,
-      commentary: 0,
-      unknown: 0
-    },
-    geometryWarnings: 0,
-    status: 'unreviewed',
-    suggestedAction: 'accept'
-  }
-}
+/* The card is the compact unit of review: template + stats + decide/inspect
+   controls. Inspecting every message happens in a modal, not by stretching the
+   card in place. */
 
 function makeGroup(messageCount) {
-  const candidates = Array.from({ length: messageCount }, (_, i) =>
-    makeCandidate(i + 1)
-  )
+  const candidates = Array.from({ length: messageCount }, (_, i) => ({
+    message: { id: `m${i + 1}`, text: `MSG-${i + 1} body` },
+    fields: { instrument: 'BTCUSDT', direction: 'BUY', orderType: 'market' },
+    intent: 'new_signal',
+    confidence: 0.9,
+    rejectionReasons: []
+  }))
   return {
     id: 'tpl_x',
     templateKey: 'tpl_x',
@@ -64,120 +24,58 @@ function makeGroup(messageCount) {
     count: messageCount,
     dateRange: { from: 'Jun 1', to: 'Jun 2' },
     confidenceAvg: 0.85,
-    intentDistribution: {
-      new_signal: messageCount,
-      update: 0,
-      result: 0,
-      commentary: 0,
-      unknown: 0
-    },
+    intentDistribution: { new_signal: messageCount },
     geometryWarnings: 0,
     status: 'unreviewed',
     suggestedAction: 'accept'
   }
 }
 
-function renderCard(group, { expanded = false } = {}) {
+function renderCard(props = {}) {
   return render(
     <TemplateGroupCard
-      group={group}
+      group={makeGroup(7)}
       status="unreviewed"
-      expanded={expanded}
       onAccept={vi.fn()}
       onReject={vi.fn()}
       onReset={vi.fn()}
-      onToggleExamples={vi.fn()}
+      onShowExamples={vi.fn()}
+      {...props}
     />
   )
 }
 
-describe('TemplateGroupCard message list', () => {
-  it('offers to show ALL messages by total count, not a fixed example sample', () => {
-    renderCard(makeGroup(7))
-    expect(screen.getByRole('button', { name: /Show all 7 messages/i })).toBeTruthy()
+describe('TemplateGroupCard', () => {
+  it('offers to view all messages by total count', () => {
+    renderCard()
+    expect(screen.getByRole('button', { name: /View all 7 messages/i })).toBeTruthy()
   })
 
-  it('shows five messages per page when expanded', () => {
-    renderCard(makeGroup(7), { expanded: true })
-
-    // Page 1: first five messages present, the rest hidden.
-    expect(screen.getByText('MSG-1 body')).toBeTruthy()
-    expect(screen.getByText('MSG-5 body')).toBeTruthy()
-    expect(screen.queryByText('MSG-6 body')).toBeNull()
-    expect(screen.queryByText('MSG-7 body')).toBeNull()
-    // The total is visible alongside the current window.
-    expect(screen.getByText(/1\s*[–-]\s*5 of 7/)).toBeTruthy()
-  })
-
-  it('pages forward to reveal the remaining messages', async () => {
+  it('opens the examples modal instead of expanding in place', async () => {
     const user = userEvent.setup()
-    renderCard(makeGroup(7), { expanded: true })
-
-    await user.click(screen.getByRole('button', { name: /Next/i }))
-
+    const onShowExamples = vi.fn()
+    renderCard({ onShowExamples })
+    await user.click(screen.getByRole('button', { name: /View all 7 messages/i }))
+    expect(onShowExamples).toHaveBeenCalledTimes(1)
+    // No in-card message list or extraction table on the card itself.
     expect(screen.queryByText('MSG-1 body')).toBeNull()
-    expect(screen.getByText('MSG-6 body')).toBeTruthy()
-    expect(screen.getByText('MSG-7 body')).toBeTruthy()
-    expect(screen.getByText(/6\s*[–-]\s*7 of 7/)).toBeTruthy()
-  })
-
-  it('does not paginate a family that fits on one page', () => {
-    renderCard(makeGroup(3), { expanded: true })
-    expect(screen.getByText('MSG-3 body')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Next/i })).toBeNull()
-  })
-
-  it('orders the list by confidence so the leading row matches the representative', () => {
-    // Insertion order (1,2,3) differs from confidence order (2,3,1).
-    const group = groupFromCandidates([
-      makeCandidate(1, 0.5),
-      makeCandidate(2, 0.95),
-      makeCandidate(3, 0.7)
-    ])
-    renderCard(group, { expanded: true })
-
-    const order = screen.getAllByText(/MSG-\d body/).map((el) => el.textContent)
-    expect(order).toEqual(['MSG-2 body', 'MSG-3 body', 'MSG-1 body'])
-  })
-
-  it('marks a boundary control aria-disabled but keeps it focusable (no focus loss)', () => {
-    renderCard(makeGroup(7), { expanded: true })
-    const prev = screen.getByRole('button', { name: /Prev/i })
-    const next = screen.getByRole('button', { name: /Next/i })
-
-    // On page one, Prev is the bound; it is aria-disabled, NOT natively disabled.
-    expect(prev.getAttribute('aria-disabled')).toBe('true')
-    expect(prev.hasAttribute('disabled')).toBe(false)
-    expect(next.getAttribute('aria-disabled')).toBe('false')
-  })
-
-  it('announces the page window as a live status region', () => {
-    renderCard(makeGroup(7), { expanded: true })
-    const status = screen.getByRole('status')
-    expect(status.getAttribute('aria-live')).toBe('polite')
-    expect(status.textContent).toMatch(/1\s*[–-]\s*5 of 7/)
-  })
-})
-
-describe('TemplateGroupCard decluttering', () => {
-  function groupWithWarnings(messageCount) {
-    const group = makeGroup(messageCount)
-    return { ...group, geometryWarnings: 2 }
-  }
-
-  it('hides the intent bar, geometry warning, and extraction table when collapsed', () => {
-    const { container } = renderCard(groupWithWarnings(7), { expanded: false })
-    expect(container.querySelector('.vrs-tm-legend')).toBeNull()
-    expect(screen.queryByText(/suspicious stop\/target geometry/i)).toBeNull()
     expect(screen.queryByText('Instrument')).toBeNull()
   })
 
-  it('shows the intent bar, geometry warning, and extraction table when expanded', () => {
-    const { container } = renderCard(groupWithWarnings(7), { expanded: true })
-    expect(container.querySelector('.vrs-tm-legend')).toBeTruthy()
-    expect(screen.getByText(/suspicious stop\/target geometry/i)).toBeTruthy()
-    // The representative ExtractionSummary table plus one row per paginated
-    // CandidateExample both carry an "Instrument" label — assert at least one exists.
-    expect(screen.getAllByText('Instrument').length).toBeGreaterThan(0)
+  it('fires accept and reject decisions', async () => {
+    const user = userEvent.setup()
+    const onAccept = vi.fn()
+    const onReject = vi.fn()
+    renderCard({ onAccept, onReject })
+    await user.click(screen.getByRole('button', { name: /Accept as signal format/i }))
+    await user.click(screen.getByRole('button', { name: /Reject as noise/i }))
+    expect(onAccept).toHaveBeenCalledTimes(1)
+    expect(onReject).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the decided status and a Reset control once decided', () => {
+    renderCard({ status: 'accepted' })
+    expect(screen.getAllByText('Accepted').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /Reset/i })).toBeTruthy()
   })
 })
