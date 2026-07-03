@@ -161,8 +161,12 @@ export function TemplateMiningPage({
   // whenever the active feed changes — no button click in the primary path.
   useEffect(() => {
     const feedId = activeFeed?.id ?? null
-    const { finishMining: mine, fireToast: toast, onListMessages: list, authToken: token } =
-      runRef.current
+    const {
+      finishMining: mine,
+      fireToast: toast,
+      onListMessages: list,
+      authToken: token
+    } = runRef.current
 
     if (!(token && list && feedId)) {
       setRunning(true)
