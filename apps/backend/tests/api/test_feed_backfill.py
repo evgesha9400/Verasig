@@ -429,6 +429,58 @@ def test_full_backfill_resets_cursor_and_refetches_all(client, app):
     assert listed["fetched"] == 3
 
 
+def test_full_refetch_secures_deletion_evidence_then_wipes_and_recaptures(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    # message 2 vanished upstream: both the live snapshot and the recapture see {1,3}
+    survivors = [message for message in _messages() if message.message_id != 2]
+    refetch = FakeSource(_channel(), survivors, live_ids={1, 3})
+    app.state.telegram_source_factory = lambda _link: refetch
+    full = client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert full.status_code == 202
+    assert "Securing deletion evidence" in body
+    assert "event: done" in body
+    assert listed["fetched"] == 2  # counter restarted; only survivors recaptured
+    assert listed["deletedCount"] == 1  # message 2 secured as a deletion
+
+
+def test_full_refetch_aborts_without_wiping_on_empty_live_channel(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    refetch = FakeSource(_channel(), _messages(), live_ids=set())  # inaccessible
+    app.state.telegram_source_factory = lambda _link: refetch
+    full = client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert full.status_code == 202
+    assert "event: error" in body
+    assert listed["fetched"] == 3  # original capture intact — nothing wiped
+
+
 def test_verified_feed_full_refetch_restores_verified_status(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})

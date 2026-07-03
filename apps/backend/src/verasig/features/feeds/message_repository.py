@@ -7,7 +7,7 @@ translates and is scoped by `user_id`.
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,18 @@ def insert_messages(
         .returning(RawMessageRow.external_message_id)
     )
     return len(session.execute(statement).fetchall())
+
+
+def delete_feed_messages(session: Session, user_id: UUID, external_id: int) -> int:
+    """Delete a feed's whole capture. Derived rows (events, extractions, drift,
+    labels, lifecycle links) cascade from `raw_message`; durable deletion
+    evidence and distilled rules FK to `feed`, so they survive (ADR 0014)."""
+    return session.execute(
+        delete(RawMessageRow).where(
+            RawMessageRow.user_id == user_id,
+            RawMessageRow.external_id == external_id,
+        )
+    ).rowcount
 
 
 def count_messages(session: Session, user_id: UUID, external_id: int) -> int:

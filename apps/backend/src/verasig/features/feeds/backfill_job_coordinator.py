@@ -30,6 +30,7 @@ from verasig.features.feeds.feed_job_progress import (
     should_publish_count,
 )
 from verasig.features.feeds.history_depth import HistoryDepth, depth_cutoff
+from verasig.features.feeds.recapture import secure_and_wipe
 from verasig.foundation.jobs.registry import (
     JobAlreadyRunningError,
     JobPublisher,
@@ -97,9 +98,8 @@ class BackfillJobCoordinator:
             return idempotent
 
         self._persist_depth(user_id, channel_id, depth)
-        if mode is BackfillMode.FULL:
-            self._reset_cursor(user_id, channel_id)
-
+        # FULL no longer mutates anything synchronously: the wipe happens inside
+        # the job, AFTER a mandatory pre-wipe rescan secures deletion evidence.
         source = make_source()
         run, previous_status = self._create_run(user_id, channel_id)
         self._previous_status_by_run_id[run.id] = previous_status
@@ -254,19 +254,6 @@ class BackfillJobCoordinator:
             depth = feed_repository.read_history_depth(session, user_id, channel_id)
         return depth_cutoff(depth, _now())
 
-    def _reset_cursor(self, user_id: UUID, channel_id: int) -> None:
-        with self._session_factory() as session:
-            previous = feed_repository.read_cursor(session, user_id, channel_id)
-            feed_repository.reset_cursor(session, user_id, channel_id)
-            session.commit()
-        logger.info(
-            "backfill.full reset cursor: channel=%s previous_cursor=%s -> None "
-            "(next stream refetches from the start; raw rows are upserted by PK, "
-            "not deleted)",
-            channel_id,
-            previous,
-        )
-
     def _read_attachable_run(
         self, user_id: UUID, channel_id: int
     ) -> BackfillJobRun | None:
@@ -312,6 +299,10 @@ class BackfillJobCoordinator:
                 logger.info(
                     "backfill.run stream begin: run=%s channel=%s", run_id, channel_id
                 )
+                if mode is BackfillMode.FULL:
+                    await self._secure_evidence_then_wipe(
+                        publisher, source, run_id, user_id, channel_id, mode
+                    )
                 result = await backfill(
                     source,
                     user_id,
@@ -405,6 +396,36 @@ class BackfillJobCoordinator:
             fetched=progress.fetched,
             cursor=progress.cursor_message_id,
             **fields,
+        )
+
+    async def _secure_evidence_then_wipe(
+        self,
+        publisher: JobPublisher,
+        source: TelegramSource,
+        run_id: UUID,
+        user_id: UUID,
+        channel_id: int,
+        mode: BackfillMode,
+    ) -> None:
+        """FULL only: secure deletion evidence, then wipe the capture generation.
+
+        A `RescanAborted` (empty live snapshot) propagates before any wipe, so an
+        inaccessible channel fails the run without destroying the existing capture.
+        """
+        self._publish_progress(
+            publisher, run_id, channel_id, mode, "Securing deletion evidence..."
+        )
+        await secure_and_wipe(
+            source,
+            user_id,
+            channel_id,
+            self._session_factory,
+            on_progress=self._rescan_progress_reporter(
+                publisher, run_id, channel_id, mode
+            ),
+        )
+        self._publish_progress(
+            publisher, run_id, channel_id, mode, "Re-capturing history..."
         )
 
     def _rescan_progress_reporter(
