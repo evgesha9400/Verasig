@@ -28,7 +28,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.deletion_diff import detect_deletions
-from verasig.features.rules.repository import read_labels
+from verasig.features.rules.repository import read_labels, read_rule_feed_ids
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +147,9 @@ def _read_deletion_summary(
     session_factory: sessionmaker, user_id: UUID, external_id: int
 ) -> deletion_repository.DeletionSummary:
     with session_factory() as session:
+        rule_backed = read_rule_feed_ids(session, user_id, [external_id])
         summaries = deletion_repository.summarize_deletions(
-            session, user_id, [external_id]
+            session, user_id, [external_id], rule_backed_ids=frozenset(rule_backed)
         )
     return summaries[external_id]
 

@@ -207,6 +207,40 @@ def _seed_corpus(session_factory) -> None:
         session.commit()
 
 
+def _summary(session_factory, rule_backed_ids=frozenset()):
+    with session_factory() as session:
+        return deletion_repository.summarize_deletions(
+            session, _USER_ID, [_CHANNEL_ID], rule_backed_ids=rule_backed_ids
+        )[_CHANNEL_ID]
+
+
+def test_summarize_deletions_returns_confidence_counts(session_factory):
+    _seed_channel(session_factory)
+    _upsert(session_factory, [_confirmed(2, _LATER), _suspected(4, _LATER)])
+
+    summary = _summary(session_factory)
+
+    assert summary.deleted_count == 2
+    assert summary.confirmed_count == 1
+    assert summary.suspected_count == 1
+
+
+def test_summarize_deletions_signal_count_is_rule_gated(session_factory):
+    _seed_channel(session_factory)
+    # a CONFIRMED candidate deletion with no golden label
+    _upsert(session_factory, [_confirmed(2, _LATER, "BTC long 65k")])
+
+    without_rules = _summary(session_factory)
+    with_rules = _summary(session_factory, rule_backed_ids={_CHANNEL_ID})
+
+    # recall-first seed candidacy must not floor the score before the operator
+    # has approved rules; once rules exist, was_signal_candidate is authoritative
+    assert without_rules.deleted_signal_count == 0
+    assert without_rules.signal_deletion is False
+    assert with_rules.deleted_signal_count == 1
+    assert with_rules.signal_deletion is True
+
+
 def _source(live_ids: set[int]) -> FakeSource:
     return FakeSource(_channel(), [], live_ids=live_ids)
 

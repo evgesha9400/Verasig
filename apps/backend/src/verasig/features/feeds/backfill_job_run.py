@@ -49,11 +49,24 @@ def backfill_job_key(user_id: UUID, channel_id: int) -> str:
     return f"{user_id}:{channel_id}:backfill"
 
 
+def _stage_for_phase(phase: str) -> str:
+    """Coarse stage the UI drives its backfill strip off, so it never parses the
+    free-text phase. secure -> capture -> index -> rescan."""
+    if phase.startswith("Securing deletion evidence"):
+        return "secure"
+    if phase.startswith("Checking deleted messages") or phase.startswith("Deletion"):
+        return "rescan"
+    if phase.startswith("Indexing"):
+        return "index"
+    return "capture"
+
+
 def present_progress(progress: BackfillProgress) -> dict:
     payload = {
         "jobId": str(progress.job_id),
         "status": progress.status,
         "phase": progress.phase,
+        "stage": _stage_for_phase(progress.phase),
         "fetched": progress.fetched,
         "lastDate": (
             format_long(progress.oldest_posted_at)

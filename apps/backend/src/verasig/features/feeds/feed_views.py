@@ -66,11 +66,11 @@ def present_feeds(session: Session, user_id: UUID) -> list[dict]:
     if not external_ids:
         return []
     message_stats = _message_stats(session, user_id, external_ids)
+    rule_feed_ids = rule_repository.read_rule_feed_ids(session, user_id, external_ids)
     deletion_summaries = deletion_repository.summarize_deletions(
-        session, user_id, external_ids
+        session, user_id, external_ids, rule_backed_ids=frozenset(rule_feed_ids)
     )
     latest_results = _latest_results(session, user_id)
-    rule_feed_ids = rule_repository.read_rule_feed_ids(session, user_id, external_ids)
     return [
         _present_feed(
             feed, message_stats, deletion_summaries, latest_results, rule_feed_ids
@@ -112,4 +112,7 @@ def _present_feed(
         "historyGaps": deletion.history_gaps,
         "signalDeletion": deletion.signal_deletion,
         "deletedCount": deletion.deleted_count,
+        "confirmedDeletedCount": deletion.confirmed_count,
+        "suspectedDeletedCount": deletion.suspected_count,
+        "deletedSignalCount": deletion.deleted_signal_count,
     }

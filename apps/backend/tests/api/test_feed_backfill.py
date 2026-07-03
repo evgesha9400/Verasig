@@ -167,9 +167,14 @@ def test_backfill_job_streams_progress_and_counts_unlabelled_deletion(client, ap
     assert started.status_code == 202
     assert "event: progress" in body
     assert "event: done" in body
-    assert listed.json()["feeds"][0]["status"] == "backfilled"
-    assert listed.json()["feeds"][0]["signalDeletion"] is False
-    assert listed.json()["feeds"][0]["deletedCount"] == 1
+    assert '"stage"' in body  # progress carries a coarse stage for the UI strip
+    feed = listed.json()["feeds"][0]
+    assert feed["status"] == "backfilled"
+    assert feed["signalDeletion"] is False  # candidate, no rules yet -> not a signal
+    assert feed["deletedCount"] == 1
+    assert feed["confirmedDeletedCount"] == 1
+    assert feed["suspectedDeletedCount"] == 0
+    assert feed["deletedSignalCount"] == 0
 
 
 def test_backfill_persists_selected_history_depth(client, app):

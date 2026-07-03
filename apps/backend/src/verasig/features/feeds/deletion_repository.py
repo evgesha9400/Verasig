@@ -21,6 +21,9 @@ class DeletionSummary:
     history_gaps: bool = False
     signal_deletion: bool = False
     deleted_count: int = 0
+    confirmed_count: int = 0
+    suspected_count: int = 0
+    deleted_signal_count: int = 0
 
 
 def _deletion_values(user_id: UUID, evidence: DeletedSignalEvidence) -> dict:
@@ -119,8 +122,29 @@ def read_deletion_evidence(
     return [_row_to_deletion(row) for row in rows]
 
 
+def _is_signal_deletion(
+    confidence: str,
+    was_candidate: bool,
+    label: str | None,
+    external_id: int,
+    rule_backed_ids: frozenset[int],
+) -> bool:
+    """A CONFIRMED deletion counts as a signal via a golden label (legacy) or,
+    once the feed has saved rules, its rule-authoritative candidacy (ADR 0015).
+    The rule gate stops recall-first seed candidacy flooring the score before the
+    operator has approved any rules."""
+    if confidence != "CONFIRMED":
+        return False
+    if label == "signal":
+        return True
+    return bool(was_candidate) and external_id in rule_backed_ids
+
+
 def summarize_deletions(
-    session: Session, user_id: UUID, external_ids: list[int]
+    session: Session,
+    user_id: UUID,
+    external_ids: list[int],
+    rule_backed_ids: frozenset[int] = frozenset(),
 ) -> dict[int, DeletionSummary]:
     if not external_ids:
         return {}
@@ -128,6 +152,7 @@ def summarize_deletions(
         select(
             DeletedSignalEvidenceRow.external_id,
             DeletedSignalEvidenceRow.confidence,
+            DeletedSignalEvidenceRow.was_signal_candidate,
             GoldenLabelRow.label,
         )
         .outerjoin(
@@ -145,12 +170,17 @@ def summarize_deletions(
         )
     ).all()
     summaries = {external_id: DeletionSummary() for external_id in external_ids}
-    for external_id, confidence, label in rows:
+    for external_id, confidence, was_candidate, label in rows:
         current = summaries[external_id]
+        is_signal = _is_signal_deletion(
+            confidence, was_candidate, label, external_id, frozenset(rule_backed_ids)
+        )
         summaries[external_id] = DeletionSummary(
             history_gaps=current.history_gaps or confidence == "SUSPECTED",
-            signal_deletion=current.signal_deletion
-            or (confidence == "CONFIRMED" and label == "signal"),
+            signal_deletion=current.signal_deletion or is_signal,
             deleted_count=current.deleted_count + 1,
+            confirmed_count=current.confirmed_count + int(confidence == "CONFIRMED"),
+            suspected_count=current.suspected_count + int(confidence == "SUSPECTED"),
+            deleted_signal_count=current.deleted_signal_count + int(is_signal),
         )
     return summaries
