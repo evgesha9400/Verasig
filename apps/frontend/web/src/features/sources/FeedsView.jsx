@@ -62,7 +62,7 @@ export function FeedsView({
   onResume,
   onFetchNew,
   onRefetchFull,
-  onReviewLabels,
+  onReviewTemplates,
   onRemove,
   onViewDeleted,
   onCheckGaps,
@@ -229,9 +229,9 @@ export function FeedsView({
           <MenuItem
             iconLeft={<Icon name="doc" size={15} />}
             disabled={busy}
-            onClick={() => onReviewLabels && onReviewLabels(c)}
+            onClick={() => onReviewTemplates && onReviewTemplates(c)}
           >
-            Review labels
+            Review templates
           </MenuItem>
         )}
         <MenuSeparator />

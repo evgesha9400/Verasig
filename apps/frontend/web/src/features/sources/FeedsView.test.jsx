@@ -147,9 +147,9 @@ describe('FeedsView', () => {
     expect(onCheckGaps).toHaveBeenCalledWith(reviewedFeed)
   })
 
-  it.each(['verified', 'analyzed'])('shows Review labels for %s feeds', (status) => {
+  it.each(['verified', 'analyzed'])('shows Review templates for %s feeds', (status) => {
     const reviewedFeed = { ...feed, status, signalDeletion: false }
-    const onReviewLabels = vi.fn()
+    const onReviewTemplates = vi.fn()
 
     render(
       <FeedsView
@@ -159,7 +159,7 @@ describe('FeedsView', () => {
         onResume={() => {}}
         onFetchNew={() => {}}
         onRefetchFull={() => {}}
-        onReviewLabels={onReviewLabels}
+        onReviewTemplates={onReviewTemplates}
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
@@ -168,9 +168,9 @@ describe('FeedsView', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Options' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /review labels/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /review templates/i }))
 
-    expect(onReviewLabels).toHaveBeenCalledWith(reviewedFeed)
+    expect(onReviewTemplates).toHaveBeenCalledWith(reviewedFeed)
   })
 
   it('shows Backtest for a backfilled feed with saved rules', () => {
@@ -191,7 +191,7 @@ describe('FeedsView', () => {
         onResume={onResume}
         onFetchNew={() => {}}
         onRefetchFull={() => {}}
-        onReviewLabels={() => {}}
+        onReviewTemplates={() => {}}
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}

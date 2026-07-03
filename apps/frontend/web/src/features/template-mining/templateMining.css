@@ -1,0 +1,599 @@
+/* ============================================================
+   Verasig — Parser-first Template Mining (prototype page).
+   Page-local layout only; design-system primitives bring their
+   own CSS. All spacing comes from the --space-* token grid (4px
+   base). Classes are prefixed vrs-tm to avoid collisions with the
+   rest of the kit.
+   ============================================================ */
+
+/* ---- stage indicator ---- */
+/* A compact three-pill Mine → Review → Confirm marker for the reviewer's state
+   inside this step; the outer Pipeline stepper already shows "Mining" one level
+   up, so this stays intentionally minimal. */
+.vrs-tm-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.vrs-tm-stage {
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+.vrs-tm-stage.is-done {
+  color: var(--text-body);
+}
+.vrs-tm-stage.is-active {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+/* ---- alternate source disclosure (dev/demo affordance) ---- */
+.vrs-tm-altsource > summary {
+  cursor: pointer;
+  width: fit-content;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+.vrs-tm-altsource > summary:hover {
+  color: var(--text-body);
+}
+.vrs-tm-altsource[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+/* ---- source panel ---- */
+.vrs-tm-source {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.vrs-tm-source__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.vrs-tm-source__hint {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
+}
+.vrs-tm-source__area {
+  width: 100%;
+  min-height: 8rem; /* 128 — on the 4px grid */
+  resize: vertical;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--text-strong);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.vrs-tm-source__area:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* ---- metrics ---- */
+/* Eight headline metrics read as a balanced 4×2 block on desktop, collapsing to
+   2 columns then 1 so the row never strands a few cards against empty space. */
+.vrs-tm-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+@media (max-width: 940px) {
+  .vrs-tm-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .vrs-tm-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+.vrs-tm-metric {
+  padding: var(--space-4);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+/* ---- review section ---- */
+/* Block wrapper for the "Template families" heading + the card grid. */
+.vrs-tm-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.vrs-tm-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.vrs-tm-section__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+.vrs-tm-section__sub {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  margin-top: var(--space-0-5);
+}
+.vrs-tm-bulk {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.vrs-tm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+/* ---- template family card ---- */
+/* Cards in a row stretch to a common height; the padded body is a flex column
+   that fills that height so the action row can pin to a shared bottom baseline
+   (margin-top:auto). The kit's own head/body padding sets the outer rhythm. */
+.vrs-tm-card {
+  display: flex;
+  flex-direction: column;
+}
+.vrs-tm-card > .vrs-card__pad {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.vrs-tm-card > .vrs-card__head {
+  align-items: flex-start;
+}
+.vrs-tm-card.is-accepted {
+  border-color: color-mix(in srgb, var(--verified-500) 55%, var(--border-default));
+}
+.vrs-tm-card.is-rejected {
+  opacity: 0.72;
+}
+.vrs-tm-tmpl {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-strong);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.vrs-tm-tmpl .ph {
+  color: var(--accent-text);
+  font-weight: var(--fw-medium);
+}
+
+.vrs-tm-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.vrs-tm-stats__bar {
+  flex: 1;
+  min-width: 140px;
+}
+.vrs-tm-stat__v {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+}
+.vrs-tm-stat__l {
+  font-family: var(--font-sans);
+  font-size: var(--text-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+/* ---- intent distribution bar ---- */
+.vrs-tm-intent {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--surface-hover);
+}
+.vrs-tm-intent__seg {
+  height: 100%;
+}
+.vrs-tm-intent__seg.new_signal {
+  background: var(--verified-500);
+}
+.vrs-tm-intent__seg.update {
+  background: var(--pending-500);
+}
+.vrs-tm-intent__seg.result {
+  background: var(--info-500);
+}
+.vrs-tm-intent__seg.commentary {
+  background: var(--text-faint);
+}
+.vrs-tm-intent__seg.unknown {
+  background: var(--border-strong);
+}
+.vrs-tm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-1-5);
+}
+.vrs-tm-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-family: var(--font-sans);
+  font-size: var(--text-3xs);
+  color: var(--text-muted);
+}
+.vrs-tm-legend__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+/* ---- extracted fields summary + example table ---- */
+.vrs-tm-kv {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+.vrs-tm-kv td {
+  padding: var(--space-1-5) var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+.vrs-tm-kv td:first-child {
+  width: 38%;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+}
+.vrs-tm-kv td:last-child {
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+}
+.vrs-tm-kv .none {
+  color: var(--text-faint);
+  font-family: var(--font-sans);
+}
+.vrs-tm-kv tr.is-warning td {
+  background: color-mix(in srgb, var(--pending-500) 10%, transparent);
+}
+.vrs-tm-kv tr.is-warning td:first-child {
+  color: var(--pending-500);
+  font-weight: var(--fw-medium);
+}
+
+/* Action row: decision buttons cluster left, the expand toggle anchors right.
+   margin-top:auto pins the whole row to the card's bottom baseline. */
+.vrs-tm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+.vrs-tm-actions__expand {
+  margin-left: auto;
+}
+
+.vrs-tm-ex {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+  margin-top: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--border-default);
+}
+.vrs-tm-ex__item {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+/* Pager for the full per-family message list (five messages per page). */
+.vrs-tm-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+.vrs-tm-pager__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+/* Dim a pager button at its bound without disabling it natively — it stays
+   focusable (no keyboard focus loss) while the click handler clamps to a no-op. */
+.vrs-tm-pager [aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}
+.vrs-tm-ex__msg {
+  margin: 0;
+  padding: var(--space-2-5) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-body);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.vrs-tm-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  font-family: var(--font-sans);
+  font-size: var(--text-3xs);
+  color: var(--pending-500);
+}
+.vrs-tm-warn strong {
+  display: block;
+  color: var(--text-strong);
+  font-weight: var(--fw-medium);
+}
+.vrs-tm-warn__msg {
+  display: block;
+  margin-top: var(--space-0-5);
+  color: var(--text-muted);
+}
+.vrs-tm-issues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  margin-top: var(--space-2);
+}
+
+/* ---- compiled rules ---- */
+.vrs-tm-rule__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1-5);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+.vrs-tm-rule__name .vrs-icon,
+.vrs-tm-rule__name svg {
+  color: var(--verified-500);
+}
+.vrs-tm-rulejson {
+  margin: 0;
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--text-body);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.vrs-tm-rulejson .k {
+  color: var(--accent-text);
+}
+
+/* ---- review (full-history result review) ---- */
+.vrs-tm-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+/* Filter bar: search + template select grow on the left; live count pinned right
+   (models the SignalsView .vrs-sig-filters bar). */
+.vrs-tm-review__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.vrs-tm-review__filters {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.vrs-tm-review__filters .vrs-field {
+  flex: 1 1 260px;
+}
+.vrs-tm-review__filters .vrs-select {
+  flex: 0 1 260px;
+}
+.vrs-tm-review__count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+.vrs-tm-review__count-v {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+}
+.vrs-tm-review__count-l {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+.vrs-tm-review__tabsrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.vrs-tm-review__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vrs-tm-review__item {
+  display: flex;
+  flex-direction: column;
+}
+/* Each row is a collapsed one-liner; clicking expands its detail below. */
+.vrs-tm-review__row {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  padding: var(--space-2) var(--space-2-5);
+  font: inherit;
+  color: inherit;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.vrs-tm-review__row:hover,
+.vrs-tm-review__row[aria-expanded='true'] {
+  border-color: var(--border-strong);
+}
+.vrs-tm-review__row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.vrs-tm-review__chev {
+  flex: none;
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.vrs-tm-review__flag {
+  flex: none;
+  display: inline-flex;
+}
+.vrs-tm-review__row-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vrs-tm-review__tmpl {
+  flex: none;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: var(--text-3xs);
+  color: var(--text-faint);
+}
+.vrs-tm-review__issue,
+.vrs-tm-review__issue-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  max-width: 24%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: var(--text-3xs);
+}
+.vrs-tm-review__issue {
+  color: var(--pending-500);
+}
+.vrs-tm-review__issue-label {
+  color: var(--text-muted);
+}
+.vrs-tm-review__detail {
+  margin: var(--space-1-5) 0 var(--space-0-5);
+  padding: var(--space-3);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 720px) {
+  .vrs-tm-ex__item {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- overlay manager ---- */
+.vrs-tm-overlay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.vrs-tm-overlay__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+}
+.vrs-tm-overlay__label {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.vrs-tm-overlay__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1-5) var(--space-2-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-body);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.vrs-tm-overlay__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.vrs-tm-overlay__add .vrs-field {
+  flex: 1 1 160px;
+}
+/* The BUY/SELL side dropdown is a compact fixed-purpose control, not a free-text
+   field — it stays narrow so the token input keeps the row's growable width. */
+.vrs-tm-overlay__add .vrs-select {
+  flex: 0 1 120px;
+}

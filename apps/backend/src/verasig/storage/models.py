@@ -640,3 +640,18 @@ class LifecycleLinkRow(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class ParserOverlayRow(Base):
+    __tablename__ = "parser_overlay"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), primary_key=True
+    )
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )

@@ -1,0 +1,112 @@
+import { Icon } from '@verasig/design-system'
+import {
+  INTENT_LABEL,
+  formatConfidence,
+  formatEntry,
+  formatPrice,
+  formatTakeProfits
+} from './format.js'
+import { SignalFieldRow } from './SignalFieldRow.jsx'
+
+/* Verasig — Template Mining: one worked example.
+   The raw Telegram message beside the structured object the parser produced, plus
+   any geometry / intent warnings — so a reviewer can audit the extraction itself. */
+function issueFields(candidate) {
+  return new Set((candidate.parserIssues || []).map((issue) => issue.field))
+}
+
+function issueWarnings(candidate) {
+  const parserIssues = candidate.parserIssues || []
+  if (parserIssues.length > 0) {
+    return parserIssues.map((issue) => ({
+      key: `${issue.code}-${issue.field}-${issue.price ?? issue.label}`,
+      content: (
+        <span>
+          <strong>{issue.label}</strong>
+          <span className="vrs-tm-warn__msg">{issue.message}</span>
+        </span>
+      )
+    }))
+  }
+  return candidate.rejectionReasons.map((reason) => ({ key: reason, content: reason }))
+}
+
+function IssueList({ candidate }) {
+  const warnings = issueWarnings(candidate)
+  if (warnings.length === 0) return null
+  return (
+    <div className="vrs-tm-issues">
+      {warnings.map(({ key, content }) => (
+        <span key={key} className="vrs-tm-warn">
+          <Icon name="alert" size={12} />
+          {content}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+export function CandidateExample({ candidate }) {
+  const { fields } = candidate
+  const takeProfits = formatTakeProfits(fields.takeProfits)
+  const fieldsWithIssues = issueFields(candidate)
+  return (
+    <div className="vrs-tm-ex__item">
+      <pre className="vrs-tm-ex__msg">{candidate.message.text}</pre>
+      <div>
+        <table className="vrs-tm-kv">
+          <tbody>
+            <SignalFieldRow
+              label="Instrument"
+              value={fields.instrument || 'none'}
+              muted={!fields.instrument}
+              field="instrument"
+            />
+            <SignalFieldRow
+              label="Direction"
+              value={fields.direction || 'none'}
+              muted={!fields.direction}
+              field="direction"
+            />
+            <SignalFieldRow
+              label="Order type"
+              value={fields.orderType}
+              field="orderType"
+            />
+            <SignalFieldRow
+              label="Entry"
+              value={formatEntry(fields.entry)}
+              muted={!fields.entry}
+              field="entry"
+            />
+            <SignalFieldRow
+              label="Stop loss"
+              value={fields.stopLoss == null ? 'none' : formatPrice(fields.stopLoss)}
+              muted={fields.stopLoss == null}
+              field="stopLoss"
+              warning={fieldsWithIssues.has('stopLoss')}
+            />
+            <SignalFieldRow
+              label="Take profits"
+              value={takeProfits || 'none'}
+              muted={!takeProfits}
+              field="takeProfits"
+              warning={fieldsWithIssues.has('takeProfits')}
+            />
+            <SignalFieldRow
+              label="Intent"
+              value={INTENT_LABEL[candidate.intent]}
+              field="intent"
+            />
+            <SignalFieldRow
+              label="Confidence"
+              value={formatConfidence(candidate.confidence)}
+              field="confidence"
+            />
+          </tbody>
+        </table>
+        <IssueList candidate={candidate} />
+      </div>
+    </div>
+  )
+}

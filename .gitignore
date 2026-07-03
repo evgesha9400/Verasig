@@ -34,7 +34,6 @@ prototype/uploads/
 IDEAS.md
 
 # Local tool state
-.impeccable/live/
 .playwright-mcp/
 graphify-out/
 graphify-out/.graphify_python
@@ -50,3 +49,9 @@ distill-prompt-audit/
 
 # IDE metadata (JetBrains)
 .idea/
+
+# Template-mining dev-only preview + exported real feed data (not committed)
+apps/frontend/web/dev/realFeedMessages.json
+apps/frontend/web/dev/index.html
+apps/frontend/web/mining-preview.html
+apps/frontend/web/dev/mining-preview.jsx

@@ -9,6 +9,7 @@ from verasig.features.accounts import auth_routes, user_routes
 from verasig.features.exchanges import routes as exchange_routes
 from verasig.features.feeds import routes as feed_routes
 from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
+from verasig.features.parser_overlay import routes as parser_overlay_routes
 from verasig.features.risk import routes as risk_routes
 from verasig.features.rules import (
     distill_routes,
@@ -46,6 +47,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     source_routes.router,
     exchange_routes.router,
     feed_routes.router,
+    parser_overlay_routes.router,
     simulation_routes.router,
     label_routes.router,
     distill_routes.router,

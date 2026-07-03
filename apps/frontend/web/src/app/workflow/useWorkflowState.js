@@ -8,9 +8,7 @@ const LS_KEY = 'vrs-proto-state-2'
 
 const PIPELINE_SCREEN_BY_SCREEN = {
   backfill: 'backfill',
-  label: 'label',
-  distill: 'distill',
-  verify: 'verify',
+  mining: 'mining',
   exchange: 'exchange',
   risk: 'risk',
   backtest: 'backtest',
@@ -105,7 +103,6 @@ export function useWorkflowState(authToken) {
     saved ? mergeDemoFeedFlags(saved.feeds) : authToken ? [] : FEEDS
   )
   const [activeFeedId, setActiveFeedId] = useState(saved ? saved.activeFeedId : null)
-  const [verifyAttempt, setVerifyAttempt] = useState(saved ? saved.verifyAttempt : 1)
   const [bybitConnected, setBybitConnected] = useState(
     saved ? saved.bybitConnected : false
   )
@@ -132,28 +129,17 @@ export function useWorkflowState(authToken) {
         telegramConnected,
         feeds,
         activeFeedId,
-        verifyAttempt,
         bybitConnected
       })
     )
-  }, [
-    authToken,
-    screen,
-    telegramConnected,
-    feeds,
-    activeFeedId,
-    verifyAttempt,
-    bybitConnected
-  ])
+  }, [authToken, screen, telegramConnected, feeds, activeFeedId, bybitConnected])
 
   async function refreshSources() {
     if (!authToken) return null
 
     const sourceState = await readSourceState(authToken)
     setTelegramConnected(sourceState.telegram.connected)
-    setFeeds((currentFeeds) =>
-      mergeReviewedFeedState(currentFeeds, sourceState.feeds)
-    )
+    setFeeds((currentFeeds) => mergeReviewedFeedState(currentFeeds, sourceState.feeds))
     return sourceState
   }
 
@@ -233,14 +219,12 @@ export function useWorkflowState(authToken) {
     setActiveFeedId(feed.id)
     if (feed.status === 'analyzed') setScreen('backtest-result')
     else if (feed.status === 'verified' || feed.hasRisk) setScreen('backtest')
-    else if (feed.status === 'backfilled') setScreen('label')
-    else setScreen('label')
+    else if (feed.status === 'backfilled') setScreen('mining')
+    else setScreen('mining')
   }
 
   function fetchNewMessages(feed) {
-    previousBackfillStatusRef.current = isReviewedFeed(feed)
-      ? feed.status
-      : null
+    previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('refresh')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
@@ -253,9 +237,7 @@ export function useWorkflowState(authToken) {
   }
 
   function refetchFullHistory(feed) {
-    previousBackfillStatusRef.current = isReviewedFeed(feed)
-      ? feed.status
-      : null
+    previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('full')
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
@@ -275,9 +257,9 @@ export function useWorkflowState(authToken) {
     }
   }
 
-  function reviewLabels(feed) {
+  function reopenMining(feed) {
     setActiveFeedId(feed.id)
-    setScreen('label')
+    setScreen('mining')
   }
 
   function checkGaps(feed) {
@@ -338,7 +320,7 @@ export function useWorkflowState(authToken) {
     })
     previousBackfillStatusRef.current = null
     setBackfillMode('resume')
-    setScreen(keepsReview ? 'feeds' : 'label')
+    setScreen(keepsReview ? 'feeds' : 'mining')
     if (keepsReview) {
       fireToast(
         'verified',
@@ -424,7 +406,7 @@ export function useWorkflowState(authToken) {
   function requestStepBack(stepId) {
     const order = PIPELINE_STEPS.map((step) => step.id)
     const currentScreen = { 'backtest-result': 'backtest' }[screen] || screen
-    if (stepId === 'label' && order.indexOf(currentScreen) > order.indexOf('verify')) {
+    if (stepId === 'mining' && order.indexOf(currentScreen) > order.indexOf('mining')) {
       setBackTarget(stepId)
       return
     }
@@ -437,8 +419,8 @@ export function useWorkflowState(authToken) {
     setScreen(target)
     fireToast(
       'pending',
-      'Back to Label',
-      'Your labels are kept. Distill and Verify will run again before signals can route.'
+      'Back to Mining',
+      'Your family decisions are kept. Rules will be recompiled and re-audited before signals can route again.'
     )
   }
 
@@ -502,8 +484,6 @@ export function useWorkflowState(authToken) {
     telegramConnected,
     feeds,
     activeFeedId,
-    verifyAttempt,
-    setVerifyAttempt,
     bybitConnected,
     toast,
     backTarget,
@@ -519,7 +499,7 @@ export function useWorkflowState(authToken) {
     resumeFeed,
     fetchNewMessages,
     refetchFullHistory,
-    reviewLabels,
+    reopenMining,
     removeFeed,
     checkGaps,
     stopAfterVerify,

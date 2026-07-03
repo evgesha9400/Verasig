@@ -4,3 +4,6 @@ dist/
 **/dist/
 coverage/
 **/coverage/
+web/dev/realFeedMessages.json
+web/dev/mining-preview.jsx
+web/mining-preview.html
