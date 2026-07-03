@@ -20,11 +20,11 @@ export function deleteFeed(token, feedId) {
   })
 }
 
-export function startBackfill(token, feedId, mode = 'resume') {
+export function startBackfill(token, feedId, mode = 'resume', depth = null) {
   return requestJson(`/feeds/${feedId}/backfill`, {
     method: 'POST',
     token,
-    body: { mode }
+    body: { mode, ...(depth ? { depth } : {}) }
   })
 }
 

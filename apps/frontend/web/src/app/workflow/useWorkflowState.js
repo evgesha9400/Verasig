@@ -110,6 +110,7 @@ export function useWorkflowState(authToken) {
   const [backTarget, setBackTarget] = useState(null)
   const [signalsPreset, setSignalsPreset] = useState(null)
   const [backfillMode, setBackfillMode] = useState('resume')
+  const [backfillDepth, setBackfillDepth] = useState('1y')
 
   const prevNavRef = useRef('sources')
   const previousBackfillStatusRef = useRef(null)
@@ -199,9 +200,10 @@ export function useWorkflowState(authToken) {
     setNav('signals')
   }
 
-  function startBackfill(feed) {
+  function startBackfill(feed, depth = '1y') {
     previousBackfillStatusRef.current = null
     setBackfillMode('resume')
+    setBackfillDepth(depth)
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
@@ -236,9 +238,10 @@ export function useWorkflowState(authToken) {
     )
   }
 
-  function refetchFullHistory(feed) {
+  function refetchFullHistory(feed, depth = '1y') {
     previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('full')
+    setBackfillDepth(depth)
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
@@ -489,6 +492,7 @@ export function useWorkflowState(authToken) {
     backTarget,
     signalsPreset,
     backfillMode,
+    backfillDepth,
     activeFeed,
     isWorkflow: WORKFLOW_SCREENS.has(screen),
     pipelineStep: PIPELINE_SCREEN_BY_SCREEN[screen] || null,

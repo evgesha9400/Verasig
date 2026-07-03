@@ -10,9 +10,17 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
-  Popover
+  Popover,
+  Select,
+  SplitButton
 } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+
+const DEPTH_OPTIONS = [
+  { value: '6m', label: '6 months' },
+  { value: '1y', label: '1 year' },
+  { value: 'all', label: 'All history' }
+]
 
 const CONFIRM_COPY = {
   fetchNew: {
@@ -24,12 +32,12 @@ const CONFIRM_COPY = {
       `Pull messages posted since the last backfill of ${feed.name}. Existing labels and rules are kept.`
   },
   refetchFull: {
-    title: 'Re-fetch full history?',
-    confirmLabel: 'Re-fetch all',
-    variant: 'primary',
-    icon: 'download',
+    title: 'Wipe & re-fetch full history?',
+    confirmLabel: 'Wipe & re-fetch',
+    variant: 'danger',
+    icon: 'alert',
     body: (feed) =>
-      `Re-pull the entire history of ${feed.name} from the start. This can take a while; existing labels and rules are kept.`
+      `This removes the captured history of ${feed.name} and recaptures it from Telegram. The message counter restarts at zero. Template decisions, saved rules and deletion evidence are kept.`
   },
   remove: {
     title: 'Remove this feed?',
@@ -74,13 +82,14 @@ export function FeedsView({
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState(null)
   const [confirm, setConfirm] = useState(null)
+  const [refetchDepth, setRefetchDepth] = useState('1y')
 
   function runConfirm() {
     if (!confirm) return
     const { kind, feed } = confirm
     setConfirm(null)
     if (kind === 'fetchNew') onFetchNew(feed)
-    else if (kind === 'refetchFull') onRefetchFull(feed)
+    else if (kind === 'refetchFull') onRefetchFull(feed, refetchDepth)
     else if (kind === 'remove') onRemove(feed)
   }
 
@@ -320,14 +329,17 @@ export function FeedsView({
     }
     return (
       <div className="vrs-feed-right">
-        <Button
+        <SplitButton
           variant="secondary"
           size="sm"
-          iconLeft={<Icon name="download" size={14} />}
-          onClick={() => onStartBackfill(c)}
+          value="1y"
+          options={DEPTH_OPTIONS}
+          menuLabel="Choose history depth"
+          onClick={() => onStartBackfill(c, '1y')}
+          onSelect={(depth) => onStartBackfill(c, depth)}
         >
           Start backfill
-        </Button>
+        </SplitButton>
         {optionsMenu(c)}
       </div>
     )
@@ -443,6 +455,16 @@ export function FeedsView({
           }
         >
           {CONFIRM_COPY[confirm.kind].body(confirm.feed)}
+          {confirm.kind === 'refetchFull' && (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <Select
+                label="History depth"
+                options={DEPTH_OPTIONS}
+                value={refetchDepth}
+                onChange={(event) => setRefetchDepth(event.target.value)}
+              />
+            </div>
+          )}
         </Dialog>
       )}
     </div>

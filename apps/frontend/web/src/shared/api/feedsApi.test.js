@@ -120,6 +120,30 @@ describe('feedsApi', () => {
     })
   })
 
+  it('includes the history depth when one is chosen', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:backfill' }, 202))
+
+    await startBackfill('jwt-token', '7', 'full', '6m')
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/backfill', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({ mode: 'full', depth: '6m' })
+    })
+  })
+
+  it('omits the depth when none is chosen', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:backfill' }, 202))
+
+    await startBackfill('jwt-token', '7', 'resume')
+
+    const sentBody = JSON.parse(fetch.mock.calls[0][1].body)
+    expect(sentBody).toEqual({ mode: 'resume' })
+  })
+
   it('starts a deletion rescan job', async () => {
     fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:deletion-rescan' }, 202))
 

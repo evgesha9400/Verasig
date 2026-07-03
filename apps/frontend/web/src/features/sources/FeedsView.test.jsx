@@ -442,3 +442,66 @@ describe('FeedsView', () => {
     expect(onRetry).toHaveBeenCalledWith(failedFeed)
   })
 })
+
+describe('FeedsView history depth', () => {
+  const newFeed = { id: 'nf', name: 'New Feed', initials: 'NF', status: 'new' }
+
+  function renderNew(props = {}) {
+    return render(
+      <FeedsView
+        feeds={[newFeed]}
+        onStartBackfill={props.onStartBackfill || (() => {})}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={props.onRefetchFull || (() => {})}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+  }
+
+  it('starts backfill at one year from the main split-button', () => {
+    const onStartBackfill = vi.fn()
+    renderNew({ onStartBackfill })
+    fireEvent.click(screen.getByRole('button', { name: 'Start backfill' }))
+    expect(onStartBackfill).toHaveBeenCalledWith(newFeed, '1y')
+  })
+
+  it('starts backfill at the depth chosen from the split-button menu', () => {
+    const onStartBackfill = vi.fn()
+    renderNew({ onStartBackfill })
+    fireEvent.click(screen.getByLabelText('Choose history depth'))
+    fireEvent.click(screen.getByRole('menuitem', { name: '6 months' }))
+    expect(onStartBackfill).toHaveBeenCalledWith(newFeed, '6m')
+  })
+
+  it('re-fetch confirm warns about the wipe and passes the chosen depth', () => {
+    const onRefetchFull = vi.fn()
+    const reviewed = { ...newFeed, status: 'analyzed', score: 80 }
+    render(
+      <FeedsView
+        feeds={[reviewed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={onRefetchFull}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /re-fetch full history/i }))
+    expect(screen.getByText(/counter restarts at zero/i)).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'all' } })
+    fireEvent.click(screen.getByRole('button', { name: /wipe & re-fetch/i }))
+    expect(onRefetchFull).toHaveBeenCalledWith(reviewed, 'all')
+  })
+})

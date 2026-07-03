@@ -135,6 +135,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     backTarget,
     signalsPreset,
     backfillMode,
+    backfillDepth,
     isWorkflow,
     pipelineStep,
     goToDeletedSignals,
@@ -356,7 +357,9 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       body = (
         <BackfillView
           feed={activeFeed}
-          onStart={(chatId) => startBackfillJob(authToken, chatId, backfillMode)}
+          onStart={(chatId) =>
+            startBackfillJob(authToken, chatId, backfillMode, backfillDepth)
+          }
           onStream={(chatId, handlers) =>
             streamBackfillProgress(authToken, chatId, handlers)
           }
