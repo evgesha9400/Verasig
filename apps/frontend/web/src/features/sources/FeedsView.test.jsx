@@ -173,38 +173,33 @@ describe('FeedsView', () => {
     expect(onReviewTemplates).toHaveBeenCalledWith(reviewedFeed)
   })
 
-  it('shows Backtest for a backfilled feed with saved rules', () => {
+  it('opens a backfilled reviewed feed from the row click', () => {
     const reviewedBackfilledFeed = {
       ...feed,
       status: 'backfilled',
       hasRisk: true,
       signalDeletion: false
     }
-    const onBacktest = vi.fn()
-    const onResume = vi.fn()
+    const onOpenFeed = vi.fn()
 
     render(
       <FeedsView
         feeds={[reviewedBackfilledFeed]}
-        onStartBackfill={() => {}}
-        onRetry={() => {}}
-        onResume={onResume}
+        onOpenFeed={onOpenFeed}
         onFetchNew={() => {}}
         onRefetchFull={() => {}}
         onReviewTemplates={() => {}}
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
-        onBacktest={onBacktest}
       />
     )
 
     expect(screen.getByText('Ready to backtest')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /backtest/i }))
+    fireEvent.click(screen.getByText('Delta Futures'))
 
-    expect(onBacktest).toHaveBeenCalledWith(reviewedBackfilledFeed)
-    expect(onResume).not.toHaveBeenCalled()
+    expect(onOpenFeed).toHaveBeenCalledWith(reviewedBackfilledFeed)
   })
 
   it('keeps Fetch new messages wording in the menu and confirmation copy', async () => {
@@ -408,7 +403,7 @@ describe('FeedsView', () => {
     expect(screen.getByText('Cannot resolve Telegram channel reference.')).toBeTruthy()
   })
 
-  it('shows failed backfill progress and retry action', () => {
+  it('shows failed backfill progress and opens the feed from the row', () => {
     const failedFeed = {
       ...feed,
       status: 'failed',
@@ -416,20 +411,17 @@ describe('FeedsView', () => {
       lastDate: 'Jun 1, 2026',
       signalDeletion: false
     }
-    const onRetry = vi.fn()
+    const onOpenFeed = vi.fn()
 
     render(
       <FeedsView
         feeds={[failedFeed]}
-        onStartBackfill={() => {}}
-        onRetry={onRetry}
-        onResume={() => {}}
+        onOpenFeed={onOpenFeed}
         onFetchNew={() => {}}
         onRefetchFull={() => {}}
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
-        onBacktest={() => {}}
       />
     )
 
@@ -437,9 +429,29 @@ describe('FeedsView', () => {
     expect(screen.getByText('200 fetched')).toBeTruthy()
     expect(screen.getByText('through Jun 1, 2026')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+    fireEvent.click(screen.getByText('Delta Futures'))
 
-    expect(onRetry).toHaveBeenCalledWith(failedFeed)
+    expect(onOpenFeed).toHaveBeenCalledWith(failedFeed)
+  })
+
+  it('does not open the feed when the gear menu is clicked', () => {
+    const onOpenFeed = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'backfilled', signalDeletion: false }]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+
+    expect(onOpenFeed).not.toHaveBeenCalled()
   })
 })
 
@@ -507,39 +519,24 @@ describe('FeedsView deletion visibility', () => {
   })
 })
 
-describe('FeedsView history depth', () => {
+describe('FeedsView feed navigation', () => {
   const newFeed = { id: 'nf', name: 'New Feed', initials: 'NF', status: 'new' }
 
-  function renderNew(props = {}) {
-    return render(
+  it('opens a new feed from the row click', () => {
+    const onOpenFeed = vi.fn()
+    render(
       <FeedsView
         feeds={[newFeed]}
-        onStartBackfill={props.onStartBackfill || (() => {})}
-        onRetry={() => {}}
-        onResume={() => {}}
+        onOpenFeed={onOpenFeed}
         onFetchNew={() => {}}
-        onRefetchFull={props.onRefetchFull || (() => {})}
+        onRefetchFull={() => {}}
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
-        onBacktest={() => {}}
       />
     )
-  }
-
-  it('starts backfill at one year from the main split-button', () => {
-    const onStartBackfill = vi.fn()
-    renderNew({ onStartBackfill })
-    fireEvent.click(screen.getByRole('button', { name: 'Start backfill' }))
-    expect(onStartBackfill).toHaveBeenCalledWith(newFeed, '1y')
-  })
-
-  it('starts backfill at the depth chosen from the split-button menu', () => {
-    const onStartBackfill = vi.fn()
-    renderNew({ onStartBackfill })
-    fireEvent.click(screen.getByLabelText('Choose history depth'))
-    fireEvent.click(screen.getByRole('menuitem', { name: '6 months' }))
-    expect(onStartBackfill).toHaveBeenCalledWith(newFeed, '6m')
+    fireEvent.click(screen.getByText('New Feed'))
+    expect(onOpenFeed).toHaveBeenCalledWith(newFeed)
   })
 
   it('re-fetch confirm warns about the wipe and passes the chosen depth', () => {
@@ -548,15 +545,12 @@ describe('FeedsView history depth', () => {
     render(
       <FeedsView
         feeds={[reviewed]}
-        onStartBackfill={() => {}}
-        onRetry={() => {}}
-        onResume={() => {}}
+        onOpenFeed={() => {}}
         onFetchNew={() => {}}
         onRefetchFull={onRefetchFull}
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
-        onBacktest={() => {}}
       />
     )
 

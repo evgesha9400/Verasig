@@ -223,6 +223,22 @@ export function useWorkflowState(authToken) {
     else setScreen('mining')
   }
 
+  // The whole feed row is clickable: open it at its latest stage. New feeds start
+  // a backfill (default depth; choose another later via the gear); failed/cancelled
+  // retry; an in-progress backfill shows live progress; the rest resume their stage.
+  function openFeed(feed) {
+    if (feed.status === 'new') return startBackfill(feed)
+    if (feed.status === 'failed' || feed.status === 'cancelled') {
+      return retryBackfill(feed)
+    }
+    if (feed.status === 'backfilling') {
+      setActiveFeedId(feed.id)
+      setScreen('backfill')
+      return
+    }
+    resumeFeed(feed)
+  }
+
   function fetchNewMessages(feed) {
     previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('refresh')
@@ -493,6 +509,7 @@ export function useWorkflowState(authToken) {
     startBackfill,
     retryBackfill,
     resumeFeed,
+    openFeed,
     fetchNewMessages,
     refetchFullHistory,
     reopenMining,

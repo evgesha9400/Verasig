@@ -140,9 +140,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     isWorkflow,
     pipelineStep,
     goToDeletedSignals,
-    startBackfill,
-    retryBackfill,
-    resumeFeed,
+    openFeed,
     fetchNewMessages,
     refetchFullHistory,
     reopenMining,
@@ -150,7 +148,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     checkGaps: previewCheckGaps,
     stopAfterVerify,
     routeAfterVerify,
-    backtestFeed,
     onBackfillComplete,
     onBackfillCancel,
     onBackfillError,
@@ -329,9 +326,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     body = (
       <FeedsView
         feeds={feeds}
-        onStartBackfill={startBackfill}
-        onRetry={retryBackfill}
-        onResume={resumeFeed}
+        onOpenFeed={openFeed}
         onFetchNew={fetchNewMessages}
         onRefetchFull={refetchFullHistory}
         onReviewTemplates={reopenMining}
@@ -340,7 +335,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onCheckGaps={handleCheckGaps}
         checkingGapFeedId={checkingGapFeedId}
         rescanScanned={rescanScanned}
-        onBacktest={backtestFeed}
         onAddFeed={addTelegramFeed}
       />
     )
