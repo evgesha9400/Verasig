@@ -94,6 +94,7 @@ class BackfillJobCoordinator:
             return idempotent
 
         self._persist_depth(user_id, channel_id, depth)
+        extend_newer = self._should_extend_newer(user_id, channel_id, mode)
         # FULL mutates nothing synchronously: the wipe happens inside the job,
         # after a reachability guard, and secures no evidence (that is Check gaps).
         source = make_source()
@@ -117,6 +118,7 @@ class BackfillJobCoordinator:
                     channel_id,
                     mode,
                     previous_status,
+                    extend_newer,
                 ),
             )
         except JobAlreadyRunningError:
@@ -235,6 +237,23 @@ class BackfillJobCoordinator:
             return latest
         return None
 
+    def _should_extend_newer(
+        self, user_id: UUID, channel_id: int, mode: BackfillMode
+    ) -> bool:
+        """REFRESH pulls only messages newer than the top cursor — but only once
+        the capture is complete. If the last run did not SUCCEED, an interrupted
+        backfill left a hole below the top cursor; REFRESH then resumes the capture
+        (extend older) instead of falsely reporting "caught up" and stranding the
+        gap until a full re-fetch.
+        """
+        if mode is not BackfillMode.REFRESH:
+            return False
+        with self._session_factory() as session:
+            latest = backfill_job_repository.read_latest_run(
+                session, user_id, channel_id
+            )
+        return latest is not None and latest.status == BackfillJobStatus.SUCCEEDED
+
     def _persist_depth(
         self, user_id: UUID, channel_id: int, depth: HistoryDepth | None
     ) -> None:
@@ -283,6 +302,7 @@ class BackfillJobCoordinator:
         channel_id: int,
         mode: BackfillMode,
         previous_status: str | None,
+        extend_newer: bool,
     ) -> dict:
         phases = itertools.cycle(CAPTURE_PHASES)
         self._publish_progress(publisher, run_id, channel_id, mode, OPENING_PHASE)
@@ -305,6 +325,7 @@ class BackfillJobCoordinator:
                     self._batch_size,
                     on_batch=on_batch,
                     since=self._capture_cutoff(user_id, channel_id),
+                    extend_newer=extend_newer,
                 )
                 logger.info(
                     "backfill.run stream done: run=%s channel=%s inserted=%s cursor=%s",

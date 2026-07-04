@@ -286,15 +286,19 @@ export function BackfillView({
           <div className="vrs-bf-stat__v">{count.toLocaleString()}</div>
           <div className="vrs-bf-stat__l">Messages fetched</div>
         </div>
-        <div>
-          <div
-            className="vrs-bf-stat__v"
-            style={{ fontSize: 'var(--text-2xl)', paddingTop: 14 }}
-          >
-            {date}
+        {/* Hidden until the first fetch reports a date; a newest-first capture then
+            keeps pushing this frontier further into the past. */}
+        {date !== EMPTY_DATE_LABEL && (
+          <div>
+            <div
+              className="vrs-bf-stat__v"
+              style={{ fontSize: 'var(--text-2xl)', paddingTop: 14 }}
+            >
+              {date}
+            </div>
+            <div className="vrs-bf-stat__l">Oldest message reached</div>
           </div>
-          <div className="vrs-bf-stat__l">Oldest message reached</div>
-        </div>
+        )}
       </div>
 
       <StageStrip stage={stage} />

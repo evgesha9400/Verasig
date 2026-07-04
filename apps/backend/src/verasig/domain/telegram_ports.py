@@ -50,12 +50,19 @@ class TelegramAuth(Protocol):
 class TelegramSource(Protocol):
     async def resolve_channel(self, reference: str | int) -> TelegramChannel: ...
 
-    def backfill_batches(
+    def fetch_older_batches(
+        self,
+        channel_id: int,
+        before_message_id: int | None,
+        batch_size: int,
+        since: datetime | None = None,
+    ) -> AsyncIterator[list[RawTelegramMessage]]: ...
+
+    def fetch_newer_batches(
         self,
         channel_id: int,
         after_message_id: int | None,
         batch_size: int,
-        since: datetime | None = None,
     ) -> AsyncIterator[list[RawTelegramMessage]]: ...
 
     async def live_message_ids(

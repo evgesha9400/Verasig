@@ -109,12 +109,19 @@ def _many_messages(count: int) -> list[RawTelegramMessage]:
 
 
 class SlowSource(FakeSource):
-    async def backfill_batches(
-        self, channel_id, after_message_id, batch_size, since=None
+    async def fetch_older_batches(
+        self, channel_id, before_message_id, batch_size, since=None
     ):
         await asyncio.sleep(0.2)
-        async for batch in super().backfill_batches(
-            channel_id, after_message_id, batch_size, since=since
+        async for batch in super().fetch_older_batches(
+            channel_id, before_message_id, batch_size, since=since
+        ):
+            yield batch
+
+    async def fetch_newer_batches(self, channel_id, after_message_id, batch_size):
+        await asyncio.sleep(0.2)
+        async for batch in super().fetch_newer_batches(
+            channel_id, after_message_id, batch_size
         ):
             yield batch
 
@@ -246,7 +253,7 @@ def test_backfill_duplicate_start_and_cancel(client, app):
     assert listed.json()["feeds"][0]["status"] == "cancelled"
 
 
-def test_failed_backfill_can_retry_from_persisted_cursor(client, app):
+def test_failed_backfill_retries_and_continues_older(client, app):
     token = _register(client)
     failed_source = FakeSource(
         _channel(), _many_messages(205), live_ids={1, 2}, fail_after_batch=1
@@ -274,16 +281,20 @@ def test_failed_backfill_can_retry_from_persisted_cursor(client, app):
     assert started.status_code == 202
     assert "event: error" in failed_body
     assert failed_list["status"] == "failed"
-    assert failed_list["fetched"] == 200
-    assert failed_list["lastDate"] == "Jun 1, 2026"
+    assert failed_list["fetched"] == 200  # the 200 newest captured before the crash
+    assert failed_list["lastDate"] == "Jun 6, 2026"  # oldest of those 200 (id 6)
     assert retried.status_code == 202
     assert retried.json()["jobId"] != started.json()["jobId"]
-    assert resumed_source.requested_afters[0] == 200
-    assert all(message_id > 200 for message_id in resumed_source.yielded_ids)
+    assert (
+        resumed_source.requested_befores[0] == 6
+    )  # continue below the oldest captured
+    assert all(message_id < 6 for message_id in resumed_source.yielded_ids)
     assert "event: done" in retried_body
     assert retried_list["status"] == "backfilled"
     assert retried_list["fetched"] == 205
-    assert retried_list["lastDate"] == "Jun 1, 2026"
+    assert (
+        retried_list["lastDate"] == "Jun 1, 2026"
+    )  # now reached back to the very first
 
 
 def test_backfill_after_success_is_idempotent_and_does_not_restart(client, app):
@@ -343,6 +354,51 @@ def test_refresh_backfill_starts_new_run_and_resumes_from_cursor(client, app):
     assert "event: done" in refreshed_body
     assert listed["status"] == "backfilled"
     assert listed["fetched"] == 5
+
+
+def test_refresh_on_incomplete_capture_resumes_older_not_newer(client, app):
+    token = _register(client)
+    # initial backfill crashes after the first batch (200 of 205 newest captured)
+    failed = FakeSource(_channel(), _many_messages(205), fail_after_batch=1)
+    _connect_and_subscribe(client, app, token, failed)
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    # a REFRESH must finish the capture (page older) rather than fetch newer and
+    # falsely report "caught up" while the older gap remains below the top cursor
+    resumed = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
+    app.state.telegram_source_factory = lambda _link: resumed
+    client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert resumed.requested_befores == [6]  # paged older, below the oldest captured
+    assert resumed.requested_afters == []  # never fetched newer
+    assert listed["fetched"] == 205  # the older gap was filled
+
+
+def test_backfill_progress_oldest_date_descends_toward_the_past(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
+    _connect_and_subscribe(client, app, token, source)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    # newest-first: after the first 200-message batch the oldest reached is Jun 6,
+    # then it descends to Jun 1 as the final older batch lands — NOT a static date
+    assert '"lastDate": "Jun 6, 2026"' in body  # intermediate frontier
+    assert listed["lastDate"] == "Jun 1, 2026"  # final oldest reached
 
 
 def test_verified_feed_refresh_restores_verified_status(client, app):
@@ -426,7 +482,7 @@ def test_full_backfill_resets_cursor_and_refetches_all(client, app):
 
     assert full.status_code == 202
     assert full.json()["jobId"] != first.json()["jobId"]
-    assert refetch.requested_afters[0] is None
+    assert refetch.requested_befores[0] is None
     assert sorted(refetch.yielded_ids) == [1, 2, 3]
     assert "event: done" in full_body
     assert listed["status"] == "backfilled"
@@ -541,7 +597,7 @@ def test_verified_feed_full_refetch_restores_verified_status(client, app):
     listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
 
     assert full.status_code == 202
-    assert refetch.requested_afters[0] is None
+    assert refetch.requested_befores[0] is None
     assert "event: done" in full_body
     assert listed["status"] == "verified"
     assert listed["fetched"] == 3
@@ -795,6 +851,6 @@ def test_readd_after_delete_refetches_from_zero(client, app):
     ) as response:
         "".join(response.iter_text())
 
-    assert readded.requested_afters[0] is None
+    assert readded.requested_befores[0] is None
     assert sorted(readded.yielded_ids) == [1, 2, 3]
     assert client.get("/feeds", headers=_auth(token)).json()["feeds"][0]["fetched"] == 3

@@ -92,6 +92,7 @@ class FakeSource:
         self.before_batch = before_batch
         self.resolve_error = resolve_error
         self.requested_afters: list[int | None] = []
+        self.requested_befores: list[int | None] = []
         self.requested_sinces: list[object] = []
         self.yielded_ids: list[int] = []
 
@@ -106,21 +107,41 @@ class FakeSource:
             raise self.resolve_error
         return self.channel
 
-    async def backfill_batches(
+    async def fetch_older_batches(
+        self,
+        _channel_id: int,
+        before_message_id: int | None,
+        batch_size: int,
+        since=None,
+    ) -> AsyncIterator[list[RawTelegramMessage]]:
+        # newest -> oldest, strictly below `before_message_id`, stopping at `since`
+        self.requested_befores.append(before_message_id)
+        self.requested_sinces.append(since)
+        pending = [
+            m
+            for m in self.messages
+            if (before_message_id is None or m.message_id < before_message_id)
+            and (since is None or m.posted_at >= since)
+        ]
+        pending.sort(key=lambda message: message.message_id, reverse=True)
+        for batch in self._emit_batches(pending, batch_size):
+            yield batch
+
+    async def fetch_newer_batches(
         self,
         _channel_id: int,
         after_message_id: int | None,
         batch_size: int,
-        since=None,
     ) -> AsyncIterator[list[RawTelegramMessage]]:
+        # newest -> oldest, strictly above `after_message_id` (REFRESH)
         self.requested_afters.append(after_message_id)
-        self.requested_sinces.append(since)
         after = after_message_id or 0
-        pending = [
-            m
-            for m in self.messages
-            if m.message_id > after and (since is None or m.posted_at > since)
-        ]
+        pending = [m for m in self.messages if m.message_id > after]
+        pending.sort(key=lambda message: message.message_id, reverse=True)
+        for batch in self._emit_batches(pending, batch_size):
+            yield batch
+
+    def _emit_batches(self, pending, batch_size):
         yielded = 0
         for index, start in enumerate(range(0, len(pending), batch_size)):
             if self.fail_after_batch is not None and index == self.fail_after_batch:

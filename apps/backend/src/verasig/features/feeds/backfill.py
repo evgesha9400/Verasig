@@ -1,14 +1,16 @@
-"""Resumable, chunked history backfill (spec §4.1).
+"""Resumable, chunked history backfill (spec §4.1, ADR 0014).
 
-Resolve the channel, then stream `backfill_batches` oldest->newest. Each batch
-is inserted and advances the cursor in **one committed transaction**, so a crash
-mid-stream loses at most the in-flight batch and a restart resumes from the
-persisted cursor without refetching captured ids. Only one batch is ever held.
-Capture is user-owned, so every step is scoped by `user_id`.
+Resolve the channel, then stream messages NEWEST->OLDEST. Each batch is inserted
+and advances the top cursor in one committed transaction, so a crash mid-stream
+loses at most the in-flight batch and a restart resumes from the oldest captured
+id — paging further into the past without refetching, because the capture insert
+is ON CONFLICT DO NOTHING. `extend_newer` (REFRESH) instead pulls only messages
+posted since the top cursor. Only one batch is ever held. Capture is user-owned,
+so every step is scoped by `user_id`.
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -29,15 +31,6 @@ class BackfillResult:
     captured_through_external_message_id: int | None
 
 
-def _effective_since(cursor: int | None, since: datetime | None) -> datetime | None:
-    """Apply the depth cutoff only to a fresh capture; a resume is cursor-bound.
-
-    Deepening an existing capture is a `Re-fetch full history` (which clears the
-    cursor first), never a resume, so `since` is ignored while a cursor is set.
-    """
-    return since if cursor is None else None
-
-
 async def backfill(
     source: TelegramSource,
     user_id: UUID,
@@ -46,29 +39,26 @@ async def backfill(
     batch_size: int,
     on_batch: Callable[[int, datetime], None] | None = None,
     since: datetime | None = None,
+    extend_newer: bool = False,
 ) -> BackfillResult:
-    external_id, cursor = await _register_feed(
-        source, user_id, reference, session_factory
-    )
-    effective_since = _effective_since(cursor, since)
+    external_id = await _register_feed(source, user_id, reference, session_factory)
     logger.info(
-        "backfill stream: user=%s external_id=%s resuming after_message_id=%s "
-        "(None means from the beginning) since=%s",
+        "backfill stream: user=%s external_id=%s extend_newer=%s since=%s",
         user_id,
         external_id,
-        cursor,
-        effective_since,
+        extend_newer,
+        since,
     )
     inserted = 0
-    async for batch in source.backfill_batches(
-        external_id, cursor, batch_size, since=effective_since
+    async for batch in _open_stream(
+        source, session_factory, user_id, external_id, batch_size, since, extend_newer
     ):
         inserted += _persist_batch(session_factory, user_id, external_id, batch)
         if on_batch and batch:
             on_batch(inserted, min(message.posted_at for message in batch))
     final_cursor = _read_cursor(session_factory, user_id, external_id)
     logger.info(
-        "backfill stream complete: user=%s external_id=%s inserted=%s final_cursor=%s",
+        "backfill stream complete: user=%s external_id=%s inserted=%s cursor=%s",
         user_id,
         external_id,
         inserted,
@@ -77,21 +67,37 @@ async def backfill(
     return BackfillResult(external_id, inserted, final_cursor)
 
 
+def _open_stream(
+    source: TelegramSource,
+    session_factory: sessionmaker,
+    user_id: UUID,
+    external_id: int,
+    batch_size: int,
+    since: datetime | None,
+    extend_newer: bool,
+) -> AsyncIterator[list[RawTelegramMessage]]:
+    """REFRESH pulls messages newer than the top cursor; a capture (initial /
+    resume / re-fetch) pages older than the oldest captured id, down to `since`."""
+    if extend_newer:
+        after = _read_cursor(session_factory, user_id, external_id)
+        return source.fetch_newer_batches(external_id, after, batch_size)
+    before = _read_oldest_captured_id(session_factory, user_id, external_id)
+    return source.fetch_older_batches(external_id, before, batch_size, since=since)
+
+
 async def _register_feed(
     source: TelegramSource,
     user_id: UUID,
     reference: str | int,
     session_factory: sessionmaker,
-) -> tuple[int, int | None]:
+) -> int:
     channel = await source.resolve_channel(reference)
     with session_factory() as session:
         feed_repository.upsert_feed_metadata(
             session, user_id, channel, datetime.now(tz=UTC)
         )
         session.commit()
-        return channel.channel_id, feed_repository.read_cursor(
-            session, user_id, channel.channel_id
-        )
+        return channel.channel_id
 
 
 def _persist_batch(
@@ -116,3 +122,10 @@ def _read_cursor(
 ) -> int | None:
     with session_factory() as session:
         return feed_repository.read_cursor(session, user_id, external_id)
+
+
+def _read_oldest_captured_id(
+    session_factory: sessionmaker, user_id: UUID, external_id: int
+) -> int | None:
+    with session_factory() as session:
+        return message_repository.read_oldest_message_id(session, user_id, external_id)

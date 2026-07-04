@@ -32,17 +32,33 @@ conflated "re-download" with "detect deleted signals". A wipe & re-fetch is now 
 predictable clean re-download; deletion evidence is preserved deliberately via
 Check gaps *before* wiping, when the user wants it.
 
+## Update (2026-07): capture streams newest → oldest
+
+Capture now pages **newest → oldest** (`iter_messages(reverse=False, offset_id=…)`)
+so the "oldest message reached" progress date descends from today as the capture
+goes back, and the most recent signals land first. Cursor consequences:
+
+- `captured_through_external_message_id` is the **top** (highest/newest) captured
+  id. REFRESH pulls messages *above* it; a capture pages *below* the **oldest**
+  captured id — derived via `min(external_message_id)`, no new column — down to the
+  depth cutoff. Resume-after-crash relies on capture being ON CONFLICT DO NOTHING.
+- The depth cutoff is a manual **break** on the older walk (Telethon's
+  `offset_date` bounds the wrong end for `reverse=False`): it stops before keeping
+  the first message past the cutoff, so nothing out-of-window leaks in.
+- REFRESH extends-newer only once the capture has SUCCEEDED; on an incomplete
+  capture it resumes the older walk instead of falsely reporting "caught up".
+
 ## History depth
 
-A feed remembers a **history depth**: `6m`, `1y` (default), or `all`. A *fresh*
-capture (NULL cursor) stops once it reaches the depth's cutoff (`183` / `365`
-days before now, or no bound); a resume is cursor-bound and ignores the cutoff.
-Deepening later is therefore a Re-fetch full history, not a resume. Depth lives
-in its own `feed.history_depth` column, **not** in `feed.metadata`, because a
-backfill start overwrites the whole `metadata` JSONB. Telethon applies the bound
-via `iter_messages(reverse=True, offset_date=cutoff)`, which composes with the
-`min_id` cursor. The deletion gap-span is floored at the oldest stored id so a
-depth-limited capture never reports pre-window id gaps as SUSPECTED deletions.
+A feed remembers a **history depth**: `6m`, `1y` (default), or `all`. A capture
+pages newest → oldest and stops once it reaches the depth's cutoff (`183` / `365`
+days before now, or no bound for `all`); a resume continues that same older walk,
+also bounded by the cutoff. Deepening later is a Re-fetch full history, not a
+resume. Depth lives in its own `feed.history_depth` column, **not** in
+`feed.metadata`, because a backfill start overwrites the whole `metadata` JSONB.
+Telethon walks via `iter_messages(reverse=False, offset_id=…)` and the cutoff is a
+manual break on the walk. The Check-gaps gap-span is floored at the oldest stored
+id so a depth-limited capture never reports pre-window id gaps as SUSPECTED.
 
 ## Wipe safety
 
@@ -57,8 +73,8 @@ The wipe runs inside the backfill job, not synchronously on the request:
 2. The wipe is a single transaction: `DELETE FROM raw_message` (events →
    extractions / drift / lifecycle links, and golden labels cascade) plus a
    cursor reset. If it fails, it rolls back whole.
-3. Recapture is the normal backfill stream, now from a NULL cursor at the chosen
-   depth.
+3. Recapture is the normal backfill stream: newest → oldest from the newest
+   message down to the chosen depth (the wipe left an empty capture).
 
 ## What survives a wipe
 
