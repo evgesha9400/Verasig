@@ -55,3 +55,9 @@ apps/frontend/web/dev/realFeedMessages.json
 apps/frontend/web/dev/index.html
 apps/frontend/web/mining-preview.html
 apps/frontend/web/dev/mining-preview.jsx
+
+# Playwright e2e — auth state is a real credential; the rest is generated
+apps/frontend/web/e2e/.auth/
+apps/frontend/web/test-results/
+apps/frontend/web/playwright-report/
+apps/frontend/web/playwright/.cache/
