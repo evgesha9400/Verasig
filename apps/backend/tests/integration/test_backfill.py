@@ -104,23 +104,31 @@ async def test_backfill_with_since_captures_only_messages_after_cutoff(session_f
         assert message_repository.count_messages(db_session, user_id, 1) == 1
 
 
-async def test_backfill_ignores_since_when_cursor_present(session_factory):
+async def test_refresh_fetches_newer_and_ignores_depth_cutoff(session_factory):
     user_id = _seed_account(session_factory)
     await backfill(
         FakeSource(_channel(), _messages(3)), user_id, "@pilot", session_factory, 5
     )
+    # messages 4,5 arrived since; REFRESH pulls only what is newer than the top
+    # cursor and ignores any depth cutoff (deepening is a full re-fetch, not this).
     resumed = FakeSource(_channel(), _messages(5))
     future_cutoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
 
     result = await backfill(
-        resumed, user_id, "@pilot", session_factory, batch_size=5, since=future_cutoff
+        resumed,
+        user_id,
+        "@pilot",
+        session_factory,
+        batch_size=5,
+        since=future_cutoff,
+        extend_newer=True,
     )
 
-    assert resumed.requested_sinces[0] is None  # suppressed: cursor already set
-    assert result.inserted == 2  # messages 4,5 captured, unaffected by the cutoff
+    assert resumed.requested_afters[0] == 3  # fetch newer than the top cursor
+    assert result.inserted == 2  # messages 4,5 captured, cutoff not applied
 
 
-async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
+async def test_backfill_rerun_pages_below_oldest_and_adds_zero(session_factory):
     user_id = _seed_account(session_factory)
     await backfill(
         FakeSource(_channel(), _messages(5)), user_id, "@pilot", session_factory, 2
@@ -128,28 +136,49 @@ async def test_backfill_idempotent_rerun_adds_zero_and_resumes(session_factory):
     rerun = FakeSource(_channel(), _messages(5))
     result = await backfill(rerun, user_id, "@pilot", session_factory, batch_size=2)
     assert result.inserted == 0
-    assert rerun.requested_afters[0] == 5  # resumed at cursor, not 0
+    assert rerun.requested_befores[0] == 1  # paged strictly below the oldest captured
     with session_factory() as db_session:
         assert message_repository.count_messages(db_session, user_id, 1) == 5
 
 
-async def test_backfill_resumes_from_cursor_without_refetch(session_factory):
+async def test_backfill_resumes_older_from_oldest_captured_without_refetch(
+    session_factory,
+):
     user_id = _seed_account(session_factory)
     messages = _messages(6)
     crashed = FakeSource(_channel(), messages, fail_after_batch=1)
     with pytest.raises(FakeStreamInterrupted):
         await backfill(crashed, user_id, "@pilot", session_factory, batch_size=2)
     with session_factory() as db_session:
+        # newest-first: the first batch captured ids 6,5 before the crash
         assert message_repository.count_messages(db_session, user_id, 1) == 2
-        assert feed_repository.read_cursor(db_session, user_id, 1) == 2
+        assert feed_repository.read_cursor(db_session, user_id, 1) == 6  # top cursor
 
     resumed = FakeSource(_channel(), messages)
     result = await backfill(resumed, user_id, "@pilot", session_factory, batch_size=2)
-    assert resumed.requested_afters[0] == 2
-    assert all(message_id > 2 for message_id in resumed.yielded_ids)
+    assert resumed.requested_befores[0] == 5  # continue below the oldest captured id
+    assert all(message_id < 5 for message_id in resumed.yielded_ids)
     assert result.captured_through_external_message_id == 6
     with session_factory() as db_session:
         assert message_repository.count_messages(db_session, user_id, 1) == 6
+
+
+async def test_capture_insert_ignores_already_captured_ids(session_factory):
+    user_id = _seed_account(session_factory)
+    # first capture creates the feed and stores ids 1..3
+    await backfill(
+        FakeSource(_channel(), _messages(3)), user_id, "@pilot", session_factory, 5
+    )
+    # re-inserting captured ids is a no-op (ON CONFLICT DO NOTHING) — the invariant
+    # newest-first resume relies on to never double-count a boundary message
+    with session_factory() as db_session:
+        reinserted = message_repository.insert_messages(
+            db_session, user_id, _messages(3)
+        )
+        db_session.commit()
+    assert reinserted == 0
+    with session_factory() as db_session:
+        assert message_repository.count_messages(db_session, user_id, 1) == 3
 
 
 async def test_backfill_commits_each_batch_before_pulling_the_next(session_factory):

@@ -76,6 +76,20 @@ def count_messages(session: Session, user_id: UUID, external_id: int) -> int:
     )
 
 
+def read_oldest_message_id(
+    session: Session, user_id: UUID, external_id: int
+) -> int | None:
+    """The lowest captured message id — the back frontier a newest->oldest
+    capture pages below to resume going further into the past. `None` when the
+    feed has no capture yet (start from the newest message)."""
+    return session.scalar(
+        select(func.min(RawMessageRow.external_message_id)).where(
+            RawMessageRow.user_id == user_id,
+            RawMessageRow.external_id == external_id,
+        )
+    )
+
+
 def _row_to_message(row: RawMessageRow) -> RawTelegramMessage:
     return RawTelegramMessage(
         channel_id=row.external_id,

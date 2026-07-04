@@ -56,7 +56,10 @@ class FeedRow(Base):
 
     `metadata` holds provider-specific stream attributes (Telegram: handle,
     is_private, subscriber_count). `captured_through_external_message_id` is the
-    backfill cursor; it lives here so deleting the feed drops it.
+    top (highest/newest) captured id — REFRESH pulls messages above it; a
+    newest->oldest capture fills older history in behind it (the oldest frontier
+    is derived from the stored messages). It lives here so deleting the feed drops
+    it.
     """
 
     __tablename__ = "feed"

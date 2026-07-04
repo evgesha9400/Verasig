@@ -139,21 +139,46 @@ class TelethonSource(TelegramSource):
             )
         return matches[0]
 
-    async def backfill_batches(
+    async def fetch_older_batches(
+        self,
+        channel_id: int,
+        before_message_id: int | None,
+        batch_size: int,
+        since: datetime | None = None,
+    ) -> AsyncIterator[list[RawTelegramMessage]]:
+        # reverse=False streams newest->oldest; offset_id excludes ids >= it, so we
+        # page strictly older than what we already hold. The depth cutoff is a
+        # manual break (offset_date would bound the wrong end here): stop BEFORE
+        # keeping the first message past `since`, so no out-of-window message leaks.
+        batch: list[RawTelegramMessage] = []
+        entity = self._read_entity(channel_id)
+        messages = self._client.iter_messages(
+            entity, reverse=False, offset_id=before_message_id or 0
+        )
+        async for message in messages:  # Telethon auto-sleeps short flood-waits
+            if since is not None and message.date < since:
+                break
+            batch.append(self._to_raw_message(channel_id, message))
+            if len(batch) >= batch_size:
+                yield batch
+                batch = []
+        if batch:
+            yield batch
+
+    async def fetch_newer_batches(
         self,
         channel_id: int,
         after_message_id: int | None,
         batch_size: int,
-        since: datetime | None = None,
     ) -> AsyncIterator[list[RawTelegramMessage]]:
-        # reverse=True streams oldest->newest; offset_date bounds the oldest end
-        # (Telethon returns messages strictly after `since`), composing with min_id.
+        # reverse=False streams newest->oldest; min_id excludes ids <= it, so we
+        # capture only the messages posted since the last capture (REFRESH).
         batch: list[RawTelegramMessage] = []
         entity = self._read_entity(channel_id)
         messages = self._client.iter_messages(
-            entity, reverse=True, min_id=after_message_id or 0, offset_date=since
+            entity, reverse=False, min_id=after_message_id or 0
         )
-        async for message in messages:  # Telethon auto-sleeps short flood-waits
+        async for message in messages:
             batch.append(self._to_raw_message(channel_id, message))
             if len(batch) >= batch_size:
                 yield batch

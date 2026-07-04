@@ -56,7 +56,13 @@ def test_conforming_source_satisfies_protocol():
             )
 
         @staticmethod
-        async def backfill_batches(
+        async def fetch_older_batches(
+            _channel_id, _before_message_id, _batch_size, _since=None
+        ) -> AsyncIterator[list[RawTelegramMessage]]:
+            yield []
+
+        @staticmethod
+        async def fetch_newer_batches(
             _channel_id, _after_message_id, _batch_size
         ) -> AsyncIterator[list[RawTelegramMessage]]:
             yield []
@@ -80,7 +86,13 @@ def test_conforming_source_satisfies_protocol():
 def test_source_missing_resolve_channel_does_not_satisfy_protocol():
     class NoResolve:
         @staticmethod
-        async def backfill_batches(_channel_id, _after_message_id, _batch_size):
+        async def fetch_older_batches(
+            _channel_id, _before_message_id, _batch_size, _since=None
+        ):
+            yield []
+
+        @staticmethod
+        async def fetch_newer_batches(_channel_id, _after_message_id, _batch_size):
             yield []
 
         @staticmethod
@@ -93,7 +105,13 @@ def test_source_missing_resolve_channel_does_not_satisfy_protocol():
 def test_source_missing_live_events_does_not_satisfy_protocol():
     class BackfillOnly:
         @staticmethod
-        async def backfill_batches(_channel_id, _after_message_id, _batch_size):
+        async def fetch_older_batches(
+            _channel_id, _before_message_id, _batch_size, _since=None
+        ):
+            yield []
+
+        @staticmethod
+        async def fetch_newer_batches(_channel_id, _after_message_id, _batch_size):
             yield []
 
     assert not isinstance(BackfillOnly(), TelegramSource)
@@ -108,7 +126,13 @@ def test_source_missing_live_message_ids_does_not_satisfy_protocol():
             )
 
         @staticmethod
-        async def backfill_batches(_channel_id, _after_message_id, _batch_size):
+        async def fetch_older_batches(
+            _channel_id, _before_message_id, _batch_size, _since=None
+        ):
+            yield []
+
+        @staticmethod
+        async def fetch_newer_batches(_channel_id, _after_message_id, _batch_size):
             yield []
 
         @staticmethod
@@ -297,7 +321,9 @@ async def test_numeric_channel_resolution_reuses_joined_dialog_entity_for_reads(
     source = TelethonSource(client)
 
     channel = await source.resolve_channel(2358686814)
-    batches = [batch async for batch in source.backfill_batches(2358686814, None, 200)]
+    batches = [
+        batch async for batch in source.fetch_older_batches(2358686814, None, 200)
+    ]
     live_ids = await source.live_message_ids(2358686814)
 
     assert channel.channel_id == 2358686814
@@ -309,7 +335,7 @@ async def test_numeric_channel_resolution_reuses_joined_dialog_entity_for_reads(
     assert client.iter_dialog_calls == 1
 
 
-async def test_backfill_batches_forwards_offset_date_and_min_id():
+async def test_fetch_older_batches_pages_newest_first_below_offset():
     entity = _entity(entity_id=7, title="Private Signals", username=None)
     client = FakeTelethonClient(
         messages_by_channel={entity: [FakeTelethonMessage(11)]},
@@ -319,15 +345,38 @@ async def test_backfill_batches_forwards_offset_date_and_min_id():
     await source.resolve_channel(7)
 
     since = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    _ = [batch async for batch in source.backfill_batches(7, 42, 200, since=since)]
+    _ = [batch async for batch in source.fetch_older_batches(7, 42, 200, since=since)]
 
     _channel_arg, kwargs = client.iter_calls[0]
-    assert kwargs["min_id"] == 42
-    assert kwargs["offset_date"] == since
-    assert kwargs["reverse"] is True
+    assert kwargs["offset_id"] == 42  # page strictly older than id 42
+    assert kwargs["reverse"] is False  # newest -> oldest
+    assert "offset_date" not in kwargs  # the depth cutoff is a manual break, not this
 
 
-async def test_backfill_batches_without_since_bounds_nothing_by_date():
+async def test_fetch_older_batches_stops_at_depth_cutoff_without_leaking():
+    entity = _entity(entity_id=7, title="Private Signals", username=None)
+    in_window = FakeTelethonMessage(20)
+    in_window.date = datetime(2026, 4, 1, tzinfo=timezone.utc)
+    past_cutoff = FakeTelethonMessage(10)
+    past_cutoff.date = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    # Telethon yields newest -> oldest; the walk must stop at the cutoff.
+    client = FakeTelethonClient(
+        messages_by_channel={entity: [in_window, past_cutoff]},
+        dialogs=[_dialog(entity)],
+    )
+    source = TelethonSource(client)
+    await source.resolve_channel(7)
+
+    cutoff = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    batches = [
+        batch async for batch in source.fetch_older_batches(7, None, 200, since=cutoff)
+    ]
+
+    captured = [message.message_id for batch in batches for message in batch]
+    assert captured == [20]  # id 10 (Feb, past the Mar cutoff) never leaks in
+
+
+async def test_fetch_newer_batches_pages_from_min_id():
     entity = _entity(entity_id=7, title="Private Signals", username=None)
     client = FakeTelethonClient(
         messages_by_channel={entity: [FakeTelethonMessage(11)]},
@@ -336,11 +385,11 @@ async def test_backfill_batches_without_since_bounds_nothing_by_date():
     source = TelethonSource(client)
     await source.resolve_channel(7)
 
-    _ = [batch async for batch in source.backfill_batches(7, None, 200)]
+    _ = [batch async for batch in source.fetch_newer_batches(7, 42, 200)]
 
     _channel_arg, kwargs = client.iter_calls[0]
-    assert kwargs["offset_date"] is None
-    assert kwargs["min_id"] == 0
+    assert kwargs["min_id"] == 42  # only messages newer than id 42
+    assert kwargs["reverse"] is False
 
 
 async def test_live_message_ids_reports_scan_progress():
