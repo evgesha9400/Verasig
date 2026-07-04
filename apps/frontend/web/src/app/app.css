@@ -519,7 +519,12 @@
   background: var(--surface-card);
   transition:
     border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
+    background var(--dur-fast) var(--ease-out);
+}
+.vrs-feed-row:hover,
+.vrs-feed-row:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
 }
 .vrs-feed-av {
   width: 44px;
