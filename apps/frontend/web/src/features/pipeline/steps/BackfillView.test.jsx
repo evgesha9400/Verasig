@@ -53,11 +53,11 @@ describe('BackfillView', () => {
       streamHandlers.onProgress({
         fetched: 200,
         lastDate: 'Jun 1, 2026',
-        phase: 'Checking deleted messages... (200 scanned)'
+        phase: 'Indexing message bodies...'
       })
     })
 
-    expect(screen.getByText('Checking deleted messages... (200 scanned)')).toBeTruthy()
+    expect(screen.getByText('Indexing message bodies...')).toBeTruthy()
 
     act(() => {
       streamHandlers.onDone({ fetched: 12, lastDate: 'May 30, 2026' })
@@ -138,12 +138,12 @@ describe('BackfillView', () => {
     act(() => {
       streamHandlers.onProgress({
         fetched: 200,
-        stage: 'rescan',
-        phase: 'Checking deleted messages...'
+        stage: 'index',
+        phase: 'Indexing message bodies...'
       })
     })
 
-    expect(screen.getByText('Deletion scan').classList.contains('is-active')).toBe(true)
+    expect(screen.getByText('Indexing').classList.contains('is-active')).toBe(true)
     expect(screen.getByText('Fetching history').classList.contains('is-done')).toBe(
       true
     )
