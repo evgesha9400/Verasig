@@ -11,7 +11,7 @@ from verasig.features.feeds import routes as feed_routes
 from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
 from verasig.features.parser_overlay import routes as parser_overlay_routes
 from verasig.features.risk import routes as risk_routes
-from verasig.features.rules import mining_routes
+from verasig.features.rules import mine_routes, mining_routes
 from verasig.features.signals import routes as signal_routes
 from verasig.features.simulation import routes as simulation_routes
 from verasig.features.sources import routes as source_routes
@@ -37,6 +37,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     feed_routes.router,
     parser_overlay_routes.router,
     simulation_routes.router,
+    mine_routes.router,
     mining_routes.router,
     risk_routes.router,
     signal_routes.router,
