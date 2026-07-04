@@ -149,17 +149,34 @@ describe('BackfillView', () => {
     )
   })
 
-  it('renders an empty oldest-date placeholder until the backend reports a date', () => {
+  it('hides the oldest-date stat until the first fetch reports a date', async () => {
+    const onStart = vi.fn().mockResolvedValue()
+    let streamHandlers
+    const onStream = vi.fn((_id, handlers) => {
+      streamHandlers = handlers
+      return { close: vi.fn() }
+    })
     render(
       <BackfillView
         feed={feed}
-        onStart={vi.fn().mockResolvedValue()}
-        onStream={() => ({ close: vi.fn() })}
+        onStart={onStart}
+        onStream={onStream}
         onCancel={() => {}}
         onComplete={() => {}}
       />
     )
+    await waitFor(() => expect(onStart).toHaveBeenCalled())
 
-    expect(screen.getByText('No messages yet')).toBeTruthy()
+    // before the first fetch reports a date, the stat and its label are hidden
+    expect(screen.queryByText('No messages yet')).toBeNull()
+    expect(screen.queryByText('Oldest message reached')).toBeNull()
+
+    act(() => {
+      streamHandlers.onProgress({ fetched: 5, lastDate: 'Jun 1, 2026' })
+    })
+
+    // once a date arrives the stat appears and tracks the descending frontier
+    expect(screen.getByText('Jun 1, 2026')).toBeTruthy()
+    expect(screen.getByText('Oldest message reached')).toBeTruthy()
   })
 })
