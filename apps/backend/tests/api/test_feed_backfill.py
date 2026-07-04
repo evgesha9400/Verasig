@@ -462,6 +462,38 @@ def test_full_refetch_secures_deletion_evidence_then_wipes_and_recaptures(client
     assert listed["deletedCount"] == 1  # message 2 secured as a deletion
 
 
+def test_full_refetch_progress_never_shows_stale_pre_wipe_total(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+    _connect_and_subscribe(client, app, token, source)
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    assert client.get("/feeds", headers=_auth(token)).json()["feeds"][0]["fetched"] == 5
+
+    # Only messages 1 and 2 still live upstream: the full re-fetch wipes the old
+    # capture of 5 and recaptures 2. The counter must restart at 0 for the new
+    # generation, so the stale pre-wipe total (5) must never reach the stream —
+    # not even during the slow "Securing deletion evidence..." phase.
+    survivors = _many_messages(5)[:2]
+    refetch = FakeSource(_channel(), survivors, live_ids={1, 2})
+    app.state.telegram_source_factory = lambda _link: refetch
+    full = client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert full.status_code == 202
+    assert "Securing deletion evidence" in body  # the pre-wipe window ran
+    assert '"fetched": 5' not in body  # the doomed old total must never appear
+    assert "event: done" in body
+    assert listed["fetched"] == 2  # only the survivors recaptured
+
+
 def test_full_refetch_aborts_without_wiping_on_empty_live_channel(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})

@@ -70,6 +70,7 @@ class BackfillJobCoordinator:
         self._jobs = jobs
         self._batch_size = batch_size
         self._previous_status_by_run_id: dict[UUID, str | None] = {}
+        self._capture_generation_live: set[UUID] = set()
 
     def start(
         self,
@@ -101,7 +102,7 @@ class BackfillJobCoordinator:
         # FULL no longer mutates anything synchronously: the wipe happens inside
         # the job, AFTER a mandatory pre-wipe rescan secures deletion evidence.
         source = make_source()
-        run, previous_status = self._create_run(user_id, channel_id)
+        run, previous_status = self._create_run(user_id, channel_id, mode)
         self._previous_status_by_run_id[run.id] = previous_status
         key = backfill_job_key(user_id, channel_id)
         logger.info(
@@ -178,7 +179,7 @@ class BackfillJobCoordinator:
                         self._previous_status_by_run_id.get(run.id), "failed"
                     ),
                 )
-                self._previous_status_by_run_id.pop(run.id, None)
+                self._forget_run(run.id)
             session.commit()
 
     def mark_inactive_backfilling_failed(
@@ -213,7 +214,7 @@ class BackfillJobCoordinator:
                 )
                 row.status = _feed_status_after_backfill(previous_status, "failed")
                 if run is not None:
-                    self._previous_status_by_run_id.pop(run.id, None)
+                    self._forget_run(run.id)
             session.commit()
 
     def _read_idempotent_run(
@@ -266,13 +267,13 @@ class BackfillJobCoordinator:
             )
 
     def _create_run(
-        self, user_id: UUID, channel_id: int
+        self, user_id: UUID, channel_id: int, mode: BackfillMode
     ) -> tuple[BackfillJobRun, str | None]:
         with self._session_factory() as session:
             feed = feed_repository.read_feed(session, user_id, channel_id)
             previous_status = feed.status if feed is not None else None
             run = backfill_job_repository.create_run(
-                session, user_id, channel_id, _now()
+                session, user_id, channel_id, _now(), mode
             )
             feed_repository.set_status(session, user_id, channel_id, "backfilling")
             session.commit()
@@ -382,7 +383,8 @@ class BackfillJobCoordinator:
         phase: str,
         **fields,
     ) -> None:
-        progress = self._refresh_progress(run_id, phase)
+        sync = self._should_sync_from_capture(run_id, mode)
+        progress = self._refresh_progress(run_id, phase, sync)
         publish_logged_progress(
             publisher,
             present_progress(progress),
@@ -424,6 +426,9 @@ class BackfillJobCoordinator:
                 publisher, run_id, channel_id, mode
             ),
         )
+        # The old generation is gone: the live table now reflects only the fresh
+        # capture, so progress may resume reading it (0, then growing up).
+        self._capture_generation_live.add(run_id)
         self._publish_progress(
             publisher, run_id, channel_id, mode, "Re-capturing history..."
         )
@@ -448,11 +453,34 @@ class BackfillJobCoordinator:
 
         return report
 
-    def _refresh_progress(self, run_id: UUID, phase: str) -> BackfillProgress:
+    def _should_sync_from_capture(self, run_id: UUID, mode: BackfillMode) -> bool:
+        """Whether progress may reflect the live capture table yet.
+
+        Progress reads the live table only once the run's capture generation is
+        live: RESUME/REFRESH capture in place, so they are live from the start; a
+        FULL re-fetch's generation only goes live after its pre-capture wipe, so
+        until then progress stays at the seeded-empty baseline (0 / no date / no
+        cursor) instead of the doomed pre-wipe total.
+        """
+        if mode is not BackfillMode.FULL:
+            return True
+        return run_id in self._capture_generation_live
+
+    def _refresh_progress(
+        self, run_id: UUID, phase: str, sync: bool = True
+    ) -> BackfillProgress:
         with self._session_factory() as session:
-            run = backfill_job_repository.refresh_run_progress(session, run_id)
-            session.commit()
+            if sync:
+                run = backfill_job_repository.refresh_run_progress(session, run_id)
+                session.commit()
+            else:
+                run = backfill_job_repository.read_run(session, run_id)
         return self._progress_from_run(run, phase)
+
+    def _forget_run(self, run_id: UUID) -> None:
+        """Drop a finished run's per-run bookkeeping."""
+        self._previous_status_by_run_id.pop(run_id, None)
+        self._capture_generation_live.discard(run_id)
 
     def _finish_succeeded(
         self,
@@ -470,7 +498,7 @@ class BackfillJobCoordinator:
                 _feed_status_after_backfill(previous_status, "backfilled"),
             )
             session.commit()
-        self._previous_status_by_run_id.pop(run_id, None)
+        self._forget_run(run_id)
         return self._progress_from_run(run, "Backfill complete.")
 
     def _finish_cancelled(
@@ -489,7 +517,7 @@ class BackfillJobCoordinator:
                 _feed_status_after_backfill(previous_status, "cancelled"),
             )
             session.commit()
-        self._previous_status_by_run_id.pop(run_id, None)
+        self._forget_run(run_id)
         return self._progress_from_run(run, "Backfill cancelled.")
 
     def _finish_failed(
@@ -512,7 +540,7 @@ class BackfillJobCoordinator:
                 _feed_status_after_backfill(previous_status, "failed"),
             )
             session.commit()
-        self._previous_status_by_run_id.pop(run_id, None)
+        self._forget_run(run_id)
         return self._progress_from_run(run, "Backfill failed.")
 
     @staticmethod
