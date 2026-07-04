@@ -10,7 +10,6 @@ import {
 } from '../../domain/template-mining/index.js'
 import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
-import { MiningStepBar } from './MiningStepBar.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
 import { TemplateExamplesDialog } from './TemplateExamplesDialog.jsx'
 import { OverlayManager } from './OverlayManager.jsx'
@@ -18,12 +17,13 @@ import { AuditReview } from './AuditReview.jsx'
 import { formatPercent } from './format.js'
 import './template-mining.css'
 
-/* Verasig — Parser-first Template Mining (pipeline wizard step).
-   Three sub-steps shown one at a time: Mine (auto-runs the deterministic local
-   pipeline against the active feed) → Review (accept/reject templates) → Verify
-   (audit the full history, then confirm). All business logic lives in
-   domain/template-mining; this component only holds UI state. Rules and audit
-   recompute reactively from the decisions state, so revisiting is safe. */
+/* Verasig — Parser-first Template Mining.
+   Mine, Review and Verify are now top-level pipeline steps: the active one is
+   driven by the `step` prop and the shared top-level stepper, not an internal
+   sub-stepper. This component owns the shared mining state (result, decisions)
+   and renders the view for the current step; advancing calls up to the parent
+   to change the screen. Rules and audit recompute reactively from decisions, so
+   revisiting Review/Verify is safe. */
 
 const EMPTY_AUDIT = {
   parsedSignals: [],
@@ -74,10 +74,14 @@ function TemplateSection({ title, subtitle, groups, action, cardProps }) {
 export function TemplateMiningPage({
   activeFeed,
   authToken,
+  step = 'mine',
   onListMessages,
   fireToast,
   overlay = {},
   onSaveOverlay,
+  onMined,
+  onContinueToVerify,
+  onBackToReview,
   onFinish,
   onKeepVerified,
   decisions: controlledDecisions,
@@ -89,7 +93,6 @@ export function TemplateMiningPage({
   const [internalDecisions, setInternalDecisions] = useState({})
   const [examplesFor, setExamplesFor] = useState(null) // open template's key
   const [running, setRunning] = useState(true)
-  const [subStep, setSubStep] = useState('mine') // 'mine' | 'review' | 'verify'
 
   // Controlled-with-fallback: the parent may own decisions (so they survive this
   // component unmounting on a screen change); otherwise we keep them locally.
@@ -175,6 +178,11 @@ export function TemplateMiningPage({
   const runRef = useRef({ finishMining, fireToast, onListMessages, authToken })
   runRef.current = { finishMining, fireToast, onListMessages, authToken }
 
+  // Navigation callbacks read through a ref so effects don't refire on the
+  // parent re-creating them each render.
+  const navRef = useRef({})
+  navRef.current = { onMined, onContinueToVerify, onBackToReview }
+
   // Auto-runs on entry and whenever the active feed changes — no button click in
   // the primary path. Loads the full backfilled history when authenticated, else
   // the bundled demo history so the prototype still runs.
@@ -186,7 +194,6 @@ export function TemplateMiningPage({
       onListMessages: list,
       authToken: token
     } = runRef.current
-    setSubStep('mine')
 
     if (!(token && list && feedId)) {
       setRunning(true)
@@ -219,18 +226,19 @@ export function TemplateMiningPage({
     // overlay or callback identity change never re-mines and drops decisions.
   }, [activeFeed?.id])
 
-  // Advance to Review as soon as mining lands; a re-mine resets to Mine above.
+  // Advance to Review as soon as mining lands (only while on the Mine screen).
   useEffect(() => {
-    if (subStep === 'mine' && result && !running) setSubStep('review')
-  }, [subStep, result, running])
+    if (step === 'mine' && result && !running) navRef.current.onMined?.()
+  }, [step, result, running])
 
   // Guard: if decisions drop to zero while on Verify, fall back to Review.
   useEffect(() => {
-    if (subStep === 'verify' && acceptedGroups.length === 0) setSubStep('review')
-  }, [subStep, acceptedGroups.length])
+    if (step === 'verify' && result && acceptedGroups.length === 0) {
+      navRef.current.onBackToReview?.()
+    }
+  }, [step, result, acceptedGroups.length])
 
   function runStaticMining() {
-    setSubStep('mine')
     finishMining(messages)
   }
 
@@ -251,7 +259,7 @@ export function TemplateMiningPage({
   }
 
   function goToVerify() {
-    if (acceptedGroups.length > 0) setSubStep('verify')
+    if (acceptedGroups.length > 0) onContinueToVerify?.()
   }
 
   const cardProps = (group) => ({
@@ -266,36 +274,11 @@ export function TemplateMiningPage({
     ? groups.find((group) => group.templateKey === examplesFor)
     : null
 
+  const showMineLoader = step === 'mine' || !result
+
   return (
     <div className="vrs-page vrs-tm">
-      <MiningStepBar
-        active={subStep}
-        canVerify={acceptedGroups.length > 0}
-        onNavigate={setSubStep}
-      />
-
-      <details className="vrs-tm-altsource">
-        <summary>Use sample or pasted messages instead</summary>
-        <MiningSourcePanel
-          source={source}
-          onSourceChange={setSource}
-          pasted={pasted}
-          onPastedChange={setPasted}
-          feeds={[]}
-          feedId={null}
-          onFeedChange={() => {}}
-          selectedFeedName={activeFeed?.name}
-          authenticated={Boolean(authToken)}
-          demoFeedCount={FEED_MESSAGES.length}
-          sampleCount={SAMPLE_MESSAGES.length}
-          pastedCount={pastedCount}
-          running={running}
-          canRun={messages.length > 0}
-          onRun={runStaticMining}
-        />
-      </details>
-
-      {subStep === 'mine' && (
+      {showMineLoader && (
         <div className="vrs-empty vrs-empty--sm">
           <div className="vrs-empty__note">
             {running
@@ -307,8 +290,29 @@ export function TemplateMiningPage({
         </div>
       )}
 
-      {subStep === 'review' && result && (
+      {step === 'review' && result && (
         <>
+          <details className="vrs-tm-altsource">
+            <summary>Use sample or pasted messages instead</summary>
+            <MiningSourcePanel
+              source={source}
+              onSourceChange={setSource}
+              pasted={pasted}
+              onPastedChange={setPasted}
+              feeds={[]}
+              feedId={null}
+              onFeedChange={() => {}}
+              selectedFeedName={activeFeed?.name}
+              authenticated={Boolean(authToken)}
+              demoFeedCount={FEED_MESSAGES.length}
+              sampleCount={SAMPLE_MESSAGES.length}
+              pastedCount={pastedCount}
+              running={running}
+              canRun={messages.length > 0}
+              onRun={runStaticMining}
+            />
+          </details>
+
           <MiningMetrics metrics={metrics} variant="slim" />
 
           {groups.length === 0 ? (
@@ -371,9 +375,9 @@ export function TemplateMiningPage({
         </>
       )}
 
-      {subStep === 'verify' && result && (
+      {step === 'verify' && result && (
         <>
-          <Button variant="ghost" size="sm" onClick={() => setSubStep('review')}>
+          <Button variant="ghost" size="sm" onClick={() => onBackToReview?.()}>
             Back to review
           </Button>
           <AuditReview

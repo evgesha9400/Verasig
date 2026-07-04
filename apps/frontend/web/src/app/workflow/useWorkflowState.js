@@ -2,16 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listFeeds } from '../../shared/api/feedsApi.js'
 import { getTelegramStatus } from '../../shared/api/telegramApi.js'
 import { PIPELINE_STEPS } from '../../domain/workflow/pipelineSteps.js'
+import { landingStepForFeed } from '../../domain/workflow/stepAccess.js'
 import { FEEDS } from '../../domain/demo-data/seed.js'
 
 const LS_KEY = 'vrs-proto-state-2'
 
 const PIPELINE_SCREEN_BY_SCREEN = {
   backfill: 'backfill',
-  mining: 'mining',
+  mine: 'mine',
+  review: 'review',
+  verify: 'verify',
   exchange: 'exchange',
-  risk: 'risk',
   backtest: 'backtest',
+  execution: 'execution',
   'backtest-result': 'backtest'
 }
 
@@ -89,7 +92,7 @@ async function readSourceState(authToken) {
   }
 }
 
-export function useWorkflowState(authToken) {
+export function useWorkflowState(authToken, plan) {
   const saved = useRef(authToken ? null : loadState()).current
 
   const [nav, setNav] = useState('sources')
@@ -217,10 +220,13 @@ export function useWorkflowState(authToken) {
 
   function resumeFeed(feed) {
     setActiveFeedId(feed.id)
-    if (feed.status === 'analyzed') setScreen('backtest-result')
-    else if (feed.status === 'verified' || feed.hasRisk) setScreen('backtest')
-    else if (feed.status === 'backfilled') setScreen('mining')
-    else setScreen('mining')
+    const landing = landingStepForFeed(feed, plan)
+    // An analyzed feed that can reach Backtest opens its results, not the runner.
+    if (feed.status === 'analyzed' && landing === 'backtest') {
+      setScreen('backtest-result')
+      return
+    }
+    setScreen(landing)
   }
 
   // The whole feed row is clickable: open it at its latest stage. New feeds start
@@ -276,7 +282,7 @@ export function useWorkflowState(authToken) {
 
   function reopenMining(feed) {
     setActiveFeedId(feed.id)
-    setScreen('mining')
+    setScreen('mine')
   }
 
   function checkGaps(feed) {
@@ -331,7 +337,7 @@ export function useWorkflowState(authToken) {
     })
     previousBackfillStatusRef.current = null
     setBackfillMode('resume')
-    setScreen(keepsReview ? 'feeds' : 'mining')
+    setScreen(keepsReview ? 'feeds' : 'mine')
     if (keepsReview) {
       fireToast(
         'verified',
@@ -417,7 +423,7 @@ export function useWorkflowState(authToken) {
   function requestStepBack(stepId) {
     const order = PIPELINE_STEPS.map((step) => step.id)
     const currentScreen = { 'backtest-result': 'backtest' }[screen] || screen
-    if (stepId === 'mining' && order.indexOf(currentScreen) > order.indexOf('mining')) {
+    if (stepId === 'mine' && order.indexOf(currentScreen) > order.indexOf('mine')) {
       setBackTarget(stepId)
       return
     }
