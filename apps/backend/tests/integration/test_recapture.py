@@ -1,10 +1,10 @@
-"""Re-fetch full history = secure deletion evidence, then wipe & recapture (ADR 0014).
+"""Re-fetch full history = verify reachability, then wipe & recapture (ADR 0014).
 
-`secure_and_wipe` re-scans the live channel FIRST (so a CONFIRMED deletion's
-original text is durably captured), then deletes the feed's capture + cascaded
-derived rows in one transaction. Durable evidence, distilled rules and the
-backfill-run history survive because they FK to `feed`, not to `raw_message`. An
-inaccessible channel (empty live snapshot) aborts BEFORE anything is deleted.
+`guard_and_wipe` verifies the channel still resolves FIRST, then deletes the
+feed's capture + cascaded derived rows in one transaction. It secures NO deletion
+evidence (that is the deliberate `Check gaps` rescan). Durable evidence, distilled
+rules and the backfill-run history survive because they FK to `feed`, not to
+`raw_message`. An unreachable channel aborts BEFORE anything is deleted.
 """
 
 from datetime import datetime, timezone
@@ -28,8 +28,7 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.feeds.deletion_rescan import RescanAborted
-from verasig.features.feeds.recapture import secure_and_wipe
+from verasig.features.feeds.recapture import ChannelUnreachableError, guard_and_wipe
 from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 
@@ -123,14 +122,13 @@ def _seed_feed_with_full_capture(session_factory) -> object:
         return account.id
 
 
-async def test_secure_and_wipe_purges_capture_but_keeps_evidence_rules_runs(
+async def test_guard_and_wipe_purges_capture_but_keeps_rules_and_runs(
     session_factory,
 ):
     user_id = _seed_feed_with_full_capture(session_factory)
-    # message 2 vanished from the live channel — a CONFIRMED deletion to secure
-    source = FakeSource(_channel(), [], live_ids={1, 3})
+    source = FakeSource(_channel(), [])
 
-    result = await secure_and_wipe(source, user_id, 1, session_factory)
+    deleted = await guard_and_wipe(source, user_id, 1, session_factory)
 
     with session_factory() as session:
         assert message_repository.count_messages(session, user_id, 1) == 0
@@ -140,20 +138,20 @@ async def test_secure_and_wipe_purges_capture_but_keeps_evidence_rules_runs(
         assert rule_repository.read_filter_rules(session, 1, user_id)  # rules survive
         assert backfill_job_repository.read_latest_run(session, user_id, 1) is not None
         assert feed_repository.read_cursor(session, user_id, 1) is None
-        evidence = deletion_repository.read_deletion_evidence(session, user_id, 1)
-    assert result.messages_deleted == 3
-    secured = [item for item in evidence if item.message_id == 2]
-    assert secured and secured[0].original_text == "BTC long 65k"
+        # a clean wipe secures NO deletion evidence (that is the Check gaps rescan)
+        assert deletion_repository.read_deletion_evidence(session, user_id, 1) == []
+    assert deleted == 3
 
 
-async def test_secure_and_wipe_aborts_before_wipe_on_empty_live_snapshot(
+async def test_guard_and_wipe_aborts_before_wipe_when_channel_unreachable(
     session_factory,
 ):
     user_id = _seed_feed_with_full_capture(session_factory)
-    source = FakeSource(_channel(), [], live_ids=set())  # inaccessible channel
+    # channel no longer resolves — never wipe a capture we cannot refill
+    source = FakeSource(_channel(), [], resolve_error=RuntimeError("channel gone"))
 
-    with pytest.raises(RescanAborted):
-        await secure_and_wipe(source, user_id, 1, session_factory)
+    with pytest.raises(ChannelUnreachableError):
+        await guard_and_wipe(source, user_id, 1, session_factory)
 
     with session_factory() as session:
         assert message_repository.count_messages(session, user_id, 1) == 3  # intact

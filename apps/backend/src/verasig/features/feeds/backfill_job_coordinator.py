@@ -23,14 +23,9 @@ from verasig.features.feeds.backfill_job_run import (
     present_progress,
 )
 from verasig.features.feeds.candidate_derivation import derive_candidates
-from verasig.features.feeds.deletion_rescan import rescan
-from verasig.features.feeds.feed_job_progress import (
-    publish_logged_progress,
-    scan_phase,
-    should_publish_count,
-)
+from verasig.features.feeds.feed_job_progress import publish_logged_progress
 from verasig.features.feeds.history_depth import HistoryDepth, depth_cutoff
-from verasig.features.feeds.recapture import secure_and_wipe
+from verasig.features.feeds.recapture import guard_and_wipe
 from verasig.foundation.jobs.registry import (
     JobAlreadyRunningError,
     JobPublisher,
@@ -42,20 +37,20 @@ from verasig.storage.models import FeedRow
 
 logger = logging.getLogger(__name__)
 
-BACKFILL_PHASES = (
-    "Opening MTProto session...",
+OPENING_PHASE = "Opening MTProto session..."
+# Decorative capture-phase flavour cycled per batch so a long download is not
+# silent. Every entry maps to the `capture` stage — the indexing phase is
+# published explicitly by its own step and is never mixed into this cycle, so the
+# stage strip never flickers to `index` mid-download.
+CAPTURE_PHASES = (
     "Reading channel history...",
     "Decrypting message batch...",
     "Resolving media references...",
     "Backfilling older window...",
-    "Indexing message bodies...",
 )
+INDEXING_PHASE = "Indexing message bodies..."
 
 SERVICE_INTERRUPTED = "SERVICE_INTERRUPTED"
-
-# Publish one deletion-scan progress event every this many live messages, so a
-# long re-fetch keeps the stream alive without flooding it with one event per id.
-RESCAN_PROGRESS_INTERVAL = 200
 REVIEWED_FEED_STATUSES = {"verified", "analyzed"}
 
 
@@ -99,8 +94,8 @@ class BackfillJobCoordinator:
             return idempotent
 
         self._persist_depth(user_id, channel_id, depth)
-        # FULL no longer mutates anything synchronously: the wipe happens inside
-        # the job, AFTER a mandatory pre-wipe rescan secures deletion evidence.
+        # FULL mutates nothing synchronously: the wipe happens inside the job,
+        # after a reachability guard, and secures no evidence (that is Check gaps).
         source = make_source()
         run, previous_status = self._create_run(user_id, channel_id, mode)
         self._previous_status_by_run_id[run.id] = previous_status
@@ -289,8 +284,8 @@ class BackfillJobCoordinator:
         mode: BackfillMode,
         previous_status: str | None,
     ) -> dict:
-        phases = itertools.cycle(BACKFILL_PHASES[1:])
-        self._publish_progress(publisher, run_id, channel_id, mode, BACKFILL_PHASES[0])
+        phases = itertools.cycle(CAPTURE_PHASES)
+        self._publish_progress(publisher, run_id, channel_id, mode, OPENING_PHASE)
 
         def on_batch(_inserted: int, _oldest: datetime) -> None:
             self._publish_progress(publisher, run_id, channel_id, mode, next(phases))
@@ -301,9 +296,7 @@ class BackfillJobCoordinator:
                     "backfill.run stream begin: run=%s channel=%s", run_id, channel_id
                 )
                 if mode is BackfillMode.FULL:
-                    await self._secure_evidence_then_wipe(
-                        publisher, source, run_id, user_id, channel_id, mode
-                    )
+                    await self._guard_then_wipe(source, run_id, user_id, channel_id)
                 result = await backfill(
                     source,
                     user_id,
@@ -321,7 +314,7 @@ class BackfillJobCoordinator:
                     result.captured_through_external_message_id,
                 )
                 self._publish_progress(
-                    publisher, run_id, channel_id, mode, "Indexing message bodies..."
+                    publisher, run_id, channel_id, mode, INDEXING_PHASE
                 )
                 logger.info(
                     "backfill.run derive_candidates begin: channel=%s", channel_id
@@ -331,32 +324,6 @@ class BackfillJobCoordinator:
                 )
                 logger.info(
                     "backfill.run derive_candidates done: channel=%s", channel_id
-                )
-                self._publish_progress(
-                    publisher, run_id, channel_id, mode, "Checking deleted messages..."
-                )
-                logger.info(
-                    "backfill.run rescan begin: channel=%s (fetches the FULL live "
-                    "message-id set from Telegram regardless of how little was "
-                    "backfilled — this is the slow step)",
-                    channel_id,
-                )
-                rescan_result = await rescan(
-                    source,
-                    user_id,
-                    channel_id,
-                    self._session_factory,
-                    on_progress=self._rescan_progress_reporter(
-                        publisher, run_id, channel_id, mode
-                    ),
-                )
-                logger.info(
-                    "backfill.run rescan done: channel=%s confirmed=%s suspected=%s "
-                    "written=%s",
-                    channel_id,
-                    rescan_result.confirmed,
-                    rescan_result.suspected,
-                    rescan_result.written,
                 )
         except asyncio.CancelledError as error:
             progress = self._finish_cancelled(
@@ -400,58 +367,26 @@ class BackfillJobCoordinator:
             **fields,
         )
 
-    async def _secure_evidence_then_wipe(
+    async def _guard_then_wipe(
         self,
-        publisher: JobPublisher,
         source: TelegramSource,
         run_id: UUID,
         user_id: UUID,
         channel_id: int,
-        mode: BackfillMode,
     ) -> None:
-        """FULL only: secure deletion evidence, then wipe the capture generation.
+        """FULL only: verify reachability, then wipe the old capture generation.
 
-        A `RescanAborted` (empty live snapshot) propagates before any wipe, so an
-        inaccessible channel fails the run without destroying the existing capture.
+        `guard_and_wipe` raises `ChannelUnreachableError` before any deletion if
+        the channel does not resolve, so an inaccessible channel fails the run
+        without destroying the existing capture. The wipe is a near-instant delete
+        (no securing) so it needs no progress event of its own — the opening event
+        already fired and the fetch's first batch follows. No deletion evidence is
+        secured; that is the deliberate, template-gated `Check gaps` rescan.
         """
-        self._publish_progress(
-            publisher, run_id, channel_id, mode, "Securing deletion evidence..."
-        )
-        await secure_and_wipe(
-            source,
-            user_id,
-            channel_id,
-            self._session_factory,
-            on_progress=self._rescan_progress_reporter(
-                publisher, run_id, channel_id, mode
-            ),
-        )
+        await guard_and_wipe(source, user_id, channel_id, self._session_factory)
         # The old generation is gone: the live table now reflects only the fresh
         # capture, so progress may resume reading it (0, then growing up).
         self._capture_generation_live.add(run_id)
-        self._publish_progress(
-            publisher, run_id, channel_id, mode, "Re-capturing history..."
-        )
-
-    def _rescan_progress_reporter(
-        self,
-        publisher: JobPublisher,
-        run_id: UUID,
-        channel_id: int,
-        mode: BackfillMode,
-    ) -> Callable[[int], None]:
-        def report(scanned: int) -> None:
-            if should_publish_count(scanned, RESCAN_PROGRESS_INTERVAL):
-                self._publish_progress(
-                    publisher,
-                    run_id,
-                    channel_id,
-                    mode,
-                    scan_phase(scanned),
-                    scanned=scanned,
-                )
-
-        return report
 
     def _should_sync_from_capture(self, run_id: UUID, mode: BackfillMode) -> bool:
         """Whether progress may reflect the live capture table yet.
