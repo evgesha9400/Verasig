@@ -25,9 +25,6 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-secret"
     jwt_ttl_days: int = 7
     secret_keys: str = ""
-    claude_code_oauth_token: str = ""
-    claude_code_model: str = "sonnet"
-    claude_code_timeout_seconds: int = 600
     cors_origins: list[str] = ["http://localhost:5173"]
 
     @property

@@ -2,7 +2,7 @@
 
 A `GoldenLabel` is the operator's verdict on one message: `label`, plus the
 `expected` `ExtractedSignal` fields when positive. The labeled set is the
-precision/recall oracle and the provenance both rule kinds are distilled from.
+precision/recall oracle for evaluating a feed's mined rules.
 """
 
 from datetime import datetime, timezone
@@ -36,7 +36,3 @@ class GoldenLabel(BaseModel):
     @property
     def is_signal(self) -> bool:
         return self.label == LabelKind.SIGNAL
-
-
-class DistillationExample(GoldenLabel):
-    text: str | None = None

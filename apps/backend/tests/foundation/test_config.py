@@ -102,15 +102,7 @@ def test_settings_carry_api_secrets(monkeypatch):
 
     assert settings.jwt_secret == "jwt-secret"
     assert settings.secret_keys == "2026-06:newb64key,2026-01:oldb64key"
-    assert settings.claude_code_model == "sonnet"
-    assert settings.claude_code_timeout_seconds == 600
     assert settings.cors_origins == ["http://localhost:5173"]
-
-
-def test_claude_code_timeout_loads_from_env(monkeypatch):
-    monkeypatch.setenv("VERASIG_CLAUDE_CODE_TIMEOUT_SECONDS", "900")
-
-    assert Settings(_env_file=None).claude_code_timeout_seconds == 900
 
 
 def test_secret_key_spec_returns_configured_keyring(monkeypatch):
