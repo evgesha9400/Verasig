@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from verasig.features.feeds.backfill_job_run import (
     BackfillJobRun,
     BackfillJobStatus,
+    BackfillMode,
 )
 from verasig.storage.models import BackfillJobRunRow, FeedRow, RawMessageRow
 
@@ -57,10 +58,28 @@ def _sync_progress(session: Session, row: BackfillJobRunRow) -> BackfillJobRunRo
     return row
 
 
+def _initial_progress(
+    session: Session, user_id: UUID, external_id: int, mode: BackfillMode
+) -> tuple[int, datetime | None, int | None]:
+    """The progress a new run starts from.
+
+    A FULL re-fetch opens a fresh capture generation (the old one is wiped later
+    in the job), so its progress starts empty. RESUME/REFRESH continue the
+    existing capture, so they resume from the stored progress.
+    """
+    if mode is BackfillMode.FULL:
+        return 0, None, None
+    return _read_stored_progress(session, user_id, external_id)
+
+
 def create_run(
-    session: Session, user_id: UUID, channel_id: int, started_at: datetime
+    session: Session,
+    user_id: UUID,
+    channel_id: int,
+    started_at: datetime,
+    mode: BackfillMode = BackfillMode.RESUME,
 ) -> BackfillJobRun:
-    fetched, oldest, cursor = _read_stored_progress(session, user_id, channel_id)
+    fetched, oldest, cursor = _initial_progress(session, user_id, channel_id, mode)
     row = BackfillJobRunRow(
         id=uuid4(),
         user_id=user_id,

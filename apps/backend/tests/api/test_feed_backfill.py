@@ -152,7 +152,7 @@ def _set_feed_status(app, token: str, status: str) -> None:
         session.commit()
 
 
-def test_backfill_job_streams_progress_and_counts_unlabelled_deletion(client, app):
+def test_backfill_streams_progress_and_indexes_without_deletion_scan(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 3})
     _connect_and_subscribe(client, app, token, source)
@@ -168,13 +168,12 @@ def test_backfill_job_streams_progress_and_counts_unlabelled_deletion(client, ap
     assert "event: progress" in body
     assert "event: done" in body
     assert '"stage"' in body  # progress carries a coarse stage for the UI strip
+    assert "Checking deleted messages" not in body  # a fetch runs no deletion scan
     feed = listed.json()["feeds"][0]
     assert feed["status"] == "backfilled"
-    assert feed["signalDeletion"] is False  # candidate, no rules yet -> not a signal
-    assert feed["deletedCount"] == 1
-    assert feed["confirmedDeletedCount"] == 1
-    assert feed["suspectedDeletedCount"] == 0
-    assert feed["deletedSignalCount"] == 0
+    # a plain backfill no longer detects deletions — that is the Check gaps rescan
+    assert feed["deletedCount"] == 0
+    assert feed["signalDeletion"] is False
 
 
 def test_backfill_persists_selected_history_depth(client, app):
@@ -434,7 +433,7 @@ def test_full_backfill_resets_cursor_and_refetches_all(client, app):
     assert listed["fetched"] == 3
 
 
-def test_full_refetch_secures_deletion_evidence_then_wipes_and_recaptures(client, app):
+def test_full_refetch_wipes_and_recaptures_without_securing_evidence(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
     _connect_and_subscribe(client, app, token, source)
@@ -444,7 +443,7 @@ def test_full_refetch_secures_deletion_evidence_then_wipes_and_recaptures(client
     ) as response:
         "".join(response.iter_text())
 
-    # message 2 vanished upstream: both the live snapshot and the recapture see {1,3}
+    # message 2 vanished upstream: the recapture simply sees {1,3}
     survivors = [message for message in _messages() if message.message_id != 2]
     refetch = FakeSource(_channel(), survivors, live_ids={1, 3})
     app.state.telegram_source_factory = lambda _link: refetch
@@ -456,13 +455,44 @@ def test_full_refetch_secures_deletion_evidence_then_wipes_and_recaptures(client
     listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
 
     assert full.status_code == 202
-    assert "Securing deletion evidence" in body
+    assert "Securing deletion evidence" not in body  # a wipe & re-fetch secures nothing
+    assert "Checking deleted messages" not in body  # and runs no deletion scan
     assert "event: done" in body
     assert listed["fetched"] == 2  # counter restarted; only survivors recaptured
-    assert listed["deletedCount"] == 1  # message 2 secured as a deletion
+    assert listed["deletedCount"] == 0  # deletion detection is the Check gaps rescan
 
 
-def test_full_refetch_aborts_without_wiping_on_empty_live_channel(client, app):
+def test_full_refetch_progress_never_shows_stale_pre_wipe_total(client, app):
+    token = _register(client)
+    source = FakeSource(_channel(), _many_messages(5), live_ids=set(range(1, 6)))
+    _connect_and_subscribe(client, app, token, source)
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    assert client.get("/feeds", headers=_auth(token)).json()["feeds"][0]["fetched"] == 5
+
+    # Only messages 1 and 2 still live upstream: the full re-fetch wipes the old
+    # capture of 5 and recaptures 2. The counter must restart at 0 for the new
+    # generation, so the stale pre-wipe total (5) must never reach the stream.
+    survivors = _many_messages(5)[:2]
+    refetch = FakeSource(_channel(), survivors, live_ids={1, 2})
+    app.state.telegram_source_factory = lambda _link: refetch
+    full = client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert full.status_code == 202
+    assert '"fetched": 5' not in body  # the doomed old total must never appear
+    assert "event: done" in body
+    assert listed["fetched"] == 2  # only the survivors recaptured
+
+
+def test_full_refetch_aborts_without_wiping_when_channel_unreachable(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
     _connect_and_subscribe(client, app, token, source)
@@ -472,7 +502,10 @@ def test_full_refetch_aborts_without_wiping_on_empty_live_channel(client, app):
     ) as response:
         "".join(response.iter_text())
 
-    refetch = FakeSource(_channel(), _messages(), live_ids=set())  # inaccessible
+    # channel no longer resolves — the reachability guard must abort before wiping
+    refetch = FakeSource(
+        _channel(), _messages(), resolve_error=RuntimeError("channel gone")
+    )
     app.state.telegram_source_factory = lambda _link: refetch
     full = client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "full"})
     with client.stream(
@@ -595,21 +628,6 @@ def test_full_backfill_while_running_attaches_without_starting_second_job(client
     assert attached.json()["jobId"] == first.json()["jobId"]
 
 
-def test_backfill_rescan_emits_scan_progress_so_stream_is_not_silent(client, app):
-    token = _register(client)
-    source = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
-    _connect_and_subscribe(client, app, token, source)
-
-    client.post("/feeds/7/backfill", headers=_auth(token))
-    with client.stream(
-        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
-    ) as response:
-        body = "".join(response.iter_text())
-
-    assert "event: done" in body
-    assert "scanned)" in body
-
-
 def test_backfill_progress_stream_reports_cumulative_count_and_oldest_date(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _many_messages(5), live_ids={1, 2, 3, 4, 5})
@@ -628,7 +646,7 @@ def test_backfill_progress_stream_reports_cumulative_count_and_oldest_date(clien
     assert '"cursorExternalMessageId": 5' in body
 
 
-def test_backfill_logs_shared_progress_for_history_and_rescan(client, app):
+def test_backfill_logs_history_progress(client, app):
     token = _register(client)
     source = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
     _connect_and_subscribe(client, app, token, source)
@@ -644,8 +662,7 @@ def test_backfill_logs_shared_progress_for_history_and_rescan(client, app):
     assert "feed_job.progress: operation=backfill external_id=7" in logs
     assert "phase=Reading channel history..." in logs
     assert "fetched=200" in logs
-    assert "phase=Checking deleted messages... (200 scanned)" in logs
-    assert "scanned=200" in logs
+    assert "Checking deleted messages" not in logs  # a fetch runs no deletion scan
 
 
 def test_refresh_backfill_logs_fetch_latest_progress(client, app):

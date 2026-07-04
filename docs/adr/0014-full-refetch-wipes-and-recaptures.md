@@ -1,11 +1,12 @@
 # Re-fetch full history wipes and recaptures a feed at a chosen history depth
 
 A **Re-fetch full history** (`BackfillMode.FULL`) starts a *new capture
-generation*: it secures deletion evidence, atomically deletes the feed's
-captured messages and their cascaded derived rows, resets the cursor, and
+generation*: it verifies the channel still resolves, atomically deletes the
+feed's captured messages and their cascaded derived rows, resets the cursor, and
 recaptures the channel from scratch — bounded by the feed's chosen **history
 depth**. The message counter restarts at zero because progress is recomputed
-from the `raw_message` count.
+from the `raw_message` count. It is a **clean wipe** — it secures no deletion
+evidence (see the Update below).
 
 Previously FULL only reset the cursor and re-walked the channel, upserting rows
 by primary key. Because capture is append-only ([ADR 0001](0001-two-layer-raw-capture.md)),
@@ -13,6 +14,23 @@ re-walking never healed in-place edits or removed anything, and the counter kept
 climbing from the old total — so "re-fetch full history" silently did almost
 nothing a resume didn't. Users needed a real "start this feed's capture over"
 action, and a way to capture less than everything.
+
+## Update (2026-07): fetch and deletion detection are decoupled
+
+FULL no longer secures deletion evidence, and **no fetch mode runs the live
+deletion rescan**. The operations are now single-purpose:
+
+- **Fetch** (initial backfill, fetch-new, and this wipe & re-fetch) = capture →
+  index. A wipe & re-fetch adds only the reachability guard + wipe above.
+- **Check gaps** = the live deletion/gap scan plus the signal ("scam") verdict, a
+  separate, template-gated operation ([ADR 0008](0008-deletion-evidence-durable-projection.md)).
+  It is the *only* place the live channel is walked for deletions.
+
+Rationale: a live rescan finds nothing right after a fresh capture (capture ≈
+live) and is the slow step, so running it inside every fetch was wasted work and
+conflated "re-download" with "detect deleted signals". A wipe & re-fetch is now a
+predictable clean re-download; deletion evidence is preserved deliberately via
+Check gaps *before* wiping, when the user wants it.
 
 ## History depth
 
@@ -30,11 +48,12 @@ depth-limited capture never reports pre-window id gaps as SUSPECTED deletions.
 
 The wipe runs inside the backfill job, not synchronously on the request:
 
-1. A mandatory **pre-wipe rescan** ([ADR 0008](0008-deletion-evidence-durable-projection.md))
-   re-reads the live channel and persists CONFIRMED deletions with their
-   original text **before** any row is deleted. An empty live snapshot raises
-   `RescanAborted` here, so an inaccessible channel fails the run and **nothing
-   is wiped** — the existing capture stays intact and the run is retryable.
+1. A lightweight **reachability guard** resolves the channel
+   (`resolve_channel`) **before** any row is deleted. If it does not resolve the
+   run fails with `ChannelUnreachableError` and **nothing is wiped** — the
+   existing capture stays intact and the run is retryable. (This replaced the
+   former mandatory pre-wipe evidence rescan; see the Update above. Securing
+   deletion evidence is now the separate Check gaps operation.)
 2. The wipe is a single transaction: `DELETE FROM raw_message` (events →
    extractions / drift / lifecycle links, and golden labels cascade) plus a
    cursor reset. If it fails, it rolls back whole.
@@ -71,5 +90,5 @@ drift warnings, `golden_label`, `lifecycle_link`.
 - Golden labels are cascaded away by a wipe (accepted: they are tied to the
   captured messages that no longer exist).
 - A FULL against a reviewed (`verified` / `analyzed`) feed keeps that status
-  (rules survive); a FULL that aborts on an empty live snapshot marks a plain
-  `backfilled` feed `failed`, with its capture untouched and retryable.
+  (rules survive); a FULL that aborts because the channel is unreachable marks a
+  plain `backfilled` feed `failed`, with its capture untouched and retryable.

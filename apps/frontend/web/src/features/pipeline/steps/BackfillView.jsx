@@ -30,21 +30,19 @@ function simulatedDateLabels() {
   })
 }
 
-// Coarse capture stages the strip shows, driven by the SSE `stage` field
-// (falls back to the log line for the free-text detail).
+// A fetch is Fetch -> Index only, driven by the SSE `stage` field. Deletion
+// detection is a separate operation (Check gaps), so no securing/deletion stages
+// ever appear in the fetch strip.
 const CAPTURE_STAGES = [
   { id: 'capture', label: 'Fetching history' },
-  { id: 'index', label: 'Indexing' },
-  { id: 'rescan', label: 'Deletion scan' }
+  { id: 'index', label: 'Indexing' }
 ]
-const SECURE_STAGE = { id: 'secure', label: 'Securing evidence' }
 
-function StageStrip({ stage, isFull }) {
-  const stages = isFull ? [SECURE_STAGE, ...CAPTURE_STAGES] : CAPTURE_STAGES
-  const activeIndex = stages.findIndex((item) => item.id === stage)
+function StageStrip({ stage }) {
+  const activeIndex = CAPTURE_STAGES.findIndex((item) => item.id === stage)
   return (
     <div className="vrs-bf-stages">
-      {stages.map((item, index) => (
+      {CAPTURE_STAGES.map((item, index) => (
         <span
           key={item.id}
           className={`vrs-bf-stage ${index === activeIndex ? 'is-active' : ''} ${
@@ -108,7 +106,7 @@ export function BackfillView({
     setCount(isFull ? 0 : feed.fetched || 0)
     setDate(displayDate(isFull ? null : feed.lastDate))
     setLogLine('Opening MTProto session…')
-    setStage(isFull ? 'secure' : 'capture')
+    setStage('capture')
 
     if (hasBackendBackfill) {
       let closed = false
@@ -299,7 +297,7 @@ export function BackfillView({
         </div>
       </div>
 
-      <StageStrip stage={stage} isFull={isFull} />
+      <StageStrip stage={stage} />
       <div className="vrs-bf-track" />
       <div className="vrs-bf-log">{logLine}</div>
 
