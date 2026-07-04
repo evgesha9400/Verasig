@@ -152,9 +152,8 @@ def test_feed_summary_derives_counts_flags_score_and_display(db_session):
     assert feed["tag"] == "@pilot"
     assert feed["fetched"] == 2
     assert feed["lastDate"] == "Jun 7, 2025"
-    assert feed["historyGaps"] is True
     assert feed["signalDeletion"] is True
-    assert feed["deletedCount"] == 2
+    assert feed["deletedCount"] == 1  # confirmed only; the suspected id-gap isn't shown
     assert feed["score"] == 0
     assert feed["winRate"] == 61.5
     assert feed["pnl"] == 12.4
@@ -247,6 +246,5 @@ def test_feed_summary_treats_unlabelled_candidate_deletion_as_warning(db_session
 
     feed = present_feeds(db_session, account.id)[0]
 
-    assert feed["historyGaps"] is False
     assert feed["signalDeletion"] is False
     assert feed["deletedCount"] == 1

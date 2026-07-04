@@ -174,7 +174,6 @@ def _present_deletion_rescan_result(result: RescanResult) -> dict:
         "externalId": str(result.external_id),
         "newDeletedSignalCount": result.new_deleted_signal_count,
         "newDeletedNonSignalCount": result.new_deleted_non_signal_count,
-        "newSuspectedGapCount": result.new_suspected_gap_count,
         "totalDeletedCount": result.total_deleted_count,
         "signalDeletion": result.signal_deletion,
     }

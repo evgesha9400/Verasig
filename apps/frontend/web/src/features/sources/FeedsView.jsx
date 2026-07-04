@@ -11,8 +11,7 @@ import {
   MenuItem,
   MenuSeparator,
   Popover,
-  Select,
-  SplitButton
+  Select
 } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 
@@ -68,9 +67,7 @@ function isReviewedFeed(feed) {
 
 export function FeedsView({
   feeds,
-  onStartBackfill,
-  onRetry,
-  onResume,
+  onOpenFeed,
   onFetchNew,
   onRefetchFull,
   onReviewTemplates,
@@ -79,7 +76,6 @@ export function FeedsView({
   onCheckGaps,
   checkingGapFeedId,
   rescanScanned,
-  onBacktest,
   onAddFeed
 }) {
   const [tag, setTag] = useState('')
@@ -114,30 +110,7 @@ export function FeedsView({
     }
   }
 
-  function FeedFlag({ kind, onLink }) {
-    if (kind === 'gaps') {
-      return (
-        <Popover
-          className="vrs-feed-pop"
-          trigger={
-            <Badge tone="pending" dot>
-              History gaps
-            </Badge>
-          }
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="vrs-pilltip__t">
-            <Icon name="alert" size={13} /> Possible history gaps
-          </span>
-          <span className="vrs-pilltip__b">
-            The backfill found breaks in this feed&rsquo;s message ID sequence — some
-            messages appear to be missing from the channel history. They may have been
-            deleted. There&rsquo;s no confirmation that any of the deleted messages were
-            signals.
-          </span>
-        </Popover>
-      )
-    }
+  function ScamFlag({ onLink }) {
     return (
       <Popover
         className="vrs-feed-pop"
@@ -260,91 +233,27 @@ export function FeedsView({
     )
   }
 
+  // The row itself navigates (onOpenFeed); the right side shows status info and
+  // the gear only. The gear stops propagation so it never triggers row nav.
   function rightSide(c) {
-    if (c.status === 'verified' || (c.status === 'backfilled' && c.hasRisk)) {
-      return (
-        <div className="vrs-feed-right">
-          <Button
-            variant="primary"
-            size="sm"
-            iconLeft={<Icon name="chart" size={14} />}
-            onClick={() => onBacktest && onBacktest(c)}
-          >
-            Backtest
-          </Button>
-          {optionsMenu(c)}
-        </div>
-      )
-    }
-    if (c.status === 'analyzed') {
-      const scam = c.signalDeletion
-      return (
-        <div className="vrs-feed-right">
-          <div className={`vrs-score ${scam ? 'vrs-score--zero' : ''}`}>
-            <span className="vrs-score__v">{scam ? 0 : c.score}</span>
+    return (
+      <div className="vrs-feed-right">
+        {c.status === 'analyzed' && (
+          <div className={`vrs-score ${c.signalDeletion ? 'vrs-score--zero' : ''}`}>
+            <span className="vrs-score__v">{c.signalDeletion ? 0 : c.score}</span>
             <span className="vrs-score__l">Quality</span>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            iconLeft={<Icon name="chart" size={14} />}
-            onClick={() => onResume(c)}
-          >
-            Results
-          </Button>
-          {optionsMenu(c)}
-        </div>
-      )
-    }
-    if (c.status === 'cancelled' || c.status === 'failed') {
-      return (
-        <div className="vrs-feed-right">
+        )}
+        {(c.status === 'cancelled' || c.status === 'failed') && (
           <div className="vrs-feed-progress">
             <span>{fmtNum(c.fetched)} fetched</span>
             <span>{c.lastDate ? `through ${c.lastDate}` : 'no date yet'}</span>
           </div>
-          <Button
-            variant="primary"
-            size="sm"
-            iconLeft={<Icon name="refresh" size={14} />}
-            onClick={() => onRetry(c)}
-          >
-            Retry
-          </Button>
-          {optionsMenu(c)}
-        </div>
-      )
-    }
-    if (c.status === 'backfilled') {
-      return (
-        <div className="vrs-feed-right">
+        )}
+        {c.status === 'backfilled' && (
           <div className="vrs-feed-progress">{fmtNum(c.fetched)} messages</div>
-          <Button
-            variant="primary"
-            size="sm"
-            iconRight={<Icon name="arrowRight" size={14} />}
-            onClick={() => onResume(c)}
-          >
-            Continue
-          </Button>
-          {optionsMenu(c)}
-        </div>
-      )
-    }
-    return (
-      <div className="vrs-feed-right">
-        <SplitButton
-          variant="secondary"
-          size="sm"
-          value="1y"
-          options={DEPTH_OPTIONS}
-          menuLabel="Choose history depth"
-          onClick={() => onStartBackfill(c, '1y')}
-          onSelect={(depth) => onStartBackfill(c, depth)}
-        >
-          Start backfill
-        </SplitButton>
-        {optionsMenu(c)}
+        )}
+        <span onClick={(e) => e.stopPropagation()}>{optionsMenu(c)}</span>
       </div>
     )
   }
@@ -383,27 +292,28 @@ export function FeedsView({
       )}
       <div className="vrs-stack-sm">
         {feeds.map((c) => (
-          <div key={c.id} className="vrs-feed-row">
+          <div
+            key={c.id}
+            className="vrs-feed-row"
+            role="button"
+            tabIndex={0}
+            style={{ cursor: 'pointer' }}
+            onClick={() => onOpenFeed && onOpenFeed(c)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onOpenFeed && onOpenFeed(c)
+              }
+            }}
+          >
             <span className="vrs-feed-av" style={{ background: c.tint }}>
               {c.initials}
             </span>
             <div className="vrs-feed-main">
               <div className="vrs-feed-name">
                 {c.name} {statusBadge(c)}
-                {c.historyGaps &&
-                  !c.signalDeletion &&
-                  [
-                    'backfilled',
-                    'analyzed',
-                    'cancelled',
-                    'failed',
-                    'verified'
-                  ].includes(c.status) && <FeedFlag kind="gaps" />}
                 {c.signalDeletion && ['verified', 'analyzed'].includes(c.status) && (
-                  <FeedFlag
-                    kind="scam"
-                    onLink={() => onViewDeleted && onViewDeleted(c)}
-                  />
+                  <ScamFlag onLink={() => onViewDeleted && onViewDeleted(c)} />
                 )}
               </div>
               <div className="vrs-feed-meta">

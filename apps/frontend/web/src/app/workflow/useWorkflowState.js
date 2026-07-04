@@ -31,9 +31,7 @@ function mergeDemoFeedFlags(savedFeeds) {
   const seed = Object.fromEntries(FEEDS.map((c) => [c.id, c]))
   return savedFeeds.map((c) => {
     const source = seed[c.id]
-    return source
-      ? { ...c, historyGaps: source.historyGaps, signalDeletion: source.signalDeletion }
-      : c
+    return source ? { ...c, signalDeletion: source.signalDeletion } : c
   })
 }
 
@@ -225,6 +223,22 @@ export function useWorkflowState(authToken) {
     else setScreen('mining')
   }
 
+  // The whole feed row is clickable: open it at its latest stage. New feeds start
+  // a backfill (default depth; choose another later via the gear); failed/cancelled
+  // retry; an in-progress backfill shows live progress; the rest resume their stage.
+  function openFeed(feed) {
+    if (feed.status === 'new') return startBackfill(feed)
+    if (feed.status === 'failed' || feed.status === 'cancelled') {
+      return retryBackfill(feed)
+    }
+    if (feed.status === 'backfilling') {
+      setActiveFeedId(feed.id)
+      setScreen('backfill')
+      return
+    }
+    resumeFeed(feed)
+  }
+
   function fetchNewMessages(feed) {
     previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
     setBackfillMode('refresh')
@@ -272,17 +286,11 @@ export function useWorkflowState(authToken) {
         'Signal deletion confirmed',
         `${feed.name} is missing extracted signals — quality is floored to 0.`
       )
-    } else if (feed.historyGaps) {
-      fireToast(
-        'pending',
-        'History gaps found',
-        `${feed.name} has breaks in its message-ID sequence — some history may be missing.`
-      )
     } else {
       fireToast(
         'verified',
-        'No gaps found',
-        `${feed.name}'s message history is contiguous — no missing IDs.`
+        'No signal deletions',
+        `${feed.name} has no confirmed deleted signals.`
       )
     }
   }
@@ -501,6 +509,7 @@ export function useWorkflowState(authToken) {
     startBackfill,
     retryBackfill,
     resumeFeed,
+    openFeed,
     fetchNewMessages,
     refetchFullHistory,
     reopenMining,

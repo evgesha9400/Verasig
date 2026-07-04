@@ -214,15 +214,16 @@ def _summary(session_factory, rule_backed_ids=frozenset()):
         )[_CHANNEL_ID]
 
 
-def test_summarize_deletions_returns_confidence_counts(session_factory):
+def test_summarize_deletions_counts_confirmed_only(session_factory):
     _seed_channel(session_factory)
     _upsert(session_factory, [_confirmed(2, _LATER), _suspected(4, _LATER)])
 
     summary = _summary(session_factory)
 
-    assert summary.deleted_count == 2
-    assert summary.confirmed_count == 1
-    assert summary.suspected_count == 1
+    # suspected id-gaps are internal-only (hygiene); the user-facing summary counts
+    # confirmed deletions only
+    assert summary.deleted_count == 1
+    assert summary.signal_deletion is False
 
 
 def test_summarize_deletions_signal_count_is_rule_gated(session_factory):

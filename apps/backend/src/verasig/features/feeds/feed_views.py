@@ -109,10 +109,7 @@ def _present_feed(
         "pnl": float(result.pnl) if result else None,
         "hasRisk": feed.status in {"verified", "analyzed"}
         or feed.external_id in rule_feed_ids,
-        "historyGaps": deletion.history_gaps,
         "signalDeletion": deletion.signal_deletion,
         "deletedCount": deletion.deleted_count,
-        "confirmedDeletedCount": deletion.confirmed_count,
-        "suspectedDeletedCount": deletion.suspected_count,
         "deletedSignalCount": deletion.deleted_signal_count,
     }

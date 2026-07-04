@@ -173,7 +173,6 @@ def test_deletion_rescan_streams_signal_label_deletion_and_keeps_status(client, 
     assert "event: done" in body
     assert '"newDeletedSignalCount": 1' in body
     assert '"newDeletedNonSignalCount": 0' in body
-    assert '"newSuspectedGapCount": 0' in body
     assert '"totalDeletedCount": 1' in body
     assert '"signalDeletion": true' in body
     assert feed["status"] == "verified"
@@ -195,7 +194,7 @@ def test_deletion_rescan_logs_shared_scan_progress(client, app):
     assert "scanned=200" in logs
 
 
-def test_deletion_rescan_reports_noise_modifier_and_gaps_as_warning_only(client, app):
+def test_deletion_rescan_reports_non_signal_deletions_without_scam(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
     _seed_feed_state(
@@ -210,13 +209,13 @@ def test_deletion_rescan_reports_noise_modifier_and_gaps_as_warning_only(client,
 
     assert '"newDeletedSignalCount": 0' in body
     assert '"newDeletedNonSignalCount": 2' in body
-    assert '"newSuspectedGapCount": 1' in body
-    assert '"totalDeletedCount": 3' in body
+    assert (
+        '"totalDeletedCount": 2' in body
+    )  # confirmed only; the id-4 gap isn't counted
     assert '"signalDeletion": false' in body
     assert feed["status"] == "analyzed"
     assert feed["signalDeletion"] is False
-    assert feed["historyGaps"] is True
-    assert feed["deletedCount"] == 3
+    assert feed["deletedCount"] == 2
 
 
 def test_deletion_rescan_rerun_reports_zero_new_evidence(client, app):
@@ -230,7 +229,6 @@ def test_deletion_rescan_rerun_reports_zero_new_evidence(client, app):
 
     assert '"newDeletedSignalCount": 0' in body
     assert '"newDeletedNonSignalCount": 0' in body
-    assert '"newSuspectedGapCount": 0' in body
     assert '"totalDeletedCount": 1' in body
     assert '"signalDeletion": true' in body
     assert feed["deletedCount"] == 1

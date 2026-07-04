@@ -27,8 +27,7 @@ export const FEEDS = [
     score: 79,
     winRate: 58.6,
     pnl: 28.4,
-    hasRisk: true,
-    historyGaps: true // suspected — id-sequence gaps found on backfill
+    hasRisk: true
   },
   {
     id: 'delta',
