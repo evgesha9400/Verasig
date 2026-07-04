@@ -72,8 +72,10 @@
   --text-strong: var(--ink-050);
   --text-heading: var(--ink-100);
   --text-body: var(--ink-200);
-  --text-muted: var(--ink-400);
-  --text-faint: var(--ink-500);
+  /* muted/faint pinned to AA-legible hexes (>=4.5:1 on every surface);
+     kept off the ink ramp so the Avatar offline dot (--ink-500) stays as-is. */
+  --text-muted: #9ba3af;
+  --text-faint: #8c93a0;
   --text-on-accent: #0c1004;
 
   /* Borders */
@@ -110,8 +112,8 @@
   --text-strong: #0a0d11;
   --text-heading: #121821;
   --text-body: #2c353f;
-  --text-muted: #5c6671;
-  --text-faint: #8a929c;
+  --text-muted: #525c67; /* AA-tuned for label contrast */
+  --text-faint: #5e6772; /* AA-tuned for label contrast */
   --text-on-accent: #0c1004;
 
   /* Borders */
