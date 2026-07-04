@@ -18,11 +18,10 @@ from verasig.storage.models import DeletedSignalEvidenceRow, GoldenLabelRow
 
 @dataclass(frozen=True)
 class DeletionSummary:
-    history_gaps: bool = False
+    # Confirmed deletions only. Suspected id-gaps are detected and persisted for
+    # provider-hygiene scoring, but never surfaced to the user (no value).
     signal_deletion: bool = False
     deleted_count: int = 0
-    confirmed_count: int = 0
-    suspected_count: int = 0
     deleted_signal_count: int = 0
 
 
@@ -171,16 +170,15 @@ def summarize_deletions(
     ).all()
     summaries = {external_id: DeletionSummary() for external_id in external_ids}
     for external_id, confidence, was_candidate, label in rows:
+        if confidence != "CONFIRMED":
+            continue  # suspected id-gaps are internal-only (hygiene), never surfaced
         current = summaries[external_id]
         is_signal = _is_signal_deletion(
             confidence, was_candidate, label, external_id, frozenset(rule_backed_ids)
         )
         summaries[external_id] = DeletionSummary(
-            history_gaps=current.history_gaps or confidence == "SUSPECTED",
             signal_deletion=current.signal_deletion or is_signal,
             deleted_count=current.deleted_count + 1,
-            confirmed_count=current.confirmed_count + int(confidence == "CONFIRMED"),
-            suspected_count=current.suspected_count + int(confidence == "SUSPECTED"),
             deleted_signal_count=current.deleted_signal_count + int(is_signal),
         )
     return summaries

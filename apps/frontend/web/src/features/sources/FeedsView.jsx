@@ -114,30 +114,7 @@ export function FeedsView({
     }
   }
 
-  function FeedFlag({ kind, onLink }) {
-    if (kind === 'gaps') {
-      return (
-        <Popover
-          className="vrs-feed-pop"
-          trigger={
-            <Badge tone="pending" dot>
-              History gaps
-            </Badge>
-          }
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="vrs-pilltip__t">
-            <Icon name="alert" size={13} /> Possible history gaps
-          </span>
-          <span className="vrs-pilltip__b">
-            The backfill found breaks in this feed&rsquo;s message ID sequence — some
-            messages appear to be missing from the channel history. They may have been
-            deleted. There&rsquo;s no confirmation that any of the deleted messages were
-            signals.
-          </span>
-        </Popover>
-      )
-    }
+  function ScamFlag({ onLink }) {
     return (
       <Popover
         className="vrs-feed-pop"
@@ -390,20 +367,8 @@ export function FeedsView({
             <div className="vrs-feed-main">
               <div className="vrs-feed-name">
                 {c.name} {statusBadge(c)}
-                {c.historyGaps &&
-                  !c.signalDeletion &&
-                  [
-                    'backfilled',
-                    'analyzed',
-                    'cancelled',
-                    'failed',
-                    'verified'
-                  ].includes(c.status) && <FeedFlag kind="gaps" />}
                 {c.signalDeletion && ['verified', 'analyzed'].includes(c.status) && (
-                  <FeedFlag
-                    kind="scam"
-                    onLink={() => onViewDeleted && onViewDeleted(c)}
-                  />
+                  <ScamFlag onLink={() => onViewDeleted && onViewDeleted(c)} />
                 )}
               </div>
               <div className="vrs-feed-meta">

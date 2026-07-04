@@ -31,9 +31,7 @@ function mergeDemoFeedFlags(savedFeeds) {
   const seed = Object.fromEntries(FEEDS.map((c) => [c.id, c]))
   return savedFeeds.map((c) => {
     const source = seed[c.id]
-    return source
-      ? { ...c, historyGaps: source.historyGaps, signalDeletion: source.signalDeletion }
-      : c
+    return source ? { ...c, signalDeletion: source.signalDeletion } : c
   })
 }
 
@@ -272,17 +270,11 @@ export function useWorkflowState(authToken) {
         'Signal deletion confirmed',
         `${feed.name} is missing extracted signals — quality is floored to 0.`
       )
-    } else if (feed.historyGaps) {
-      fireToast(
-        'pending',
-        'History gaps found',
-        `${feed.name} has breaks in its message-ID sequence — some history may be missing.`
-      )
     } else {
       fireToast(
         'verified',
-        'No gaps found',
-        `${feed.name}'s message history is contiguous — no missing IDs.`
+        'No signal deletions',
+        `${feed.name} has no confirmed deleted signals.`
       )
     }
   }
