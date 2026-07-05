@@ -1,42 +1,30 @@
 """record_outcome = recomputable per-event projection (ADR 0006, amends 0001).
 
-The winning outcome is upserted ON CONFLICT(event_id); the losing sibling is
-deleted; the parser_drift_warning is upserted (fallback hit) or cleared. Re-extract
-is +0 and transitions (unrecognized <-> extracted) leave no stale sibling. Raw
-tables stay append-only; only this projection is recomputed.
+The winning outcome is upserted ON CONFLICT(event_id) and the losing sibling is
+deleted, so a transition (unrecognized <-> extracted) leaves no stale sibling and
+re-recording the same winner is +0. Raw tables stay append-only; only this
+projection is recomputed.
 """
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from uuid import UUID
 
-from fakes import FakeExtractor
 from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
+from verasig.domain.extraction_outcome import ExtractOutcome
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.parser_rule import ParserRule
-from verasig.domain.signal import Side, TradeIntent
+from verasig.domain.signal import ExtractedSignal, Side, UnrecognizedSignal
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.rules import drift_repository
 from verasig.features.signals import event_repository, outcome_repository
-from verasig.features.signals.extract_service import ExtractService
+from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 
-_LONG_RULE = ParserRule(
-    rule_id="r1",
-    patterns=[
-        r"(?P<symbol>[A-Za-z]{2,10})\s+(?P<side>long|short)"
-        r"(?:.*?entry[:\s]+(?P<entry>[\d.,]+k?))?"
-    ],
-    field_map={"symbol": "symbol", "side": "side", "entry": "entry"},
-    side_aliases={"long": "LONG", "short": "SHORT"},
-)
 _USER_ID = UUID("40000000-0000-0000-0000-000000000001")
 
 
@@ -99,63 +87,50 @@ def _seed_event(session_factory, text: str) -> RawSignalEvent:
     return event
 
 
-def _record(session_factory, outcome) -> None:
+def _extracted(event: RawSignalEvent) -> ExtractOutcome:
+    return ExtractOutcome(
+        signal=ExtractedSignal(
+            event_id=event.id,
+            channel_id=event.channel_id,
+            symbol="BTCUSDT",
+            side=Side.LONG,
+        )
+    )
+
+
+def _unrecognized(event: RawSignalEvent) -> ExtractOutcome:
+    return ExtractOutcome(
+        unrecognized=UnrecognizedSignal(event_id=event.id, reason="no_match")
+    )
+
+
+def _record(session_factory, outcome: ExtractOutcome) -> None:
     with session_factory() as session:
         outcome_repository.record_outcome(session, outcome, _USER_ID)
         session.commit()
 
 
-def test_record_outcome_persists_extracted_and_reextract_is_idempotent(session_factory):
+def test_record_outcome_persists_extracted_and_rerecord_is_idempotent(session_factory):
     event = _seed_event(session_factory, "BTC long entry 65000")
-    _record(session_factory, ExtractService(rules=[_LONG_RULE]).extract(event))
-    _record(session_factory, ExtractService(rules=[_LONG_RULE]).extract(event))
+    _record(session_factory, _extracted(event))
+    _record(session_factory, _extracted(event))
     with session_factory() as session:
         stored = outcome_repository.read_extracted_signals(session, 7, _USER_ID)
     assert len(stored) == 1  # upsert on event_id, never duplicated
     assert stored[0].symbol == "BTCUSDT"
 
 
-def test_record_outcome_persists_parser_drift_one_to_one(session_factory):
-    event = _seed_event(session_factory, "no rule will match this")
-    intent = TradeIntent(symbol="BTC", side=Side.LONG, stop_loss=Decimal("64000"))
-    outcome = ExtractService(rules=[], fallback=FakeExtractor(returns=intent)).extract(
-        event
-    )
-    _record(session_factory, outcome)
-    with session_factory() as session:
-        signals = outcome_repository.read_extracted_signals(session, 7, _USER_ID)
-        drifts = drift_repository.read_parser_drift_warnings(session, 7, _USER_ID)
-    assert len(signals) == 1 and len(drifts) == 1  # exactly one drift per fallback hit
-    assert drifts[0].event_id == event.id
-    assert drifts[0].fallback_signal_id == signals[0].id  # stamped with the stored id
-
-
-def test_record_outcome_reextract_keeps_pk_and_drift_stays_consistent(session_factory):
-    event = _seed_event(session_factory, "no rule will match this")
-    intent = TradeIntent(symbol="BTC", side=Side.LONG)
-    service = ExtractService(rules=[], fallback=FakeExtractor(returns=intent))
-    _record(session_factory, service.extract(event))
-    with session_factory() as session:
-        first_id = outcome_repository.read_extracted_signals(session, 7, _USER_ID)[0].id
-    _record(session_factory, service.extract(event))  # fresh signal id, same event
-    with session_factory() as session:
-        signals = outcome_repository.read_extracted_signals(session, 7, _USER_ID)
-        drifts = drift_repository.read_parser_drift_warnings(session, 7, _USER_ID)
-    assert len(signals) == 1 and signals[0].id == first_id  # original PK preserved
-    assert drifts[0].fallback_signal_id == first_id  # drift re-stamped to stored id
-
-
 def test_record_outcome_transition_unrecognized_to_extracted_drops_sibling(
     session_factory,
 ):
     event = _seed_event(session_factory, "BTC long entry 65000")
-    _record(session_factory, ExtractService(rules=[]).extract(event))  # no_match
+    _record(session_factory, _unrecognized(event))
     with session_factory() as session:
         assert (
             len(outcome_repository.read_unrecognized_signals(session, 7, _USER_ID)) == 1
         )
         assert outcome_repository.read_extracted_signals(session, 7, _USER_ID) == []
-    _record(session_factory, ExtractService(rules=[_LONG_RULE]).extract(event))
+    _record(session_factory, _extracted(event))
     with session_factory() as session:
         assert len(outcome_repository.read_extracted_signals(session, 7, _USER_ID)) == 1
         assert (
@@ -163,21 +138,14 @@ def test_record_outcome_transition_unrecognized_to_extracted_drops_sibling(
         )  # stale sibling gone
 
 
-def test_record_outcome_transition_extracted_to_unrecognized_clears_drift(
+def test_record_outcome_transition_extracted_to_unrecognized_drops_sibling(
     session_factory,
 ):
-    event = _seed_event(session_factory, "no rule will match this")
-    intent = TradeIntent(symbol="BTC", side=Side.LONG)
-    _record(
-        session_factory,
-        ExtractService(rules=[], fallback=FakeExtractor(returns=intent)).extract(event),
-    )
+    event = _seed_event(session_factory, "BTC long entry 65000")
+    _record(session_factory, _extracted(event))
     with session_factory() as session:
         assert len(outcome_repository.read_extracted_signals(session, 7, _USER_ID)) == 1
-        assert (
-            len(drift_repository.read_parser_drift_warnings(session, 7, _USER_ID)) == 1
-        )
-    _record(session_factory, ExtractService(rules=[]).extract(event))  # now a miss
+    _record(session_factory, _unrecognized(event))
     with session_factory() as session:
         assert (
             len(outcome_repository.read_unrecognized_signals(session, 7, _USER_ID)) == 1
@@ -185,6 +153,30 @@ def test_record_outcome_transition_extracted_to_unrecognized_clears_drift(
         assert (
             outcome_repository.read_extracted_signals(session, 7, _USER_ID) == []
         )  # sibling gone
-        assert (
-            drift_repository.read_parser_drift_warnings(session, 7, _USER_ID) == []
-        )  # drift cleared
+
+
+def test_materialize_projects_uncovered_event_as_unrecognized(session_factory):
+    # The miner writes signals on Confirm; an event it never recognized has no
+    # outcome. materialize fills the gap so the one-of invariant always holds.
+    event = _seed_event(session_factory, "gm — just chatter, no trade")
+    with session_factory() as session:
+        materialize_missing_signal_outcomes(session, _USER_ID, 7)
+        session.commit()
+    with session_factory() as session:
+        unrecognized = outcome_repository.read_unrecognized_signals(
+            session, 7, _USER_ID
+        )
+        assert [item.event_id for item in unrecognized] == [event.id]
+        assert unrecognized[0].reason == "no_match"
+        assert outcome_repository.read_extracted_signals(session, 7, _USER_ID) == []
+
+
+def test_materialize_skips_events_the_miner_already_settled(session_factory):
+    event = _seed_event(session_factory, "BTC long entry 65000")
+    _record(session_factory, _extracted(event))  # miner confirmed it on Confirm
+    with session_factory() as session:
+        materialize_missing_signal_outcomes(session, _USER_ID, 7)
+        session.commit()
+    with session_factory() as session:
+        assert len(outcome_repository.read_extracted_signals(session, 7, _USER_ID)) == 1
+        assert outcome_repository.read_unrecognized_signals(session, 7, _USER_ID) == []

@@ -12,10 +12,9 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.parser_rule import ParserRule
 from verasig.domain.risk_config import RiskConfig
+from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.domain.simulation import Kline
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
@@ -23,7 +22,6 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.backtesting import load_folded_signals, run_backtest
@@ -96,24 +94,19 @@ def _event() -> RawSignalEvent:
     )
 
 
-def _parser_rule(user_id: UUID) -> ParserRule:
-    return ParserRule(
-        rule_id=f"{user_id}:7-parser-v1",
-        user_id=user_id,
+def _signal() -> ExtractedSignal:
+    return ExtractedSignal(
+        id=_uuid(2),
+        event_id=_uuid(1),
         channel_id=7,
-        patterns=[
-            r"(?P<symbol>[A-Z]{2,10})\s+(?P<side>long|short)"
-            r".*?entry\s+(?P<entry>[\d.]+).*?sl\s+(?P<sl>[\d.]+)"
-            r".*?tp\s+(?P<tp>[\d.]+)"
-        ],
-        field_map={
-            "symbol": "symbol",
-            "side": "side",
-            "entry": "entry",
-            "sl": "stop_loss",
-            "tp": "take_profit",
-        },
-        side_aliases={"long": "LONG", "short": "SHORT"},
+        symbol="BTCUSDT",
+        side=Side.LONG,
+        entry_type=EntryType.LIMIT_SINGLE,
+        entry_low=Decimal("100"),
+        entry_high=Decimal("100"),
+        stop_loss=Decimal("95"),
+        take_profits=[Decimal("110")],
+        extracted_at=_BASE,
     )
 
 
@@ -140,7 +133,7 @@ def _klines() -> list[Kline]:
     ]
 
 
-def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_factory):
+def test_run_backtest_simulates_signals_and_persists_summary(session_factory):
     account = _seed(session_factory)
     market_data = FakeMarketData(_klines())
 
@@ -170,17 +163,14 @@ def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_f
     assert subscription.status == "analyzed"
 
 
-def test_load_folded_signals_scores_only_signal_labelled_deletions(session_factory):
+def test_load_folded_signals_uses_stored_deletion_candidacy(session_factory):
     account = _seed(session_factory)
     _insert_deleted_candidate(session_factory, account.id)
-    _label_message(session_factory, account.id, LabelKind.NOISE)
 
-    noise_inputs = load_folded_signals(session_factory, account.id, 7)
-    _label_message(session_factory, account.id, LabelKind.SIGNAL)
-    signal_inputs = load_folded_signals(session_factory, account.id, 7)
+    inputs = load_folded_signals(session_factory, account.id, 7)
 
-    assert noise_inputs.deletions[0].was_signal_candidate is False
-    assert signal_inputs.deletions[0].was_signal_candidate is True
+    # candidacy comes from the stored evidence (miner-set), not a re-derived label
+    assert inputs.deletions[0].was_signal_candidate is True
 
 
 def _seed(session_factory) -> UserAccount:
@@ -190,7 +180,7 @@ def _seed(session_factory) -> UserAccount:
         feed_repository.create_feed(session, account.id, _channel(), _BASE)
         message_repository.insert_messages(session, account.id, [_message()])
         event_repository.insert_signal_events(session, account.id, [_event()])
-        rule_repository.upsert_parser_rules(session, [_parser_rule(account.id)])
+        outcome_repository.insert_extracted_signals(session, [_signal()], account.id)
         session.commit()
         return account
 
@@ -208,23 +198,6 @@ def _insert_deleted_candidate(session_factory, user_id: UUID) -> None:
                     method=DeletionMethod.SNAPSHOT_DIFF,
                     detected_at=_BASE,
                     was_signal_candidate=True,
-                )
-            ],
-        )
-        session.commit()
-
-
-def _label_message(session_factory, user_id: UUID, label: LabelKind) -> None:
-    with session_factory() as session:
-        rule_repository.upsert_labels(
-            session,
-            [
-                GoldenLabel(
-                    user_id=user_id,
-                    channel_id=7,
-                    message_id=1,
-                    label=label,
-                    labeled_at=_BASE,
                 )
             ],
         )

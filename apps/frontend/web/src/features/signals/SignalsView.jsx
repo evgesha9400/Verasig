@@ -264,7 +264,7 @@ export function SignalsView({
           </svg>
           <div className="vrs-empty__title">No signals yet</div>
           <div className="vrs-empty__note">
-            Backfill, label, distill, and verify a feed under Sources. Once a feed is
+            Backfill, mine, and verify a feed under Sources. Once a feed is
             verified, its extracted signals stream here.
           </div>
           <Button

@@ -12,7 +12,7 @@ pattern disagree, the local pattern wins for that area — but update this doc.
 | Frontend logic modules | camelCase `.js` | `feedMessages.js` |
 | Frontend styles | kebab-case `.css` | `template-mining.css` |
 | Frontend tests | colocated `.test.jsx` sibling | `AuditReview.test.jsx` |
-| Backend modules | snake_case `.py`, name discloses purity | `deterministic_parser.py` (pure), `extract_service.py` (IO), `feed_repository.py` (data) — [ADR 0010](adr/0010-refine-codebase-structure-without-new-application-layer.md) |
+| Backend modules | snake_case `.py`, name discloses purity | `deletion_diff.py` (pure), `mining_confirm.py` (IO), `feed_repository.py` (data) — [ADR 0010](adr/0010-refine-codebase-structure-without-new-application-layer.md) |
 
 ## CSS classes
 
@@ -47,6 +47,6 @@ new class prefixes.
 ## Backend
 
 snake_case modules and feature folders; `CamelModel` wire schemas expose
-camelCase JSON (`alias_generator=to_camel`, `populate_by_name`). Rules persist
-through `features/rules/repository.py` regardless of producer (Mining or the
-legacy distillation loop).
+camelCase JSON (`alias_generator=to_camel`, `populate_by_name`). **Mining confirm**
+persists the miner's structured signals straight into `raw_signal_event` +
+`extracted_signal` via `features/signals/outcome_repository.py`; no rules are written.

@@ -7,7 +7,6 @@ from seed import insert_source
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import EntryMode, RiskConfig
 from verasig.domain.signal import ExtractedSignal, Side
@@ -19,7 +18,6 @@ from verasig.features.feeds import (
 )
 from verasig.features.feeds.history_depth import HistoryDepth
 from verasig.features.risk import repository as risk_repository
-from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
     event_repository,
     lifecycle_link_repository,
@@ -192,23 +190,11 @@ def test_feed_repository_round_trips_and_purges_capture_on_delete(db_session):
     insert_source(db_session, account.id)
     feed = feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     message_repository.insert_messages(db_session, account.id, [_message(99)])
-    rule_repository.upsert_labels(
-        db_session,
-        [
-            GoldenLabel(
-                user_id=account.id,
-                channel_id=1,
-                message_id=99,
-                label=LabelKind.SIGNAL,
-            )
-        ],
-    )
     feed_repository.advance_cursor(db_session, account.id, 1, 99)
     db_session.commit()
 
     assert feed.status == "new"
     assert feed_repository.count_feeds(db_session, account.id) == 1
-    assert feed_repository.bump_verify_attempt(db_session, account.id, 1) == 2
     assert (
         feed_repository.set_status(db_session, account.id, 1, "verified").status
         == "verified"
@@ -220,7 +206,6 @@ def test_feed_repository_round_trips_and_purges_capture_on_delete(db_session):
     assert feed_repository.read_feed(db_session, account.id, 1) is None
     assert message_repository.count_messages(db_session, account.id, 1) == 0
     assert feed_repository.read_cursor(db_session, account.id, 1) is None
-    assert rule_repository.read_labels(db_session, 1, account.id) == []
 
 
 def test_feed_defaults_to_one_year_history_depth(db_session):

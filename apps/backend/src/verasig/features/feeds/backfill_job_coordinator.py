@@ -22,7 +22,6 @@ from verasig.features.feeds.backfill_job_run import (
     backfill_job_key,
     present_progress,
 )
-from verasig.features.feeds.candidate_derivation import derive_candidates
 from verasig.features.feeds.feed_job_progress import publish_logged_progress
 from verasig.features.feeds.history_depth import HistoryDepth, depth_cutoff
 from verasig.features.feeds.recapture import guard_and_wipe
@@ -32,7 +31,6 @@ from verasig.foundation.jobs.registry import (
     JobRegistry,
     JobTerminalError,
 )
-from verasig.foundation.market_data.static_exchange import StaticExchange
 from verasig.storage.models import FeedRow
 
 logger = logging.getLogger(__name__)
@@ -336,15 +334,6 @@ class BackfillJobCoordinator:
                 )
                 self._publish_progress(
                     publisher, run_id, channel_id, mode, INDEXING_PHASE
-                )
-                logger.info(
-                    "backfill.run derive_candidates begin: channel=%s", channel_id
-                )
-                derive_candidates(
-                    self._session_factory, user_id, channel_id, StaticExchange()
-                )
-                logger.info(
-                    "backfill.run derive_candidates done: channel=%s", channel_id
                 )
         except asyncio.CancelledError as error:
             progress = self._finish_cancelled(

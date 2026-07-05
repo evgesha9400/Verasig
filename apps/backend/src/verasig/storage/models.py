@@ -20,7 +20,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Float,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -82,7 +81,6 @@ class FeedRow(Base):
     history_depth: Mapped[str] = mapped_column(
         String, nullable=False, server_default="1y"
     )
-    verify_attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     captured_through_external_message_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True
     )
@@ -122,8 +120,8 @@ class RawMessageRow(Base):
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
-# --- Candidate events, extraction outputs, distilled rules, drift --------------
-# JSONB holds list/map fields + GoldenLabel.expected; enums stored as their value.
+# --- Candidate events + extraction outputs ------------------------------------
+# JSONB holds list/map fields; enums stored as their value.
 
 
 class RawSignalEventRow(Base):
@@ -153,7 +151,6 @@ class RawSignalEventRow(Base):
     candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
     materialized_by: Mapped[str] = mapped_column(String, nullable=False)
     matched_reasons: Mapped[list] = mapped_column(JSONB, nullable=False)
-    filter_rule_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -225,169 +222,6 @@ class UnrecognizedSignalRow(Base):
     )
     reason: Mapped[str] = mapped_column(String, nullable=False)
     attempted_methods: Mapped[list] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
-class FilterRuleRow(Base):
-    __tablename__ = "filter_rule"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "external_id",
-            "version",
-            name="uq_filter_rule_user_channel_version",
-        ),
-        ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_filter_rule_feed", ondelete="CASCADE"
-        ),
-        Index("ix_filter_rule_user_channel", "user_id", "external_id"),
-    )
-
-    rule_id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    external_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    include_patterns: Mapped[list] = mapped_column(JSONB, nullable=False)
-    exclude_patterns: Mapped[list] = mapped_column(JSONB, nullable=False)
-    matched_reason_template: Mapped[str] = mapped_column(String, nullable=False)
-    recall_target: Mapped[float] = mapped_column(Float, nullable=False)
-    python_filter: Mapped[str | None] = mapped_column(String, nullable=True)
-    display: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    distilled_from_label_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
-
-
-class ParserRuleRow(Base):
-    __tablename__ = "parser_rule"
-    __table_args__ = (
-        ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_parser_rule_feed", ondelete="CASCADE"
-        ),
-        Index("ix_parser_rule_user_channel", "user_id", "external_id"),
-    )
-
-    rule_id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    external_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
-    patterns: Mapped[list] = mapped_column(JSONB, nullable=False)
-    field_map: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    side_aliases: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    python_extractor: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    distilled_from_label_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
-
-
-class GoldenLabelRow(Base):
-    __tablename__ = "golden_label"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "external_id",
-            "external_message_id",
-            name="uq_golden_label_user_msg",
-        ),
-        CheckConstraint(
-            "label IN ('signal', 'noise', 'modifier')",
-            name="ck_golden_label_label",
-        ),
-        ForeignKeyConstraint(
-            _MESSAGE_FK,
-            _MESSAGE_REF,
-            name="fk_golden_label_message",
-            ondelete="CASCADE",
-        ),
-        ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_golden_label_feed", ondelete="CASCADE"
-        ),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    label: Mapped[str] = mapped_column(String, nullable=False)
-    expected: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    labeled_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
-class FilterDriftWarningRow(Base):
-    __tablename__ = "filter_drift_warning"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "external_id",
-            "external_message_id",
-            name="uq_filter_drift_user_msg",
-        ),
-        ForeignKeyConstraint(
-            _MESSAGE_FK,
-            _MESSAGE_REF,
-            name="fk_filter_drift_warning_message",
-            ondelete="CASCADE",
-        ),
-        ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_filter_drift_warning_feed", ondelete="CASCADE"
-        ),
-        Index("ix_filter_drift_warning_user_channel", "user_id", "external_id"),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    filter_rule_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    miss_discovered_by: Mapped[str] = mapped_column(String, nullable=False)
-    event_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("raw_signal_event.id", ondelete="CASCADE"), nullable=True
-    )
-    source_label_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("golden_label.id", ondelete="CASCADE"), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
-class ParserDriftWarningRow(Base):
-    __tablename__ = "parser_drift_warning"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "event_id",
-            name="uq_parser_drift_user_event",
-        ),
-        Index("ix_parser_drift_warning_user_channel", "user_id", "external_id"),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    event_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("raw_signal_event.id", ondelete="CASCADE"), nullable=False
-    )
-    external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    deterministic_result: Mapped[str] = mapped_column(String, nullable=False)
-    fallback_result: Mapped[str] = mapped_column(String, nullable=False)
-    # plain Uuid, not a FK: re-extract churns the extracted PK; a FK would cascade
-    fallback_signal_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

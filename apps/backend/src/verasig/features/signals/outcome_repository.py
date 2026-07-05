@@ -6,12 +6,10 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from verasig.domain.drift import ParserDriftWarning
 from verasig.domain.extraction_outcome import ExtractOutcome
 from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
 from verasig.storage.models import (
     ExtractedSignalRow,
-    ParserDriftWarningRow,
     RawSignalEventRow,
     UnrecognizedSignalRow,
 )
@@ -141,21 +139,6 @@ def read_unrecognized_signals(
     ]
 
 
-def _parser_drift_values(
-    drift: ParserDriftWarning, fallback_signal_id: UUID, user_id: UUID
-) -> dict:
-    return {
-        "id": drift.id,
-        "user_id": user_id,
-        "event_id": drift.event_id,
-        "external_id": drift.channel_id,
-        "deterministic_result": drift.deterministic_result,
-        "fallback_result": drift.fallback_result,
-        "fallback_signal_id": fallback_signal_id,
-        "created_at": drift.created_at,
-    }
-
-
 def _excluded_except(statement, row_type, keep: set[str]) -> dict:
     return {
         column.name: getattr(statement.excluded, column.name)
@@ -205,36 +188,9 @@ def _upsert_unrecognized_signal(
     session.execute(statement)
 
 
-def _upsert_parser_drift(
-    session: Session,
-    drift: ParserDriftWarning,
-    fallback_signal_id: UUID,
-    user_id: UUID,
-) -> None:
-    statement = pg_insert(ParserDriftWarningRow).values(
-        _parser_drift_values(drift, fallback_signal_id, user_id)
-    )
-    statement = statement.on_conflict_do_update(
-        index_elements=["user_id", "event_id"],
-        set_=_excluded_except(
-            statement, ParserDriftWarningRow, {"id", "user_id", "event_id"}
-        ),
-    )
-    session.execute(statement)
-
-
-def _record_extracted(
-    session: Session,
-    signal: ExtractedSignal,
-    drift_warnings: list,
-    user_id: UUID,
-) -> None:
-    stored_id = _upsert_extracted_signal(session, signal, user_id)
+def _record_extracted(session: Session, signal: ExtractedSignal, user_id: UUID) -> None:
+    _upsert_extracted_signal(session, signal, user_id)
     _delete_outcome_row(session, UnrecognizedSignalRow, signal.event_id, user_id)
-    if drift_warnings:
-        _upsert_parser_drift(session, drift_warnings[0], stored_id, user_id)
-    else:
-        _delete_outcome_row(session, ParserDriftWarningRow, signal.event_id, user_id)
 
 
 def _record_unrecognized(
@@ -242,12 +198,11 @@ def _record_unrecognized(
 ) -> None:
     _upsert_unrecognized_signal(session, item, user_id)
     _delete_outcome_row(session, ExtractedSignalRow, item.event_id, user_id)
-    _delete_outcome_row(session, ParserDriftWarningRow, item.event_id, user_id)
 
 
 def record_outcome(session: Session, outcome: ExtractOutcome, user_id: UUID) -> None:
-    """Recompute one event's projection: upsert the winner, drop the loser + drift."""
+    """Recompute one event's projection: upsert the winner, drop the loser."""
     if outcome.signal is not None:
-        _record_extracted(session, outcome.signal, outcome.drift_warnings, user_id)
+        _record_extracted(session, outcome.signal, user_id)
     elif outcome.unrecognized is not None:
         _record_unrecognized(session, outcome.unrecognized, user_id)

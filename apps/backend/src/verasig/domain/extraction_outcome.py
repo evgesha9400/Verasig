@@ -1,8 +1,7 @@
 """Extraction outcome contract shared by extraction and storage."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from verasig.domain.drift import ParserDriftWarning
 from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
 
 
@@ -10,4 +9,3 @@ from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
 class ExtractOutcome:
     signal: ExtractedSignal | None = None
     unrecognized: UnrecognizedSignal | None = None
-    drift_warnings: list[ParserDriftWarning] = field(default_factory=list)

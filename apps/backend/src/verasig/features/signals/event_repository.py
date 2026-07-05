@@ -33,7 +33,6 @@ def insert_signal_events(
                     "matched_reasons": [
                         reason.value for reason in event.matched_reasons
                     ],
-                    "filter_rule_id": event.filter_rule_id,
                     "created_at": event.created_at,
                 }
                 for event in events
@@ -64,7 +63,6 @@ def read_signal_events(
             candidate_text=row.candidate_text,
             materialized_by=row.materialized_by,
             matched_reasons=row.matched_reasons,
-            filter_rule_id=row.filter_rule_id,
             created_at=row.created_at,
         )
         for row in rows

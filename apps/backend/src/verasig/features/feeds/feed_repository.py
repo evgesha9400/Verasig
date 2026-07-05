@@ -75,7 +75,6 @@ def _upsert_feed(
         source_id=_require_source_id(session, user_id),
         title=channel.title,
         status="new",
-        verify_attempt=1,
         captured_through_external_message_id=None,
         metadata=_metadata(channel),
         first_seen_at=channel.first_seen_at,
@@ -184,17 +183,6 @@ def set_history_depth(
     row.history_depth = depth.value
     session.flush()
     return row
-
-
-def bump_verify_attempt(
-    session: Session, user_id: UUID, external_id: int
-) -> int | None:
-    row = read_feed(session, user_id, external_id)
-    if row is None:
-        return None
-    row.verify_attempt += 1
-    session.flush()
-    return row.verify_attempt
 
 
 def count_feeds(session: Session, user_id: UUID) -> int:

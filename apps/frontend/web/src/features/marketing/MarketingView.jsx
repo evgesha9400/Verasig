@@ -78,7 +78,7 @@ function HeroTrace() {
 }
 
 function Hero({ loginPath, signupPath }) {
-  const pipe = ['Backfill', 'Label', 'Distill', 'Verify', 'Backtest']
+  const pipe = ['Backfill', 'Mine', 'Verify', 'Backtest']
   return (
     <section className="mk-hero v-lattice" id="top">
       <div className="mk-hero__glow" />
@@ -95,8 +95,8 @@ function Hero({ loginPath, signupPath }) {
           </h1>
           <p className="mk-hero__sub">
             Verasig connects to your Telegram signal channels, learns what a real call
-            looks like from your own labels, backtests it across full history, and
-            routes only verified signals to your exchange.
+            looks like from the channel’s own history, backtests it across that history,
+            and routes only verified signals to your exchange.
           </p>
           <div className="mk-hero__cta">
             <Button
@@ -208,36 +208,30 @@ const FLOW = [
   },
   {
     n: '03',
-    ic: 'check',
-    t: 'Label',
-    b: 'Mark a handful of messages as signal or noise. You define what a tradeable call looks like.'
+    ic: 'sparkles',
+    t: 'Mine',
+    b: 'Verasig auto-detects the channel’s signal templates from its own history — no labeling, no configuration.'
   },
   {
     n: '04',
-    ic: 'sparkles',
-    t: 'Distill',
-    b: 'Verasig turns your labels into a small ruleset and classifies the rest of the history.'
+    ic: 'shield',
+    t: 'Verify',
+    b: 'Review the detected signal families and confirm the ones that match. Only what you accept moves on.'
   },
   {
     n: '05',
-    ic: 'shield',
-    t: 'Verify',
-    b: 'Confirm a fresh sample of auto-classified signals. Wrong ones send the rules back to refine.'
-  },
-  {
-    n: '06',
     ic: 'exchanges',
     t: 'Route',
     b: 'Send verified signals to a connected exchange — or just watch them stream, your call.'
   },
   {
-    n: '07',
+    n: '06',
     ic: 'settings',
     t: 'Risk',
     b: 'Set position sizing and stops so a verified signal becomes an order you actually want.'
   },
   {
-    n: '08',
+    n: '07',
     ic: 'chart',
     t: 'Backtest',
     b: 'Simulate the source over its history for a quality score and win rate before going live.'
@@ -258,7 +252,7 @@ function HowItWorks() {
         </h2>
         <p className="mk-sec__lead">
           Every source moves through the same pipeline. Nothing reaches your exchange
-          until it has been labelled, distilled, verified, and backtested.
+          until it has been mined, verified, and backtested.
         </p>
       </div>
       <div className="mk-flow">
@@ -364,13 +358,13 @@ function Integrations() {
 const PRINCIPLES = [
   {
     ic: 'check',
-    t: 'You teach it',
-    b: 'Label messages as signal or noise. Verasig learns your definition of a tradeable call from your own labels — not a generic model.'
+    t: 'It learns the channel',
+    b: 'Verasig auto-detects a channel’s signal templates from its own history — your feed’s real format, not a generic model.'
   },
   {
     ic: 'shield',
     t: 'Verified, then trusted',
-    b: 'Distilled rules are re-checked on fresh messages. If the sample isn’t clean, the rules go back to be refined before anything routes.'
+    b: 'You confirm the detected signal families before anything routes — only the ones you accept reach your exchange.'
   },
   {
     ic: 'chart',
@@ -424,8 +418,8 @@ function CTA({ loginPath, signupPath }) {
           first source.
         </h2>
         <p className="mk-cta__sub">
-          Bring a channel, label a handful of messages, and see whether it holds up on
-          its own history — before a cent is at risk.
+          Bring a channel and see whether it holds up on its own history — before a
+          cent is at risk.
         </p>
         <div className="mk-cta__btns">
           <Button

@@ -27,7 +27,6 @@ from verasig.features.feeds.feed_job_progress import (
 from verasig.features.feeds.feed_views import present_feeds
 from verasig.features.feeds.message_views import read_history
 from verasig.features.feeds.schemas import BackfillStartIn, FeedCreateIn
-from verasig.features.rules import repository as rule_repository
 from verasig.features.sources.telegram_adapter import read_connection
 from verasig.foundation.http.auth_dependencies import (
     get_current_user,
@@ -151,16 +150,8 @@ def _deletion_rescan_job_key(user_id, external_id: int) -> str:
     return f"{user_id}:{external_id}:deletion-rescan"
 
 
-def _has_saved_rules(session, feed) -> bool:
-    return bool(
-        rule_repository.read_rule_feed_ids(session, feed.user_id, [feed.external_id])
-    )
-
-
-def _require_deletion_rescan_ready(session, feed) -> None:
+def _require_deletion_rescan_ready(feed) -> None:
     if feed.status in DELETION_RESCAN_READY_STATUSES:
-        return
-    if _has_saved_rules(session, feed):
         return
     raise ApiError(
         409,
@@ -254,7 +245,7 @@ async def start_deletion_rescan(
     channel_id = int(external_id)
 
     with request.app.state.session_factory() as session:
-        _require_deletion_rescan_ready(session, subscription)
+        _require_deletion_rescan_ready(subscription)
         source = _require_connected_source(request, session, subscription.user_id)
 
     key = _deletion_rescan_job_key(subscription.user_id, channel_id)

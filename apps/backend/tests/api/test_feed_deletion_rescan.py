@@ -5,12 +5,11 @@ from datetime import datetime, timezone
 from fakes import FakeSource, FakeTelegramAuth
 
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.filter_rule import FilterRule
-from verasig.domain.label import GoldenLabel, LabelKind
+from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
 from verasig.features.feeds import feed_repository, message_repository
-from verasig.features.rules import repository as rule_repository
+from verasig.features.signals import event_repository
 
 _CHANNEL_ID = 7
 _INSTANT = datetime(2026, 6, 1, tzinfo=timezone.utc)
@@ -120,7 +119,7 @@ def _user_id(token: str, app):
 
 
 def _seed_feed_state(
-    app, token: str, status: str, labels: dict[int, LabelKind]
+    app, token: str, status: str, signal_message_ids: set[int]
 ) -> None:
     user_id = _user_id(token, app)
     messages = [
@@ -131,21 +130,24 @@ def _seed_feed_state(
     ]
     with app.state.session_factory() as session:
         message_repository.insert_messages(session, user_id, messages)
-        rule_repository.upsert_labels(
-            session,
-            [
-                GoldenLabel(
-                    user_id=user_id,
-                    channel_id=_CHANNEL_ID,
-                    message_id=message_id,
-                    label=label,
-                    labeled_at=_INSTANT,
-                )
-                for message_id, label in labels.items()
-            ],
-        )
+        if signal_message_ids:
+            event_repository.insert_signal_events(
+                session,
+                user_id,
+                [_event(message_id) for message_id in sorted(signal_message_ids)],
+            )
         feed_repository.set_status(session, user_id, _CHANNEL_ID, status)
         session.commit()
+
+
+def _event(message_id: int) -> RawSignalEvent:
+    return RawSignalEvent(
+        channel_id=_CHANNEL_ID,
+        message_id=message_id,
+        candidate_text="BTC long 65000",
+        materialized_by=MaterializationPath.SEED_HEURISTIC,
+        created_at=_INSTANT,
+    )
 
 
 def _run_rescan(client, app, token: str, live_ids: set[int]) -> str:
@@ -161,10 +163,10 @@ def _run_rescan(client, app, token: str, live_ids: set[int]) -> str:
     return body
 
 
-def test_deletion_rescan_streams_signal_label_deletion_and_keeps_status(client, app):
+def test_deletion_rescan_streams_signal_deletion_and_keeps_status(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
-    _seed_feed_state(app, token, "verified", {2: LabelKind.SIGNAL})
+    _seed_feed_state(app, token, "verified", {2})
 
     body = _run_rescan(client, app, token, {1, 3, 4, 5})
     feed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
@@ -183,7 +185,7 @@ def test_deletion_rescan_streams_signal_label_deletion_and_keeps_status(client, 
 def test_deletion_rescan_logs_shared_scan_progress(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
-    _seed_feed_state(app, token, "verified", {2: LabelKind.SIGNAL})
+    _seed_feed_state(app, token, "verified", {2})
 
     with _capture_app_logs() as messages:
         _run_rescan(client, app, token, set(range(1, 206)) - {2})
@@ -197,12 +199,7 @@ def test_deletion_rescan_logs_shared_scan_progress(client, app):
 def test_deletion_rescan_reports_non_signal_deletions_without_scam(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
-    _seed_feed_state(
-        app,
-        token,
-        "analyzed",
-        {2: LabelKind.NOISE, 3: LabelKind.MODIFIER},
-    )
+    _seed_feed_state(app, token, "analyzed", set())
 
     body = _run_rescan(client, app, token, {1, 5})
     feed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
@@ -221,7 +218,7 @@ def test_deletion_rescan_reports_non_signal_deletions_without_scam(client, app):
 def test_deletion_rescan_rerun_reports_zero_new_evidence(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
-    _seed_feed_state(app, token, "verified", {2: LabelKind.SIGNAL})
+    _seed_feed_state(app, token, "verified", {2})
 
     _run_rescan(client, app, token, {1, 3, 4, 5})
     body = _run_rescan(client, app, token, {1, 3, 4, 5})
@@ -234,36 +231,10 @@ def test_deletion_rescan_rerun_reports_zero_new_evidence(client, app):
     assert feed["deletedCount"] == 1
 
 
-def test_deletion_rescan_accepts_backfilled_feed_with_saved_rules(client, app):
-    token = _register(client)
-    _connect_and_subscribe(client, app, token)
-    _seed_feed_state(app, token, "backfilled", {2: LabelKind.SIGNAL})
-    user_id = _user_id(token, app)
-    with app.state.session_factory() as session:
-        rule_repository.upsert_filter_rule(
-            session,
-            FilterRule(
-                rule_id="pilot-filter-v1",
-                user_id=user_id,
-                channel_id=_CHANNEL_ID,
-                include_patterns=[r"\bBTC\b"],
-            ),
-        )
-        session.commit()
-
-    body = _run_rescan(client, app, token, {1, 3, 4, 5})
-    feed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
-
-    assert "event: done" in body
-    assert feed["status"] == "backfilled"
-    assert feed["hasRisk"] is True
-    assert feed["signalDeletion"] is True
-
-
 def test_deletion_rescan_empty_live_snapshot_errors_and_writes_nothing(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
-    _seed_feed_state(app, token, "verified", {2: LabelKind.SIGNAL})
+    _seed_feed_state(app, token, "verified", {2})
 
     body = _run_rescan(client, app, token, set())
     feed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
@@ -278,7 +249,7 @@ def test_deletion_rescan_blocks_foreign_user(client, app):
     owner = _register(client, "owner@example.com")
     other = _register(client, "other@example.com")
     _connect_and_subscribe(client, app, owner)
-    _seed_feed_state(app, owner, "verified", {2: LabelKind.SIGNAL})
+    _seed_feed_state(app, owner, "verified", {2})
 
     response = client.post("/feeds/7/deletion-rescan", headers=_auth(other))
 
@@ -286,10 +257,10 @@ def test_deletion_rescan_blocks_foreign_user(client, app):
     assert response.json()["error"]["code"] == "FEED_NOT_FOUND"
 
 
-def test_deletion_rescan_requires_reviewed_feed_or_saved_rules(client, app):
+def test_deletion_rescan_requires_reviewed_feed(client, app):
     token = _register(client)
     _connect_and_subscribe(client, app, token)
-    _seed_feed_state(app, token, "backfilled", {2: LabelKind.SIGNAL})
+    _seed_feed_state(app, token, "backfilled", set())
 
     response = client.post("/feeds/7/deletion-rescan", headers=_auth(token))
 

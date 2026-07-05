@@ -25,7 +25,6 @@ def test_event_constructs_with_required_fields_and_defaults():
     assert event.materialized_by is MaterializationPath.SEED_HEURISTIC
     assert isinstance(event.id, UUID)
     assert event.matched_reasons == []
-    assert event.filter_rule_id is None
     assert isinstance(event.created_at, datetime)
 
 
@@ -37,14 +36,6 @@ def test_event_records_matched_reasons_as_a_list():
         MatchReason.DIRECTIONAL_KEYWORD,
         MatchReason.SYMBOL_TOKEN,
     ]
-
-
-def test_event_carries_filter_rule_id_when_flagged_by_a_rule():
-    event = _event(
-        materialized_by=MaterializationPath.FILTER_RULE,
-        filter_rule_id="pilot-filter-v1",
-    )
-    assert event.filter_rule_id == "pilot-filter-v1"
 
 
 def test_event_rejects_missing_candidate_text():

@@ -70,7 +70,11 @@ def _seed_channel(session_factory) -> None:
 
 
 def _confirmed(
-    message_id: int, detected_at: datetime, text: str = "gone"
+    message_id: int,
+    detected_at: datetime,
+    text: str = "gone",
+    *,
+    was_candidate: bool = True,
 ) -> DeletedSignalEvidence:
     return DeletedSignalEvidence(
         channel_id=_CHANNEL_ID,
@@ -80,7 +84,7 @@ def _confirmed(
         original_text=text,
         first_seen_at=_FIRST,
         detected_at=detected_at,
-        was_signal_candidate=True,
+        was_signal_candidate=was_candidate,
     )
 
 
@@ -207,10 +211,10 @@ def _seed_corpus(session_factory) -> None:
         session.commit()
 
 
-def _summary(session_factory, rule_backed_ids=frozenset()):
+def _summary(session_factory):
     with session_factory() as session:
         return deletion_repository.summarize_deletions(
-            session, _USER_ID, [_CHANNEL_ID], rule_backed_ids=rule_backed_ids
+            session, _USER_ID, [_CHANNEL_ID]
         )[_CHANNEL_ID]
 
 
@@ -221,25 +225,28 @@ def test_summarize_deletions_counts_confirmed_only(session_factory):
     summary = _summary(session_factory)
 
     # suspected id-gaps are internal-only (hygiene); the user-facing summary counts
-    # confirmed deletions only
+    # confirmed deletions only. The confirmed row is a signal candidate.
     assert summary.deleted_count == 1
-    assert summary.signal_deletion is False
+    assert summary.signal_deletion is True
 
 
-def test_summarize_deletions_signal_count_is_rule_gated(session_factory):
+def test_summarize_deletions_counts_signal_deletions_by_candidacy(session_factory):
     _seed_channel(session_factory)
-    # a CONFIRMED candidate deletion with no golden label
-    _upsert(session_factory, [_confirmed(2, _LATER, "BTC long 65k")])
+    _upsert(
+        session_factory,
+        [
+            _confirmed(2, _LATER, "BTC long 65k", was_candidate=True),
+            _confirmed(3, _LATER, "gm", was_candidate=False),
+        ],
+    )
 
-    without_rules = _summary(session_factory)
-    with_rules = _summary(session_factory, rule_backed_ids={_CHANNEL_ID})
+    summary = _summary(session_factory)
 
-    # recall-first seed candidacy must not floor the score before the operator
-    # has approved rules; once rules exist, was_signal_candidate is authoritative
-    assert without_rules.deleted_signal_count == 0
-    assert without_rules.signal_deletion is False
-    assert with_rules.deleted_signal_count == 1
-    assert with_rules.signal_deletion is True
+    # `was_signal_candidate` is authoritative: a confirmed deletion of a candidate
+    # is a signal deletion; confirmed chatter is counted but is not.
+    assert summary.deleted_count == 2
+    assert summary.deleted_signal_count == 1
+    assert summary.signal_deletion is True
 
 
 def _source(live_ids: set[int]) -> FakeSource:

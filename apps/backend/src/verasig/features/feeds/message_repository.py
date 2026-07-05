@@ -54,9 +54,9 @@ def insert_messages(
 
 
 def delete_feed_messages(session: Session, user_id: UUID, external_id: int) -> int:
-    """Delete a feed's whole capture. Derived rows (events, extractions, drift,
-    labels, lifecycle links) cascade from `raw_message`; durable deletion
-    evidence and distilled rules FK to `feed`, so they survive (ADR 0014)."""
+    """Delete a feed's whole capture. Derived rows (signal events, extractions,
+    lifecycle links) cascade from `raw_message`; durable deletion evidence FK to
+    `feed`, so it survives (ADR 0014)."""
     return session.execute(
         delete(RawMessageRow).where(
             RawMessageRow.user_id == user_id,
