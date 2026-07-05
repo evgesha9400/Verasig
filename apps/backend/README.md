@@ -37,7 +37,7 @@
 | Auth/User | `/auth/*`, `/user/*` |
 | Telegram | `/telegram/connect`, `/telegram/verify`, `/telegram/status` |
 | Feeds | `/feeds`, `/feeds/{id}/backfill`, `/feeds/{id}/messages` |
-| Verify/Rules | `/feeds/{id}/verify/*`, `/feeds/{id}/distill`, `/feeds/{id}/rules` |
+| Mining | `/feeds/{id}/mine`, `/feeds/{id}/mine/progress`, `/feeds/{id}/mining/confirm` |
 | Exchanges/Risk/Backtest | `/exchanges`, `/feeds/{id}/risk`, `/feeds/{id}/backtest` |
 | Signals | `/signals`, `/signals/{id}`, `/signals/{id}/link-mod` |
 

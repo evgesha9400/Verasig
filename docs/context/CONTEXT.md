@@ -21,7 +21,7 @@ Resume capture for a `Feed` from its current cursor. It updates captured message
 _Avoid_: re-label, re-verify, reset.
 
 **Re-fetch full history**:
-Start a `Feed`'s capture over as a new generation ([ADR 0014](../adr/0014-full-refetch-wipes-and-recaptures.md)). It first secures deletion evidence (a mandatory pre-wipe `Rescan`, aborting on an empty live snapshot), then atomically wipes the feed's captured messages and cascaded derived rows and clears the cursor, then recaptures at the chosen **History depth**. The message counter restarts at zero. `DeletedSignalEvidence`, distilled/mined rules, and backfill-run history survive; golden labels (tied to the wiped messages) do not. This is the only way to deepen a shallow capture. Append-only capture ([ADR 0001](../adr/0001-two-layer-raw-capture.md)) still holds **within** a generation.
+Start a `Feed`'s capture over as a new generation ([ADR 0014](../adr/0014-full-refetch-wipes-and-recaptures.md)). It first secures deletion evidence (a mandatory pre-wipe `Rescan`, aborting on an empty live snapshot), then atomically wipes the feed's captured messages and cascaded derived rows and clears the cursor, then recaptures at the chosen **History depth**. The message counter restarts at zero. `DeletedSignalEvidence` and backfill-run history survive (they FK to `feed`, not `raw_message`). This is the only way to deepen a shallow capture. Append-only capture ([ADR 0001](../adr/0001-two-layer-raw-capture.md)) still holds **within** a generation.
 _Avoid_: reset (that is feed delete), rebackfill-as-no-op (the old FULL semantics).
 
 **History depth**:
@@ -37,24 +37,21 @@ One captured message exactly as received, stored immutably and append-only. The 
 _Avoid_: message record, raw event (that is something else — see below).
 
 **RawSignalEvent**:
-A `RawTelegramMessage` the candidate filter flagged as a signal candidate, plus the exact text slice handed to extraction. An **advisory** subset — it sets priority/triage for later review and LLM use, not eligibility; deterministic parsing may still run over all messages, and a `RawSignalEvent` may be **late-materialized** when a background parse or audit finds a missed signal ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
+A `RawTelegramMessage` the miner confirmed as a signal candidate, plus the exact text slice it extracted from. Written by **Mining confirm** — one row per accepted `Template family` candidate. Its presence is the authority for signal candidacy: deletion badges read `was_signal_candidate`, set from whether a deleted message had a `RawSignalEvent`.
 _Avoid_: signal, raw message. Note: this **supersedes** the old definition where `RawSignalEvent` meant "original source content" — that role now belongs to `RawTelegramMessage`.
-
-**Candidate filter**:
-The recall-first, **advisory** step that flags a `RawTelegramMessage` as a `RawSignalEvent`. Over-includes on purpose; precision is recovered downstream. It runs a cheap hand-coded **seed heuristic** for cold start, then provider-specific `FilterRule`s distilled from the golden corpus. Not a hard gate ([ADR 0005](../adr/0005-distilled-filter-and-advisory-gate.md)).
 
 ### Extraction
 
 **TradeIntent**:
-The provider's trade as parsed from message text — direction and price levels, independent of which message it came from. Required: `symbol` and `side`; optional: entry, stop, targets, leverage, provider-stated confidence. This is what **both** the deterministic parser and the LLM fallback produce; it carries **no** event linkage and **no** extraction provenance.
+The provider's trade as parsed from message text — direction and price levels, independent of which message it came from. Required: `symbol` and `side`; optional: entry, stop, targets, leverage, provider-stated confidence. This is what the miner produces from message text; it carries **no** event linkage and **no** extraction provenance.
 _Avoid_: signal, order, trade (bare).
 
 **ExtractedSignal**:
-A `TradeIntent` **recorded against** a `RawSignalEvent` — the canonical extraction output. Adds the event linkage (`event_id`, `channel_id`), the lifecycle role (`event_type`, defaulting `NEW_ENTRY` at extraction), and the provenance (`extraction_method`, `rule_id`). The extractors supply only the `TradeIntent`; the `ExtractService` attaches everything else. Replaces the docs' old term `Signal`.
+A `TradeIntent` **recorded against** a `RawSignalEvent` — the canonical extraction output. Adds the event linkage (`event_id`, `channel_id`), the lifecycle role (`event_type`, defaulting `NEW_ENTRY`), and provenance (`extraction_method`, `rule_id`). **Mining confirm** produces it directly from an accepted `Template family` candidate. Replaces the docs' old term `Signal`.
 _Avoid_: Signal, parsed signal, trade.
 
 **UnrecognizedSignal**:
-The outcome when extraction (deterministic + fallback) fails to produce an `ExtractedSignal` from a `RawSignalEvent`. Evidence of a parser gap.
+The gap-fill outcome projected by `materialize_missing_signal_outcomes` for any `RawSignalEvent` the miner did not turn into an `ExtractedSignal` — keeping every event's outcome exactly one-of `{ExtractedSignal, UnrecognizedSignal}`.
 _Avoid_: failed signal, error.
 
 **side**:
@@ -71,41 +68,19 @@ _Avoid_: edit, correction.
 The folded view of a `Signal lifecycle`: the entry plus its applied modifications as a time-ordered timeline of the **effective** stop, take-profits, position size, and average entry (after any averaging-in or reduction). Derived and recomputable from durable inputs — never stored. A standalone complete signal folds to a single-step timeline.
 _Avoid_: merged signal, final signal.
 
-### Parsing rules
-
-**FilterRule**:
-A declarative, versioned, provider-specific **inclusion** rule (recall-first include/exclude patterns) deciding whether a `RawTelegramMessage` is a `RawSignalEvent`. Produced by **Mining confirm** (from accepted `Template family`s) or the legacy `Distillation loop` (from signal `GoldenLabel.label`s); mined rules carry an empty `distilled_from_label_ids`. Shares a regex engine with `ParserRule` but is a distinct entity — it decides inclusion, the parser maps fields.
-_Avoid_: candidate regex, keyword list (those are the cold-start seed, not the persisted rule).
-
-**ParserRule**:
-A declarative, versioned, provider-specific **extraction** rule (ordered patterns + field map + normalization), with an optional named Python extractor as an escape hatch (server-side only — never accepted from the Mining wire). Produced by **Mining confirm** or the legacy `Distillation loop`; `GoldenLabel.expected` fields tighten deterministic validation when present.
-_Avoid_: parser, regex, grammar.
-
-**Distillation loop**:
-The **legacy** human-assisted labeling cycle: operator classifies messages → AI distills both a `FilterRule` (from labels) and `ParserRule`s (from labelled signal text, tightened by `expected` fields when present) → backend validation applies the rules against the golden corpus. One labeling pass, two objectives; the human labels become the golden corpus. Superseded in the product by **Template mining** ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)); both write the same rule tables.
+### Mining
 
 **Template mining**:
-The parser-first alternative to the `Distillation loop`: the browser runs the deterministic parser over a `Feed`'s captured messages, groups them into `Template family`s, and lets the operator accept or reject each family. Replaced the Label/Distill/Verify screens ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)).
-_Avoid_: distillation, labeling (that is the legacy loop).
+The parser-first extraction mechanism: the backend re-mines a `Feed`'s captured messages, groups them into `Template family`s by shared normalized format, and lets the operator accept or reject each family. Replaced the label→distill→verify screens ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)).
+_Avoid_: distillation, labeling.
 
 **Template family**:
-A group of a `Feed`'s messages sharing one normalized format (a signal template), mined by **Template mining**. Accepting a family validates every message in it at once; one decision, not per-message labels.
+A group of a `Feed`'s messages sharing one normalized format (a signal template), surfaced by **Template mining**. Accepting a family validates every message in it at once; one decision, not per-message labels.
 _Avoid_: cluster, group (unqualified).
 
 **Mining confirm**:
-Committing the accepted `Template family`s: the browser compiles them into a `FilterRule` + `ParserRule`s and POSTs them; the backend persists the ruleset (replacing the feed's prior version), re-derives candidates and extraction, recomputes deletion-evidence candidacy from the rules, and marks the `Feed` **verified** ([ADR 0015](../adr/0015-mining-confirm-persists-rules-and-rederives.md)). This is when Mining decisions become authoritative for live extraction and scoring.
+Committing the accepted `Template family`s (`POST /feeds/{external_id}/mining/confirm`). The backend re-mines the feed's stored messages (byte-identical to what the browser reviewed), keeps the accepted families, and persists each candidate as a `RawSignalEvent` + linked `ExtractedSignal`, then marks the `Feed` **verified** ([ADR 0016](../adr/0016-remove-legacy-loop-and-regex-rule-pipeline.md)). The miner **is** the extractor — its structured fields are the signal; no rules are written. This is when Mining decisions become authoritative for live scoring and deletion candidacy.
 _Avoid_: verify, distill, save.
-
-**Golden corpus**:
-The operator-labeled set of messages (signal / not-signal + expected fields) used as ground truth for parser precision and recall.
-
-**ParserDriftWarning**:
-A record emitted whenever deterministic parsing misses but LLM fallback succeeds — signalling the deterministic rules have fallen behind a provider's format. One warning per fallback success.
-_Avoid_: parser error, fallback log.
-
-**FilterDriftWarning**:
-A record emitted whenever the candidate filter missed a message that later proved to be a signal — a background deterministic parse, an operator audit, or the LLM found a signal the filter did not flag. Surfaces filter false negatives so they feed back into the next distillation; symmetric to `ParserDriftWarning`.
-_Avoid_: filter error, missed-candidate log.
 
 ### Deletion
 
