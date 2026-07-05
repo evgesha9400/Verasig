@@ -71,8 +71,7 @@ export const FEEDS = [
   }
 ]
 
-/* ---- Messages for the Label/Verify loop. kind: signal | noise ----
-   `truth` is the "correct" label, used to drive Verify outcomes. */
+/* ---- Sample channel messages (demo data; kind: signal | noise). ---- */
 export const MESSAGES = [
   {
     id: 'm1',
@@ -264,92 +263,6 @@ export const MESSAGES = [
       via: 'inferred',
       target: 'LONG SOL/USDT — most recent open SOL position'
     }
-  }
-]
-
-/* ---- AI-distilled rules ---- */
-export const DISTILLED_RULES = [
-  {
-    id: 'r1',
-    label: 'Has a directional verb',
-    detail: 'Matches LONG / SHORT / SCALP / CLOSE near a ticker',
-    match: 0.94
-  },
-  {
-    id: 'r2',
-    label: 'Contains a ticker pair',
-    detail: 'e.g. BTC/USDT, ETH/USDT, SOL/USDT',
-    match: 0.98
-  },
-  {
-    id: 'r3',
-    label: 'Defines entry + stop',
-    detail: 'Explicit entry or "SL" / "stop" value present',
-    match: 0.91
-  },
-  {
-    id: 'r4',
-    label: 'Has at least one target',
-    detail: '"TP" / "Target" with a price level',
-    match: 0.88
-  },
-  {
-    id: 'r5',
-    label: 'Links updates to their signal',
-    detail: 'Reply-to → parent signal; else most recent open position in symbol',
-    match: 0.92
-  },
-  {
-    id: 'r6',
-    label: 'Excludes promo & chatter',
-    detail: 'Drops "VIP", "link in bio", greetings, recaps',
-    match: 0.96
-  }
-]
-
-/* ---- Verify pass: messages the AI auto-classified as Signal ---- */
-export const VERIFY_SAMPLES = [
-  {
-    id: 'v1',
-    truth: 'signal',
-    text: 'LONG  AVAX/USDT\nEntry 34.20\nSL 32.80\nTP 37.5 / 40.0',
-    media: null,
-    predicted: 'signal'
-  },
-  {
-    id: 'v2',
-    truth: 'signal',
-    text: 'SHORT  XRP/USDT 0.5240\nSL 0.5410\nTP 0.502 / 0.488',
-    media: null,
-    predicted: 'signal'
-  },
-  {
-    id: 'v3',
-    truth: 'noise',
-    text: 'Scaling our SOL runner — chart looks textbook. who’s still holding? 📈',
-    media: 'chart',
-    predicted: 'signal'
-  },
-  {
-    id: 'v4',
-    truth: 'signal',
-    text: 'LONG  OP/USDT\nEntry 2.18\nSL 2.04\nTP 2.42 / 2.65',
-    media: null,
-    predicted: 'signal'
-  },
-  {
-    id: 'v5',
-    truth: 'signal',
-    text: 'CLOSE  ETH short at 3,140 — TP2 tagged. +8.1% banked.',
-    media: null,
-    predicted: 'signal'
-  },
-  {
-    id: 'v6',
-    truth: 'signal',
-    text: 'SCALP  INJ/USDT long 24.10\nStop 23.40\nTarget 25.8',
-    media: null,
-    predicted: 'signal'
   }
 ]
 
@@ -954,14 +867,4 @@ export const ORPHAN_LINKED_MOD = {
   late: true,
   text: 'close ETH ✅ out for now',
   effect: 'Ignored — position had already closed at its stop (14:18)'
-}
-
-/* ---- Verify pass: minimum number of samples a user must confirm before continuing.
-   They may verify more (up to every message), but not fewer. ---- */
-export const VERIFY_MIN = 6
-
-/* Messages the AI flags as misclassified per verify attempt — these are the catchable
-   errors the user should spot. Attempt 1 plants two; attempt >= 2 is clean. */
-export const VERIFY_MISCLASSIFIED = {
-  1: { m6: 'signal', m13: 'noise', m18: 'signal' } // m6 noise→signal (false +), m13 signal→noise (false −), m18 update→signal (missed link)
 }
