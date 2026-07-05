@@ -1,9 +1,9 @@
 """Mining Confirm endpoint (ADR 0015).
 
-`POST /feeds/{external_id}/mining/rules` persists the browser-compiled ruleset
-and re-derives extraction + evidence + status. Sync handler: the re-derivation
-is CPU-bound and runs in FastAPI's threadpool. Blocked while a backfill runs, so
-capture and re-derivation never race on the same feed.
+``POST /feeds/{external_id}/mining/confirm`` persists the accepted template
+families' signals (miner-based) and marks the feed verified. Sync handler: the
+re-mining is CPU-bound and runs in FastAPI's threadpool. Blocked while a backfill
+runs, so capture and confirm never race on the same feed.
 """
 
 import logging
@@ -13,12 +13,11 @@ from fastapi import APIRouter, Depends, Request
 from verasig.features.feeds.backfill_job_run import backfill_job_key
 from verasig.features.rules.mining_confirm import (
     MiningConfirmResult,
-    confirm_mining_rules,
+    confirm_mined_signals,
 )
-from verasig.features.rules.mining_schemas import MiningRulesConfirmIn
+from verasig.features.rules.mining_schemas import MiningConfirmIn, MiningConfirmOut
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.market_data.static_exchange import StaticExchange
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/feeds/{external_id}/mining")
@@ -34,36 +33,26 @@ def _guard_not_backfilling(request: Request, feed) -> None:
         )
 
 
-def _present(result: MiningConfirmResult) -> dict:
-    return {
-        "version": result.version,
-        "filterRuleId": result.filter_rule_id,
-        "parserRuleIds": result.parser_rule_ids,
-        "pipeline": {
-            "candidatesCreated": result.candidates_created,
-            "parserRecovered": result.parser_recovered,
-            "signalsExtracted": result.signals_extracted,
-            "unrecognized": result.unrecognized,
-            "evidenceUpdated": result.evidence_updated,
-        },
-        "feedStatus": result.feed_status,
-    }
+def _present(result: MiningConfirmResult) -> MiningConfirmOut:
+    return MiningConfirmOut(
+        feed_status=result.feed_status,
+        templates_accepted=result.templates_accepted,
+        signals_extracted=result.signals_extracted,
+    )
 
 
-@router.post("/rules")
-def confirm_rules(
+@router.post("/confirm")
+def confirm_signals(
     request: Request,
     external_id: str,
-    payload: MiningRulesConfirmIn,
+    payload: MiningConfirmIn,
     feed=Depends(require_feed),
-) -> dict:
+) -> MiningConfirmOut:
     _guard_not_backfilling(request, feed)
-    result = confirm_mining_rules(
+    result = confirm_mined_signals(
         request.app.state.session_factory,
         feed.user_id,
         int(external_id),
-        payload.filter_rule,
-        payload.parser_rules,
-        StaticExchange(),
+        payload.accepted_template_keys,
     )
     return _present(result)

@@ -1,9 +1,8 @@
-"""Mining Confirm persists compiled rules and re-derives everything (ADR 0015).
+"""Mining Confirm persists accepted families' signals (ADR 0015, miner-based).
 
-`confirm_mining_rules` replaces the feed's rules at a bumped version, re-derives
-candidates through the new filter, re-extracts every event with the new parser,
-recomputes deletion-evidence candidacy from the rules, and marks the feed
-verified — server-side, replacing the old frontend-only 'verified' patch.
+`confirm_mined_signals` re-mines the feed's stored messages, keeps the accepted
+template families, persists each candidate as a RawSignalEvent + ExtractedSignal
+into the SAME rows the Signals view reads, and marks the feed verified.
 """
 
 from datetime import datetime, timezone
@@ -13,23 +12,17 @@ from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.deletion import (
-    DeletedSignalEvidence,
-    DeletionConfidence,
-    DeletionMethod,
-)
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
-from verasig.features.feeds import (
-    deletion_repository,
-    feed_repository,
-    message_repository,
+from verasig.features.feeds import feed_repository, message_repository
+from verasig.features.parser_overlay.repository import read_overlay
+from verasig.features.rules.mining_confirm import (
+    _to_chat_message,
+    confirm_mined_signals,
 )
-from verasig.features.rules import repository as rule_repository
-from verasig.features.rules.mining_confirm import confirm_mining_rules
-from verasig.features.rules.mining_schemas import MiningRulesConfirmIn
-from verasig.features.signals import outcome_repository
-from verasig.foundation.market_data.static_exchange import StaticExchange
+from verasig.features.rules.template_mining import mine_template_groups
+from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals.views import present_signals
 
 
 def _instant() -> datetime:
@@ -78,95 +71,90 @@ def _seed_backfilled_feed(session_factory) -> object:
             session,
             account.id,
             [
-                _message(1, "BTC LONG entry 100"),
+                _message(1, "BTC LONG entry 100 sl 95 tp 110"),
                 _message(2, "gm everyone"),
-                _message(3, "ETH LONG entry 200"),
+                _message(3, "ETH LONG entry 200 sl 190 tp 210"),
             ],
         )
         session.commit()
         return account.id
 
 
-_PAYLOAD = {
-    "filterRule": {"includePatterns": ["LONG"]},
-    "parserRules": [
-        {
-            "patterns": [r"(?P<symbol>\w+)\s+(?P<side>LONG|SHORT)"],
-            "fieldMap": {"symbol": "symbol", "side": "side"},
-            "sideAliases": {"long": "LONG", "short": "SHORT"},
-        }
-    ],
-}
+def _all_keys(session_factory, user_id) -> list[str]:
+    with session_factory() as session:
+        messages = message_repository.read_messages(session, user_id, 1)
+        overlay = read_overlay(session, user_id)
+    groups = mine_template_groups([_to_chat_message(m) for m in messages], overlay)
+    return [group.template_key for group in groups]
 
 
-def _confirm(session_factory, user_id) -> object:
-    payload = MiningRulesConfirmIn.model_validate(_PAYLOAD)
-    return confirm_mining_rules(
-        session_factory,
-        user_id,
-        1,
-        payload.filter_rule,
-        payload.parser_rules,
-        StaticExchange(),
-    )
-
-
-def test_confirm_persists_rules_rederives_and_marks_verified(session_factory):
+def test_confirm_persists_miner_signals_and_marks_verified(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
+    keys = _all_keys(session_factory, user_id)
 
-    result = _confirm(session_factory, user_id)
+    result = confirm_mined_signals(session_factory, user_id, 1, keys)
 
     with session_factory() as session:
-        assert rule_repository.read_filter_rules(session, 1, user_id)
-        assert len(rule_repository.read_parser_rules(session, 1, user_id)) == 1
+        events = event_repository.read_signal_events(session, user_id, 1)
         extracted = outcome_repository.read_extracted_signals(session, 1, user_id)
-        assert feed_repository.read_feed(session, user_id, 1).status == "verified"
+        feed = feed_repository.read_feed(session, user_id, 1)
     assert result.feed_status == "verified"
-    assert result.signals_extracted == 2  # the two LONG messages, not the chatter
+    assert result.signals_extracted == 2  # the two LONG signals, not the chatter
     assert len(extracted) == 2
+    assert feed.status == "verified"
+    # every extracted signal links to a persisted event (no orphaned ids)
+    event_ids = {event.id for event in events}
+    assert all(signal.event_id in event_ids for signal in extracted)
 
 
-def test_reconfirm_replaces_rules_at_a_bumped_version(session_factory):
+def test_confirmed_signals_surface_through_the_signals_view(session_factory):
+    user_id = _seed_backfilled_feed(session_factory)
+    keys = _all_keys(session_factory, user_id)
+
+    confirm_mined_signals(session_factory, user_id, 1, keys)
+
+    with session_factory() as session:
+        result = present_signals(session, user_id, plan=Plan.OPERATOR)
+    symbols = sorted(signal["symbol"] for signal in result["signals"])
+    assert symbols == ["BTCUSDT", "ETHUSDT"]
+
+
+def test_confirm_maps_structured_fields_onto_the_signal(session_factory):
+    user_id = _seed_backfilled_feed(session_factory)
+    keys = _all_keys(session_factory, user_id)
+
+    confirm_mined_signals(session_factory, user_id, 1, keys)
+
+    with session_factory() as session:
+        extracted = outcome_repository.read_extracted_signals(session, 1, user_id)
+    btc = next(signal for signal in extracted if signal.symbol == "BTCUSDT")
+    assert btc.side.value == "LONG"
+    assert btc.confidence is not None  # miner confidence carried onto the signal
+    assert btc.rule_id in keys  # provenance: which template family produced it
+
+
+def test_confirm_with_empty_keys_persists_nothing_but_verifies(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
 
-    _confirm(session_factory, user_id)
-    _confirm(session_factory, user_id)
+    result = confirm_mined_signals(session_factory, user_id, 1, [])
 
     with session_factory() as session:
-        parser_rules = rule_repository.read_parser_rules(session, 1, user_id)
-        filter_rules = rule_repository.read_filter_rules(session, 1, user_id)
-    assert len(parser_rules) == 1  # replaced, not appended
-    assert len(filter_rules) == 1
-    assert parser_rules[0].version == 2
-    assert "v2" in parser_rules[0].rule_id
+        extracted = outcome_repository.read_extracted_signals(session, 1, user_id)
+        feed = feed_repository.read_feed(session, user_id, 1)
+    assert result.signals_extracted == 0
+    assert extracted == []
+    assert feed.status == "verified"
 
 
-def test_confirm_recomputes_deletion_evidence_candidacy_from_rules(session_factory):
+def test_reconfirm_is_idempotent(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
-    # a CONFIRMED deleted message (no surviving raw row) the new rules recognize
-    with session_factory() as session:
-        deletion_repository.upsert_deletion_evidence(
-            session,
-            user_id,
-            [
-                DeletedSignalEvidence(
-                    channel_id=1,
-                    message_id=99,
-                    confidence=DeletionConfidence.CONFIRMED,
-                    method=DeletionMethod.SNAPSHOT_DIFF,
-                    original_text="SOL LONG entry 5",
-                    first_seen_at=_instant(),
-                    detected_at=_instant(),
-                    was_signal_candidate=False,
-                )
-            ],
-        )
-        session.commit()
+    keys = _all_keys(session_factory, user_id)
 
-    result = _confirm(session_factory, user_id)
+    confirm_mined_signals(session_factory, user_id, 1, keys)
+    confirm_mined_signals(session_factory, user_id, 1, keys)
 
     with session_factory() as session:
-        evidence = deletion_repository.read_deletion_evidence(session, user_id, 1)
-    deleted = next(item for item in evidence if item.message_id == 99)
-    assert deleted.was_signal_candidate is True  # rules now recognize the text
-    assert result.evidence_updated == 1
+        events = event_repository.read_signal_events(session, user_id, 1)
+        extracted = outcome_repository.read_extracted_signals(session, 1, user_id)
+    assert len(events) == 2  # not doubled
+    assert len(extracted) == 2  # not doubled

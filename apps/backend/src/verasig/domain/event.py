@@ -24,6 +24,7 @@ class MaterializationPath(StrEnum):
     FILTER_RULE = "FILTER_RULE"
     PARSER_BACKFILL = "PARSER_BACKFILL"
     HUMAN_AUDIT = "HUMAN_AUDIT"
+    MINING = "MINING"
 
 
 def _now() -> datetime:

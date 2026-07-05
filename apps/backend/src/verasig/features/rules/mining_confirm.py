@@ -1,15 +1,16 @@
-"""Mining Confirm: persist compiled rules, then re-derive everything (ADR 0015).
+"""Mining Confirm: persist the accepted template families' signals (ADR 0015).
 
-Confirm is the operator's ruleset becoming authoritative. It replaces the feed's
-rules at a bumped version, re-derives candidates through the new filter,
-re-extracts every event with the new parser, recomputes deletion-evidence
-candidacy from the rules, and marks the feed verified — the real, server-side
-status that supersedes the old frontend-only 'verified' patch.
+Confirm is the operator accepting the reviewed template families. The backend
+owns extraction end-to-end via the ported miner: it re-mines the feed's stored
+messages (byte-identical port, so the ``template_key``s match what the client
+reviewed), keeps the accepted families, and persists each candidate as the two
+rows the Signals view reads — a ``RawSignalEvent`` (the message) plus an
+``ExtractedSignal`` linked to it — then marks the feed ``verified``.
 
-Each step runs in its own transaction (via `session_factory`) so a long confirm
-never holds one lock across the whole pipeline. Reuses the existing rules
-`repository`, `candidate_derivation`, and `materialization` — Mining is just a
-second rule producer alongside the legacy distillation loop.
+No parser rules: the miner is the extractor, so its structured fields ARE the
+signal. Persistence is idempotent — events upsert by (user, channel, message)
+and ``record_outcome`` upserts extractions by (user, event) — so re-confirming
+the same keys is a no-op, and confirming a superset only adds the new families.
 """
 
 import logging
@@ -17,189 +18,140 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
-from verasig.domain.filter_rule import FilterRule
-from verasig.domain.market_ports import Exchange
-from verasig.domain.parser_rule import ParserRule
-from verasig.features.feeds import (
-    deletion_repository,
-    feed_repository,
-    message_repository,
-)
-from verasig.features.feeds.candidate_derivation import (
-    derive_candidates,
-    sweep_advisory,
-)
-from verasig.features.feeds.candidate_filter import apply_filter_rule
-from verasig.features.rules import repository as rule_repository
-from verasig.features.rules.mining_schemas import MinedFilterRuleIn, MinedParserRuleIn
-from verasig.features.signals import materialization
-from verasig.features.signals.deterministic_parser import parse
+from verasig.domain.event import RawSignalEvent
+from verasig.domain.extraction_outcome import ExtractOutcome
+from verasig.domain.signal import ExtractedSignal
+from verasig.features.feeds import feed_repository, message_repository
+from verasig.features.parser_overlay.repository import read_overlay
+from verasig.features.rules.mining_signals import candidate_to_event_and_signal
+from verasig.features.rules.template_mining import mine_template_groups
+from verasig.features.rules.template_mining.types import ChatMessage, TemplateGroup
+from verasig.features.signals import event_repository, outcome_repository
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class MiningConfirmResult:
-    version: int
-    filter_rule_id: str
-    parser_rule_ids: list[str]
-    candidates_created: int
-    parser_recovered: int
-    signals_extracted: int
-    unrecognized: int
-    evidence_updated: int
     feed_status: str
+    templates_accepted: int
+    signals_extracted: int
 
 
-def confirm_mining_rules(
+def confirm_mined_signals(
     session_factory: sessionmaker,
     user_id: UUID,
     external_id: int,
-    filter_rule_in: MinedFilterRuleIn,
-    parser_rules_in: Sequence[MinedParserRuleIn],
-    exchange: Exchange,
+    accepted_template_keys: Sequence[str],
 ) -> MiningConfirmResult:
-    version = _next_version(session_factory, user_id, external_id)
-    filter_rule, parser_rules = _scope_rules(
-        filter_rule_in, parser_rules_in, user_id, external_id, version
-    )
-    _replace_rules(session_factory, user_id, external_id, filter_rule, parser_rules)
-    candidates_created = derive_candidates(
-        session_factory, user_id, external_id, exchange, filter_rules=[filter_rule]
-    )
-    parser_recovered, _ = sweep_advisory(
-        session_factory, user_id, external_id, parser_rules
-    )
-    extracted, unrecognized = _rematerialize(session_factory, user_id, external_id)
-    evidence_updated = _recompute_evidence(
-        session_factory, user_id, external_id, filter_rule, parser_rules
-    )
+    accepted = set(accepted_template_keys)
+    groups = _mine_feed(session_factory, user_id, external_id)
+    kept = [group for group in groups if group.template_key in accepted]
+    pairs = _pairs_of(kept, external_id)
+    extracted = _persist(session_factory, user_id, pairs)
     status = _mark_verified(session_factory, user_id, external_id)
     logger.info(
-        "mining.confirm done: external_id=%s version=%s candidates=%s recovered=%s "
-        "extracted=%s unrecognized=%s evidence_updated=%s status=%s",
+        "mining.confirm done: external_id=%s templates=%s signals=%s status=%s",
         external_id,
-        version,
-        candidates_created,
-        parser_recovered,
+        len(kept),
         extracted,
-        unrecognized,
-        evidence_updated,
         status,
     )
     return MiningConfirmResult(
-        version=version,
-        filter_rule_id=filter_rule.rule_id,
-        parser_rule_ids=[rule.rule_id for rule in parser_rules],
-        candidates_created=candidates_created,
-        parser_recovered=parser_recovered,
-        signals_extracted=extracted,
-        unrecognized=unrecognized,
-        evidence_updated=evidence_updated,
         feed_status=status,
+        templates_accepted=len(kept),
+        signals_extracted=extracted,
     )
 
 
-def _next_version(
+def _mine_feed(
     session_factory: sessionmaker, user_id: UUID, external_id: int
-) -> int:
+) -> list[TemplateGroup]:
     with session_factory() as session:
-        return rule_repository.next_rule_version(session, user_id, external_id)
+        messages = message_repository.read_messages(session, user_id, external_id)
+        overlay = read_overlay(session, user_id)
+    chat_messages = [_to_chat_message(message) for message in messages]
+    return mine_template_groups(chat_messages, overlay)
 
 
-def _scope_rules(
-    filter_rule_in: MinedFilterRuleIn,
-    parser_rules_in: Sequence[MinedParserRuleIn],
-    user_id: UUID,
-    external_id: int,
-    version: int,
-) -> tuple[FilterRule, list[ParserRule]]:
-    filter_rule = FilterRule(
-        rule_id=f"{user_id}:{external_id}-mining-filter-v{version}",
-        user_id=user_id,
-        channel_id=external_id,
-        version=version,
-        include_patterns=filter_rule_in.include_patterns,
-        exclude_patterns=filter_rule_in.exclude_patterns,
-        display=filter_rule_in.display,
-        distilled_from_label_ids=[],
+def _to_chat_message(message) -> ChatMessage:
+    return ChatMessage(
+        id=str(message.message_id),
+        text=message.text or "",
+        date=message.posted_at.isoformat() if message.posted_at else None,
     )
-    parser_rules = [
-        ParserRule(
-            rule_id=f"{user_id}:{external_id}-mining-parser-{index + 1}-v{version}",
-            user_id=user_id,
-            channel_id=external_id,
-            version=version,
-            patterns=rule_in.patterns,
-            field_map=rule_in.field_map,
-            side_aliases=rule_in.side_aliases,
-            distilled_from_label_ids=[],
-        )
-        for index, rule_in in enumerate(parser_rules_in)
+
+
+def _pairs_of(
+    groups: Sequence[TemplateGroup], external_id: int
+) -> list[tuple[RawSignalEvent, ExtractedSignal]]:
+    return [
+        pair
+        for group in groups
+        for candidate in group.candidates
+        if (pair := candidate_to_event_and_signal(candidate, external_id)) is not None
     ]
-    return filter_rule, parser_rules
 
 
-def _replace_rules(
+def _persist(
     session_factory: sessionmaker,
     user_id: UUID,
-    external_id: int,
-    filter_rule: FilterRule,
-    parser_rules: list[ParserRule],
-) -> None:
-    with session_factory() as session:
-        rule_repository.delete_feed_rules(session, user_id, external_id)
-        rule_repository.upsert_filter_rule(session, filter_rule)
-        rule_repository.upsert_parser_rules(session, parser_rules)
-        session.commit()
-
-
-def _rematerialize(
-    session_factory: sessionmaker, user_id: UUID, external_id: int
-) -> tuple[int, int]:
-    with session_factory() as session:
-        counts = materialization.rematerialize_signal_outcomes(
-            session, user_id, external_id
-        )
-        session.commit()
-        return counts
-
-
-def _text_is_signal(
-    text: str | None, filter_rule: FilterRule, parser_rules: list[ParserRule]
-) -> bool:
-    if not text:
-        return False
-    if apply_filter_rule(filter_rule, text):
-        return True
-    return any(parse(rule, text) is not None for rule in parser_rules)
-
-
-def _recompute_evidence(
-    session_factory: sessionmaker,
-    user_id: UUID,
-    external_id: int,
-    filter_rule: FilterRule,
-    parser_rules: list[ParserRule],
+    pairs: Sequence[tuple[RawSignalEvent, ExtractedSignal]],
 ) -> int:
+    if not pairs:
+        return 0
     with session_factory() as session:
-        candidate_ids = message_repository.candidate_message_ids(
-            session, user_id, external_id
-        )
-
-    def decide(message_id: int, original_text: str | None) -> bool:
-        return message_id in candidate_ids or _text_is_signal(
-            original_text, filter_rule, parser_rules
-        )
-
-    with session_factory() as session:
-        updated = deletion_repository.update_evidence_candidacy(
-            session, user_id, external_id, decide
-        )
+        _persist_events(session, user_id, [event for event, _ in pairs])
+        event_id_by_message = _persisted_event_ids(session, user_id, pairs)
+        extracted = _persist_signals(session, user_id, pairs, event_id_by_message)
         session.commit()
-        return updated
+        return extracted
+
+
+def _persist_events(
+    session: Session, user_id: UUID, events: Sequence[RawSignalEvent]
+) -> None:
+    event_repository.insert_signal_events(session, user_id, list(events))
+    session.flush()
+
+
+def _persisted_event_ids(
+    session: Session,
+    user_id: UUID,
+    pairs: Sequence[tuple[RawSignalEvent, ExtractedSignal]],
+) -> dict[int, UUID]:
+    """Resolve each signal to the row that actually persisted for its message.
+
+    ``insert_signal_events`` is on-conflict-do-nothing, so a pre-existing event
+    keeps its own id and the freshly-minted one is discarded. Re-reading the
+    stored events yields the authoritative (message -> event id) map to link
+    against, never an orphaned id.
+    """
+    channel_id = pairs[0][0].channel_id
+    return {
+        event.message_id: event.id
+        for event in event_repository.read_signal_events(session, user_id, channel_id)
+    }
+
+
+def _persist_signals(
+    session: Session,
+    user_id: UUID,
+    pairs: Sequence[tuple[RawSignalEvent, ExtractedSignal]],
+    event_id_by_message: dict[int, UUID],
+) -> int:
+    extracted = 0
+    for event, signal in pairs:
+        persisted_event_id = event_id_by_message.get(event.message_id)
+        if persisted_event_id is None:
+            continue
+        linked = signal.model_copy(update={"event_id": persisted_event_id})
+        outcome = ExtractOutcome(signal=linked)
+        outcome_repository.record_outcome(session, outcome, user_id)
+        extracted += 1
+    return extracted
 
 
 def _mark_verified(

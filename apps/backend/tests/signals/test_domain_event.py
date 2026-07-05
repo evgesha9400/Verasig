@@ -64,10 +64,11 @@ def test_match_reason_has_the_three_seed_heuristics():
     }
 
 
-def test_materialization_path_has_the_four_provenance_values():
+def test_materialization_path_has_the_provenance_values():
     assert {path.value for path in MaterializationPath} == {
         "SEED_HEURISTIC",
         "FILTER_RULE",
         "PARSER_BACKFILL",
         "HUMAN_AUDIT",
+        "MINING",
     }
