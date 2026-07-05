@@ -1,18 +1,30 @@
 import { describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TemplateMiningPage } from './TemplateMiningPage.jsx'
 
 const feed = { id: 'apex', name: 'Apex Crypto Calls' }
 
-// Offline (no authToken): the auto-run falls back to the bundled demo history and
-// advances Mine → Review synchronously as the effects settle.
-function renderPage(props = {}) {
-  return render(<TemplateMiningPage activeFeed={feed} {...props} />)
+// Mirrors how ProductApp drives the page: the parent owns the current step and
+// advances it in response to the page's callbacks. Offline (no authToken) the
+// auto-run falls back to the bundled demo history and lands on Review.
+function Harness({ activeFeed = feed, startStep = 'mine', ...props }) {
+  const [step, setStep] = useState(startStep)
+  return (
+    <TemplateMiningPage
+      activeFeed={activeFeed}
+      step={step}
+      onMined={() => setStep('review')}
+      onContinueToVerify={() => setStep('verify')}
+      onBackToReview={() => setStep('review')}
+      {...props}
+    />
+  )
 }
 
-function step(label) {
-  return screen.getByText(label).closest('.vrs-tm-step')
+function renderPage(props = {}) {
+  return render(<Harness {...props} />)
 }
 
 function acceptFirstTemplate(user) {
@@ -25,46 +37,8 @@ function acceptFirstTemplate(user) {
 describe('TemplateMiningPage', () => {
   it('auto-runs and lands on Review with no manual button click', () => {
     renderPage()
-    expect(step('Review').classList.contains('is-active')).toBe(true)
-    expect(step('Mine').classList.contains('is-done')).toBe(true)
     expect(screen.getByText('Messages scanned')).toBeTruthy()
     expect(screen.getAllByText('<INSTRUMENT>').length).toBeGreaterThan(0)
-  })
-
-  it('mines the connected feed history when authenticated', async () => {
-    const messages = [
-      { id: 'f1', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
-      { id: 'f2', text: 'gm team' }
-    ]
-    const onListMessages = vi.fn().mockResolvedValue({ messages })
-    render(
-      <TemplateMiningPage
-        activeFeed={feed}
-        authToken="jwt"
-        onListMessages={onListMessages}
-      />
-    )
-    expect(onListMessages).toHaveBeenCalledWith('apex')
-    expect(await screen.findByText('Messages scanned')).toBeTruthy()
-  })
-
-  it('re-mines when the active feed changes', async () => {
-    const messages = [{ id: 'f1', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340' }]
-    const first = vi.fn().mockResolvedValue({ messages })
-    const { rerender } = render(
-      <TemplateMiningPage activeFeed={feed} authToken="jwt" onListMessages={first} />
-    )
-    expect(first).toHaveBeenCalledWith('apex')
-    const next = vi.fn().mockResolvedValue({ messages })
-    rerender(
-      <TemplateMiningPage
-        activeFeed={{ id: 'delta', name: 'Delta' }}
-        authToken="jwt"
-        onListMessages={next}
-      />
-    )
-    expect(next).toHaveBeenCalledWith('delta')
-    expect(await screen.findByText('Messages scanned')).toBeTruthy()
   })
 
   it('renders the Suggested accept and Needs review sections', () => {
@@ -95,10 +69,11 @@ describe('TemplateMiningPage', () => {
     await acceptFirstTemplate(user)
     await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
     expect(screen.getByRole('tab', { name: /Parsed/i })).toBeTruthy()
-    expect(step('Verify').classList.contains('is-active')).toBe(true)
 
     await user.click(screen.getByRole('button', { name: /Back to review/i }))
-    expect(step('Review').classList.contains('is-active')).toBe(true)
+    expect(
+      screen.getByRole('button', { name: /Continue to verify/i })
+    ).toBeTruthy()
   })
 
   it('Apply all accepts the suggested templates', async () => {

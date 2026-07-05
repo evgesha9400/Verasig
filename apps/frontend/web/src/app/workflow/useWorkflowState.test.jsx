@@ -150,29 +150,29 @@ describe('useWorkflowState', () => {
     const workflow = getWorkflow()
 
     expect(workflow.activeFeedId).toBe(feed.id)
-    expect(workflow.screen).toBe('mining')
+    expect(workflow.screen).toBe('mine')
   })
 
-  it('confirms stepping back to Mining only from a later pipeline step', () => {
+  it('confirms stepping back to Mine only from a later pipeline step', () => {
     const getWorkflow = renderWorkflow()
 
-    // From a step positioned after Mining (Exchange), stepping back to Mining
+    // From a step positioned after Mine (Exchange), stepping back to Mine
     // opens the confirmation dialog rather than jumping straight back.
     act(() => getWorkflow().setScreen('exchange'))
-    act(() => getWorkflow().requestStepBack('mining'))
+    act(() => getWorkflow().requestStepBack('mine'))
 
     let workflow = getWorkflow()
-    expect(workflow.backTarget).toBe('mining')
+    expect(workflow.backTarget).toBe('mine')
     expect(workflow.screen).toBe('exchange')
 
     act(() => getWorkflow().confirmStepBack())
     workflow = getWorkflow()
     expect(workflow.backTarget).toBe(null)
-    expect(workflow.screen).toBe('mining')
+    expect(workflow.screen).toBe('mine')
     expect(workflow.toast.title).toBe('Back to Mining')
 
-    // From a step at or before Mining, stepping back navigates with no dialog.
-    act(() => getWorkflow().setScreen('mining'))
+    // From a step at or before Mine, stepping back navigates with no dialog.
+    act(() => getWorkflow().setScreen('mine'))
     act(() => getWorkflow().requestStepBack('backfill'))
 
     workflow = getWorkflow()
@@ -220,7 +220,7 @@ describe('useWorkflowState', () => {
     expect(merged[0].lastDate).toBe('Jun 3, 2026')
   })
 
-  it('continues reviewable backfilled feeds to backtest config', () => {
+  it('opens backfilled feeds at Mine regardless of prior rules', () => {
     const getWorkflow = renderWorkflow()
     const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: true }
 
@@ -230,7 +230,7 @@ describe('useWorkflowState', () => {
     const workflow = getWorkflow()
 
     expect(workflow.activeFeedId).toBe(feed.id)
-    expect(workflow.screen).toBe('backtest')
+    expect(workflow.screen).toBe('mine')
   })
 
   it('keeps rules-backed backfilled feeds out of Label after fetching new messages', () => {
@@ -285,6 +285,6 @@ describe('useWorkflowState', () => {
     act(() => getWorkflow().resumeFeed(refreshedFeed))
 
     expect(refreshedFeed.status).toBe('verified')
-    expect(getWorkflow().screen).toBe('backtest')
+    expect(getWorkflow().screen).toBe('verify')
   })
 })

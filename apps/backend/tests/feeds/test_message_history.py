@@ -6,12 +6,12 @@ from seed import insert_source
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import LabelKind
+from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import feed_repository, message_repository
 from verasig.features.feeds.message_views import read_history
-from verasig.features.rules.labeling import record_label
+from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
 
 
@@ -111,7 +111,14 @@ def test_read_history_returns_every_message_regardless_of_label_or_candidacy(
     account = _seed(db_session)
     # Labeling a message must NOT drop it from the full history (unlike the
     # labeling sample, which excludes labeled + non-candidate messages).
-    record_label(db_session, account.id, 7, 1, LabelKind.NOISE)
+    rule_repository.upsert_labels(
+        db_session,
+        [
+            GoldenLabel(
+                user_id=account.id, channel_id=7, message_id=1, label=LabelKind.NOISE
+            )
+        ],
+    )
     db_session.commit()
 
     channel = feed_repository.read_feed(db_session, account.id, 7)

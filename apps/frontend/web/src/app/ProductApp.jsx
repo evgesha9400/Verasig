@@ -20,6 +20,7 @@ import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
 import { TemplateMiningPage } from '../features/template-mining/TemplateMiningPage.jsx'
 import { SettingsView } from '../features/settings/SettingsView.jsx'
 import { useWorkflowState } from './workflow/useWorkflowState.js'
+import { isStepLocked } from '../domain/workflow/stepAccess.js'
 import {
   connectTelegram as connectTelegramApi,
   verifyTelegram
@@ -33,11 +34,8 @@ import {
   streamBackfillProgress,
   streamDeletionRescanProgress
 } from '../shared/api/feedsApi.js'
-import {
-  getParserOverlay,
-  putParserOverlay,
-  listFeedHistory
-} from '../shared/api/pipelineApi.js'
+import { getParserOverlay, putParserOverlay } from '../shared/api/pipelineApi.js'
+import { startMine, streamMineProgress } from '../shared/api/mineApi.js'
 import './app.css'
 
 const USER_DEFAULTS = {
@@ -164,7 +162,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     refreshSources,
     upsertFeed,
     setBackTarget
-  } = useWorkflowState(authToken)
+  } = useWorkflowState(authToken, user.plan)
 
   useEffect(() => {
     const root = document.documentElement
@@ -341,14 +339,22 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
   } else if (isWorkflow && activeFeed) {
     breadcrumb = activeFeed.name
     onExit = exitToFeeds
-    pipeline = <Pipeline current={pipelineStep} onStepBack={requestStepBack} />
+    pipeline = (
+      <Pipeline
+        current={pipelineStep}
+        plan={user.plan}
+        onStepBack={requestStepBack}
+      />
+    )
 
     const stepTitles = {
       backfill: ['Backfill', 'Pulling message history'],
-      mining: ['Mining', 'Discover signal formats and confirm the ruleset'],
+      mine: ['Mine', 'Discovering signal formats'],
+      review: ['Review', 'Accept the real signal templates'],
+      verify: ['Verify', 'Audit the full history, then confirm'],
       exchange: ['Exchange', 'Route verified signals'],
-      risk: ['Execution', 'Size, entry and exit for every verified signal'],
       backtest: ['Backtest', 'Simulating performance'],
+      execution: ['Execution', 'Size, entry and exit for every verified signal'],
       'backtest-result': ['Signal quality', 'Backtest results']
     }
 
@@ -372,39 +378,51 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onError={handleBackfillError}
         />
       )
-    } else if (screen === 'mining') {
+    } else if (screen === 'mine' || screen === 'review' || screen === 'verify') {
       body = (
         <TemplateMiningPage
           activeFeed={activeFeed}
           authToken={authToken}
-          onListMessages={(chatId) => listFeedHistory(authToken, chatId)}
+          step={screen}
+          onStartMine={(chatId) => startMine(authToken, chatId)}
+          onStreamMine={(chatId, handlers) =>
+            streamMineProgress(authToken, chatId, handlers)
+          }
           fireToast={fireToast}
           overlay={overlay}
           onSaveOverlay={saveOverlay}
+          onMined={() => setScreen('review')}
+          onContinueToVerify={() => setScreen('verify')}
+          onBackToReview={() => setScreen('review')}
           onFinish={routeAfterVerify}
-          onKeepVerified={() => {
-            stopAfterVerify()
-            void refreshSources().catch(() => {})
-          }}
+          onKeepVerified={(acceptedTemplateKeys) =>
+            stopAfterVerify(acceptedTemplateKeys)
+          }
         />
       )
     } else if (
       screen === 'exchange' ||
-      screen === 'risk' ||
       screen === 'backtest' ||
+      screen === 'execution' ||
       screen === 'backtest-result'
     ) {
+      // These steps aren't built yet. Message depends on why they're blocked:
+      // beyond the plan's reach (upgrade) vs. reachable-but-unbuilt (coming soon).
+      const lockedByPlan = isStepLocked(pipelineStep, user.plan)
       const featureName =
         screen === 'exchange'
           ? 'Exchange routing'
-          : screen === 'risk'
+          : screen === 'execution'
             ? 'Execution'
             : 'Backtesting'
       title = featureName
-      subtitle = `${activeFeed.name} · Available on a higher plan`
+      subtitle = lockedByPlan
+        ? `${activeFeed.name} · Available on a higher plan`
+        : `${activeFeed.name} · Coming soon`
       body = (
         <PaidFeaturePlaceholder
           feature={featureName}
+          lockedByPlan={lockedByPlan}
           onDone={() => {
             void refreshSources().catch(() => {})
             exitToFeeds()

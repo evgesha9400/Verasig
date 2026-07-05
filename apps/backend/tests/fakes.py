@@ -8,7 +8,6 @@ records every `after_message_id` it was asked for (refetch assertions).
 from collections.abc import AsyncIterator, Callable
 
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.label import GoldenLabel
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import TradeIntent
 from verasig.domain.telegram_ports import (
@@ -17,7 +16,6 @@ from verasig.domain.telegram_ports import (
     TwoFactorPasswordInvalidError,
     TwoFactorUnsupportedError,
 )
-from verasig.features.rules.rule_distiller import parse_distiller_output
 from verasig.foundation.market_data.static_exchange import normalize_base_symbol
 
 
@@ -181,28 +179,6 @@ class FakeExchange:
 
     def is_listed(self, token: str) -> bool:
         return normalize_base_symbol(token) in self._symbols
-
-
-class FakeDistiller:
-    """Offline RuleDistiller: serves rules parsed from canned LLM stdout."""
-
-    def __init__(self, stdout: str, version: int = 1) -> None:
-        self._stdout = stdout
-        self._version = version
-
-    def _parse(self, labels: list[GoldenLabel]):
-        return parse_distiller_output(
-            self._stdout,
-            channel_id=labels[0].channel_id,
-            label_ids=[label.id for label in labels],
-            version=self._version,
-        )
-
-    def distill_filter(self, labels: list[GoldenLabel]):
-        return self._parse(labels)[0]
-
-    def distill_parsers(self, labels: list[GoldenLabel]):
-        return self._parse(labels)[1]
 
 
 class FakeExtractor:

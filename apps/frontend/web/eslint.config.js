@@ -34,5 +34,13 @@ export default [
       'react/jsx-no-target-blank': 'off',
       'react/prop-types': 'off'
     }
+  },
+  {
+    // Playwright config + e2e specs run in Node (the harness) and also drive the
+    // browser via page.evaluate callbacks, so allow both global sets.
+    files: ['playwright.config.js', 'e2e/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser }
+    }
   }
 ]

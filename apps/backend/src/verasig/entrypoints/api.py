@@ -11,13 +11,7 @@ from verasig.features.feeds import routes as feed_routes
 from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
 from verasig.features.parser_overlay import routes as parser_overlay_routes
 from verasig.features.risk import routes as risk_routes
-from verasig.features.rules import (
-    distill_routes,
-    label_routes,
-    mining_routes,
-    verify_routes,
-)
-from verasig.features.rules.rule_distiller import AnthropicDistiller
+from verasig.features.rules import mine_routes, mining_routes
 from verasig.features.signals import routes as signal_routes
 from verasig.features.simulation import routes as simulation_routes
 from verasig.features.sources import routes as source_routes
@@ -29,13 +23,6 @@ from verasig.foundation.http.access_logging import (
 )
 from verasig.foundation.http.errors import ApiError, api_error_handler
 from verasig.foundation.jobs.registry import JobRegistry
-from verasig.foundation.llm.claude_code_runner import make_claude_code_runner
-from verasig.foundation.llm.prompt_audit import (
-    make_distill_prompt_auditor,
-    make_distill_response_auditor,
-    make_distill_skip_auditor,
-    make_distill_validation_auditor,
-)
 from verasig.foundation.market_data.bybit_account import verify_api_keys
 from verasig.foundation.market_data.bybit_market_data import BybitKlineClient
 from verasig.foundation.security.secrets import SecretCipher
@@ -50,10 +37,8 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     feed_routes.router,
     parser_overlay_routes.router,
     simulation_routes.router,
-    label_routes.router,
-    distill_routes.router,
+    mine_routes.router,
     mining_routes.router,
-    verify_routes.router,
     risk_routes.router,
     signal_routes.router,
 )
@@ -81,17 +66,6 @@ def create_app(
     app.state.telegram_auth = telegram_session
     app.state.exchange_verifier = verify_api_keys
     app.state.market_data_factory = BybitKlineClient
-    app.state.distiller_factory = lambda: AnthropicDistiller(
-        runner=make_claude_code_runner(
-            settings.claude_code_oauth_token,
-            settings.claude_code_model,
-            timeout_seconds=settings.claude_code_timeout_seconds,
-        ),
-        prompt_auditor=make_distill_prompt_auditor(),
-        response_auditor=make_distill_response_auditor(),
-        validation_auditor=make_distill_validation_auditor(),
-        parser_skip_auditor=make_distill_skip_auditor(),
-    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
