@@ -9,7 +9,6 @@ from collections.abc import AsyncIterator, Callable
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import TradeIntent
 from verasig.domain.telegram_ports import (
     CodeInvalidError,
     PendingCode,
@@ -179,15 +178,3 @@ class FakeExchange:
 
     def is_listed(self, token: str) -> bool:
         return normalize_base_symbol(token) in self._symbols
-
-
-class FakeExtractor:
-    """Offline LlmExtractor: returns a canned TradeIntent (or None), counts calls."""
-
-    def __init__(self, returns: TradeIntent | None = None) -> None:
-        self._returns = returns
-        self.calls = 0
-
-    def extract(self, _candidate_text: str) -> TradeIntent | None:
-        self.calls += 1
-        return self._returns

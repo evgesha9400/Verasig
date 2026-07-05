@@ -13,8 +13,8 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.parser_rule import ParserRule
 from verasig.domain.risk_config import RiskConfig
+from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.domain.simulation import Kline
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
@@ -22,7 +22,6 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.backtesting import load_folded_signals, run_backtest
@@ -95,24 +94,19 @@ def _event() -> RawSignalEvent:
     )
 
 
-def _parser_rule(user_id: UUID) -> ParserRule:
-    return ParserRule(
-        rule_id=f"{user_id}:7-parser-v1",
-        user_id=user_id,
+def _signal() -> ExtractedSignal:
+    return ExtractedSignal(
+        id=_uuid(2),
+        event_id=_uuid(1),
         channel_id=7,
-        patterns=[
-            r"(?P<symbol>[A-Z]{2,10})\s+(?P<side>long|short)"
-            r".*?entry\s+(?P<entry>[\d.]+).*?sl\s+(?P<sl>[\d.]+)"
-            r".*?tp\s+(?P<tp>[\d.]+)"
-        ],
-        field_map={
-            "symbol": "symbol",
-            "side": "side",
-            "entry": "entry",
-            "sl": "stop_loss",
-            "tp": "take_profit",
-        },
-        side_aliases={"long": "LONG", "short": "SHORT"},
+        symbol="BTCUSDT",
+        side=Side.LONG,
+        entry_type=EntryType.LIMIT_SINGLE,
+        entry_low=Decimal("100"),
+        entry_high=Decimal("100"),
+        stop_loss=Decimal("95"),
+        take_profits=[Decimal("110")],
+        extracted_at=_BASE,
     )
 
 
@@ -139,7 +133,7 @@ def _klines() -> list[Kline]:
     ]
 
 
-def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_factory):
+def test_run_backtest_simulates_signals_and_persists_summary(session_factory):
     account = _seed(session_factory)
     market_data = FakeMarketData(_klines())
 
@@ -186,7 +180,7 @@ def _seed(session_factory) -> UserAccount:
         feed_repository.create_feed(session, account.id, _channel(), _BASE)
         message_repository.insert_messages(session, account.id, [_message()])
         event_repository.insert_signal_events(session, account.id, [_event()])
-        rule_repository.upsert_parser_rules(session, [_parser_rule(account.id)])
+        outcome_repository.insert_extracted_signals(session, [_signal()], account.id)
         session.commit()
         return account
 

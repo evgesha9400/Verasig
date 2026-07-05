@@ -12,7 +12,7 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.parser_rule import ParserRule
+from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.domain.simulation import Kline
 from verasig.features.accounts.tokens import read_user_id
 from verasig.features.feeds import (
@@ -20,12 +20,13 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.rules import repository as rule_repository
-from verasig.features.signals import event_repository
+from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 
 SECRET = "s" * 32
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+_EVENT_ID = UUID("70000000-0000-0000-0000-000000000001")
+_SIGNAL_ID = UUID("70000000-0000-0000-0000-000000000002")
 
 
 class FakeMarketData:
@@ -161,6 +162,7 @@ def _seed(app, user_id: UUID) -> None:
             user_id,
             [
                 RawSignalEvent(
+                    id=_EVENT_ID,
                     channel_id=7,
                     message_id=1,
                     candidate_text="BTC long entry 100 sl 95 tp 110",
@@ -169,29 +171,24 @@ def _seed(app, user_id: UUID) -> None:
                 )
             ],
         )
-        rule_repository.upsert_parser_rules(session, [_parser_rule(user_id)])
+        outcome_repository.insert_extracted_signals(session, [_signal()], user_id)
         feed_repository.set_status(session, user_id, 7, "verified")
         session.commit()
 
 
-def _parser_rule(user_id: UUID) -> ParserRule:
-    return ParserRule(
-        rule_id=f"{user_id}:7-parser-v1",
-        user_id=user_id,
+def _signal() -> ExtractedSignal:
+    return ExtractedSignal(
+        id=_SIGNAL_ID,
+        event_id=_EVENT_ID,
         channel_id=7,
-        patterns=[
-            r"(?P<symbol>[A-Z]{2,10})\s+(?P<side>long|short)"
-            r".*?entry\s+(?P<entry>[\d.]+).*?sl\s+(?P<sl>[\d.]+)"
-            r".*?tp\s+(?P<tp>[\d.]+)"
-        ],
-        field_map={
-            "symbol": "symbol",
-            "side": "side",
-            "entry": "entry",
-            "sl": "stop_loss",
-            "tp": "take_profit",
-        },
-        side_aliases={"long": "LONG", "short": "SHORT"},
+        symbol="BTCUSDT",
+        side=Side.LONG,
+        entry_type=EntryType.LIMIT_SINGLE,
+        entry_low=Decimal("100"),
+        entry_high=Decimal("100"),
+        stop_loss=Decimal("95"),
+        take_profits=[Decimal("110")],
+        extracted_at=_BASE,
     )
 
 

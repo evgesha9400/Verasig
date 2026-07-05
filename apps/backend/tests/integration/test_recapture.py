@@ -2,9 +2,9 @@
 
 `guard_and_wipe` verifies the channel still resolves FIRST, then deletes the
 feed's capture + cascaded derived rows in one transaction. It secures NO deletion
-evidence (that is the deliberate `Check gaps` rescan). Durable evidence, distilled
-rules and the backfill-run history survive because they FK to `feed`, not to
-`raw_message`. An unreachable channel aborts BEFORE anything is deleted.
+evidence (that is the deliberate `Check gaps` rescan). Durable evidence and the
+backfill-run history survive because they FK to `feed`, not to `raw_message`. An
+unreachable channel aborts BEFORE anything is deleted.
 """
 
 from datetime import datetime, timezone
@@ -17,7 +17,6 @@ from seed import insert_source
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.filter_rule import FilterRule
 from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import ExtractedSignal, Side
@@ -107,15 +106,6 @@ def _seed_feed_with_full_capture(session_factory) -> object:
                 )
             ],
         )
-        rule_repository.upsert_filter_rule(
-            session,
-            FilterRule(
-                rule_id="r1",
-                user_id=account.id,
-                channel_id=1,
-                include_patterns=["long"],
-            ),
-        )
         feed_repository.advance_cursor(session, account.id, 1, 3)
         backfill_job_repository.create_run(session, account.id, 1, _instant())
         session.commit()
@@ -135,7 +125,6 @@ async def test_guard_and_wipe_purges_capture_but_keeps_rules_and_runs(
         assert event_repository.read_signal_events(session, user_id, 1) == []
         assert outcome_repository.read_extracted_signals(session, 1, user_id) == []
         assert rule_repository.read_labels(session, 1, user_id) == []
-        assert rule_repository.read_filter_rules(session, 1, user_id)  # rules survive
         assert backfill_job_repository.read_latest_run(session, user_id, 1) is not None
         assert feed_repository.read_cursor(session, user_id, 1) is None
         # a clean wipe secures NO deletion evidence (that is the Check gaps rescan)
