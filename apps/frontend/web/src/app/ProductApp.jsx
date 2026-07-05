@@ -34,11 +34,8 @@ import {
   streamBackfillProgress,
   streamDeletionRescanProgress
 } from '../shared/api/feedsApi.js'
-import {
-  getParserOverlay,
-  putParserOverlay,
-  listFeedHistory
-} from '../shared/api/pipelineApi.js'
+import { getParserOverlay, putParserOverlay } from '../shared/api/pipelineApi.js'
+import { startMine, streamMineProgress } from '../shared/api/mineApi.js'
 import './app.css'
 
 const USER_DEFAULTS = {
@@ -387,7 +384,10 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           activeFeed={activeFeed}
           authToken={authToken}
           step={screen}
-          onListMessages={(chatId) => listFeedHistory(authToken, chatId)}
+          onStartMine={(chatId) => startMine(authToken, chatId)}
+          onStreamMine={(chatId, handlers) =>
+            streamMineProgress(authToken, chatId, handlers)
+          }
           fireToast={fireToast}
           overlay={overlay}
           onSaveOverlay={saveOverlay}

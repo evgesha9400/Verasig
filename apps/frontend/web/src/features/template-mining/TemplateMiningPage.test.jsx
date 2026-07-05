@@ -41,36 +41,6 @@ describe('TemplateMiningPage', () => {
     expect(screen.getAllByText('<INSTRUMENT>').length).toBeGreaterThan(0)
   })
 
-  it('mines the connected feed history when authenticated', async () => {
-    const messages = [
-      { id: 'f1', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355' },
-      { id: 'f2', text: 'gm team' }
-    ]
-    const onListMessages = vi.fn().mockResolvedValue({ messages })
-    renderPage({ authToken: 'jwt', onListMessages })
-    expect(onListMessages).toHaveBeenCalledWith('apex')
-    expect(await screen.findByText('Messages scanned')).toBeTruthy()
-  })
-
-  it('re-mines when the active feed changes', async () => {
-    const messages = [{ id: 'f1', text: 'XAUUSD BUY NOW\nSL 2312\nTP 2340' }]
-    const first = vi.fn().mockResolvedValue({ messages })
-    const { rerender } = render(
-      <Harness authToken="jwt" onListMessages={first} />
-    )
-    expect(first).toHaveBeenCalledWith('apex')
-    const next = vi.fn().mockResolvedValue({ messages })
-    rerender(
-      <Harness
-        activeFeed={{ id: 'delta', name: 'Delta' }}
-        authToken="jwt"
-        onListMessages={next}
-      />
-    )
-    expect(next).toHaveBeenCalledWith('delta')
-    expect(await screen.findByText('Messages scanned')).toBeTruthy()
-  })
-
   it('renders the Suggested accept and Needs review sections', () => {
     renderPage()
     expect(screen.getByText('Suggested accept')).toBeTruthy()
