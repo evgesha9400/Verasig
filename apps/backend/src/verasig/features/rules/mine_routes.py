@@ -102,7 +102,15 @@ async def _run_mine(
     # CPU-bound pure port — run off the event loop so progress can flush.
     groups = await asyncio.to_thread(mine_template_groups, messages, overlay)
     _publish(publisher, channel_id, "grouping", len(groups))
-    payload = {"groups": [template_group_to_dict(group) for group in groups]}
+    # Carry the raw messages too: the browser's verify audit re-runs the parser
+    # over the full history (a client-side preview of the server-side confirm).
+    payload = {
+        "groups": [template_group_to_dict(group) for group in groups],
+        "messages": [
+            {"id": message.id, "text": message.text, "date": message.date}
+            for message in messages
+        ],
+    }
     _publish(publisher, channel_id, "complete", len(groups))
     return payload
 

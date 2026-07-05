@@ -1,0 +1,70 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { startMine, streamMineProgress } from './mineApi.js'
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+beforeEach(() => {
+  globalThis.fetch = vi.fn()
+})
+
+describe('mineApi', () => {
+  it('starts a mine job with bearer auth', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:mine' }, 202))
+
+    const body = await startMine('jwt-token', '7')
+
+    expect(body.jobId).toBe('user:7:mine')
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mine', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
+  it('streams mine progress with the token in the query string', () => {
+    const events = []
+    const onProgress = vi.fn()
+    const onDone = vi.fn()
+
+    class FakeEventSource {
+      constructor(url) {
+        this.url = url
+        this.closed = false
+        this.listeners = {}
+        events.push(this)
+      }
+
+      addEventListener(type, listener) {
+        this.listeners[type] = listener
+      }
+
+      close() {
+        this.closed = true
+      }
+
+      emit(type, data) {
+        this.listeners[type]({ data: JSON.stringify(data) })
+      }
+    }
+
+    globalThis.EventSource = FakeEventSource
+
+    streamMineProgress('jwt-token', '7', { onProgress, onDone })
+    events[0].emit('progress', { stage: 'extracting', count: 42 })
+    events[0].emit('done', { groups: [{ template_key: 'tpl_x' }], messages: [] })
+
+    expect(events[0].url).toBe(
+      'http://localhost:8000/feeds/7/mine/progress?token=jwt-token'
+    )
+    expect(onProgress).toHaveBeenCalledWith({ stage: 'extracting', count: 42 })
+    expect(onDone).toHaveBeenCalledWith({
+      groups: [{ template_key: 'tpl_x' }],
+      messages: []
+    })
+    expect(events[0].closed).toBe(true)
+  })
+})

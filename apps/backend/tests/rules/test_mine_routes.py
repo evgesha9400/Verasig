@@ -65,13 +65,15 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
     assert len(result["groups"]) >= 1
     group = result["groups"][0]
     assert {"template_key", "count", "suggested_action", "examples"} <= set(group)
+    # Raw messages ride along for the browser's verify audit preview.
+    assert [m["id"] for m in result["messages"]] == ["1", "2", "3"]
     # Must be JSON-serializable — it is sent verbatim as the SSE `done` payload.
     json.dumps(result)
 
 
 def test_run_mine_handles_empty_history(monkeypatch):
     publisher, result = _run([], monkeypatch)
-    assert result == {"groups": []}
+    assert result == {"groups": [], "messages": []}
     assert [event["stage"] for event in publisher.events] == [
         "loading",
         "extracting",
