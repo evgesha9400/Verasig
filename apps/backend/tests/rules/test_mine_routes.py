@@ -64,7 +64,11 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
     assert isinstance(result["groups"], list)
     assert len(result["groups"]) >= 1
     group = result["groups"][0]
-    assert {"template_key", "count", "suggested_action", "examples"} <= set(group)
+    # Wire shape is the browser's camelCase JS shape…
+    assert {"templateKey", "count", "suggestedAction", "examples"} <= set(group)
+    assert "normalizedTemplate" in group and "confidenceAvg" in group
+    # …except intentDistribution's inner keys, which the UI reads verbatim.
+    assert set(group["intentDistribution"]) >= {"new_signal", "update"}
     # Raw messages ride along for the browser's verify audit preview.
     assert [m["id"] for m in result["messages"]] == ["1", "2", "3"]
     # Must be JSON-serializable — it is sent verbatim as the SSE `done` payload.

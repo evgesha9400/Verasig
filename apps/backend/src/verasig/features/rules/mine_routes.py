@@ -48,6 +48,28 @@ MINE_STAGE_BY_KEY = {
 }
 
 
+def _to_camel(snake: str) -> str:
+    head, *rest = snake.split("_")
+    return head + "".join(word[:1].upper() + word[1:] for word in rest)
+
+
+# The browser consumes the miner's JS camelCase shape. One exception:
+# intentDistribution's inner keys are a fixed enum read verbatim (new_signal, …),
+# so camelize that key but leave its value's keys untouched.
+_PRESERVE_VALUE_KEYS = {"intent_distribution"}
+
+
+def _camelize(value):
+    if isinstance(value, dict):
+        return {
+            _to_camel(key): inner if key in _PRESERVE_VALUE_KEYS else _camelize(inner)
+            for key, inner in value.items()
+        }
+    if isinstance(value, list):
+        return [_camelize(item) for item in value]
+    return value
+
+
 def mine_job_key(user_id: UUID, channel_id: int) -> str:
     return f"{user_id}:{channel_id}:mine"
 
@@ -105,7 +127,7 @@ async def _run_mine(
     # Carry the raw messages too: the browser's verify audit re-runs the parser
     # over the full history (a client-side preview of the server-side confirm).
     payload = {
-        "groups": [template_group_to_dict(group) for group in groups],
+        "groups": [_camelize(template_group_to_dict(group)) for group in groups],
         "messages": [
             {"id": message.id, "text": message.text, "date": message.date}
             for message in messages
