@@ -99,7 +99,7 @@ def _seed_feed_with_full_capture(session_factory) -> object:
         return account.id
 
 
-async def test_guard_and_wipe_purges_capture_but_keeps_rules_and_runs(
+async def test_guard_and_wipe_purges_capture_but_keeps_evidence_and_runs(
     session_factory,
 ):
     user_id = _seed_feed_with_full_capture(session_factory)

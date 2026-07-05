@@ -57,6 +57,11 @@ def upsert_deletion_evidence(
             "first_seen_at": statement.excluded.first_seen_at,
             "was_signal_candidate": statement.excluded.was_signal_candidate,
         },
+        # Refresh only on the SUSPECTED->CONFIRMED upgrade. An already-CONFIRMED
+        # row's `was_signal_candidate` is fixed at first confirmation — fine for the
+        # wired `Rescan`, which only runs post-mine so candidacy is already known. A
+        # future live-delete path that could CONFIRM *before* mining would need an
+        # explicit recompute (the rule-era recompute is gone — ADR 0016).
         where=(
             (DeletedSignalEvidenceRow.confidence == "SUSPECTED")
             & (statement.excluded.confidence == "CONFIRMED")
