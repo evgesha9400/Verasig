@@ -395,10 +395,9 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onContinueToVerify={() => setScreen('verify')}
           onBackToReview={() => setScreen('review')}
           onFinish={routeAfterVerify}
-          onKeepVerified={() => {
-            stopAfterVerify()
-            void refreshSources().catch(() => {})
-          }}
+          onKeepVerified={(acceptedTemplateKeys) =>
+            stopAfterVerify(acceptedTemplateKeys)
+          }
         />
       )
     } else if (

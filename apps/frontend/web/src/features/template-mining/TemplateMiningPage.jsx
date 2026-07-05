@@ -387,8 +387,12 @@ export function TemplateMiningPage({
             messages={result.messages}
             rules={rules}
             hasAccepted={acceptedGroups.length > 0}
-            onFinish={onFinish}
-            onKeepVerified={onKeepVerified}
+            onFinish={() =>
+              onFinish?.(acceptedGroups.map((group) => group.templateKey))
+            }
+            onKeepVerified={() =>
+              onKeepVerified?.(acceptedGroups.map((group) => group.templateKey))
+            }
           />
         </>
       )}

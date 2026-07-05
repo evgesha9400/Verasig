@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { startMine, streamMineProgress } from './mineApi.js'
+import { confirmMining, startMine, streamMineProgress } from './mineApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -23,6 +23,31 @@ describe('mineApi', () => {
       method: 'POST',
       headers: { Authorization: 'Bearer jwt-token' }
     })
+  })
+
+  it('confirms mining with the accepted template keys', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({
+        feedStatus: 'verified',
+        templatesAccepted: 2,
+        signalsExtracted: 5
+      })
+    )
+
+    const body = await confirmMining('jwt-token', '7', ['tpl_a', 'tpl_b'])
+
+    expect(body.feedStatus).toBe('verified')
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/feeds/7/mining/confirm',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer jwt-token'
+        },
+        body: JSON.stringify({ acceptedTemplateKeys: ['tpl_a', 'tpl_b'] })
+      }
+    )
   })
 
   it('streams mine progress with the token in the query string', () => {

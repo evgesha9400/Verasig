@@ -3,6 +3,7 @@ import { listFeeds } from '../../shared/api/feedsApi.js'
 import { getTelegramStatus } from '../../shared/api/telegramApi.js'
 import { PIPELINE_STEPS } from '../../domain/workflow/pipelineSteps.js'
 import { landingStepForFeed } from '../../domain/workflow/stepAccess.js'
+import { confirmMining } from '../../shared/api/mineApi.js'
 import { FEEDS } from '../../domain/demo-data/seed.js'
 
 const LS_KEY = 'vrs-proto-state-2'
@@ -301,7 +302,24 @@ export function useWorkflowState(authToken, plan) {
     }
   }
 
-  function stopAfterVerify() {
+  // Persist the accepted templates server-side: the backend re-mines (identical
+  // template keys by parity), extracts + stores the signals, and marks the feed
+  // verified. Optimistic UI patches first; this reconciles from the server.
+  async function persistVerified(acceptedTemplateKeys) {
+    if (!authToken || !activeFeedId) return
+    try {
+      await confirmMining(authToken, activeFeedId, acceptedTemplateKeys || [])
+      await refreshSources()
+    } catch (error) {
+      fireToast(
+        'rejected',
+        'Could not save verification',
+        error?.message || 'Try again in a moment.'
+      )
+    }
+  }
+
+  function stopAfterVerify(acceptedTemplateKeys = []) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
     patchFeed(activeFeedId, { status: 'verified', hasRisk: true })
     setScreen('feeds')
@@ -310,11 +328,13 @@ export function useWorkflowState(authToken, plan) {
       'Source verified',
       `${current ? current.name : 'Feed'} is verified and saved. Backtest it any time from the feed options.`
     )
+    void persistVerified(acceptedTemplateKeys)
   }
 
-  function routeAfterVerify() {
+  function routeAfterVerify(acceptedTemplateKeys = []) {
     patchFeed(activeFeedId, { status: 'verified', hasRisk: true })
     setScreen('exchange')
+    void persistVerified(acceptedTemplateKeys)
   }
 
   function backtestFeed(feed) {
