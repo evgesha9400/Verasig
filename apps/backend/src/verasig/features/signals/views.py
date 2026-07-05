@@ -5,7 +5,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from verasig.domain.account import Plan
-from verasig.domain.label import LabelKind
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
@@ -15,7 +14,6 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.feed_views import feed_initials, feed_tint
-from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import (
     event_repository,
     lifecycle_link_repository,
@@ -38,7 +36,7 @@ def present_signals(
     status: str | None = None,
     plan: Plan = Plan.DESK,
 ) -> dict:
-    signals, orphan_mods = _project_user_signals(session, user_id, feed_id)
+    signals = _project_user_signals(session, user_id, feed_id)
     if status is not None:
         signals = [signal for signal in signals if signal["status"] == status]
     limit_reached = plan is Plan.OBSERVER and len(signals) > OBSERVER_SIGNAL_LIMIT
@@ -46,7 +44,7 @@ def present_signals(
         signals = signals[:OBSERVER_SIGNAL_LIMIT]
     return {
         "signals": signals,
-        "orphanMods": orphan_mods,
+        "orphanMods": [],
         "limitReached": limit_reached,
     }
 
@@ -79,7 +77,7 @@ def link_modifier(
 
 def _project_user_signals(
     session: Session, user_id: UUID, feed_id: str | None
-) -> tuple[list[dict], list[dict]]:
+) -> list[dict]:
     feeds = [
         feed
         for feed in feed_repository.read_feeds(session, user_id)
@@ -89,19 +87,16 @@ def _project_user_signals(
         feeds = [feed for feed in feeds if str(feed.external_id) == feed_id]
     latest_results = backtest_repository.read_latest_results(session, user_id)
     signals: list[dict] = []
-    orphan_mods: list[dict] = []
     for feed in feeds:
-        projected, orphans = _project_channel(
-            session, user_id, feed, latest_results.get(feed.external_id)
+        signals.extend(
+            _project_channel(
+                session, user_id, feed, latest_results.get(feed.external_id)
+            )
         )
-        signals.extend(projected)
-        orphan_mods.extend(orphans)
-    return signals, orphan_mods
+    return signals
 
 
-def _project_channel(
-    session: Session, user_id: UUID, feed, result
-) -> tuple[list[dict], list[dict]]:
+def _project_channel(session: Session, user_id: UUID, feed, result) -> list[dict]:
     channel_id = feed.external_id
     materialize_missing_signal_outcomes(session, user_id, channel_id)
     session.flush()
@@ -128,7 +123,7 @@ def _project_channel(
     }
     outcome_by_signal_id = _outcomes_by_signal_id(result)
     deleted_message_ids = _deleted_message_ids(session, user_id, channel_id)
-    rows = [
+    return [
         _signal_row(
             item,
             feed,
@@ -141,10 +136,6 @@ def _project_channel(
         )
         for item in folded
     ]
-    used_message_ids = {
-        step.source_message_id for item in folded for step in item.timeline
-    }
-    return rows, _orphan_mods(session, user_id, feed, messages, rows, used_message_ids)
 
 
 def _signal_row(
@@ -267,59 +258,6 @@ def _outcome_fields(outcome: dict | None, deleted: bool) -> dict:
     }
 
 
-def _orphan_mods(
-    session: Session,
-    user_id: UUID,
-    feed,
-    messages: list[RawTelegramMessage],
-    signals: list[dict],
-    used_message_ids: set[int],
-) -> list[dict]:
-    channel_id = feed.external_id
-    labels = [
-        label
-        for label in rule_repository.read_labels(session, channel_id, user_id)
-        if label.label is LabelKind.MODIFIER
-        and label.message_id not in used_message_ids
-    ]
-    messages_by_id = {message.message_id: message for message in messages}
-    return [
-        _orphan_row(feed, messages_by_id[label.message_id], signals)
-        for label in labels
-        if label.message_id in messages_by_id
-    ]
-
-
-def _orphan_row(feed, message: RawTelegramMessage, signals: list[dict]) -> dict:
-    return {
-        "id": str(message.message_id),
-        **_feed_fields(feed),
-        "symbol": _suggested_symbol(message.text, signals),
-        "date": format_short(message.posted_at),
-        "time": format_time(message.posted_at),
-        "text": message.text,
-        "suggestId": _suggested_signal_id(message.text, signals),
-        "reason": "No reply link found",
-    }
-
-
-def _suggested_signal_id(text: str | None, signals: list[dict]) -> str | None:
-    symbol = _suggested_symbol(text, signals)
-    for signal in reversed(signals):
-        if signal["symbol"] == symbol:
-            return signal["id"]
-    return signals[-1]["id"] if signals else None
-
-
-def _suggested_symbol(text: str | None, signals: list[dict]) -> str | None:
-    normalized = (text or "").upper()
-    for signal in reversed(signals):
-        base = signal["symbol"].removesuffix("USDT")
-        if base in normalized:
-            return signal["symbol"]
-    return signals[-1]["symbol"] if signals else None
-
-
 def _outcomes_by_signal_id(result) -> dict[str, dict]:
     if result is None:
         return {}
@@ -327,18 +265,12 @@ def _outcomes_by_signal_id(result) -> dict[str, dict]:
 
 
 def _deleted_message_ids(session: Session, user_id: UUID, channel_id: int) -> set[int]:
-    signal_label_ids = {
-        label.message_id
-        for label in rule_repository.read_labels(session, channel_id, user_id)
-        if label.label is LabelKind.SIGNAL
-    }
     return {
         evidence.message_id
         for evidence in deletion_repository.read_deletion_evidence(
             session, user_id, channel_id
         )
-        if evidence.confidence.value == "CONFIRMED"
-        and evidence.message_id in signal_label_ids
+        if evidence.confidence.value == "CONFIRMED" and evidence.was_signal_candidate
     }
 
 

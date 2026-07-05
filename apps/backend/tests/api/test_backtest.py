@@ -11,7 +11,6 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.simulation import Kline
@@ -205,18 +204,6 @@ def _latest_backtest(app, user_id: UUID):
 
 def _seed_confirmed_signal_deletion(app, user_id: UUID) -> None:
     with app.state.session_factory() as session:
-        rule_repository.upsert_labels(
-            session,
-            [
-                GoldenLabel(
-                    user_id=user_id,
-                    channel_id=7,
-                    message_id=1,
-                    label=LabelKind.SIGNAL,
-                    labeled_at=_BASE,
-                )
-            ],
-        )
         deletion_repository.upsert_deletion_evidence(
             session,
             user_id,

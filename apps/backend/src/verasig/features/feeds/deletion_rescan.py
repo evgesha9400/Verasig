@@ -28,7 +28,6 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.deletion_diff import detect_deletions
-from verasig.features.rules.repository import read_labels, read_rule_feed_ids
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +74,10 @@ async def rescan(
     )
     _guard_live_snapshot(live_ids, external_id)
     previous = _read_previous_evidence(session_factory, user_id, external_id)
-    labels = _read_labels_by_message_id(session_factory, user_id, external_id)
     evidence = _detect(session_factory, user_id, external_id, live_ids)
     written = _persist(session_factory, user_id, evidence)
     summary = _read_deletion_summary(session_factory, user_id, external_id)
-    return _tally(external_id, evidence, written, previous, labels, summary)
+    return _tally(external_id, evidence, written, previous, summary)
 
 
 def _resolve_external_id(
@@ -135,21 +133,12 @@ def _read_previous_evidence(
     return {row.message_id: row for row in rows}
 
 
-def _read_labels_by_message_id(
-    session_factory: sessionmaker, user_id: UUID, external_id: int
-) -> dict[int, str]:
-    with session_factory() as session:
-        labels = read_labels(session, external_id, user_id)
-    return {label.message_id: label.label.value for label in labels}
-
-
 def _read_deletion_summary(
     session_factory: sessionmaker, user_id: UUID, external_id: int
 ) -> deletion_repository.DeletionSummary:
     with session_factory() as session:
-        rule_backed = read_rule_feed_ids(session, user_id, [external_id])
         summaries = deletion_repository.summarize_deletions(
-            session, user_id, [external_id], rule_backed_ids=frozenset(rule_backed)
+            session, user_id, [external_id]
         )
     return summaries[external_id]
 
@@ -178,24 +167,22 @@ def _is_new_suspected(
 def _count_new_deleted_signals(
     evidence: list[DeletedSignalEvidence],
     previous: dict[int, DeletedSignalEvidence],
-    labels: dict[int, str],
 ) -> int:
     return sum(
         1
         for item in evidence
-        if _is_new_confirmed(item, previous) and labels.get(item.message_id) == "signal"
+        if _is_new_confirmed(item, previous) and item.was_signal_candidate
     )
 
 
 def _count_new_deleted_non_signals(
     evidence: list[DeletedSignalEvidence],
     previous: dict[int, DeletedSignalEvidence],
-    labels: dict[int, str],
 ) -> int:
     return sum(
         1
         for item in evidence
-        if _is_new_confirmed(item, previous) and labels.get(item.message_id) != "signal"
+        if _is_new_confirmed(item, previous) and not item.was_signal_candidate
     )
 
 
@@ -211,7 +198,6 @@ def _tally(
     evidence: list[DeletedSignalEvidence],
     written: int,
     previous: dict[int, DeletedSignalEvidence],
-    labels: dict[int, str],
     summary: deletion_repository.DeletionSummary,
 ) -> RescanResult:
     confirmed = sum(
@@ -222,10 +208,8 @@ def _tally(
         confirmed=confirmed,
         suspected=len(evidence) - confirmed,
         written=written,
-        new_deleted_signal_count=_count_new_deleted_signals(evidence, previous, labels),
-        new_deleted_non_signal_count=_count_new_deleted_non_signals(
-            evidence, previous, labels
-        ),
+        new_deleted_signal_count=_count_new_deleted_signals(evidence, previous),
+        new_deleted_non_signal_count=_count_new_deleted_non_signals(evidence, previous),
         new_suspected_gap_count=_count_new_suspected_gaps(evidence, previous),
         total_deleted_count=summary.deleted_count,
         signal_deletion=summary.signal_deletion,

@@ -4,7 +4,6 @@ The domain `DeletedSignalEvidence` speaks `channel_id`/`message_id`; storage
 speaks `external_id`/`external_message_id` and is user-owned.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -13,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.deletion import DeletedSignalEvidence
-from verasig.storage.models import DeletedSignalEvidenceRow, GoldenLabelRow
+from verasig.storage.models import DeletedSignalEvidenceRow
 
 
 @dataclass(frozen=True)
@@ -80,35 +79,6 @@ def _row_to_deletion(row: DeletedSignalEvidenceRow) -> DeletedSignalEvidence:
     )
 
 
-def update_evidence_candidacy(
-    session: Session,
-    user_id: UUID,
-    external_id: int,
-    decide: Callable[[int, str | None], bool],
-) -> int:
-    """Recompute `was_signal_candidate` for CONFIRMED evidence from `decide`.
-
-    `decide(message_id, original_text)` is rule-authoritative (ADR 0015). Only
-    CONFIRMED rows carry text; post-wipe they have no surviving `raw_message`, so
-    `decide` must fall back to the retained `original_text`. Returns rows changed.
-    """
-    rows = session.scalars(
-        select(DeletedSignalEvidenceRow).where(
-            DeletedSignalEvidenceRow.user_id == user_id,
-            DeletedSignalEvidenceRow.external_id == external_id,
-            DeletedSignalEvidenceRow.confidence == "CONFIRMED",
-        )
-    ).all()
-    changed = 0
-    for row in rows:
-        decided = decide(row.external_message_id, row.original_text)
-        if row.was_signal_candidate != decided:
-            row.was_signal_candidate = decided
-            changed += 1
-    session.flush()
-    return changed
-
-
 def read_deletion_evidence(
     session: Session, user_id: UUID, external_id: int
 ) -> list[DeletedSignalEvidence]:
@@ -121,29 +91,20 @@ def read_deletion_evidence(
     return [_row_to_deletion(row) for row in rows]
 
 
-def _is_signal_deletion(
-    confidence: str,
-    was_candidate: bool,
-    label: str | None,
-    external_id: int,
-    rule_backed_ids: frozenset[int],
-) -> bool:
-    """A CONFIRMED deletion counts as a signal via a golden label (legacy) or,
-    once the feed has saved rules, its rule-authoritative candidacy (ADR 0015).
-    The rule gate stops recall-first seed candidacy flooring the score before the
-    operator has approved any rules."""
-    if confidence != "CONFIRMED":
-        return False
-    if label == "signal":
-        return True
-    return bool(was_candidate) and external_id in rule_backed_ids
+def _is_signal_deletion(confidence: str, was_candidate: bool) -> bool:
+    """A CONFIRMED deletion of a signal candidate is a signal deletion (ADR 0016).
+
+    `was_signal_candidate` is authoritative: it is set at detection time iff the
+    deleted message had a `RawSignalEvent`, which only the miner writes on
+    Confirm — so no unconfirmed candidacy can reach here.
+    """
+    return confidence == "CONFIRMED" and bool(was_candidate)
 
 
 def summarize_deletions(
     session: Session,
     user_id: UUID,
     external_ids: list[int],
-    rule_backed_ids: frozenset[int] = frozenset(),
 ) -> dict[int, DeletionSummary]:
     if not external_ids:
         return {}
@@ -152,30 +113,17 @@ def summarize_deletions(
             DeletedSignalEvidenceRow.external_id,
             DeletedSignalEvidenceRow.confidence,
             DeletedSignalEvidenceRow.was_signal_candidate,
-            GoldenLabelRow.label,
-        )
-        .outerjoin(
-            GoldenLabelRow,
-            (GoldenLabelRow.user_id == DeletedSignalEvidenceRow.user_id)
-            & (GoldenLabelRow.external_id == DeletedSignalEvidenceRow.external_id)
-            & (
-                GoldenLabelRow.external_message_id
-                == DeletedSignalEvidenceRow.external_message_id
-            ),
-        )
-        .where(
+        ).where(
             DeletedSignalEvidenceRow.user_id == user_id,
             DeletedSignalEvidenceRow.external_id.in_(external_ids),
         )
     ).all()
     summaries = {external_id: DeletionSummary() for external_id in external_ids}
-    for external_id, confidence, was_candidate, label in rows:
+    for external_id, confidence, was_candidate in rows:
         if confidence != "CONFIRMED":
             continue  # suspected id-gaps are internal-only (hygiene), never surfaced
         current = summaries[external_id]
-        is_signal = _is_signal_deletion(
-            confidence, was_candidate, label, external_id, frozenset(rule_backed_ids)
-        )
+        is_signal = _is_signal_deletion(confidence, was_candidate)
         summaries[external_id] = DeletionSummary(
             signal_deletion=current.signal_deletion or is_signal,
             deleted_count=current.deleted_count + 1,

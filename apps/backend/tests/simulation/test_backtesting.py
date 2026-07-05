@@ -12,7 +12,6 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.parser_rule import ParserRule
 from verasig.domain.risk_config import RiskConfig
@@ -170,17 +169,14 @@ def test_run_backtest_extracts_missing_candidates_and_persists_summary(session_f
     assert subscription.status == "analyzed"
 
 
-def test_load_folded_signals_scores_only_signal_labelled_deletions(session_factory):
+def test_load_folded_signals_uses_stored_deletion_candidacy(session_factory):
     account = _seed(session_factory)
     _insert_deleted_candidate(session_factory, account.id)
-    _label_message(session_factory, account.id, LabelKind.NOISE)
 
-    noise_inputs = load_folded_signals(session_factory, account.id, 7)
-    _label_message(session_factory, account.id, LabelKind.SIGNAL)
-    signal_inputs = load_folded_signals(session_factory, account.id, 7)
+    inputs = load_folded_signals(session_factory, account.id, 7)
 
-    assert noise_inputs.deletions[0].was_signal_candidate is False
-    assert signal_inputs.deletions[0].was_signal_candidate is True
+    # candidacy comes from the stored evidence (miner-set), not a re-derived label
+    assert inputs.deletions[0].was_signal_candidate is True
 
 
 def _seed(session_factory) -> UserAccount:
@@ -208,23 +204,6 @@ def _insert_deleted_candidate(session_factory, user_id: UUID) -> None:
                     method=DeletionMethod.SNAPSHOT_DIFF,
                     detected_at=_BASE,
                     was_signal_candidate=True,
-                )
-            ],
-        )
-        session.commit()
-
-
-def _label_message(session_factory, user_id: UUID, label: LabelKind) -> None:
-    with session_factory() as session:
-        rule_repository.upsert_labels(
-            session,
-            [
-                GoldenLabel(
-                    user_id=user_id,
-                    channel_id=7,
-                    message_id=1,
-                    label=label,
-                    labeled_at=_BASE,
                 )
             ],
         )

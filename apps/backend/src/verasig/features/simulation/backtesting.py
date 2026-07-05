@@ -7,7 +7,6 @@ from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.domain.event import RawSignalEvent
-from verasig.domain.label import LabelKind
 from verasig.domain.market_ports import MarketData
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
@@ -20,7 +19,6 @@ from verasig.features.feeds import (
 )
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
-from verasig.features.rules.repository import read_labels
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.fold import fold
 from verasig.features.signals.materialization import materialize_missing_signal_outcomes
@@ -81,11 +79,6 @@ def load_folded_signals(
         deletions = deletion_repository.read_deletion_evidence(
             session, user_id, channel_id
         )
-        signal_label_ids = {
-            label.message_id
-            for label in read_labels(session, channel_id, user_id)
-            if label.label is LabelKind.SIGNAL
-        }
         message_count = message_repository.count_messages(session, user_id, channel_id)
     return BacktestInputs(
         channel=channel,
@@ -94,20 +87,9 @@ def load_folded_signals(
         events=events,
         signals=signals,
         unrecognized=unrecognized,
-        deletions=_scoreable_deletions(deletions, signal_label_ids),
+        deletions=deletions,
         folded_signals=fold(signals, events, messages),
     )
-
-
-def _scoreable_deletions(
-    deletions: list[DeletedSignalEvidence], signal_label_ids: set[int]
-) -> list[DeletedSignalEvidence]:
-    return [
-        deletion.model_copy(
-            update={"was_signal_candidate": deletion.message_id in signal_label_ids}
-        )
-        for deletion in deletions
-    ]
 
 
 def simulate_outcomes(

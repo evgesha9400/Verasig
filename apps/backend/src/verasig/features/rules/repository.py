@@ -84,30 +84,6 @@ def read_filter_rules(
     ]
 
 
-def read_rule_feed_ids(
-    session: Session, user_id: UUID, channel_ids: list[int]
-) -> set[int]:
-    if not channel_ids:
-        return set()
-    filter_ids = session.scalars(
-        select(FilterRuleRow.external_id).where(
-            FilterRuleRow.user_id == user_id,
-            FilterRuleRow.external_id.in_(channel_ids),
-        )
-    ).all()
-    parser_ids = session.scalars(
-        select(ParserRuleRow.external_id).where(
-            ParserRuleRow.user_id == user_id,
-            ParserRuleRow.external_id.in_(channel_ids),
-        )
-    ).all()
-    return {
-        channel_id
-        for channel_id in [*filter_ids, *parser_ids]
-        if channel_id is not None
-    }
-
-
 def next_rule_version(session: Session, user_id: UUID, channel_id: int) -> int:
     """One past the highest version across both rule tables for this feed.
 

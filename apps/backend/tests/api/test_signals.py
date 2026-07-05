@@ -57,7 +57,7 @@ def test_signal_routes_list_detail_filter_and_link_mod(client, app):
 
     assert listed.status_code == 200
     assert listed.json()["signals"][0]["id"] == str(_SIGNAL_ID)
-    assert listed.json()["orphanMods"][0]["id"] == "3"
+    assert listed.json()["orphanMods"] == []
     assert detail.status_code == 200
     assert linked.status_code == 200
     assert linked.json()["mods"][-1]["id"] == "3"
