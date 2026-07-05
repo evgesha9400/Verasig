@@ -75,7 +75,6 @@ def _upsert_feed(
         source_id=_require_source_id(session, user_id),
         title=channel.title,
         status="new",
-        verify_attempt=1,
         captured_through_external_message_id=None,
         metadata=_metadata(channel),
         first_seen_at=channel.first_seen_at,

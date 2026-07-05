@@ -4,9 +4,9 @@
 NOT secure deletion evidence — that is the deliberate, template-gated `Check gaps`
 rescan (`deletion_rescan.py`), a separate operation. Before deleting anything the
 wipe verifies the channel still resolves, so it never destroys a capture we could
-not refill. What survives the wipe: durable `DeletedSignalEvidence` (ADR 0008),
-distilled rules, and the backfill-run history — all FK to `feed`, not
-`raw_message`. The recapture itself is the normal backfill stream that follows,
+not refill. What survives the wipe: durable `DeletedSignalEvidence` (ADR 0008) and
+the backfill-run history — both FK to `feed`, not `raw_message`. The recapture
+itself is the normal backfill stream that follows,
 bounded by the feed's history depth.
 """
 

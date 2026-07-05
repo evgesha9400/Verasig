@@ -38,5 +38,4 @@ class RawSignalEvent(BaseModel):
     candidate_text: str  # exact slice fed to extraction (verbatim message text)
     materialized_by: MaterializationPath
     matched_reasons: list[MatchReason] = Field(default_factory=list)
-    filter_rule_id: str | None = None
     created_at: datetime = Field(default_factory=_now)

@@ -54,10 +54,10 @@ def _insert_feed(session) -> None:
         text(
             """
             INSERT INTO feed
-                (user_id, external_id, source_id, title, status, verify_attempt,
+                (user_id, external_id, source_id, title, status,
                  metadata, first_seen_at, added_at)
             VALUES
-                (:user_id, :external_id, :source_id, 'Pilot', 'new', 1,
+                (:user_id, :external_id, :source_id, 'Pilot', 'new',
                  CAST('{}' AS jsonb), :now, :now)
             """
         ),
@@ -102,10 +102,12 @@ def test_null_user_id_insert_fails_at_db_level(db_session):
         db_session.execute(
             text(
                 """
-                INSERT INTO golden_label
-                    (id, user_id, external_id, external_message_id, label, labeled_at)
+                INSERT INTO raw_signal_event
+                    (id, user_id, external_id, external_message_id, candidate_text,
+                     materialized_by, matched_reasons, created_at)
                 VALUES
-                    (:id, NULL, :external_id, 1, 'signal', :now)
+                    (:id, NULL, :external_id, 1, 'BTC long', 'SEED_HEURISTIC',
+                     CAST('[]' AS jsonb), :now)
                 """
             ),
             {"id": uuid4(), "external_id": _CHANNEL_ID, "now": _NOW},
@@ -152,25 +154,6 @@ def test_orphan_captured_message_links_fail_at_db_level(db_session):
                 VALUES
                     (:id, :user_id, :external_id, 404, 'BTC long', 'SEED_HEURISTIC',
                      CAST('[]' AS jsonb), :now)
-                """
-            ),
-            {
-                "id": uuid4(),
-                "user_id": _USER_ID,
-                "external_id": _CHANNEL_ID,
-                "now": _NOW,
-            },
-        )
-    db_session.rollback()
-
-    with pytest.raises(IntegrityError):
-        db_session.execute(
-            text(
-                """
-                INSERT INTO golden_label
-                    (id, user_id, external_id, external_message_id, label, labeled_at)
-                VALUES
-                    (:id, :user_id, :external_id, 404, 'signal', :now)
                 """
             ),
             {

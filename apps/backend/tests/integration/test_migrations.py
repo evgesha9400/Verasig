@@ -39,23 +39,12 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     columns_by_table = {
         table: {column["name"] for column in inspector.get_columns(table)}
         for table in (
-            "golden_label",
-            "filter_rule",
-            "parser_rule",
             "extracted_signal",
             "unrecognized_signal",
-            "parser_drift_warning",
-            "filter_drift_warning",
         )
     }
-    assert {"user_id", "label"} <= columns_by_table["golden_label"]
-    assert "is_signal" not in columns_by_table["golden_label"]
-    assert {"user_id", "display"} <= columns_by_table["filter_rule"]
-    assert {"user_id"} <= columns_by_table["parser_rule"]
     assert {"user_id"} <= columns_by_table["extracted_signal"]
     assert {"user_id"} <= columns_by_table["unrecognized_signal"]
-    assert {"user_id"} <= columns_by_table["parser_drift_warning"]
-    assert {"user_id"} <= columns_by_table["filter_drift_warning"]
 
     backfill_columns = {
         column["name"] for column in inspector.get_columns("backfill_job_run")
@@ -83,13 +72,8 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     inspector = inspect(create_engine(pg_url, future=True))
 
     required_user_tables = {
-        "golden_label",
-        "filter_rule",
-        "parser_rule",
         "extracted_signal",
         "unrecognized_signal",
-        "parser_drift_warning",
-        "filter_drift_warning",
     }
     nullable_user_tables = {
         table
@@ -105,12 +89,8 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
             "backtest_result",
             "extracted_signal",
             "unrecognized_signal",
-            "parser_rule",
-            "filter_rule",
             "deleted_signal_evidence",
             "backfill_job_run",
-            "parser_drift_warning",
-            "filter_drift_warning",
         )
         for index in inspector.get_indexes(table)
     }
@@ -118,19 +98,14 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         "ix_backtest_result_user_channel_completed",
         "ix_extracted_signal_user_channel",
         "ix_unrecognized_signal_user_event",
-        "ix_parser_rule_user_channel",
-        "ix_filter_rule_user_channel",
         "ix_deleted_signal_evidence_channel",
         "ix_backfill_job_run_user_channel_started",
         "ix_backfill_job_run_status",
-        "ix_parser_drift_warning_user_channel",
-        "ix_filter_drift_warning_user_channel",
     } <= index_names
 
     check_names = {
         check["name"]
         for table in (
-            "golden_label",
             "extracted_signal",
             "deleted_signal_evidence",
             "backfill_job_run",
@@ -139,7 +114,6 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         for check in inspector.get_check_constraints(table)
     }
     assert {
-        "ck_golden_label_label",
         "ck_extracted_signal_side",
         "ck_extracted_signal_event_type",
         "ck_extracted_signal_extraction_method",
@@ -155,16 +129,12 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         foreign_key["name"]
         for table in (
             "raw_signal_event",
-            "golden_label",
-            "filter_drift_warning",
             "lifecycle_link",
         )
         for foreign_key in inspector.get_foreign_keys(table)
     }
     assert {
         "fk_raw_signal_event_message",
-        "fk_golden_label_message",
-        "fk_filter_drift_warning_message",
         "fk_lifecycle_link_root_signal",
     } <= foreign_key_names
 
@@ -229,12 +199,7 @@ _USER_ACCOUNT_FK_TABLES = (
     "extracted_signal",
     "feed",
     "feed_risk_config",
-    "filter_drift_warning",
-    "filter_rule",
-    "golden_label",
     "lifecycle_link",
-    "parser_drift_warning",
-    "parser_rule",
     "unrecognized_signal",
 )
 

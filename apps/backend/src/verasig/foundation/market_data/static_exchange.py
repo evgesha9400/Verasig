@@ -8,8 +8,8 @@ from verasig.domain.market_ports import Exchange
 
 _QUOTE_SUFFIXES = ("USDT", "USDC", "USD", "PERP")
 
-# Bundled cold-start seed: major Bybit linear-perp base coins (recall-first; the
-# distilled FilterRule replaces this once a channel is labeled).
+# Bundled cold-start seed: major Bybit linear-perp base coins (recall-first — a
+# broad base-symbol universe for symbol recognition).
 _SEED_BASE_SYMBOLS = frozenset(
     {
         "BTC",
