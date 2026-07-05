@@ -186,17 +186,6 @@ def set_history_depth(
     return row
 
 
-def bump_verify_attempt(
-    session: Session, user_id: UUID, external_id: int
-) -> int | None:
-    row = read_feed(session, user_id, external_id)
-    if row is None:
-        return None
-    row.verify_attempt += 1
-    session.flush()
-    return row.verify_attempt
-
-
 def count_feeds(session: Session, user_id: UUID) -> int:
     return session.scalar(
         select(func.count()).select_from(FeedRow).where(FeedRow.user_id == user_id)

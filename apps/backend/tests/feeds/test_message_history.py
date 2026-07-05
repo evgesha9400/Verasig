@@ -6,12 +6,10 @@ from seed import insert_source
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import feed_repository, message_repository
 from verasig.features.feeds.message_views import read_history
-from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository
 
 
@@ -105,27 +103,14 @@ def _seed(db_session):
     return account
 
 
-def test_read_history_returns_every_message_regardless_of_label_or_candidacy(
-    db_session,
-):
+def test_read_history_returns_every_message_regardless_of_candidacy(db_session):
     account = _seed(db_session)
-    # Labeling a message must NOT drop it from the full history (unlike the
-    # labeling sample, which excludes labeled + non-candidate messages).
-    rule_repository.upsert_labels(
-        db_session,
-        [
-            GoldenLabel(
-                user_id=account.id, channel_id=7, message_id=1, label=LabelKind.NOISE
-            )
-        ],
-    )
-    db_session.commit()
 
     channel = feed_repository.read_feed(db_session, account.id, 7)
     history = read_history(db_session, channel)
 
-    # Every stored message is present, oldest first — including the labeled one
-    # (1) and the non-candidate one (2), which the labeling sample would omit.
+    # Every stored message is present, oldest first — including the
+    # non-candidate one (2).
     assert [message["id"] for message in history] == ["1", "2", "3"]
     assert history[0]["author"] == "Pilot Signals"
     assert history[2]["media"] == "image"

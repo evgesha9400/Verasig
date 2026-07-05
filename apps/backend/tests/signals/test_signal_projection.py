@@ -12,7 +12,6 @@ from verasig.domain.deletion import (
     DeletionMethod,
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
-from verasig.domain.label import GoldenLabel, LabelKind
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.features.accounts import repository as account_repository
@@ -21,7 +20,6 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.rules import repository as rule_repository
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.views import present_signals
 from verasig.features.simulation import repository as backtest_repository
@@ -132,14 +130,6 @@ def _seed(
     )
     event_repository.insert_signal_events(session, _USER_ID, [_event(message_text)])
     outcome_repository.insert_extracted_signals(session, [_signal()], _USER_ID)
-    rule_repository.upsert_labels(
-        session,
-        [
-            GoldenLabel(
-                user_id=_USER_ID, channel_id=7, message_id=3, label=LabelKind.MODIFIER
-            )
-        ],
-    )
     if with_backtest:
         backtest_repository.insert_result(
             session,
