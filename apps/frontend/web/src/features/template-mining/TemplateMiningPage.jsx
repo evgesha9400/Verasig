@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@verasig/design-system'
 import {
-  SAMPLE_MESSAGES,
   FEED_MESSAGES,
   mineTemplateGroups,
   compileRuleFromTemplate,
   applyAcceptedRules
 } from '../../domain/template-mining/index.js'
-import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { MineView } from './MineView.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
@@ -32,20 +30,6 @@ const EMPTY_AUDIT = {
   rejectedCandidates: [],
   rareTemplates: [],
   potentialMisses: []
-}
-
-function parsePasted(text) {
-  return text
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter((block) => block.length > 0)
-    .map((block, index) => ({ id: `paste-${index + 1}`, text: block }))
-}
-
-function resolveStaticMessages(source, pasted) {
-  if (source === 'sample') return SAMPLE_MESSAGES
-  if (source === 'paste') return parsePasted(pasted)
-  return []
 }
 
 function TemplateSection({ title, subtitle, groups, action, cardProps }) {
@@ -89,8 +73,6 @@ export function TemplateMiningPage({
   decisions: controlledDecisions,
   onDecisionsChange
 }) {
-  const [source, setSource] = useState('sample')
-  const [pasted, setPasted] = useState('')
   const [result, setResult] = useState(null) // { groups, messages }
   const [internalDecisions, setInternalDecisions] = useState({})
   const [examplesFor, setExamplesFor] = useState(null) // open template's key
@@ -102,11 +84,6 @@ export function TemplateMiningPage({
   // Server-side mining when signed in against a real feed; demo history offline.
   const authenticated = Boolean(authToken && activeFeed?.id && onStartMine)
 
-  const messages = useMemo(
-    () => resolveStaticMessages(source, pasted),
-    [source, pasted]
-  )
-  const pastedCount = useMemo(() => parsePasted(pasted).length, [pasted])
   const groups = useMemo(() => result?.groups ?? [], [result])
 
   // One pass sorts every template into its decision bucket, so the grids, the
@@ -226,10 +203,6 @@ export function TemplateMiningPage({
     )
   }
 
-  function runStaticMining() {
-    finishMining(messages)
-  }
-
   function decide(templateKey, status) {
     setDecisions({ ...decisions, [templateKey]: status })
   }
@@ -294,27 +267,6 @@ export function TemplateMiningPage({
 
       {step === 'review' && (
         <>
-          <details className="vrs-tm-altsource">
-            <summary>Use sample or pasted messages instead</summary>
-            <MiningSourcePanel
-              source={source}
-              onSourceChange={setSource}
-              pasted={pasted}
-              onPastedChange={setPasted}
-              feeds={[]}
-              feedId={null}
-              onFeedChange={() => {}}
-              selectedFeedName={activeFeed?.name}
-              authenticated={Boolean(authToken)}
-              demoFeedCount={FEED_MESSAGES.length}
-              sampleCount={SAMPLE_MESSAGES.length}
-              pastedCount={pastedCount}
-              running={false}
-              canRun={messages.length > 0}
-              onRun={runStaticMining}
-            />
-          </details>
-
           <MiningMetrics metrics={metrics} variant="slim" />
 
           {groups.length === 0 ? (

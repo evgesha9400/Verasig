@@ -116,12 +116,14 @@ describe('TemplateMiningPage', () => {
     expect(onKeepVerified).toHaveBeenCalledTimes(1)
   })
 
-  it('still supports the sample dataset through the alternate-source disclosure', async () => {
-    const user = userEvent.setup()
+  it('no longer offers the alternate-source disclosure', () => {
     renderPage()
-    await user.click(screen.getByText('Sample dataset'))
-    await user.click(screen.getByRole('button', { name: /Run template mining/i }))
-    expect(screen.getByText('Messages scanned')).toBeTruthy()
+    expect(
+      screen.queryByText(/Use sample or pasted messages instead/i)
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: /Run template mining/i })
+    ).toBeNull()
   })
 
   it('never renders NaN', async () => {

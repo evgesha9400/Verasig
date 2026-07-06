@@ -57,57 +57,6 @@
   color: var(--text-on-accent);
 }
 
-/* ---- alternate source disclosure (dev/demo affordance) ---- */
-.vrs-tm-altsource > summary {
-  cursor: pointer;
-  width: fit-content;
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
-}
-.vrs-tm-altsource > summary:hover {
-  color: var(--text-body);
-}
-.vrs-tm-altsource[open] > summary {
-  margin-bottom: var(--space-3);
-}
-
-/* ---- source panel ---- */
-.vrs-tm-source {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.vrs-tm-source__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-.vrs-tm-source__hint {
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  color: var(--text-faint);
-}
-.vrs-tm-source__area {
-  width: 100%;
-  min-height: 8rem; /* 128 — on the 4px grid */
-  resize: vertical;
-  padding: var(--space-3) var(--space-4);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 1.55;
-  color: var(--text-strong);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-}
-.vrs-tm-source__area:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
 /* ---- metrics ---- */
 /* Eight headline metrics read as a balanced 4×2 block on desktop, collapsing to
    2 columns then 1 so the row never strands a few cards against empty space. */
