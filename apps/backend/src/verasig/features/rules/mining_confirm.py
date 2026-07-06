@@ -66,6 +66,17 @@ def confirm_mined_signals(
     )
 
 
+def read_confirmed_template_keys(
+    session_factory: sessionmaker, user_id: UUID, external_id: int
+) -> list[str]:
+    """The accepted template keys recovered from persisted signals — the resume
+    source for the Verify audit when a verified feed is reopened."""
+    with session_factory() as session:
+        return outcome_repository.read_confirmed_template_keys(
+            session, user_id, external_id
+        )
+
+
 def _mine_feed(
     session_factory: sessionmaker, user_id: UUID, external_id: int
 ) -> list[TemplateGroup]:

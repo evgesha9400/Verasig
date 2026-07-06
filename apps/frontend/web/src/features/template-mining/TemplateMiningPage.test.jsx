@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TemplateMiningPage } from './TemplateMiningPage.jsx'
+import { FEED_MESSAGES, mineTemplateGroups } from '../../domain/template-mining/index.js'
 
 const feed = { id: 'apex', name: 'Apex Crypto Calls' }
 
@@ -116,12 +117,14 @@ describe('TemplateMiningPage', () => {
     expect(onKeepVerified).toHaveBeenCalledTimes(1)
   })
 
-  it('still supports the sample dataset through the alternate-source disclosure', async () => {
-    const user = userEvent.setup()
+  it('no longer offers the alternate-source disclosure', () => {
     renderPage()
-    await user.click(screen.getByText('Sample dataset'))
-    await user.click(screen.getByRole('button', { name: /Run template mining/i }))
-    expect(screen.getByText('Messages scanned')).toBeTruthy()
+    expect(
+      screen.queryByText(/Use sample or pasted messages instead/i)
+    ).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: /Run template mining/i })
+    ).toBeNull()
   })
 
   it('never renders NaN', async () => {
@@ -130,5 +133,98 @@ describe('TemplateMiningPage', () => {
     await acceptFirstTemplate(user)
     await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
     expect(screen.queryByText(/NaN/)).toBeNull()
+  })
+
+  it('closes the examples modal after Accept', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(
+      screen.getAllByRole('button', { name: /View all .* messages/i })[0]
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Accept$/ }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('closes the examples modal after Reject', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(
+      screen.getAllByRole('button', { name: /View all .* messages/i })[0]
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Reject$/ }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps the examples modal open after Reset', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    // Decide on the card first so the modal opens already-accepted (shows Reset).
+    await user.click(
+      screen.getAllByRole('button', { name: /Accept as signal format/i })[0]
+    )
+    await user.click(
+      screen.getAllByRole('button', { name: /View all .* messages/i })[0]
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Reset$/ }))
+    expect(screen.queryByRole('dialog')).toBeTruthy()
+  })
+})
+
+// Reopening a verified feed lands on Verify with empty decisions. The page must
+// re-mine, then reseed the accepted templates recovered from the backend so the
+// audit repopulates — instead of bouncing back to Review as if nothing was done.
+function mountVerifyResume({ acceptedTemplateKeys }) {
+  const onStartMine = vi.fn().mockResolvedValue({ jobId: 'user:7:mine' })
+  const stream = {}
+  const onStreamMine = vi.fn((_id, handlers) => {
+    stream.handlers = handlers
+    return { close: vi.fn() }
+  })
+  const onLoadConfirmed = vi.fn().mockResolvedValue({ acceptedTemplateKeys })
+  const onBackToReview = vi.fn()
+  render(
+    <TemplateMiningPage
+      activeFeed={{ id: '7', name: 'Pilot Signals' }}
+      authToken="jwt-token"
+      step="verify"
+      onStartMine={onStartMine}
+      onStreamMine={onStreamMine}
+      onLoadConfirmed={onLoadConfirmed}
+      onBackToReview={onBackToReview}
+    />
+  )
+  return { stream, onLoadConfirmed, onBackToReview }
+}
+
+describe('TemplateMiningPage — resume a verified feed', () => {
+  it('reseeds the confirmed templates and shows the audit (no bounce)', async () => {
+    const groups = mineTemplateGroups(FEED_MESSAGES)
+    const confirmedKey = groups[0].templateKey
+    const { stream, onLoadConfirmed, onBackToReview } = mountVerifyResume({
+      acceptedTemplateKeys: [confirmedKey]
+    })
+
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    act(() => stream.handlers.onDone({ groups, messages: FEED_MESSAGES }))
+
+    expect(await screen.findByRole('tab', { name: /Parsed/i })).toBeTruthy()
+    expect(onLoadConfirmed).toHaveBeenCalledWith('7')
+    expect(onBackToReview).not.toHaveBeenCalled()
+  })
+
+  it('falls back to Review when no confirmed templates come back', async () => {
+    const groups = mineTemplateGroups(FEED_MESSAGES)
+    const { stream, onLoadConfirmed, onBackToReview } = mountVerifyResume({
+      acceptedTemplateKeys: []
+    })
+
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    act(() => stream.handlers.onDone({ groups, messages: FEED_MESSAGES }))
+
+    await waitFor(() => expect(onBackToReview).toHaveBeenCalled())
+    expect(onLoadConfirmed).toHaveBeenCalledWith('7')
   })
 })

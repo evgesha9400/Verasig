@@ -6,9 +6,9 @@ import { TemplateExamplesDialog } from './TemplateExamplesDialog.jsx'
 /* Every message in a template, paged 5 at a time, in a modal — so a reviewer can
    double-check the whole grouping and decide without leaving the review. */
 
-function makeCandidate(index, confidence = 0.9) {
+function makeCandidate(index, confidence = 0.9, date) {
   return {
-    message: { id: `m${index}`, text: `MSG-${index} body` },
+    message: { id: `m${index}`, text: `MSG-${index} body`, date },
     fields: {
       instrument: 'BTCUSDT',
       direction: 'BUY',
@@ -82,12 +82,26 @@ describe('TemplateExamplesDialog', () => {
     expect(screen.getByText(/6\s*[–-]\s*7 of 7/)).toBeTruthy()
   })
 
-  it('orders the list by confidence', () => {
+  it('orders the list newest-first by message date', () => {
     renderDialog(
-      groupOf([makeCandidate(1, 0.5), makeCandidate(2, 0.95), makeCandidate(3, 0.7)])
+      groupOf([
+        makeCandidate(1, 0.9, '2026-06-01T00:00:00Z'),
+        makeCandidate(2, 0.9, '2026-06-03T00:00:00Z'),
+        makeCandidate(3, 0.9, '2026-06-02T00:00:00Z')
+      ])
     )
     const order = screen.getAllByText(/MSG-\d body/).map((el) => el.textContent)
     expect(order).toEqual(['MSG-2 body', 'MSG-3 body', 'MSG-1 body'])
+  })
+
+  it('shows a reformatted message date for a dated example', () => {
+    const { container } = renderDialog(
+      groupOf([makeCandidate(1, 0.9, '2026-06-01T08:42:00Z')])
+    )
+    const date = container.querySelector('.vrs-tm-ex__date')
+    expect(date).toBeTruthy()
+    expect(date.textContent).toContain('2026')
+    expect(date.textContent).not.toContain('T')
   })
 
   it('surfaces the geometry warning and the extraction table', () => {

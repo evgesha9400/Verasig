@@ -7,6 +7,7 @@ import { SignalFieldRow } from './SignalFieldRow.jsx'
 import {
   INTENT_LABEL,
   INTENT_ORDER,
+  byMessageDateDesc,
   formatEntry,
   formatPrice,
   formatTakeProfits
@@ -93,7 +94,9 @@ export function TemplateExamplesDialog({
   const [page, setPage] = useState(0)
   if (!open || !group) return null
 
-  const ordered = [...group.candidates].sort((a, b) => b.confidence - a.confidence)
+  const ordered = [...group.candidates].sort(
+    byMessageDateDesc((candidate) => candidate.message.date)
+  )
   const total = ordered.length
   const pageCount = Math.max(1, Math.ceil(total / MESSAGES_PER_PAGE))
   const safePage = Math.min(page, pageCount - 1)

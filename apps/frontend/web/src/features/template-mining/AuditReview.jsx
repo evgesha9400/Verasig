@@ -12,8 +12,10 @@ import { byCoverageThenConfidence } from '../../domain/template-mining/index.js'
 import { Pager } from './Pager.jsx'
 import {
   INTENT_LABEL,
+  byMessageDateDesc,
   formatConfidence,
   formatEntry,
+  formatMessageDate,
   formatPrice,
   formatTakeProfits
 } from './format.js'
@@ -55,14 +57,23 @@ function issueSummary(candidate) {
 
 const confidenceOf = (row) => row.confidence
 
+// Compose two comparators: the secondary only breaks ties the primary left at 0.
+const thenBy = (primary, secondary) => (a, b) => primary(a, b) || secondary(a, b)
+
 // Each row is { key, text, template?, templateId?, haystack } — one shape so a
 // single search/filter path serves every bucket. The row whose template parsed
 // the most messages in this backtest leads (most-likely template first), then
 // confidence within a template — matches the family grid and compiled-rules order.
 function parsedRows(signals, messageById, ruleById, countByRule) {
   const coverageOf = (signal) => countByRule.get(signal.parserRuleId) || 0
+  const dateOf = (signal) => messageById.get(signal.sourceMessageIds[0])?.date
   return [...signals]
-    .sort(byCoverageThenConfidence(coverageOf, confidenceOf))
+    .sort(
+      thenBy(
+        byMessageDateDesc(dateOf),
+        byCoverageThenConfidence(coverageOf, confidenceOf)
+      )
+    )
     .map((signal, index) => {
       const takeProfits = formatTakeProfits(signal.takeProfits)
       const text = [
@@ -73,7 +84,8 @@ function parsedRows(signals, messageById, ruleById, countByRule) {
       ]
         .filter(Boolean)
         .join(' · ')
-      const sourceText = messageById.get(signal.sourceMessageIds[0])?.text || ''
+      const sourceMessage = messageById.get(signal.sourceMessageIds[0])
+      const sourceText = sourceMessage?.text || ''
       const rule = ruleById.get(signal.parserRuleId)
       return {
         key: `${signal.sourceMessageIds.join('-')}-${index}`,
@@ -89,6 +101,7 @@ function parsedRows(signals, messageById, ruleById, countByRule) {
           kind: 'parsed',
           signal,
           messageText: sourceText,
+          messageDate: sourceMessage?.date,
           template: rule?.name
         }
       }
@@ -98,8 +111,14 @@ function parsedRows(signals, messageById, ruleById, countByRule) {
 function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
   const coverageOf = (candidate) =>
     countByRule.get(ruleByTemplateKey.get(candidate.templateKey)) || 0
+  const dateOf = (candidate) => candidate.message.date
   return [...candidates]
-    .sort(byCoverageThenConfidence(coverageOf, confidenceOf))
+    .sort(
+      thenBy(
+        byMessageDateDesc(dateOf),
+        byCoverageThenConfidence(coverageOf, confidenceOf)
+      )
+    )
     .map((candidate, index) => {
       const issue = issueSummary(candidate)
       const text = `${firstLine(candidate.message.text)}  ·  ${INTENT_LABEL[candidate.intent]} ${formatConfidence(candidate.confidence)}`
@@ -117,23 +136,28 @@ function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
 
 // The rejected/rare/miss buckets share one row shape — only how each item
 // supplies its key/summary/search text/detail text differs.
-function textRows(items, { keyOf, textOf, haystackOf, messageTextOf }) {
+function textRows(items, { keyOf, textOf, haystackOf, messageTextOf, messageDateOf }) {
   return items.map((item, index) => ({
     key: `${keyOf(item)}-${index}`,
     text: textOf(item),
     templateId: null,
     haystack: haystackOf(item).toLowerCase(),
-    detail: { kind: 'text', messageText: messageTextOf(item) }
+    detail: {
+      kind: 'text',
+      messageText: messageTextOf(item),
+      messageDate: messageDateOf(item)
+    }
   }))
 }
 
 function rejectedRows(entries) {
-  return textRows(entries, {
+  return textRows([...entries].sort(byMessageDateDesc((entry) => entry.message.date)), {
     keyOf: (entry) => entry.message.id,
     textOf: (entry) =>
       `${firstLine(entry.message.text)}  ·  ${INTENT_LABEL[entry.intent]}`,
     haystackOf: (entry) => `${entry.message.text} ${INTENT_LABEL[entry.intent]}`,
-    messageTextOf: (entry) => entry.message.text
+    messageTextOf: (entry) => entry.message.text,
+    messageDateOf: (entry) => entry.message.date
   })
 }
 
@@ -143,16 +167,19 @@ function rareRows(groups) {
     textOf: (group) =>
       `${firstLine(group.normalizedTemplate)}  ·  ${group.count} message${group.count === 1 ? '' : 's'}`,
     haystackOf: (group) => group.normalizedTemplate,
-    messageTextOf: (group) => group.normalizedTemplate
+    messageTextOf: (group) => group.normalizedTemplate,
+    // A rare template is a group, not one message — no per-message date to show.
+    messageDateOf: () => null
   })
 }
 
 function missRows(messages) {
-  return textRows(messages, {
+  return textRows([...messages].sort(byMessageDateDesc((message) => message.date)), {
     keyOf: (message) => message.id,
     textOf: (message) => firstLine(message.text),
     haystackOf: (message) => message.text || '',
-    messageTextOf: (message) => message.text
+    messageTextOf: (message) => message.text,
+    messageDateOf: (message) => message.date
   })
 }
 
@@ -163,15 +190,27 @@ function RowDetail({ detail }) {
     return <CandidateExample candidate={detail.candidate} />
   }
   if (detail.kind !== 'parsed') {
-    return <pre className="vrs-tm-ex__msg">{detail.messageText || '—'}</pre>
+    return (
+      <>
+        {detail.messageDate && (
+          <div className="vrs-tm-ex__date">{formatMessageDate(detail.messageDate)}</div>
+        )}
+        <pre className="vrs-tm-ex__msg">{detail.messageText || '—'}</pre>
+      </>
+    )
   }
   const signal = detail.signal
   const takeProfits = formatTakeProfits(signal.takeProfits)
   return (
     <div className="vrs-tm-ex__item">
-      <pre className="vrs-tm-ex__msg">
-        {detail.messageText || '— original message unavailable —'}
-      </pre>
+      <div>
+        {detail.messageDate && (
+          <div className="vrs-tm-ex__date">{formatMessageDate(detail.messageDate)}</div>
+        )}
+        <pre className="vrs-tm-ex__msg">
+          {detail.messageText || '— original message unavailable —'}
+        </pre>
+      </div>
       <table className="vrs-tm-kv">
         <tbody>
           <SignalFieldRow

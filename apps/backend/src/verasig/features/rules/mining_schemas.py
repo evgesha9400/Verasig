@@ -17,3 +17,7 @@ class MiningConfirmOut(CamelModel):
     feed_status: str
     templates_accepted: int
     signals_extracted: int
+
+
+class MiningConfirmedOut(CamelModel):
+    accepted_template_keys: list[str] = []

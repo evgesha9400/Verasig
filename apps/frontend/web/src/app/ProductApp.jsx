@@ -35,7 +35,11 @@ import {
   streamDeletionRescanProgress
 } from '../shared/api/feedsApi.js'
 import { getParserOverlay, putParserOverlay } from '../shared/api/pipelineApi.js'
-import { startMine, streamMineProgress } from '../shared/api/mineApi.js'
+import {
+  getConfirmedMining,
+  startMine,
+  streamMineProgress
+} from '../shared/api/mineApi.js'
 import './app.css'
 
 const USER_DEFAULTS = {
@@ -388,6 +392,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onStreamMine={(chatId, handlers) =>
             streamMineProgress(authToken, chatId, handlers)
           }
+          onLoadConfirmed={(chatId) => getConfirmedMining(authToken, chatId)}
           fireToast={fireToast}
           overlay={overlay}
           onSaveOverlay={saveOverlay}

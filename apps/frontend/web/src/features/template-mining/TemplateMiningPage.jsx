@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@verasig/design-system'
 import {
-  SAMPLE_MESSAGES,
   FEED_MESSAGES,
   mineTemplateGroups,
   compileRuleFromTemplate,
   applyAcceptedRules
 } from '../../domain/template-mining/index.js'
-import { MiningSourcePanel } from './MiningSourcePanel.jsx'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { MineView } from './MineView.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
@@ -24,7 +22,9 @@ import './template-mining.css'
    so the prototype still runs. This component owns the shared mining state
    (result, decisions) and renders the view for the current step; advancing calls
    up to the parent. Rules and audit recompute reactively, so revisiting
-   Review/Verify is safe. */
+   Review/Verify is safe. Reopening a verified feed lands on Verify: the page
+   re-mines, then reseeds the accepted templates recovered from the backend
+   (onLoadConfirmed) so the audit repopulates instead of bouncing to Review. */
 
 const EMPTY_AUDIT = {
   parsedSignals: [],
@@ -32,20 +32,6 @@ const EMPTY_AUDIT = {
   rejectedCandidates: [],
   rareTemplates: [],
   potentialMisses: []
-}
-
-function parsePasted(text) {
-  return text
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter((block) => block.length > 0)
-    .map((block, index) => ({ id: `paste-${index + 1}`, text: block }))
-}
-
-function resolveStaticMessages(source, pasted) {
-  if (source === 'sample') return SAMPLE_MESSAGES
-  if (source === 'paste') return parsePasted(pasted)
-  return []
 }
 
 function TemplateSection({ title, subtitle, groups, action, cardProps }) {
@@ -78,6 +64,7 @@ export function TemplateMiningPage({
   step = 'mine',
   onStartMine,
   onStreamMine,
+  onLoadConfirmed,
   fireToast,
   overlay = {},
   onSaveOverlay,
@@ -89,11 +76,12 @@ export function TemplateMiningPage({
   decisions: controlledDecisions,
   onDecisionsChange
 }) {
-  const [source, setSource] = useState('sample')
-  const [pasted, setPasted] = useState('')
   const [result, setResult] = useState(null) // { groups, messages }
   const [internalDecisions, setInternalDecisions] = useState({})
   const [examplesFor, setExamplesFor] = useState(null) // open template's key
+  const [confirmedKeys, setConfirmedKeys] = useState(null) // null = not fetched / N/A
+  const [restoring, setRestoring] = useState(false)
+  const seededFeedRef = useRef(null)
 
   // Controlled-with-fallback: the parent may own decisions; otherwise local.
   const decisions = controlledDecisions ?? internalDecisions
@@ -102,11 +90,6 @@ export function TemplateMiningPage({
   // Server-side mining when signed in against a real feed; demo history offline.
   const authenticated = Boolean(authToken && activeFeed?.id && onStartMine)
 
-  const messages = useMemo(
-    () => resolveStaticMessages(source, pasted),
-    [source, pasted]
-  )
-  const pastedCount = useMemo(() => parsePasted(pasted).length, [pasted])
   const groups = useMemo(() => result?.groups ?? [], [result])
 
   // One pass sorts every template into its decision bucket, so the grids, the
@@ -183,10 +166,13 @@ export function TemplateMiningPage({
   const navRef = useRef({})
   navRef.current = { onMined, onContinueToVerify, onBackToReview }
 
-  // A new feed drops the previous feed's mining so we re-mine from scratch.
+  // A new feed drops the previous feed's mining so we re-mine from scratch, and
+  // clears the resume state so its confirmed templates are re-fetched and reseeded.
   useEffect(() => {
     setResult(null)
     setExamplesFor(null)
+    setConfirmedKeys(null)
+    seededFeedRef.current = null
   }, [activeFeed?.id])
 
   // Offline/demo (no backend): mine the bundled history once per feed. The
@@ -202,12 +188,44 @@ export function TemplateMiningPage({
     if (step === 'mine' && result) navRef.current.onMined?.()
   }, [step, result])
 
-  // Guard: if decisions drop to zero while on Verify, fall back to Review.
+  // Reopening a verified feed lands here with no decisions: fetch the accepted
+  // template keys the backend persisted, so the fresh mine can be reseeded. Fetched
+  // once per feed (confirmedKeys flips off null); fail-open to none on error.
   useEffect(() => {
+    if (!authenticated || !onLoadConfirmed) return
+    if (step !== 'verify' || confirmedKeys !== null) return
+    if (Object.keys(decisions).length > 0) return
+    setRestoring(true)
+    onLoadConfirmed(activeFeed.id)
+      .then((body) => setConfirmedKeys(body?.acceptedTemplateKeys ?? []))
+      .catch(() => setConfirmedKeys([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated, step, activeFeed?.id])
+
+  // Once the fresh mine and the confirmed keys are both in, reseed each confirmed
+  // key the mine still produces as accepted — once per feed — then release the
+  // guard. Nothing to reseed (empty or drifted keys) falls through to the guard.
+  useEffect(() => {
+    if (!restoring || !result || confirmedKeys === null) return
+    if (seededFeedRef.current === activeFeed?.id) return
+    const present = new Set(groups.map((group) => group.templateKey))
+    const reseeded = {}
+    for (const key of confirmedKeys) {
+      if (present.has(key)) reseeded[key] = 'accepted'
+    }
+    setDecisions(reseeded)
+    seededFeedRef.current = activeFeed?.id
+    setRestoring(false)
+  }, [restoring, result, confirmedKeys, groups, activeFeed?.id, setDecisions])
+
+  // Guard: if decisions drop to zero while on Verify, fall back to Review. Held off
+  // while restoring so the reseed can land before the empty state would bounce.
+  useEffect(() => {
+    if (restoring) return
     if (step === 'verify' && result && acceptedGroups.length === 0) {
       navRef.current.onBackToReview?.()
     }
-  }, [step, result, acceptedGroups.length])
+  }, [step, result, acceptedGroups.length, restoring])
 
   function handleMineDone(mineResult) {
     setResult({
@@ -224,10 +242,6 @@ export function TemplateMiningPage({
       'Mining failed',
       error?.message || 'Try again in a moment.'
     )
-  }
-
-  function runStaticMining() {
-    finishMining(messages)
   }
 
   function decide(templateKey, status) {
@@ -294,27 +308,6 @@ export function TemplateMiningPage({
 
       {step === 'review' && (
         <>
-          <details className="vrs-tm-altsource">
-            <summary>Use sample or pasted messages instead</summary>
-            <MiningSourcePanel
-              source={source}
-              onSourceChange={setSource}
-              pasted={pasted}
-              onPastedChange={setPasted}
-              feeds={[]}
-              feedId={null}
-              onFeedChange={() => {}}
-              selectedFeedName={activeFeed?.name}
-              authenticated={Boolean(authToken)}
-              demoFeedCount={FEED_MESSAGES.length}
-              sampleCount={SAMPLE_MESSAGES.length}
-              pastedCount={pastedCount}
-              running={false}
-              canRun={messages.length > 0}
-              onRun={runStaticMining}
-            />
-          </details>
-
           <MiningMetrics metrics={metrics} variant="slim" />
 
           {groups.length === 0 ? (
@@ -406,8 +399,16 @@ export function TemplateMiningPage({
             ? decisions[examplesGroup.templateKey] || 'unreviewed'
             : 'unreviewed'
         }
-        onAccept={() => examplesGroup && decide(examplesGroup.templateKey, 'accepted')}
-        onReject={() => examplesGroup && decide(examplesGroup.templateKey, 'rejected')}
+        onAccept={() => {
+          if (!examplesGroup) return
+          decide(examplesGroup.templateKey, 'accepted')
+          setExamplesFor(null)
+        }}
+        onReject={() => {
+          if (!examplesGroup) return
+          decide(examplesGroup.templateKey, 'rejected')
+          setExamplesFor(null)
+        }}
         onReset={() => examplesGroup && resetDecision(examplesGroup.templateKey)}
       />
     </div>
