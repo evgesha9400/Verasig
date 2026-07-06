@@ -386,7 +386,7 @@
 
 /* ---- examples dialog (all messages in one template) ---- */
 .vrs-tm-exdialog {
-  max-width: 760px;
+  max-width: min(1100px, 92vw);
 }
 .vrs-tm-exdialog .vrs-dialog__body {
   display: flex;

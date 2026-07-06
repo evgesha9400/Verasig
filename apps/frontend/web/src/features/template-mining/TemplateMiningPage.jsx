@@ -399,8 +399,16 @@ export function TemplateMiningPage({
             ? decisions[examplesGroup.templateKey] || 'unreviewed'
             : 'unreviewed'
         }
-        onAccept={() => examplesGroup && decide(examplesGroup.templateKey, 'accepted')}
-        onReject={() => examplesGroup && decide(examplesGroup.templateKey, 'rejected')}
+        onAccept={() => {
+          if (!examplesGroup) return
+          decide(examplesGroup.templateKey, 'accepted')
+          setExamplesFor(null)
+        }}
+        onReject={() => {
+          if (!examplesGroup) return
+          decide(examplesGroup.templateKey, 'rejected')
+          setExamplesFor(null)
+        }}
         onReset={() => examplesGroup && resetDecision(examplesGroup.templateKey)}
       />
     </div>

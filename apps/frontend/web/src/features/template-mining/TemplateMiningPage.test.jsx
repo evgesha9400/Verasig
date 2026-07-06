@@ -134,6 +134,43 @@ describe('TemplateMiningPage', () => {
     await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
     expect(screen.queryByText(/NaN/)).toBeNull()
   })
+
+  it('closes the examples modal after Accept', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(
+      screen.getAllByRole('button', { name: /View all .* messages/i })[0]
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Accept$/ }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('closes the examples modal after Reject', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(
+      screen.getAllByRole('button', { name: /View all .* messages/i })[0]
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Reject$/ }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps the examples modal open after Reset', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    // Decide on the card first so the modal opens already-accepted (shows Reset).
+    await user.click(
+      screen.getAllByRole('button', { name: /Accept as signal format/i })[0]
+    )
+    await user.click(
+      screen.getAllByRole('button', { name: /View all .* messages/i })[0]
+    )
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /^Reset$/ }))
+    expect(screen.queryByRole('dialog')).toBeTruthy()
+  })
 })
 
 // Reopening a verified feed lands on Verify with empty decisions. The page must
