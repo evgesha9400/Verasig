@@ -14,8 +14,13 @@ from verasig.features.feeds.backfill_job_run import backfill_job_key
 from verasig.features.rules.mining_confirm import (
     MiningConfirmResult,
     confirm_mined_signals,
+    read_confirmed_template_keys,
 )
-from verasig.features.rules.mining_schemas import MiningConfirmIn, MiningConfirmOut
+from verasig.features.rules.mining_schemas import (
+    MiningConfirmedOut,
+    MiningConfirmIn,
+    MiningConfirmOut,
+)
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
 
@@ -56,3 +61,19 @@ def confirm_signals(
         payload.accepted_template_keys,
     )
     return _present(result)
+
+
+@router.get("/confirmed")
+def read_confirmed(
+    request: Request,
+    external_id: str,
+    feed=Depends(require_feed),
+) -> MiningConfirmedOut:
+    """List the accepted template keys already persisted for this feed — a pure
+    read (no re-mine, no backfill guard); require_feed 404s a foreign feed."""
+    keys = read_confirmed_template_keys(
+        request.app.state.session_factory,
+        feed.user_id,
+        int(external_id),
+    )
+    return MiningConfirmedOut(accepted_template_keys=keys)

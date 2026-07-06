@@ -93,6 +93,23 @@ def read_extracted_signals(
     ]
 
 
+def read_confirmed_template_keys(
+    session: Session, user_id: UUID, external_id: int
+) -> list[str]:
+    """Distinct template keys of this feed's persisted signals — the accepted
+    families to reseed when a verified feed is reopened (rule_id == template_key)."""
+    statement = (
+        select(ExtractedSignalRow.rule_id)
+        .where(
+            ExtractedSignalRow.user_id == user_id,
+            ExtractedSignalRow.external_id == external_id,
+            ExtractedSignalRow.rule_id.is_not(None),
+        )
+        .distinct()
+    )
+    return list(session.scalars(statement).all())
+
+
 def _unrecognized_values(item: UnrecognizedSignal) -> dict:
     return {
         "id": item.id,
