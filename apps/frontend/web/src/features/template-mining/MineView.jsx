@@ -44,9 +44,21 @@ export function MineView({ feed, onStart, onStream, onDone, onError }) {
     let closed = false
     let subscription = null
 
-    async function run() {
+    // A 409 means the job is already running — e.g. StrictMode re-invokes this
+    // effect and re-POSTs while the first job is still live. Its progress stream
+    // replays state to a late subscriber, so swallow the conflict and subscribe
+    // anyway; re-raise anything else as a genuine start failure.
+    async function startMineTolerating409() {
       try {
         await handlersRef.current.onStart(feed.id)
+      } catch (error) {
+        if (error?.status !== 409) throw error
+      }
+    }
+
+    async function run() {
+      try {
+        await startMineTolerating409()
         if (closed) return
         subscription = handlersRef.current.onStream(feed.id, {
           onProgress: (progress) => {
