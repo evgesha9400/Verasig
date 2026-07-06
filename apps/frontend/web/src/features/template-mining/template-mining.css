@@ -308,6 +308,12 @@
   opacity: 0.4;
   cursor: default;
 }
+.vrs-tm-ex__date {
+  margin-bottom: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
 .vrs-tm-ex__msg {
   margin: 0;
   padding: var(--space-2-5) var(--space-3);

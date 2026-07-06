@@ -3,6 +3,7 @@ import {
   INTENT_LABEL,
   formatConfidence,
   formatEntry,
+  formatMessageDate,
   formatPrice,
   formatTakeProfits
 } from './format.js'
@@ -52,7 +53,14 @@ export function CandidateExample({ candidate }) {
   const fieldsWithIssues = issueFields(candidate)
   return (
     <div className="vrs-tm-ex__item">
-      <pre className="vrs-tm-ex__msg">{candidate.message.text}</pre>
+      <div>
+        {candidate.message.date && (
+          <div className="vrs-tm-ex__date">
+            {formatMessageDate(candidate.message.date)}
+          </div>
+        )}
+        <pre className="vrs-tm-ex__msg">{candidate.message.text}</pre>
+      </div>
       <div>
         <table className="vrs-tm-kv">
           <tbody>

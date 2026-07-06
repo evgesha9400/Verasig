@@ -354,6 +354,111 @@ describe('AuditReview', () => {
     expect(big).toBeLessThan(small)
   })
 
+  it('orders parsed rows newest-first when coverage and confidence tie', () => {
+    // Same family, same confidence → the source-message date is the only signal,
+    // so the newest message leads.
+    const sig = (id, instrument) => ({
+      sourceMessageIds: [id],
+      instrument,
+      direction: 'BUY',
+      orderType: 'limit',
+      entry: null,
+      stopLoss: null,
+      takeProfits: [],
+      confidence: 0.8,
+      parserRuleId: 'rule_a',
+      intent: 'new_signal',
+      match: 'exact'
+    })
+    const audit = {
+      parsedSignals: [sig('old', 'OLDUSDT'), sig('new', 'NEWUSDT')],
+      ambiguousCandidates: [],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const messages = [
+      { id: 'old', text: 'older', date: '2026-06-01T00:00:00Z' },
+      { id: 'new', text: 'newer', date: '2026-06-05T00:00:00Z' }
+    ]
+    const { container } = render(
+      <AuditReview audit={audit} messages={messages} rules={RULES} hasAccepted={true} />
+    )
+    const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
+      (node) => node.textContent
+    )
+    const newIdx = texts.findIndex((text) => /NEWUSDT/.test(text))
+    const oldIdx = texts.findIndex((text) => /OLDUSDT/.test(text))
+    expect(newIdx).toBeLessThan(oldIdx)
+  })
+
+  it('shows the reformatted source-message date when a parsed row is expanded', async () => {
+    const user = userEvent.setup()
+    const audit = {
+      parsedSignals: [
+        {
+          sourceMessageIds: ['m1'],
+          instrument: 'BTCUSDT',
+          direction: 'BUY',
+          orderType: 'limit',
+          entry: null,
+          stopLoss: null,
+          takeProfits: [],
+          confidence: 0.8,
+          parserRuleId: 'rule_a',
+          intent: 'new_signal',
+          match: 'exact'
+        }
+      ],
+      ambiguousCandidates: [],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const messages = [{ id: 'm1', text: 'the original', date: '2026-06-01T08:42:00Z' }]
+    const { container } = render(
+      <AuditReview audit={audit} messages={messages} rules={RULES} hasAccepted={true} />
+    )
+    await user.click(screen.getByRole('button', { name: /BTCUSDT BUY/ }))
+    const date = container.querySelector('.vrs-tm-ex__date')
+    expect(date).toBeTruthy()
+    expect(date.textContent).toContain('2026')
+  })
+
+  it('orders rejected rows newest-first and shows the date on expand', async () => {
+    const user = userEvent.setup()
+    const audit = {
+      parsedSignals: [],
+      ambiguousCandidates: [],
+      rejectedCandidates: [
+        {
+          message: { id: 'r_old', text: 'old rejected', date: '2026-06-01T00:00:00Z' },
+          intent: 'result'
+        },
+        {
+          message: { id: 'r_new', text: 'new rejected', date: '2026-06-09T00:00:00Z' },
+          intent: 'result'
+        }
+      ],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    const { container } = render(
+      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+    )
+    await user.click(screen.getByRole('tab', { name: /Rejected/i }))
+    const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
+      (node) => node.textContent
+    )
+    const newIdx = texts.findIndex((text) => /new rejected/.test(text))
+    const oldIdx = texts.findIndex((text) => /old rejected/.test(text))
+    expect(newIdx).toBeLessThan(oldIdx)
+
+    await user.click(screen.getByRole('button', { name: /new rejected/i }))
+    const date = container.querySelector('.vrs-tm-ex__date')
+    expect(date.textContent).toContain('2026')
+  })
+
   it('badges a fallback-captured parsed row, but not an exact one', () => {
     const signal = (id, instrument, confidence, match) => ({
       sourceMessageIds: [id],
