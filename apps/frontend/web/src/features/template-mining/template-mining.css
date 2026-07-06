@@ -385,7 +385,9 @@
 }
 
 /* ---- examples dialog (all messages in one template) ---- */
-.vrs-tm-exdialog {
+/* Double-class to outrank the DS `.vrs-dialog` base (max-width: 460px): both are
+   single-class selectors, so without this the base wins on source order. */
+.vrs-dialog.vrs-tm-exdialog {
   max-width: min(1100px, 92vw);
 }
 .vrs-tm-exdialog .vrs-dialog__body {
