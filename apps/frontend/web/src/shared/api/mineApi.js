@@ -25,3 +25,13 @@ export function confirmMining(token, feedId, acceptedTemplateKeys = []) {
     body: { acceptedTemplateKeys }
   })
 }
+
+// Lists the accepted template keys already persisted for a feed →
+// { acceptedTemplateKeys }. The Verify audit reseeds from these when a
+// verified feed is reopened, so it resumes instead of re-mining from scratch.
+export function getConfirmedMining(token, feedId) {
+  return requestJson(`/feeds/${feedId}/mining/confirmed`, {
+    method: 'GET',
+    token
+  })
+}
