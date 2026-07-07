@@ -14,7 +14,7 @@ from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import feed_repository
-from verasig.features.rules.mine_result_repository import (
+from verasig.features.mining.mine_result_repository import (
     read_mine_result,
     upsert_mine_result,
 )

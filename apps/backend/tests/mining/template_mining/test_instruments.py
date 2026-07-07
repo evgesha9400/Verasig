@@ -1,6 +1,6 @@
 """Parity port of ``instruments.test.js``."""
 
-from verasig.features.rules.template_mining.instruments import detect_instruments
+from verasig.features.mining.template_mining.instruments import detect_instruments
 
 
 def _normals(text: str) -> list[str]:

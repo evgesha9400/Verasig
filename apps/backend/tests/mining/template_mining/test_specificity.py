@@ -1,6 +1,6 @@
 """Parity port of ``specificity.test.js``."""
 
-from verasig.features.rules.template_mining.specificity import template_specificity
+from verasig.features.mining.template_mining.specificity import template_specificity
 
 
 def test_scores_a_literal_placeholder_template_above_a_sparser_one():

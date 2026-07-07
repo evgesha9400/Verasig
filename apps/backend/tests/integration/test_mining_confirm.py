@@ -15,12 +15,12 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import feed_repository, message_repository
-from verasig.features.parser_overlay.repository import read_overlay
-from verasig.features.rules.mining_confirm import (
+from verasig.features.mining.mining_confirm import (
     _to_chat_message,
     confirm_mined_signals,
 )
-from verasig.features.rules.template_mining import mine_template_groups
+from verasig.features.mining.template_mining import mine_template_groups
+from verasig.features.parser_overlay.repository import read_overlay
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.signals.views import present_signals
 

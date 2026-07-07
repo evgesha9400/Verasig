@@ -19,8 +19,8 @@ from verasig.domain.signal import (
     Side,
     SignalEventType,
 )
-from verasig.features.rules.template_mining.fields import SignalEntry, StructuredFields
-from verasig.features.rules.template_mining.types import Candidate
+from verasig.features.mining.template_mining.fields import SignalEntry, StructuredFields
+from verasig.features.mining.template_mining.types import Candidate
 
 _SIDE_BY_DIRECTION = {"BUY": Side.LONG, "SELL": Side.SHORT}
 _ENTRY_TYPE_BY_KIND = {

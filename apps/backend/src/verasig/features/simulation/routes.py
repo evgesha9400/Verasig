@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, Request, status
 
 from verasig.domain.risk_config import RiskConfig
 from verasig.features.risk.repository import read_risk_config
-from verasig.features.rules.schemas import JobOut
 from verasig.features.simulation.backtesting import (
     compose_score,
     load_folded_signals,
@@ -14,6 +13,7 @@ from verasig.features.simulation.backtesting import (
 )
 from verasig.features.simulation.schemas import done_out
 from verasig.foundation.http.auth_dependencies import require_feed
+from verasig.foundation.http.schemas import JobOut
 from verasig.foundation.http.sse import sse_stream, start_job_or_409
 from verasig.foundation.jobs.registry import job_key
 

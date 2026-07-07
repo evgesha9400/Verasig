@@ -1,6 +1,6 @@
 """Parity port of ``subsumption.test.js``."""
 
-from verasig.features.rules.template_mining.subsumption import pattern_subsumes
+from verasig.features.mining.template_mining.subsumption import pattern_subsumes
 
 
 def test_matches_an_identical_skeleton():

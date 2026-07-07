@@ -1,6 +1,6 @@
 """Parity port covering ``intervals.js`` helpers."""
 
-from verasig.features.rules.template_mining.intervals import (
+from verasig.features.mining.template_mining.intervals import (
     by_start_then_longest_key,
     intervals_overlap,
     overlaps_any,

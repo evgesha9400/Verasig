@@ -1,6 +1,6 @@
 """Parity port of ``directions.test.js``."""
 
-from verasig.features.rules.template_mining.directions import detect_directions
+from verasig.features.mining.template_mining.directions import detect_directions
 
 
 def _sides(text: str) -> list[str]:

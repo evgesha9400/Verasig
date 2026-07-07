@@ -2,12 +2,12 @@
 
 from types import SimpleNamespace
 
-from verasig.features.rules.template_mining.fields import (
+from verasig.features.mining.template_mining.fields import (
     SignalEntry,
     StructuredFields,
     extract_signal_fields,
 )
-from verasig.features.rules.template_mining.geometry import validate_price_geometry
+from verasig.features.mining.template_mining.geometry import validate_price_geometry
 
 
 def _buy(**over) -> StructuredFields:

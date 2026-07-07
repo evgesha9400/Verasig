@@ -2,7 +2,7 @@
 
 from fixtures_sample_messages import SIGNAL_FAMILY as SIGNALS
 
-from verasig.features.rules.template_mining.mining import mine_template_groups
+from verasig.features.mining.template_mining.mining import mine_template_groups
 
 RESULTS = [
     {"id": "r1", "date": "2026-06-01", "text": "XAUUSD BUY hit TP1"},

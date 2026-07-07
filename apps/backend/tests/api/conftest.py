@@ -99,9 +99,9 @@ def _mined_keys(client, app, token: str) -> list[str]:
     (byte-identical port) yields the SAME keys the browser saw, so the match is
     exact and the test never hardcodes a hash."""
     from verasig.features.feeds import message_repository
+    from verasig.features.mining.mining_confirm import _to_chat_message
+    from verasig.features.mining.template_mining import mine_template_groups
     from verasig.features.parser_overlay.repository import read_overlay
-    from verasig.features.rules.mining_confirm import _to_chat_message
-    from verasig.features.rules.template_mining import mine_template_groups
 
     user_id = read_user_id(token, app.state.jwt_secret)
     with app.state.session_factory() as session:

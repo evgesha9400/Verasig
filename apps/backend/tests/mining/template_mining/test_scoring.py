@@ -1,8 +1,8 @@
 """Parity port of ``scoring.test.js``."""
 
-from verasig.features.rules.template_mining.directions import detect_directions
-from verasig.features.rules.template_mining.fields import extract_signal_fields
-from verasig.features.rules.template_mining.scoring import score_candidate
+from verasig.features.mining.template_mining.directions import detect_directions
+from verasig.features.mining.template_mining.fields import extract_signal_fields
+from verasig.features.mining.template_mining.scoring import score_candidate
 
 
 def _candidate_of(text: str) -> dict:

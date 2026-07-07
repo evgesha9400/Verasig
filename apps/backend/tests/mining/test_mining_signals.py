@@ -9,9 +9,9 @@ from decimal import Decimal
 
 from verasig.domain.event import MaterializationPath
 from verasig.domain.signal import EntryType, ExtractionMethod, Side
-from verasig.features.rules.mining_signals import candidate_to_event_and_signal
-from verasig.features.rules.template_mining.fields import SignalEntry, StructuredFields
-from verasig.features.rules.template_mining.types import Candidate, ChatMessage
+from verasig.features.mining.mining_signals import candidate_to_event_and_signal
+from verasig.features.mining.template_mining.fields import SignalEntry, StructuredFields
+from verasig.features.mining.template_mining.types import Candidate, ChatMessage
 
 
 def _candidate(fields: StructuredFields, *, confidence: float = 0.8) -> Candidate:

@@ -1,7 +1,7 @@
 """Parity port of ``intent.test.js``."""
 
-from verasig.features.rules.template_mining.fields import extract_signal_fields
-from verasig.features.rules.template_mining.intent import classify_intent
+from verasig.features.mining.template_mining.fields import extract_signal_fields
+from verasig.features.mining.template_mining.intent import classify_intent
 
 
 def _intent_of(text: str) -> str:

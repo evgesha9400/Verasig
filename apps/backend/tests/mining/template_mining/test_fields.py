@@ -1,6 +1,6 @@
 """Parity port of ``fields.test.js``."""
 
-from verasig.features.rules.template_mining.fields import extract_signal_fields
+from verasig.features.mining.template_mining.fields import extract_signal_fields
 
 
 # --- instrument & direction ---

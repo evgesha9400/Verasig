@@ -11,12 +11,12 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from verasig.features.feeds.backfill_job_run import backfill_job_key
-from verasig.features.rules.mining_confirm import (
+from verasig.features.mining.mining_confirm import (
     MiningConfirmResult,
     confirm_mined_signals,
     read_confirmed_template_keys,
 )
-from verasig.features.rules.mining_schemas import (
+from verasig.features.mining.mining_schemas import (
     MiningConfirmedOut,
     MiningConfirmIn,
     MiningConfirmOut,

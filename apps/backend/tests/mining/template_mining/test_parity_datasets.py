@@ -18,7 +18,7 @@ from __future__ import annotations
 from fixtures_feed_messages import FEED_MESSAGES
 from fixtures_sample_messages import SAMPLE_MESSAGES
 
-from verasig.features.rules.template_mining.mining import mine_template_groups
+from verasig.features.mining.template_mining.mining import mine_template_groups
 
 # (template_key, normalized_template, count, confidence_avg, suggested_action,
 #  geometry_warnings) - ordered exactly as the JS miner returns them.

@@ -2,7 +2,7 @@
 
 import pytest
 
-from verasig.features.rules.template_mining.prices import detect_prices, parse_number
+from verasig.features.mining.template_mining.prices import detect_prices, parse_number
 
 
 def _values(text: str) -> list:

@@ -24,10 +24,10 @@ from verasig.domain.event import RawSignalEvent
 from verasig.domain.extraction_outcome import ExtractOutcome
 from verasig.domain.signal import ExtractedSignal
 from verasig.features.feeds import feed_repository, message_repository
+from verasig.features.mining.mining_signals import candidate_to_event_and_signal
+from verasig.features.mining.template_mining import mine_template_groups
+from verasig.features.mining.template_mining.types import ChatMessage, TemplateGroup
 from verasig.features.parser_overlay.repository import read_overlay
-from verasig.features.rules.mining_signals import candidate_to_event_and_signal
-from verasig.features.rules.template_mining import mine_template_groups
-from verasig.features.rules.template_mining.types import ChatMessage, TemplateGroup
 from verasig.features.signals import event_repository, outcome_repository
 
 logger = logging.getLogger(__name__)

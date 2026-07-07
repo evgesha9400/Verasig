@@ -1,6 +1,6 @@
 """Parity port of ``text.test.js``."""
 
-from verasig.features.rules.template_mining.text import normalize_message_text
+from verasig.features.mining.template_mining.text import normalize_message_text
 
 
 def test_keeps_original_untouched_for_display():

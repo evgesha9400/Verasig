@@ -1,6 +1,6 @@
 """Parity port of ``template.test.js``."""
 
-from verasig.features.rules.template_mining.template import (
+from verasig.features.mining.template_mining.template import (
     hash_string,
     normalize_template,
 )

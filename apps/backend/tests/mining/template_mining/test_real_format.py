@@ -7,11 +7,11 @@ numbered (keycap-emoji) lines. Results use Результат / Заработа
 
 from __future__ import annotations
 
-from verasig.features.rules.template_mining.directions import detect_directions
-from verasig.features.rules.template_mining.extract import attempt_extract_signal
-from verasig.features.rules.template_mining.fields import extract_signal_fields
-from verasig.features.rules.template_mining.instruments import detect_instruments
-from verasig.features.rules.template_mining.prices import detect_prices
+from verasig.features.mining.template_mining.directions import detect_directions
+from verasig.features.mining.template_mining.extract import attempt_extract_signal
+from verasig.features.mining.template_mining.fields import extract_signal_fields
+from verasig.features.mining.template_mining.instruments import detect_instruments
+from verasig.features.mining.template_mining.prices import detect_prices
 
 REAL_SIGNAL = """Монета: XRP ☝️
 

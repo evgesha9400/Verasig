@@ -16,19 +16,19 @@ from fastapi import APIRouter, Depends, Request, status
 
 from verasig.features.feeds import message_repository
 from verasig.features.feeds.feed_job_progress import publish_logged_progress
-from verasig.features.parser_overlay.repository import read_overlay
-from verasig.features.rules.mine_result_repository import (
+from verasig.features.mining.mine_result_repository import (
     read_mine_result,
     upsert_mine_result,
 )
-from verasig.features.rules.schemas import JobOut
-from verasig.features.rules.template_mining import (
+from verasig.features.mining.template_mining import (
     ChatMessage,
     mine_template_groups,
     template_group_to_dict,
 )
+from verasig.features.parser_overlay.repository import read_overlay
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
+from verasig.foundation.http.schemas import JobOut
 from verasig.foundation.http.sse import sse_stream, start_job_or_409
 from verasig.foundation.jobs.registry import JobPublisher, job_key
 

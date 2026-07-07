@@ -2,7 +2,7 @@
 
 import re
 
-from verasig.features.rules.template_mining.extract import attempt_extract_signal
+from verasig.features.mining.template_mining.extract import attempt_extract_signal
 
 
 # --- the parser is the classifier ---

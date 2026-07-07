@@ -9,7 +9,7 @@ import asyncio
 import json
 from types import SimpleNamespace
 
-from verasig.features.rules import mine_routes
+from verasig.features.mining import mine_routes
 
 
 class _FakePublisher:
