@@ -238,19 +238,17 @@ class BackfillJobCoordinator:
     def _should_extend_newer(
         self, user_id: UUID, channel_id: int, mode: BackfillMode
     ) -> bool:
-        """REFRESH pulls only messages newer than the top cursor — but only once
-        the capture is complete. If the last run did not SUCCEED, an interrupted
-        backfill left a hole below the top cursor; REFRESH then resumes the capture
-        (extend older) instead of falsely reporting "caught up" and stranding the
-        gap until a full re-fetch.
+        """REFRESH ("fetch new messages") pulls only messages newer than the top
+        cursor, independent of any prior run's status — a failed run must never flip
+        a refresh into a backward re-capture of the whole depth window. Requires an
+        existing cursor: without one there is nothing to be "newer" than and an
+        unbounded min_id=0 fetch would ignore the depth window, so a cursorless feed
+        falls back to a depth-bounded capture (extend_older).
         """
         if mode is not BackfillMode.REFRESH:
             return False
         with self._session_factory() as session:
-            latest = backfill_job_repository.read_latest_run(
-                session, user_id, channel_id
-            )
-        return latest is not None and latest.status == BackfillJobStatus.SUCCEEDED
+            return feed_repository.read_cursor(session, user_id, channel_id) is not None
 
     def _persist_depth(
         self, user_id: UUID, channel_id: int, depth: HistoryDepth | None

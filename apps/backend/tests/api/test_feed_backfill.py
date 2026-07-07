@@ -356,9 +356,10 @@ def test_refresh_backfill_starts_new_run_and_resumes_from_cursor(client, app):
     assert listed["fetched"] == 5
 
 
-def test_refresh_on_incomplete_capture_resumes_older_not_newer(client, app):
+def test_refresh_after_failed_run_still_fetches_newer(client, app):
     token = _register(client)
-    # initial backfill crashes after the first batch (200 of 205 newest captured)
+    # initial backfill crashes after the first batch: 200 of 205 newest captured,
+    # top cursor at 205, oldest captured at 6 — a genuinely FAILED latest run
     failed = FakeSource(_channel(), _many_messages(205), fail_after_batch=1)
     _connect_and_subscribe(client, app, token, failed)
     client.post("/feeds/7/backfill", headers=_auth(token))
@@ -367,8 +368,9 @@ def test_refresh_on_incomplete_capture_resumes_older_not_newer(client, app):
     ) as response:
         "".join(response.iter_text())
 
-    # a REFRESH must finish the capture (page older) rather than fetch newer and
-    # falsely report "caught up" while the older gap remains below the top cursor
+    # REFRESH after that FAILED run must still fetch only NEWER than the top cursor:
+    # a failed prior run must never flip "fetch new messages" into a backward
+    # re-capture of the whole depth window (the reported bug).
     resumed = FakeSource(_channel(), _many_messages(205), live_ids=set(range(1, 206)))
     app.state.telegram_source_factory = lambda _link: resumed
     client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"})
@@ -378,9 +380,9 @@ def test_refresh_on_incomplete_capture_resumes_older_not_newer(client, app):
         "".join(response.iter_text())
     listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
 
-    assert resumed.requested_befores == [6]  # paged older, below the oldest captured
-    assert resumed.requested_afters == []  # never fetched newer
-    assert listed["fetched"] == 205  # the older gap was filled
+    assert resumed.requested_afters == [205]  # fetched only newer than the top cursor
+    assert resumed.requested_befores == []  # never paged backward despite the failure
+    assert listed["fetched"] == 200  # the older gap was NOT re-filled by a refresh
 
 
 def test_backfill_progress_oldest_date_descends_toward_the_past(client, app):
