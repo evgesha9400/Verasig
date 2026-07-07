@@ -24,7 +24,7 @@ export function startBackfill(token, feedId, mode = 'resume', depth = null) {
   return requestJson(`/feeds/${feedId}/backfill`, {
     method: 'POST',
     token,
-    body: { mode, ...(depth ? { depth } : {}) }
+    body: { mode, ...(depth != null ? { depth } : {}) }
   })
 }
 

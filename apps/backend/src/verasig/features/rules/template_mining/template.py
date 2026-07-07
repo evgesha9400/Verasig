@@ -355,10 +355,23 @@ def _keep_structural_lines(template: str) -> str:
     return "\n".join(kept)
 
 
+def _utf16_code_units(text: str):
+    """JS `charCodeAt` iterates UTF-16 code units; an astral char is two
+    surrogates. Mirror that so the hash matches JS for any input, not just BMP."""
+    for ch in text:
+        code = ord(ch)
+        if code > 0xFFFF:
+            code -= 0x10000
+            yield 0xD800 + (code >> 10)
+            yield 0xDC00 + (code & 0x3FF)
+        else:
+            yield code
+
+
 def hash_string(text: str) -> str:
     h = 0
-    for ch in text:
-        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    for unit in _utf16_code_units(text):
+        h = (h * 31 + unit) & 0xFFFFFFFF
     if h == 0:
         return "0"
     digits = "0123456789abcdefghijklmnopqrstuvwxyz"

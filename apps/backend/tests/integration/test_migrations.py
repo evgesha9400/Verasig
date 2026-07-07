@@ -202,6 +202,7 @@ _USER_ACCOUNT_FK_TABLES = (
     "feed_risk_config",
     "lifecycle_link",
     "unrecognized_signal",
+    "user_exchange_connection",
 )
 
 # Retired lab-benchmark tables (archive/lab-benchmark-runs); superseded by

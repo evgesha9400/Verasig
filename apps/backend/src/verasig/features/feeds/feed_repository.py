@@ -200,6 +200,8 @@ def advance_cursor(
     session: Session, user_id: UUID, external_id: int, through_external_message_id: int
 ) -> None:
     row = read_feed(session, user_id, external_id)
+    if row is None:  # feed deleted mid-backfill; nothing to advance (cf. reset_cursor)
+        return
     if through_external_message_id > (row.captured_through_external_message_id or 0):
         row.captured_through_external_message_id = through_external_message_id
 

@@ -102,6 +102,12 @@ def test_read_cursor_is_none_for_unknown_channel(db_session):
     assert feed_repository.read_cursor(db_session, uuid4(), 999) is None
 
 
+def test_advance_cursor_is_a_noop_for_a_missing_feed(db_session):
+    # a feed deleted mid-backfill must not raise on the trailing cursor advance.
+    feed_repository.advance_cursor(db_session, uuid4(), 999, 50)  # no feed row
+    assert feed_repository.read_cursor(db_session, uuid4(), 999) is None
+
+
 def test_upsert_feed_refreshes_metadata_but_preserves_first_seen_and_cursor(
     db_session,
 ):

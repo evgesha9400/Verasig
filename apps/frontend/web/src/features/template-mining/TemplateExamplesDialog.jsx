@@ -156,7 +156,7 @@ export function TemplateExamplesDialog({
         </span>
       )}
 
-      <ExtractionSummary candidate={group.examples[0]} />
+      {group.examples[0] && <ExtractionSummary candidate={group.examples[0]} />}
 
       {pageItems.map((candidate) => (
         <CandidateExample key={candidate.message.id} candidate={candidate} />

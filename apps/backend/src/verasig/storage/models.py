@@ -381,7 +381,9 @@ class UserExchangeConnectionRow(Base):
     __tablename__ = "user_exchange_connection"
 
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id"), primary_key=True
+        Uuid,
+        ForeignKey("user_account.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     exchange_id: Mapped[str] = mapped_column(String, primary_key=True)
     api_key_masked: Mapped[str] = mapped_column(String, nullable=False)
