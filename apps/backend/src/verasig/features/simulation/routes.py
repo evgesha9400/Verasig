@@ -14,9 +14,8 @@ from verasig.features.simulation.backtesting import (
 )
 from verasig.features.simulation.schemas import done_out
 from verasig.foundation.http.auth_dependencies import require_feed
-from verasig.foundation.http.errors import ApiError
-from verasig.foundation.http.sse import sse_stream
-from verasig.foundation.jobs.registry import JobAlreadyRunningError
+from verasig.foundation.http.sse import sse_stream, start_job_or_409
+from verasig.foundation.jobs.registry import job_key
 
 router = APIRouter(prefix="/feeds/{external_id}")
 
@@ -29,7 +28,7 @@ BACKTEST_PHASES = (
 
 
 def _job_key(user_id: UUID, channel_id: int) -> str:
-    return f"{user_id}:{channel_id}:backtest"
+    return job_key(user_id, channel_id, "backtest")
 
 
 async def _run_backtest_job(
@@ -64,20 +63,18 @@ async def start_backtest(
     subscription=Depends(require_feed),
 ) -> JobOut:
     key = _job_key(subscription.user_id, int(external_id))
-    try:
-        request.app.state.jobs.start(
-            key,
-            lambda publisher: _run_backtest_job(
-                publisher,
-                request.app.state.session_factory,
-                subscription.user_id,
-                int(external_id),
-                request.app.state.market_data_factory,
-                datetime.now(tz=UTC),
-            ),
-        )
-    except JobAlreadyRunningError as error:
-        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
+    start_job_or_409(
+        request.app.state.jobs,
+        key,
+        lambda publisher: _run_backtest_job(
+            publisher,
+            request.app.state.session_factory,
+            subscription.user_id,
+            int(external_id),
+            request.app.state.market_data_factory,
+            datetime.now(tz=UTC),
+        ),
+    )
     return JobOut(job_id=key)
 
 
@@ -88,6 +85,4 @@ def backtest_progress(
     subscription=Depends(require_feed),
 ):
     key = _job_key(subscription.user_id, int(external_id))
-    if not request.app.state.jobs.has_job(key):
-        raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
     return sse_stream(request.app.state.jobs, key)

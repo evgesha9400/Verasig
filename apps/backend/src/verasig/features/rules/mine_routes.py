@@ -29,11 +29,8 @@ from verasig.features.rules.template_mining import (
 )
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.http.sse import sse_stream
-from verasig.foundation.jobs.registry import (
-    JobAlreadyRunningError,
-    JobPublisher,
-)
+from verasig.foundation.http.sse import sse_stream, start_job_or_409
+from verasig.foundation.jobs.registry import JobPublisher, job_key
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/feeds/{external_id}")
@@ -75,7 +72,7 @@ def _camelize(value):
 
 
 def mine_job_key(user_id: UUID, channel_id: int) -> str:
-    return f"{user_id}:{channel_id}:mine"
+    return job_key(user_id, channel_id, "mine")
 
 
 def _to_chat_message(message) -> ChatMessage:
@@ -154,18 +151,16 @@ async def start_mine(
 ) -> JobOut:
     channel_id = int(external_id)
     key = mine_job_key(subscription.user_id, channel_id)
-    try:
-        request.app.state.jobs.start(
-            key,
-            lambda publisher: _run_mine(
-                publisher,
-                subscription.user_id,
-                channel_id,
-                request.app.state.session_factory,
-            ),
-        )
-    except JobAlreadyRunningError as error:
-        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
+    start_job_or_409(
+        request.app.state.jobs,
+        key,
+        lambda publisher: _run_mine(
+            publisher,
+            subscription.user_id,
+            channel_id,
+            request.app.state.session_factory,
+        ),
+    )
     return JobOut(job_id=key)
 
 
@@ -176,8 +171,6 @@ def mine_progress(
     subscription=Depends(require_feed),
 ):
     key = mine_job_key(subscription.user_id, int(external_id))
-    if not request.app.state.jobs.has_job(key):
-        raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
     return sse_stream(request.app.state.jobs, key)
 
 

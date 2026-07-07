@@ -8,9 +8,9 @@ cascades it away."""
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from verasig.foundation.database.upsert import upsert_timestamped_row
 from verasig.storage.models import MineResultRow
 
 
@@ -22,20 +22,10 @@ def read_mine_result(session: Session, user_id: UUID, external_id: int) -> dict 
 def upsert_mine_result(
     session: Session, user_id: UUID, external_id: int, payload: dict
 ) -> None:
-    now = datetime.now(tz=UTC)
-    statement = (
-        pg_insert(MineResultRow.__table__)
-        .values(
-            user_id=user_id,
-            external_id=external_id,
-            payload=payload,
-            created_at=now,
-            updated_at=now,
-        )
-        .on_conflict_do_update(
-            index_elements=["user_id", "external_id"],
-            set_={"payload": payload, "updated_at": now},
-        )
+    upsert_timestamped_row(
+        session,
+        MineResultRow.__table__,
+        {"user_id": user_id, "external_id": external_id},
+        {"payload": payload},
+        datetime.now(tz=UTC),
     )
-    session.execute(statement)
-    session.flush()

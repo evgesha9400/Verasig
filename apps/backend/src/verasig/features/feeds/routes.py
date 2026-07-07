@@ -33,8 +33,12 @@ from verasig.foundation.http.auth_dependencies import (
     require_feed,
 )
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.http.sse import sse_single_event, sse_stream
-from verasig.foundation.jobs.registry import JobAlreadyRunningError, JobTerminalError
+from verasig.foundation.http.sse import (
+    sse_single_event,
+    sse_stream,
+    start_job_or_409,
+)
+from verasig.foundation.jobs.registry import JobTerminalError, job_key
 from verasig.foundation.telegram.session import make_user_source
 
 router = APIRouter(prefix="/feeds")
@@ -148,7 +152,7 @@ def cancel_backfill(
 
 
 def _deletion_rescan_job_key(user_id, external_id: int) -> str:
-    return f"{user_id}:{external_id}:deletion-rescan"
+    return job_key(user_id, external_id, "deletion-rescan")
 
 
 def _require_deletion_rescan_ready(feed) -> None:
@@ -250,19 +254,17 @@ async def start_deletion_rescan(
         source = _require_connected_source(request, session, subscription.user_id)
 
     key = _deletion_rescan_job_key(subscription.user_id, channel_id)
-    try:
-        request.app.state.jobs.start(
-            key,
-            lambda publisher: _run_deletion_rescan_job(
-                publisher,
-                source,
-                subscription.user_id,
-                channel_id,
-                request.app.state.session_factory,
-            ),
-        )
-    except JobAlreadyRunningError as error:
-        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
+    start_job_or_409(
+        request.app.state.jobs,
+        key,
+        lambda publisher: _run_deletion_rescan_job(
+            publisher,
+            source,
+            subscription.user_id,
+            channel_id,
+            request.app.state.session_factory,
+        ),
+    )
     return {"jobId": key}
 
 
@@ -273,8 +275,6 @@ def deletion_rescan_progress(
     subscription=Depends(require_feed),
 ):
     key = _deletion_rescan_job_key(subscription.user_id, int(external_id))
-    if not request.app.state.jobs.has_job(key):
-        raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
     return sse_stream(request.app.state.jobs, key)
 
 

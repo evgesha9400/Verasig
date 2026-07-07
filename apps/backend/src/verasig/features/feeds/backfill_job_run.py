@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from verasig.foundation.jobs.registry import job_key
 from verasig.shared.time import format_long
 
 
@@ -47,7 +48,7 @@ class BackfillProgress:
 
 
 def backfill_job_key(user_id: UUID, channel_id: int) -> str:
-    return f"{user_id}:{channel_id}:backfill"
+    return job_key(user_id, channel_id, "backfill")
 
 
 def _stage_for_phase(phase: str) -> str:

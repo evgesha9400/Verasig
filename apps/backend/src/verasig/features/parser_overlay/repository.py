@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from verasig.foundation.database.upsert import upsert_timestamped_row
 from verasig.storage.models import ParserOverlayRow
 
 
@@ -13,14 +13,10 @@ def read_overlay(session: Session, user_id: UUID) -> dict:
 
 
 def upsert_overlay(session: Session, user_id: UUID, config: dict) -> None:
-    now = datetime.now(tz=UTC)
-    statement = (
-        pg_insert(ParserOverlayRow.__table__)
-        .values(user_id=user_id, config=config, created_at=now, updated_at=now)
-        .on_conflict_do_update(
-            index_elements=["user_id"],
-            set_={"config": config, "updated_at": now},
-        )
+    upsert_timestamped_row(
+        session,
+        ParserOverlayRow.__table__,
+        {"user_id": user_id},
+        {"config": config},
+        datetime.now(tz=UTC),
     )
-    session.execute(statement)
-    session.flush()

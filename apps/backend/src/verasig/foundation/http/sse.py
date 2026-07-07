@@ -1,9 +1,26 @@
 import json
+from collections.abc import Awaitable, Callable
 
 from sse_starlette.sse import EventSourceResponse
 
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.jobs.registry import JobRegistry
+from verasig.foundation.jobs.registry import (
+    JobAlreadyRunningError,
+    JobPublisher,
+    JobRegistry,
+)
+
+
+def start_job_or_409(
+    registry: JobRegistry,
+    key: str,
+    run: Callable[[JobPublisher], Awaitable[dict]],
+) -> None:
+    """Start a job, translating a duplicate key into the shared 409."""
+    try:
+        registry.start(key, run)
+    except JobAlreadyRunningError as error:
+        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
 
 
 def sse_stream(registry: JobRegistry, key: str) -> EventSourceResponse:
