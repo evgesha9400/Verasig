@@ -25,8 +25,7 @@ def migrated_engine(pg_url):
 _ALL_TABLES = ", ".join(
     [
         "raw_message",
-        "raw_signal_event",
-        "extracted_signal",
+        "signal",
         "deleted_signal_evidence",
         "user_account",
         "source",

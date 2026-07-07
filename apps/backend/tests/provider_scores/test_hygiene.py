@@ -9,9 +9,8 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.provider_scores.hygiene import (
     ACTIVE_USER_PROXY_ANCHOR,
@@ -35,14 +34,15 @@ def _uuid(suffix: int) -> UUID:
     return UUID(f"00000000-0000-0000-0000-{suffix:012d}")
 
 
-def _event(suffix: int, message_id: int) -> RawSignalEvent:
-    return RawSignalEvent(
+def _event(suffix: int, message_id: int) -> Signal:
+    return Signal(
         id=_uuid(suffix),
         channel_id=7,
         message_id=message_id,
         candidate_text="BTC long",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
+        symbol="BTC",
+        side=Side.LONG,
+        extracted_at=_BASE,
     )
 
 
@@ -111,11 +111,12 @@ def _signal(
     entry_low: str | None = None,
     stop_loss: str | None = None,
     take_profits: list[str] | None = None,
-) -> ExtractedSignal:
-    return ExtractedSignal(
+) -> Signal:
+    return Signal(
         id=_uuid(suffix),
-        event_id=_uuid(suffix + 100),
         channel_id=7,
+        message_id=suffix,
+        candidate_text="BTC long",
         symbol="BTC",
         side=Side.LONG,
         entry_type=entry_type,

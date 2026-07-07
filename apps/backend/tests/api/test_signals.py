@@ -7,18 +7,16 @@ from conftest import _register_user as _register
 from seed import insert_source
 
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
-_EVENT_ID = UUID("70000000-0000-0000-0000-000000000001")
 _SIGNAL_ID = UUID("70000000-0000-0000-0000-000000000002")
 
 
@@ -86,8 +84,7 @@ def _seed(app, user_id: UUID) -> None:
                 _message(3, "close BTC at 110", None),
             ],
         )
-        event_repository.insert_signal_events(session, user_id, [_event()])
-        outcome_repository.insert_extracted_signals(session, [_signal()], user_id)
+        outcome_repository.insert_signals(session, [_signal()], user_id)
         backtest_repository.insert_result(
             session,
             user_id,
@@ -123,22 +120,12 @@ def _message(message_id: int, text: str, reply_to: int | None) -> RawTelegramMes
     )
 
 
-def _event() -> RawSignalEvent:
-    return RawSignalEvent(
-        id=_EVENT_ID,
+def _signal() -> Signal:
+    return Signal(
+        id=_SIGNAL_ID,
         channel_id=7,
         message_id=1,
         candidate_text="BTC long entry",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
-    )
-
-
-def _signal() -> ExtractedSignal:
-    return ExtractedSignal(
-        id=_SIGNAL_ID,
-        event_id=_EVENT_ID,
-        channel_id=7,
         symbol="BTCUSDT",
         side=Side.LONG,
         entry_type=EntryType.LIMIT_SINGLE,

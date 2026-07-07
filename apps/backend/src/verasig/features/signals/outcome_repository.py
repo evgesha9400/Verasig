@@ -1,29 +1,32 @@
-"""Outcome repository functions.
+"""Signal repository functions.
 
-An extraction "miss" is not a stored row — it is a `raw_signal_event` with no
-matching `extracted_signal`. Misses are therefore recovered by anti-join, never
-persisted.
+Every persisted `signal` IS an extraction — the miner is the only source, and
+Confirm replaces a feed's whole signal set as one atomic projection (delete +
+insert; see `mining_confirm.confirm_mined_signals`), so there is no
+upsert-by-message dance and no de-selected family can survive a smaller
+reconfirm.
 """
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from verasig.domain.signal import ExtractedSignal
-from verasig.storage.models import ExtractedSignalRow, RawSignalEventRow
+from verasig.domain.signal import Signal
+from verasig.storage.models import SignalRow
 
 
 def _str_list(values: list) -> list[str]:
     return [str(value) for value in values]
 
 
-def _extracted_values(signal: ExtractedSignal) -> dict:
+def _signal_values(signal: Signal) -> dict:
     return {
         "id": signal.id,
-        "event_id": signal.event_id,
         "external_id": signal.channel_id,
+        "external_message_id": signal.message_id,
+        "candidate_text": signal.candidate_text,
         "symbol": signal.symbol,
         "side": signal.side.value,
         "event_type": signal.event_type.value,
@@ -36,6 +39,7 @@ def _extracted_values(signal: ExtractedSignal) -> dict:
         "confidence": signal.confidence,
         "rule_id": signal.rule_id,
         "extracted_at": signal.extracted_at,
+        "created_at": signal.extracted_at,
     }
 
 
@@ -43,46 +47,57 @@ def _with_user_id(values: dict, user_id: UUID) -> dict:
     return {**values, "user_id": user_id}
 
 
-def insert_extracted_signals(
-    session: Session, signals: list[ExtractedSignal], user_id: UUID
-) -> int:
+def insert_signals(session: Session, signals: list[Signal], user_id: UUID) -> int:
     if not signals:
         return 0
     statement = (
-        pg_insert(ExtractedSignalRow)
-        .values(
-            [_with_user_id(_extracted_values(signal), user_id) for signal in signals]
+        pg_insert(SignalRow)
+        .values([_with_user_id(_signal_values(signal), user_id) for signal in signals])
+        .on_conflict_do_nothing(
+            index_elements=["user_id", "external_id", "external_message_id"]
         )
-        .returning(ExtractedSignalRow.id)
+        .returning(SignalRow.id)
     )
     return len(session.execute(statement).fetchall())
+
+
+def delete_signals_for_channel(
+    session: Session, user_id: UUID, external_id: int
+) -> None:
+    """Clear a feed's whole signal projection before Confirm rewrites it — a
+    de-selected family must not survive a smaller reconfirm (orphan bug)."""
+    session.execute(
+        delete(SignalRow).where(
+            SignalRow.user_id == user_id,
+            SignalRow.external_id == external_id,
+        )
+    )
 
 
 def read_signal_channel(session: Session, user_id: UUID, signal_id: UUID) -> int | None:
     """The channel a signal belongs to, so a single signal can be projected
     against only its own feed instead of every feed the user owns."""
     return session.scalar(
-        select(ExtractedSignalRow.external_id).where(
-            ExtractedSignalRow.id == signal_id,
-            ExtractedSignalRow.user_id == user_id,
+        select(SignalRow.external_id).where(
+            SignalRow.id == signal_id,
+            SignalRow.user_id == user_id,
         )
     )
 
 
-def read_extracted_signals(
-    session: Session, channel_id: int, user_id: UUID
-) -> list[ExtractedSignal]:
+def read_signals(session: Session, channel_id: int, user_id: UUID) -> list[Signal]:
     rows = session.scalars(
-        select(ExtractedSignalRow).where(
-            ExtractedSignalRow.external_id == channel_id,
-            ExtractedSignalRow.user_id == user_id,
+        select(SignalRow).where(
+            SignalRow.external_id == channel_id,
+            SignalRow.user_id == user_id,
         )
     ).all()
     return [
-        ExtractedSignal(
+        Signal(
             id=row.id,
-            event_id=row.event_id,
             channel_id=row.external_id,
+            message_id=row.external_message_id,
+            candidate_text=row.candidate_text,
             symbol=row.symbol,
             side=row.side,
             event_type=row.event_type,
@@ -100,59 +115,18 @@ def read_extracted_signals(
     ]
 
 
-def read_unrecognized_event_ids(
-    session: Session, channel_id: int, user_id: UUID
-) -> list[UUID]:
-    """Event ids for this feed with no extracted signal — the misses, by
-    anti-join. A miss is the absence of an extraction, so it is derived here
-    rather than stored."""
-    has_extraction = select(ExtractedSignalRow.id).where(
-        ExtractedSignalRow.user_id == RawSignalEventRow.user_id,
-        ExtractedSignalRow.event_id == RawSignalEventRow.id,
-    )
-    statement = select(RawSignalEventRow.id).where(
-        RawSignalEventRow.user_id == user_id,
-        RawSignalEventRow.external_id == channel_id,
-        ~has_extraction.exists(),
-    )
-    return list(session.scalars(statement).all())
-
-
 def read_confirmed_template_keys(
     session: Session, user_id: UUID, external_id: int
 ) -> list[str]:
     """Distinct template keys of this feed's persisted signals — the accepted
     families to reseed when a verified feed is reopened (rule_id == template_key)."""
     statement = (
-        select(ExtractedSignalRow.rule_id)
+        select(SignalRow.rule_id)
         .where(
-            ExtractedSignalRow.user_id == user_id,
-            ExtractedSignalRow.external_id == external_id,
-            ExtractedSignalRow.rule_id.is_not(None),
+            SignalRow.user_id == user_id,
+            SignalRow.external_id == external_id,
+            SignalRow.rule_id.is_not(None),
         )
         .distinct()
     )
     return list(session.scalars(statement).all())
-
-
-def _excluded_except(statement, row_type, keep: set[str]) -> dict:
-    return {
-        column.name: getattr(statement.excluded, column.name)
-        for column in row_type.__table__.columns
-        if column.name not in keep
-    }
-
-
-def record_outcome(session: Session, signal: ExtractedSignal, user_id: UUID) -> None:
-    """Recompute one event's projection: upsert the extracted signal by
-    (user_id, event_id). Re-recording the same extraction is a no-op change."""
-    statement = pg_insert(ExtractedSignalRow).values(
-        _with_user_id(_extracted_values(signal), user_id)
-    )
-    statement = statement.on_conflict_do_update(
-        index_elements=["user_id", "event_id"],
-        set_=_excluded_except(
-            statement, ExtractedSignalRow, {"id", "user_id", "event_id"}
-        ),
-    )
-    session.execute(statement)

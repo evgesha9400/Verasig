@@ -37,10 +37,8 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     } <= tables
     assert "user_telegram_link" not in tables
 
-    extracted_columns = {
-        column["name"] for column in inspector.get_columns("extracted_signal")
-    }
-    assert {"user_id"} <= extracted_columns
+    signal_columns = {column["name"] for column in inspector.get_columns("signal")}
+    assert {"user_id"} <= signal_columns
 
     backfill_columns = {
         column["name"] for column in inspector.get_columns("backfill_job_run")
@@ -68,7 +66,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     inspector = inspect(create_engine(pg_url, future=True))
 
     required_user_tables = {
-        "extracted_signal",
+        "signal",
     }
     nullable_user_tables = {
         table
@@ -82,7 +80,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         index["name"]
         for table in (
             "backtest_result",
-            "extracted_signal",
+            "signal",
             "deleted_signal_evidence",
             "backfill_job_run",
         )
@@ -90,7 +88,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     }
     assert {
         "ix_backtest_result_user_channel_completed",
-        "ix_extracted_signal_user_channel",
+        "ix_signal_user_channel",
         "ix_deleted_signal_evidence_channel",
         "ix_backfill_job_run_user_channel_started",
         "ix_backfill_job_run_status",
@@ -99,7 +97,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     check_names = {
         check["name"]
         for table in (
-            "extracted_signal",
+            "signal",
             "deleted_signal_evidence",
             "backfill_job_run",
             "feed_risk_config",
@@ -107,8 +105,8 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         for check in inspector.get_check_constraints(table)
     }
     assert {
-        "ck_extracted_signal_side",
-        "ck_extracted_signal_event_type",
+        "ck_signal_side",
+        "ck_signal_event_type",
         "ck_deleted_signal_evidence_confidence",
         "ck_deleted_signal_evidence_method",
         "ck_backfill_job_run_status",
@@ -120,13 +118,13 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     foreign_key_names = {
         foreign_key["name"]
         for table in (
-            "raw_signal_event",
+            "signal",
             "lifecycle_link",
         )
         for foreign_key in inspector.get_foreign_keys(table)
     }
     assert {
-        "fk_raw_signal_event_message",
+        "fk_signal_message",
         "fk_lifecycle_link_root_signal",
     } <= foreign_key_names
 
@@ -188,7 +186,7 @@ def test_feed_source_id_cascades_from_source_after_upgrade(pg_url):
 _USER_ACCOUNT_FK_TABLES = (
     "backfill_job_run",
     "backtest_result",
-    "extracted_signal",
+    "signal",
     "feed",
     "feed_risk_config",
     "lifecycle_link",
@@ -207,19 +205,41 @@ _RETIRED_LAB_TABLES = {
 }
 
 
-def test_unrecognized_signal_and_extraction_method_dropped_after_upgrade(pg_url):
+def test_unrecognized_signal_and_extraction_method_dropped_after_upgrade():
     """0021 drops the unrecognized_signal table and the constant
-    extracted_signal.extraction_method column — misses are an anti-join now."""
+    extracted_signal.extraction_method column — misses are an anti-join now.
+
+    Checked at 0021 itself (0022 later drops extracted_signal outright), on its
+    own container: the shared `pg_url` fixture is upgraded to head by other
+    tests in this module, and alembic upgrade never moves a DB backwards.
+    """
+    with PostgresContainer("postgres:16") as pg:
+        url = pg.get_connection_url().replace("psycopg2", "psycopg")
+        cfg = Config("alembic.ini")
+        cfg.set_main_option("sqlalchemy.url", url)
+        command.upgrade(cfg, "0021_drop_unrecognized")
+
+        engine = create_engine(url, future=True)
+        inspector = inspect(engine)
+        assert "unrecognized_signal" not in set(inspector.get_table_names())
+        extracted_columns = {
+            column["name"] for column in inspector.get_columns("extracted_signal")
+        }
+        assert "extraction_method" not in extracted_columns
+        engine.dispose()
+
+
+def test_signal_collapses_event_and_extraction_after_upgrade(pg_url):
+    """0022 collapses raw_signal_event + extracted_signal into one `signal`
+    table — every persisted signal IS an extraction, keyed by message."""
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", pg_url)
     command.upgrade(cfg, "head")
 
-    inspector = inspect(create_engine(pg_url, future=True))
-    assert "unrecognized_signal" not in set(inspector.get_table_names())
-    extracted_columns = {
-        column["name"] for column in inspector.get_columns("extracted_signal")
-    }
-    assert "extraction_method" not in extracted_columns
+    tables = set(inspect(create_engine(pg_url, future=True)).get_table_names())
+    assert "signal" in tables
+    assert "raw_signal_event" not in tables
+    assert "extracted_signal" not in tables
 
 
 def test_no_model_migration_drift_after_upgrade(pg_url):

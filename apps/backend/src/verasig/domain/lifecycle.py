@@ -35,7 +35,7 @@ class FoldStep(BaseModel):
 
 
 class FoldedSignal(BaseModel):
-    root_signal_id: UUID  # the NEW_ENTRY ExtractedSignal id
+    root_signal_id: UUID  # the NEW_ENTRY Signal id
     symbol: str
     side: Side
     timeline: list[FoldStep]  # time-ordered by posted_at

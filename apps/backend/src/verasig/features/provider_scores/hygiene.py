@@ -10,9 +10,8 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import ExtractedSignal
+from verasig.domain.signal import Signal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 
 ACTIVE_USER_PROXY_ANCHOR = 10_000.0
@@ -46,7 +45,7 @@ def _uuid_text(value: UUID) -> str:
     return value.urn.removeprefix("urn:uuid:")
 
 
-def _event_ref(event: RawSignalEvent) -> str:
+def _event_ref(event: Signal) -> str:
     return f"event:{_uuid_text(event.id)}"
 
 
@@ -67,7 +66,7 @@ def _append_unique(refs: list[str], ref: str) -> None:
         refs.append(ref)
 
 
-def _signal_ref(signal: ExtractedSignal) -> str:
+def _signal_ref(signal: Signal) -> str:
     return f"signal:{_uuid_text(signal.id)}"
 
 
@@ -149,7 +148,7 @@ def _confirmed_signal_deletions(
 
 
 def measure_deletion_behaviour(
-    events: list[RawSignalEvent],
+    events: list[Signal],
     deletions: list[DeletedSignalEvidence],
 ) -> Measurement:
     if not events:
@@ -172,19 +171,19 @@ def measure_deletion_behaviour(
     )
 
 
-def _has_entry(signal: ExtractedSignal) -> bool:
+def _has_entry(signal: Signal) -> bool:
     return signal.entry_type is not None or signal.entry_low is not None
 
 
-def _has_stop(signal: ExtractedSignal) -> bool:
+def _has_stop(signal: Signal) -> bool:
     return signal.stop_loss is not None
 
 
-def _has_take_profit(signal: ExtractedSignal) -> bool:
+def _has_take_profit(signal: Signal) -> bool:
     return len(signal.take_profits) > 0
 
 
-def _completion_ratio(signal: ExtractedSignal) -> float:
+def _completion_ratio(signal: Signal) -> float:
     present = sum(
         [
             _has_entry(signal),
@@ -195,7 +194,7 @@ def _completion_ratio(signal: ExtractedSignal) -> float:
     return present / 3
 
 
-def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
+def measure_completeness(signals: list[Signal]) -> Measurement:
     if not signals:
         return ExcludedMeasurement(
             name="completeness",
@@ -211,7 +210,7 @@ def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
 
 
 def measure_parser_confidence(
-    signals: list[ExtractedSignal],
+    signals: list[Signal],
     missed_event_ids: list[UUID],
 ) -> Measurement:
     """Recognition rate: extracted signals over all candidate events. A candidate
@@ -319,7 +318,7 @@ def _normalize_signal_frequency(raw_value: float) -> float:
 
 
 def measure_signal_frequency(
-    events: list[RawSignalEvent],
+    events: list[Signal],
     messages: list[RawTelegramMessage],
 ) -> Measurement:
     if not messages:

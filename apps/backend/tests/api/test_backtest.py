@@ -12,20 +12,18 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.domain.simulation import Kline
 from verasig.features.feeds import (
     deletion_repository,
     feed_repository,
     message_repository,
 )
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
-_EVENT_ID = UUID("70000000-0000-0000-0000-000000000001")
 _SIGNAL_ID = UUID("70000000-0000-0000-0000-000000000002")
 
 
@@ -139,30 +137,17 @@ def _seed(app, user_id: UUID) -> None:
                 )
             ],
         )
-        event_repository.insert_signal_events(
-            session,
-            user_id,
-            [
-                RawSignalEvent(
-                    id=_EVENT_ID,
-                    channel_id=7,
-                    message_id=1,
-                    candidate_text="BTC long entry 100 sl 95 tp 110",
-                    materialized_by=MaterializationPath.SEED_HEURISTIC,
-                    created_at=_BASE,
-                )
-            ],
-        )
-        outcome_repository.insert_extracted_signals(session, [_signal()], user_id)
+        outcome_repository.insert_signals(session, [_signal()], user_id)
         feed_repository.set_status(session, user_id, 7, "verified")
         session.commit()
 
 
-def _signal() -> ExtractedSignal:
-    return ExtractedSignal(
+def _signal() -> Signal:
+    return Signal(
         id=_SIGNAL_ID,
-        event_id=_EVENT_ID,
         channel_id=7,
+        message_id=1,
+        candidate_text="BTC long entry 100 sl 95 tp 110",
         symbol="BTCUSDT",
         side=Side.LONG,
         entry_type=EntryType.LIMIT_SINGLE,

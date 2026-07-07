@@ -12,9 +12,8 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
     deletion_repository,
@@ -22,7 +21,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.provider_scores.scorecard import build_provider_score
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import outcome_repository
 
 _CHANNEL_ID = 7
 _USER_ID = UUID("20000000-0000-0000-0000-000000999999")
@@ -76,22 +75,12 @@ def _message(message_id: int, days: int, views: int, forwards: int):
     )
 
 
-def _event(suffix: int, message_id: int) -> RawSignalEvent:
-    return RawSignalEvent(
+def _signal(suffix: int, message_id: int) -> Signal:
+    return Signal(
         id=_uuid(suffix),
         channel_id=_CHANNEL_ID,
         message_id=message_id,
         candidate_text="BTC long",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
-    )
-
-
-def _signal(signal_id: int, event_id: UUID) -> ExtractedSignal:
-    return ExtractedSignal(
-        id=_uuid(signal_id),
-        event_id=event_id,
-        channel_id=_CHANNEL_ID,
         symbol="BTC",
         side=Side.LONG,
         entry_type=EntryType.MARKET,
@@ -114,8 +103,6 @@ def _id_gap(suffix: int, message_id: int) -> DeletedSignalEvidence:
 
 
 def _seed_score_inputs(session_factory) -> None:
-    event_a = _event(1, 1)
-    event_b = _event(2, 2)
     with session_factory() as session:
         account_repository.insert_account(session, _account())
         insert_source(session, _USER_ID)
@@ -129,10 +116,9 @@ def _seed_score_inputs(session_factory) -> None:
                 _message(3, 2, views=3000, forwards=300),
             ],
         )
-        # event_a yields a signal; event_b has none → a miss, by anti-join.
-        event_repository.insert_signal_events(session, _USER_ID, [event_a, event_b])
-        outcome_repository.insert_extracted_signals(
-            session, [_signal(3, event_a.id)], _USER_ID
+        # every persisted signal IS an extraction — there are no stored misses.
+        outcome_repository.insert_signals(
+            session, [_signal(3, 1), _signal(4, 2)], _USER_ID
         )
         deletion_repository.upsert_deletion_evidence(session, _USER_ID, [_id_gap(5, 4)])
         session.commit()
@@ -143,13 +129,7 @@ def _score_from_repo(session_factory):
         feed = feed_repository.find_feed(session, _USER_ID, "@pilot")
         channel = feed_repository.read_feed_channel(session, _USER_ID, feed.external_id)
         messages = message_repository.read_messages(session, _USER_ID, _CHANNEL_ID)
-        events = event_repository.read_signal_events(session, _USER_ID, _CHANNEL_ID)
-        signals = outcome_repository.read_extracted_signals(
-            session, _CHANNEL_ID, _USER_ID
-        )
-        missed_event_ids = outcome_repository.read_unrecognized_event_ids(
-            session, _CHANNEL_ID, _USER_ID
-        )
+        signals = outcome_repository.read_signals(session, _CHANNEL_ID, _USER_ID)
         deletions = deletion_repository.read_deletion_evidence(
             session, _USER_ID, _CHANNEL_ID
         )
@@ -160,9 +140,9 @@ def _score_from_repo(session_factory):
         channel=channel,
         messages=messages,
         message_count=message_count,
-        events=events,
+        events=signals,
         signals=signals,
-        missed_event_ids=missed_event_ids,
+        missed_event_ids=[],
         deletions=deletions,
         computed_at=_BASE,
     )[0]
@@ -171,10 +151,7 @@ def _score_from_repo(session_factory):
 def _stored_refs(session_factory) -> set[str]:
     with session_factory() as session:
         messages = message_repository.read_messages(session, _USER_ID, _CHANNEL_ID)
-        events = event_repository.read_signal_events(session, _USER_ID, _CHANNEL_ID)
-        signals = outcome_repository.read_extracted_signals(
-            session, _CHANNEL_ID, _USER_ID
-        )
+        signals = outcome_repository.read_signals(session, _CHANNEL_ID, _USER_ID)
         deletions = deletion_repository.read_deletion_evidence(
             session, _USER_ID, _CHANNEL_ID
         )
@@ -183,9 +160,9 @@ def _stored_refs(session_factory) -> set[str]:
         )
     refs = {f"channel:{_CHANNEL_ID}"} if message_count == 3 else set()
     refs.update(f"message:{item.channel_id}/{item.message_id}" for item in messages)
-    # misses are raw_signal_events with no extracted signal, so their refs are
-    # among the event refs already collected here.
-    refs.update(f"event:{item.id.urn.removeprefix('urn:uuid:')}" for item in events)
+    # every signal doubles as the "candidate event" input to the score, so its
+    # id resolves under both the event: and signal: ref prefixes.
+    refs.update(f"event:{item.id.urn.removeprefix('urn:uuid:')}" for item in signals)
     refs.update(f"signal:{item.id.urn.removeprefix('urn:uuid:')}" for item in signals)
     refs.update(
         f"deletion:{item.id.urn.removeprefix('urn:uuid:')}" for item in deletions

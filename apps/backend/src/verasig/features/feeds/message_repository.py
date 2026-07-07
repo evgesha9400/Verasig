@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.message import RawTelegramMessage
-from verasig.storage.models import RawMessageRow, RawSignalEventRow
+from verasig.storage.models import RawMessageRow, SignalRow
 
 
 def _message_values(user_id: UUID, message: RawTelegramMessage) -> dict:
@@ -152,15 +152,15 @@ def read_message_page(
 def is_candidate_message(
     session: Session, user_id: UUID, external_id: int, message_id: int
 ) -> bool:
-    """Whether one message materialized a signal event — a single EXISTS instead
+    """Whether one message yielded a persisted signal — a single EXISTS instead
     of scanning every candidate id just to classify one deletion."""
     return bool(
         session.scalar(
             select(
                 exists().where(
-                    RawSignalEventRow.user_id == user_id,
-                    RawSignalEventRow.external_id == external_id,
-                    RawSignalEventRow.external_message_id == message_id,
+                    SignalRow.user_id == user_id,
+                    SignalRow.external_id == external_id,
+                    SignalRow.external_message_id == message_id,
                 )
             )
         )
@@ -172,9 +172,9 @@ def candidate_message_ids(
 ) -> set[int]:
     return set(
         session.scalars(
-            select(RawSignalEventRow.external_message_id).where(
-                RawSignalEventRow.user_id == user_id,
-                RawSignalEventRow.external_id == external_id,
+            select(SignalRow.external_message_id).where(
+                SignalRow.user_id == user_id,
+                SignalRow.external_id == external_id,
             )
         ).all()
     )

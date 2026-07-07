@@ -11,22 +11,20 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
     deletion_repository,
     feed_repository,
     message_repository,
 )
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import outcome_repository
 from verasig.features.signals.views import present_signals
 from verasig.features.simulation import repository as backtest_repository
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _USER_ID = UUID("60000000-0000-0000-0000-000000000001")
-_EVENT_ID = UUID("60000000-0000-0000-0000-000000000002")
 _SIGNAL_ID = UUID("60000000-0000-0000-0000-000000000003")
 
 
@@ -89,7 +87,6 @@ def test_present_signals_orders_newest_first(db_session):
     _seed(db_session)
     # a second, later signal from a different message must sort ahead of the first
     later = _BASE + timedelta(days=1)
-    event_id = UUID("60000000-0000-0000-0000-0000000000a2")
     signal_id = UUID("60000000-0000-0000-0000-0000000000a3")
     with db_session.begin_nested():
         message_repository.insert_messages(
@@ -108,27 +105,14 @@ def test_present_signals_orders_newest_first(db_session):
                 )
             ],
         )
-        event_repository.insert_signal_events(
+        outcome_repository.insert_signals(
             db_session,
-            _USER_ID,
             [
-                RawSignalEvent(
-                    id=event_id,
+                Signal(
+                    id=signal_id,
                     channel_id=7,
                     message_id=20,
                     candidate_text="ETH long entry",
-                    materialized_by=MaterializationPath.SEED_HEURISTIC,
-                    created_at=later,
-                )
-            ],
-        )
-        outcome_repository.insert_extracted_signals(
-            db_session,
-            [
-                ExtractedSignal(
-                    id=signal_id,
-                    event_id=event_id,
-                    channel_id=7,
                     symbol="ETHUSDT",
                     side=Side.LONG,
                     entry_type=EntryType.LIMIT_SINGLE,
@@ -194,8 +178,7 @@ def _seed(
             _message(3, "close BTC at 110", None),
         ],
     )
-    event_repository.insert_signal_events(session, _USER_ID, [_event(message_text)])
-    outcome_repository.insert_extracted_signals(session, [_signal()], _USER_ID)
+    outcome_repository.insert_signals(session, [_signal(message_text)], _USER_ID)
     if with_backtest:
         backtest_repository.insert_result(
             session,
@@ -249,22 +232,12 @@ def _message(message_id: int, text: str, reply_to: int | None) -> RawTelegramMes
     )
 
 
-def _event(candidate_text: str = "BTC long entry") -> RawSignalEvent:
-    return RawSignalEvent(
-        id=_EVENT_ID,
+def _signal(candidate_text: str = "BTC long entry") -> Signal:
+    return Signal(
+        id=_SIGNAL_ID,
         channel_id=7,
         message_id=1,
         candidate_text=candidate_text,
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
-    )
-
-
-def _signal() -> ExtractedSignal:
-    return ExtractedSignal(
-        id=_SIGNAL_ID,
-        event_id=_EVENT_ID,
-        channel_id=7,
         symbol="BTCUSDT",
         side=Side.LONG,
         entry_type=EntryType.LIMIT_SINGLE,

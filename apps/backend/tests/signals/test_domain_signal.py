@@ -1,14 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
 
 from verasig.domain.signal import (
     EntryType,
-    ExtractedSignal,
     Side,
+    Signal,
     SignalEventType,
     TradeIntent,
 )
@@ -31,41 +31,44 @@ def test_trade_intent_rejects_empty_symbol():
 
 
 def test_trade_intent_is_provenance_free():
-    assert "event_id" not in TradeIntent.model_fields
     assert "channel_id" not in TradeIntent.model_fields
+    assert "message_id" not in TradeIntent.model_fields
 
 
-def test_extracted_signal_extends_trade_intent():
-    assert issubclass(ExtractedSignal, TradeIntent)
+def test_signal_extends_trade_intent():
+    assert issubclass(Signal, TradeIntent)
 
 
-def test_extracted_signal_has_no_parser_confidence():
-    assert "parser_confidence" not in ExtractedSignal.model_fields
+def test_signal_has_no_parser_confidence():
+    assert "parser_confidence" not in Signal.model_fields
 
 
-def test_extracted_signal_normalizes_symbol_via_inherited_validator():
+def test_signal_normalizes_symbol_via_inherited_validator():
     assert _signal(symbol="btc").symbol == "BTCUSDT"
 
 
-def _signal(**overrides) -> ExtractedSignal:
+def _signal(**overrides) -> Signal:
     base = {
-        "event_id": uuid4(),
         "channel_id": 1,
+        "message_id": 2,
+        "candidate_text": "BTC long entry 65k",
         "symbol": "BTCUSDT",
         "side": Side.LONG,
     }
     base.update(overrides)
-    return ExtractedSignal(**base)
+    return Signal(**base)
 
 
-def test_extracted_signal_constructs_with_required_symbol_side_and_linkage():
+def test_signal_constructs_with_required_symbol_side_and_linkage():
     signal = _signal()
     assert signal.symbol == "BTCUSDT"
     assert signal.side is Side.LONG
     assert signal.channel_id == 1
+    assert signal.message_id == 2
+    assert signal.candidate_text == "BTC long entry 65k"
 
 
-def test_extracted_signal_defaults_provenance_and_optionals():
+def test_signal_defaults_provenance_and_optionals():
     signal = _signal()
     assert isinstance(signal.id, UUID)
     assert signal.event_type is SignalEventType.NEW_ENTRY
@@ -75,24 +78,29 @@ def test_extracted_signal_defaults_provenance_and_optionals():
     assert isinstance(signal.extracted_at, datetime)
 
 
-def test_extracted_signal_rejects_empty_symbol():
+def test_signal_rejects_empty_symbol():
     with pytest.raises(ValidationError):
         _signal(symbol="")
 
 
-def test_extracted_signal_rejects_missing_side():
+def test_signal_rejects_missing_side():
     with pytest.raises(ValidationError):
-        ExtractedSignal(event_id=uuid4(), channel_id=1, symbol="BTCUSDT")
+        Signal(
+            channel_id=1,
+            message_id=2,
+            candidate_text="BTC long entry 65k",
+            symbol="BTCUSDT",
+        )
 
 
-def test_extracted_signal_take_profits_are_ordered_decimals():
+def test_signal_take_profits_are_ordered_decimals():
     signal = _signal(side=Side.SHORT, take_profits=["67000", "68000"])
     assert signal.take_profits == [Decimal("67000"), Decimal("68000")]
 
 
-def test_extracted_signal_has_no_extraction_method():
+def test_signal_has_no_extraction_method():
     # extraction is always deterministic; the constant field/enum are dropped.
-    assert "extraction_method" not in ExtractedSignal.model_fields
+    assert "extraction_method" not in Signal.model_fields
 
 
 def test_side_has_long_and_short():

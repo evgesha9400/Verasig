@@ -2,11 +2,11 @@
 
 `TradeIntent` is the provenance-free parsed trade (required = symbol + side);
 the deterministic extractor emits it from text alone, and the symbol is
-normalized here so callers get it for free. `ExtractedSignal` extends
-`TradeIntent` with the linkage/provenance recorded against a `RawSignalEvent`
-(`event_id`, `channel_id`, `rule_id`), always supplied by the caller, which
-holds the event. A "miss" is not a stored entity — it is simply a
-`RawSignalEvent` with no `ExtractedSignal` (recovered by anti-join).
+normalized here so callers get it for free. `Signal` extends `TradeIntent`
+with the linkage/provenance of the candidate message it was extracted from
+(`channel_id`, `message_id`, `candidate_text`, `rule_id`) — one row per
+message, since the miner is the only extractor and every persisted signal IS
+an extraction (there are no stored "misses").
 """
 
 from datetime import datetime, timezone
@@ -64,10 +64,11 @@ class TradeIntent(BaseModel):
         return self
 
 
-class ExtractedSignal(TradeIntent):
+class Signal(TradeIntent):
     id: UUID = Field(default_factory=uuid4)
-    event_id: UUID
     channel_id: int
+    message_id: int  # (channel_id, message_id) unique — one signal per message
+    candidate_text: str  # exact slice fed to extraction (verbatim message text)
     event_type: SignalEventType = SignalEventType.NEW_ENTRY
     rule_id: str | None = None
     extracted_at: datetime = Field(default_factory=_now)

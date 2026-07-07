@@ -11,10 +11,9 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.domain.simulation import Kline
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
@@ -23,7 +22,6 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.signals import (
-    event_repository,
     lifecycle_link_repository,
     outcome_repository,
 )
@@ -87,22 +85,12 @@ def _message() -> RawTelegramMessage:
     )
 
 
-def _event() -> RawSignalEvent:
-    return RawSignalEvent(
-        id=_uuid(1),
+def _signal() -> Signal:
+    return Signal(
+        id=_uuid(2),
         channel_id=7,
         message_id=1,
         candidate_text="BTC long entry 100 sl 95 tp 110",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
-    )
-
-
-def _signal() -> ExtractedSignal:
-    return ExtractedSignal(
-        id=_uuid(2),
-        event_id=_uuid(1),
-        channel_id=7,
         symbol="BTCUSDT",
         side=Side.LONG,
         entry_type=EntryType.LIMIT_SINGLE,
@@ -152,7 +140,7 @@ def test_run_backtest_simulates_signals_and_persists_summary(session_factory):
 
     with session_factory() as session:
         result = backtest_repository.read_latest_results(session, account.id)[7]
-        signals = outcome_repository.read_extracted_signals(session, 7, account.id)
+        signals = outcome_repository.read_signals(session, 7, account.id)
         subscription = feed_repository.read_feed(session, account.id, 7)
 
     assert market_data.calls == [("BTCUSDT", _BASE, _NOW, "1")]
@@ -211,8 +199,7 @@ def _seed(session_factory) -> UserAccount:
         insert_source(session, account.id)
         feed_repository.create_feed(session, account.id, _channel(), _BASE)
         message_repository.insert_messages(session, account.id, [_message()])
-        event_repository.insert_signal_events(session, account.id, [_event()])
-        outcome_repository.insert_extracted_signals(session, [_signal()], account.id)
+        outcome_repository.insert_signals(session, [_signal()], account.id)
         session.commit()
         return account
 

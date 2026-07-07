@@ -20,8 +20,8 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
+from verasig.domain.signal import Side, Signal
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
     deletion_repository,
@@ -29,7 +29,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.deletion_rescan import RescanAborted, rescan
-from verasig.features.signals import event_repository
+from verasig.features.signals import outcome_repository
 
 _CHANNEL_ID = 7
 _USER_ID = UUID("90000000-0000-0000-0000-000000000001")
@@ -182,7 +182,7 @@ def _message(message_id: int, text: str) -> RawTelegramMessage:
 
 
 def _seed_corpus(session_factory) -> None:
-    """Channel + messages {1,2,3}; message 2 is a signal candidate (RawSignalEvent)."""
+    """Channel + messages {1,2,3}; message 2 is a signal candidate (has a Signal)."""
     with session_factory() as session:
         account_repository.insert_account(session, _account())
         insert_source(session, _USER_ID)
@@ -196,17 +196,18 @@ def _seed_corpus(session_factory) -> None:
                 _message(3, "still chatting"),
             ],
         )
-        event_repository.insert_signal_events(
+        outcome_repository.insert_signals(
             session,
-            _USER_ID,
             [
-                RawSignalEvent(
+                Signal(
                     channel_id=_CHANNEL_ID,
                     message_id=2,
                     candidate_text="BTC long 65k",
-                    materialized_by=MaterializationPath.SEED_HEURISTIC,
+                    symbol="BTCUSDT",
+                    side=Side.LONG,
                 )
             ],
+            _USER_ID,
         )
         session.commit()
 

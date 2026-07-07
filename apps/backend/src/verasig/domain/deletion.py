@@ -39,4 +39,4 @@ class DeletedSignalEvidence(BaseModel):
     original_text: str | None = None  # retained iff CONFIRMED/LIVE_EVENT
     first_seen_at: datetime | None = None  # the stored captured_at, when CONFIRMED
     detected_at: datetime = Field(default_factory=_now)
-    was_signal_candidate: bool  # was a RawSignalEvent?
+    was_signal_candidate: bool  # did the message yield a persisted signal?

@@ -7,11 +7,11 @@ from conftest import _register_token as _register
 from fakes import FakeSource, FakeTelegramAuth
 from fakes import channel as _channel
 
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
+from verasig.domain.signal import Side, Signal
 from verasig.features.accounts.tokens import read_user_id
 from verasig.features.feeds import feed_repository, message_repository
-from verasig.features.signals import event_repository
+from verasig.features.signals import outcome_repository
 
 _CHANNEL_ID = 7
 _INSTANT = datetime(2026, 6, 1, tzinfo=timezone.utc)
@@ -104,22 +104,23 @@ def _seed_feed_state(
     with app.state.session_factory() as session:
         message_repository.insert_messages(session, user_id, messages)
         if signal_message_ids:
-            event_repository.insert_signal_events(
+            outcome_repository.insert_signals(
                 session,
+                [_signal(message_id) for message_id in sorted(signal_message_ids)],
                 user_id,
-                [_event(message_id) for message_id in sorted(signal_message_ids)],
             )
         feed_repository.set_status(session, user_id, _CHANNEL_ID, status)
         session.commit()
 
 
-def _event(message_id: int) -> RawSignalEvent:
-    return RawSignalEvent(
+def _signal(message_id: int) -> Signal:
+    return Signal(
         channel_id=_CHANNEL_ID,
         message_id=message_id,
         candidate_text="BTC long 65000",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_INSTANT,
+        symbol="BTCUSDT",
+        side=Side.LONG,
+        extracted_at=_INSTANT,
     )
 
 

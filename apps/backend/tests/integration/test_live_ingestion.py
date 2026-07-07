@@ -7,8 +7,8 @@ from seed import insert_source
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.deletion import DeletionConfidence, DeletionMethod
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import DeliveryMode, RawTelegramMessage
+from verasig.domain.signal import Side, Signal
 from verasig.domain.telegram import (
     TelegramDeletionEvent,
     TelegramDeliveryEvent,
@@ -21,7 +21,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.live import ingest_live
-from verasig.features.signals import event_repository
+from verasig.features.signals import outcome_repository
 
 _CHANNEL_ID = 7
 _USER_ID = UUID("a0000000-0000-0000-0000-000000000001")
@@ -111,17 +111,18 @@ def _seed_captured_signal(session_factory, message: RawTelegramMessage) -> None:
         insert_source(session, _USER_ID)
         feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
         message_repository.insert_messages(session, _USER_ID, [message])
-        event_repository.insert_signal_events(
+        outcome_repository.insert_signals(
             session,
-            _USER_ID,
             [
-                RawSignalEvent(
+                Signal(
                     channel_id=_CHANNEL_ID,
                     message_id=message.message_id,
                     candidate_text=message.text or "",
-                    materialized_by=MaterializationPath.SEED_HEURISTIC,
+                    symbol="BTCUSDT",
+                    side=Side.LONG,
                 )
             ],
+            _USER_ID,
         )
         session.commit()
 

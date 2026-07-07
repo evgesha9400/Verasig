@@ -128,64 +128,40 @@ class RawMessageRow(Base):
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
-# --- Candidate events + extraction outputs ------------------------------------
-# JSONB holds list/map fields; enums stored as their value.
+# --- Signals: one row per candidate message that yielded an extraction --------
+# The miner is the only extractor and Confirm persists a candidate message and
+# its extracted trade together, 1:1, in one transaction — so there is no
+# separate "candidate event" row. Every persisted `signal` IS an extraction;
+# there are no stored "misses". JSONB holds list fields; enums store as value.
 
 
-class RawSignalEventRow(Base):
-    __tablename__ = "raw_signal_event"
+class SignalRow(Base):
+    __tablename__ = "signal"
     __table_args__ = (
         UniqueConstraint(
             "user_id",
             "external_id",
             "external_message_id",
-            name="uq_raw_signal_event_msg",
+            name="uq_signal_msg",
         ),
         ForeignKeyConstraint(
-            _MESSAGE_FK,
-            _MESSAGE_REF,
-            name="fk_raw_signal_event_message",
-            ondelete="CASCADE",
+            _MESSAGE_FK, _MESSAGE_REF, name="fk_signal_message", ondelete="CASCADE"
         ),
         ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_raw_signal_event_feed", ondelete="CASCADE"
+            _FEED_FK, _FEED_REF, name="fk_signal_feed", ondelete="CASCADE"
         ),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
-    external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
-    materialized_by: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
-class ExtractedSignalRow(Base):
-    __tablename__ = "extracted_signal"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "event_id",
-            name="uq_extracted_signal_user_event",
-        ),
-        enum_check("side", Side, name="ck_extracted_signal_side"),
-        enum_check(
-            "event_type", SignalEventType, name="ck_extracted_signal_event_type"
-        ),
-        Index("ix_extracted_signal_user_channel", "user_id", "external_id"),
+        enum_check("side", Side, name="ck_signal_side"),
+        enum_check("event_type", SignalEventType, name="ck_signal_event_type"),
+        Index("ix_signal_user_channel", "user_id", "external_id"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
     )
-    event_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("raw_signal_event.id", ondelete="CASCADE"), nullable=False
-    )
     external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False)
     event_type: Mapped[str] = mapped_column(String, nullable=False)
@@ -198,6 +174,9 @@ class ExtractedSignalRow(Base):
     confidence: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     rule_id: Mapped[str | None] = mapped_column(String, nullable=True)
     extracted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
 
@@ -432,7 +411,7 @@ class LifecycleLinkRow(Base):
         ),
         ForeignKeyConstraint(
             ["root_signal_id"],
-            ["extracted_signal.id"],
+            ["signal.id"],
             name="fk_lifecycle_link_root_signal",
             ondelete="CASCADE",
         ),

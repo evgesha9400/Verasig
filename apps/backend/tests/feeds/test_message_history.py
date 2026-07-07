@@ -5,12 +5,10 @@ from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import feed_repository, message_repository
 from verasig.features.feeds.message_views import read_history
-from verasig.features.signals import event_repository
 
 
 def _instant(day: int = 1) -> datetime:
@@ -77,25 +75,6 @@ def _seed(db_session):
                 reply_to_message_id=2,
                 has_media=True,
                 raw_payload={"photo": {"id": 1}},
-            ),
-        ],
-    )
-    # Only message 1 and 3 are signal candidates; message 2 is not.
-    event_repository.insert_signal_events(
-        db_session,
-        account.id,
-        [
-            RawSignalEvent(
-                channel_id=7,
-                message_id=1,
-                candidate_text="BTC long",
-                materialized_by=MaterializationPath.SEED_HEURISTIC,
-            ),
-            RawSignalEvent(
-                channel_id=7,
-                message_id=3,
-                candidate_text="ETH long",
-                materialized_by=MaterializationPath.SEED_HEURISTIC,
             ),
         ],
     )

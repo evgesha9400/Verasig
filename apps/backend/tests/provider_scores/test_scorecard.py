@@ -9,10 +9,9 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.score import DEFAULT_WEIGHTS, WEIGHTS_VERSION, ScoreWeights
-from verasig.domain.signal import EntryType, ExtractedSignal, Side
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.provider_scores.hygiene import (
     ExcludedMeasurement,
@@ -71,22 +70,12 @@ def _message(message_id: int) -> RawTelegramMessage:
     )
 
 
-def _event(suffix: int, message_id: int) -> RawSignalEvent:
-    return RawSignalEvent(
+def _signal(suffix: int, message_id: int) -> Signal:
+    return Signal(
         id=_uuid(suffix),
         channel_id=7,
         message_id=message_id,
         candidate_text="BTC long",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_computed_at(),
-    )
-
-
-def _signal(suffix: int, event_id: UUID) -> ExtractedSignal:
-    return ExtractedSignal(
-        id=_uuid(suffix),
-        event_id=event_id,
-        channel_id=7,
         symbol="BTC",
         side=Side.LONG,
         entry_type=EntryType.MARKET,
@@ -108,7 +97,7 @@ def _snapshot_rescan_proof(suffix: int) -> DeletedSignalEvidence:
     )
 
 
-def _sim_outcome(signal: ExtractedSignal) -> SimOutcome:
+def _sim_outcome(signal: Signal) -> SimOutcome:
     return SimOutcome(
         folded_signal_id=signal.id,
         kind=SimOutcomeKind.R_MULTIPLE,
@@ -232,13 +221,13 @@ def test_scorecard_reweights_measurements_deterministically():
 
 
 def test_provider_score_builder_measures_all_present_components():
-    event = _event(1, 10)
+    signal = _signal(2, 10)
     score, explanation = build_provider_score(
         channel=_channel(),
         messages=[_message(10), _message(11)],
         message_count=2,
-        events=[event],
-        signals=[_signal(2, event.id)],
+        events=[signal],
+        signals=[signal],
         missed_event_ids=[],
         deletions=[_snapshot_rescan_proof(3)],
         computed_at=_computed_at(),
@@ -259,13 +248,12 @@ def test_provider_score_builder_measures_all_present_components():
 
 
 def test_provider_score_builder_adds_simulation_components_when_outcomes_exist():
-    event = _event(4, 10)
-    signal = _signal(5, event.id)
+    signal = _signal(5, 10)
     score, explanation = build_provider_score(
         channel=_channel(),
         messages=[_message(10), _message(11)],
         message_count=2,
-        events=[event],
+        events=[signal],
         signals=[signal],
         missed_event_ids=[],
         deletions=[_snapshot_rescan_proof(6)],

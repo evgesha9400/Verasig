@@ -100,7 +100,7 @@ def _is_signal_deletion(confidence: str, was_candidate: bool) -> bool:
     """A CONFIRMED deletion of a signal candidate is a signal deletion (ADR 0016).
 
     `was_signal_candidate` is authoritative: it is set at detection time iff the
-    deleted message had a `RawSignalEvent`, which only the miner writes on
+    deleted message had a persisted `signal`, which only the miner writes on
     Confirm — so no unconfirmed candidacy can reach here.
     """
     return confidence == "CONFIRMED" and bool(was_candidate)

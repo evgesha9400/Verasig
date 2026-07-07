@@ -1,9 +1,9 @@
 """Mining Confirmed read endpoint end-to-end (resume source for Verify).
 
 GET /feeds/{id}/mining/confirmed lists the accepted template keys recovered from
-persisted ExtractedSignals (``rule_id`` == ``template_key``) — no re-mine, no
-migration. Only signal-bearing families ever appear. Mirrors the confirm-route
-harness so the two endpoints share exactly one setup path.
+persisted Signals (``rule_id`` == ``template_key``) — no re-mine, no migration.
+Only signal-bearing families ever appear. Mirrors the confirm-route harness so
+the two endpoints share exactly one setup path.
 """
 
 from conftest import (
