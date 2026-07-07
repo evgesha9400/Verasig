@@ -92,6 +92,18 @@ def test_market_entry_fills_at_next_kline_open_before_exit_checks():
     assert outcome.r_multiple == pytest.approx(2.0)
 
 
+def test_zero_risk_when_stop_equals_entry_returns_unfilled_without_dividing():
+    # stop == entry leaves no risk unit; the R-multiple division must not blow up.
+    folded = _folded(
+        timeline=[_step(effective_stop_loss=Decimal("100"), leg_price=Decimal("100"))]
+    )
+
+    outcome = ProviderStatedPolicy().simulate(folded, [_bar()])
+
+    assert outcome.kind is SimOutcomeKind.UNFILLED
+    assert outcome.r_multiple is None
+
+
 def test_limit_entry_stays_unfilled_when_price_never_reaches_entry():
     folded = _folded()
     bars = [

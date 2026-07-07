@@ -90,14 +90,24 @@ def rename_account(
 def request_email_change(
     session: Session, account: UserAccount, new_email: str
 ) -> UserAccount:
-    return set_pending_email(session, account.id, normalize_email(new_email))
+    normalized = normalize_email(new_email)
+    existing = find_by_email(session, normalized)
+    if existing is not None and existing.id != account.id:
+        raise EmailTakenError(normalized)
+    return set_pending_email(session, account.id, normalized)
 
 
 def confirm_email_change(
     session: Session, account: UserAccount, new_email: str
 ) -> UserAccount:
-    if account.pending_email != normalize_email(new_email):
+    normalized = normalize_email(new_email)
+    if account.pending_email != normalized:
         raise PendingEmailMismatchError()
+    # the address may have been claimed between request and confirm; reject with a
+    # typed error rather than letting the unique constraint 500 on apply.
+    existing = find_by_email(session, normalized)
+    if existing is not None and existing.id != account.id:
+        raise EmailTakenError(normalized)
     applied = apply_pending_email(session, account.id)
     if applied is None:
         raise PendingEmailMismatchError()

@@ -80,6 +80,31 @@ def test_service_restart_marks_running_backfill_run_failed(session_factory):
     assert feed.status == "failed"
 
 
+def test_service_restart_restores_reviewed_status_from_persisted_run(session_factory):
+    # A backfill that started from a reviewed feed must restore that status on a
+    # restart-driven recovery. The previous status is persisted on the run row, so
+    # a FRESH coordinator (empty in-memory state, as after a restart) still reads it.
+    with session_factory() as session:
+        account = account_repository.insert_account(session, _account())
+        insert_source(session, account.id)
+        feed_repository.create_feed(session, account.id, _channel(), _instant())
+        run = backfill_job_repository.create_run(
+            session, account.id, 7, _instant(), previous_status="verified"
+        )
+        feed_repository.set_status(session, account.id, 7, "backfilling")
+        session.commit()
+
+    coordinator = BackfillJobCoordinator(session_factory, JobRegistry(), batch_size=200)
+    coordinator.mark_interrupted_runs_failed()
+
+    with session_factory() as session:
+        recovered = backfill_job_repository.read_run(session, run.id)
+        feed = feed_repository.read_feed(session, account.id, 7)
+
+    assert recovered.status == "failed"  # the run itself still records the failure
+    assert feed.status == "verified"  # but the reviewed feed status is restored
+
+
 async def test_refresh_without_cursor_falls_back_to_depth_bounded_capture(
     session_factory, monkeypatch
 ):

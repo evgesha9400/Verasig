@@ -489,3 +489,26 @@ async def test_telethon_live_events_yields_delete_notice():
     assert isinstance(event, TelegramDeletionEvent)
     assert event.channel_id == 1
     assert event.message_id == 10
+
+
+async def test_poll_channel_survives_transient_poll_error():
+    # A single poll iteration raising must not kill the per-channel poll loop:
+    # it logs and retries, so live capture for that channel keeps running.
+    calls: list[int] = []
+
+    class _Stub:
+        _poll_interval_seconds = 0
+
+        async def _poll_channel_once(self, _state, channel_id: int) -> None:
+            calls.append(channel_id)
+            if len(calls) == 1:
+                raise RuntimeError("transient network blip")
+
+    task = asyncio.create_task(TelethonSource._poll_channel(_Stub(), None, 5))
+    while len(calls) < 2:  # survived the first raise and polled again
+        await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert len(calls) >= 2

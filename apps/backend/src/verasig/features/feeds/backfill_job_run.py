@@ -32,6 +32,7 @@ class BackfillJobRun:
     cursor_message_id: int | None
     error_code: str | None
     error_message: str | None
+    previous_status: str | None = None
 
 
 @dataclass(frozen=True)

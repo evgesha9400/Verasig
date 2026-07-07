@@ -5,6 +5,7 @@
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -28,6 +29,8 @@ from verasig.domain.telegram import (
     TelegramLiveEvent,
 )
 from verasig.domain.telegram_ports import TelegramSource
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -273,8 +276,19 @@ class TelethonSource(TelegramSource):
             self._client.remove_event_handler(delete_handler, delete_event)
 
     async def _poll_channel(self, state: _LiveEventState, channel_id: int) -> None:
+        # One channel's transient poll failure (network blip, flood-wait) must not
+        # kill the task and silently stop live capture for that channel: log it and
+        # retry next interval. Cancellation is cooperative shutdown — re-raise it.
         while True:
-            await self._poll_channel_once(state, channel_id)
+            try:
+                await self._poll_channel_once(state, channel_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "live.poll channel=%s poll failed; retrying next interval",
+                    channel_id,
+                )
             await asyncio.sleep(self._poll_interval_seconds)
 
     async def _poll_channel_once(self, state: _LiveEventState, channel_id: int) -> None:

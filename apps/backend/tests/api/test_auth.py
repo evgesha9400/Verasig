@@ -54,6 +54,27 @@ def test_register_rejects_password_shorter_than_eight_characters(client):
     assert response.status_code == 422
 
 
+def test_register_rejects_password_longer_than_bcrypt_limit(client):
+    # bcrypt raises on >72-byte input; reject at the schema edge with 422, not 500.
+    payload = _register_payload()
+    payload["password"] = "a" * 73
+
+    response = client.post("/auth/register", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_login_rejects_password_longer_than_bcrypt_limit(client):
+    _register(client)
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "ada@example.com", "password": "a" * 73},
+    )
+
+    assert response.status_code == 422
+
+
 def test_register_rejects_blank_first_name(client):
     payload = _register_payload()
     payload["firstName"] = "   "

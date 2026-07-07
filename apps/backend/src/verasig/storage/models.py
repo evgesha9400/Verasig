@@ -371,6 +371,10 @@ class BackfillJobRunRow(Base):
     )
     error_code: Mapped[str | None] = mapped_column(String, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Feed status captured when the run started, so a run interrupted by a
+    # service restart can restore the reviewed status instead of falling to
+    # "failed" (the in-memory map does not survive the restart).
+    previous_feed_status: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class UserExchangeConnectionRow(Base):
