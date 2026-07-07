@@ -42,17 +42,14 @@ describe('mineApi', () => {
     const body = await confirmMining('jwt-token', '7', ['tpl_a', 'tpl_b'])
 
     expect(body.feedStatus).toBe('verified')
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/feeds/7/mining/confirm',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer jwt-token'
-        },
-        body: JSON.stringify({ acceptedTemplateKeys: ['tpl_a', 'tpl_b'] })
-      }
-    )
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mining/confirm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({ acceptedTemplateKeys: ['tpl_a', 'tpl_b'] })
+    })
   })
 
   it('reads the accepted template keys for a feed (GET, bearer auth)', async () => {

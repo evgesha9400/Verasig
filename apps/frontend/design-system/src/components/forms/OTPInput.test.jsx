@@ -6,12 +6,7 @@ import { OTPInput } from './OTPInput.jsx'
 function Controlled({ inputMode, length = 5 }) {
   const [value, setValue] = useState('')
   return (
-    <OTPInput
-      length={length}
-      value={value}
-      onChange={setValue}
-      inputMode={inputMode}
-    />
+    <OTPInput length={length} value={value} onChange={setValue} inputMode={inputMode} />
   )
 }
 

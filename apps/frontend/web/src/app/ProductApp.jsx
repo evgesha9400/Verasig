@@ -344,11 +344,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     breadcrumb = activeFeed.name
     onExit = exitToFeeds
     pipeline = (
-      <Pipeline
-        current={pipelineStep}
-        plan={user.plan}
-        onStepBack={requestStepBack}
-      />
+      <Pipeline current={pipelineStep} plan={user.plan} onStepBack={requestStepBack} />
     )
 
     const stepTitles = {

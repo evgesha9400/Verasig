@@ -51,7 +51,12 @@ export function SignalRow({
 }) {
   const initials = (provider || '').slice(0, 2)
   const interactive = Boolean(onClick)
-  const cls = ['vrs-srow', `s-${status}`, interactive ? 'is-interactive' : '', className]
+  const cls = [
+    'vrs-srow',
+    `s-${status}`,
+    interactive ? 'is-interactive' : '',
+    className
+  ]
     .filter(Boolean)
     .join(' ')
   function onKeyDown(event) {

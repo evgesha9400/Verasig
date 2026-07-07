@@ -418,8 +418,8 @@ function CTA({ loginPath, signupPath }) {
           first source.
         </h2>
         <p className="mk-cta__sub">
-          Bring a channel and see whether it holds up on its own history — before a
-          cent is at risk.
+          Bring a channel and see whether it holds up on its own history — before a cent
+          is at risk.
         </p>
         <div className="mk-cta__btns">
           <Button

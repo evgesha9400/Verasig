@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { RadioCard } from './RadioCard.jsx'
 
 describe('RadioCard', () => {
-  it("keeps its own Enter/Space activation even when the caller passes onKeyDown", () => {
+  it('keeps its own Enter/Space activation even when the caller passes onKeyDown', () => {
     const onClick = vi.fn()
     const callerKeyDown = vi.fn()
     const { getByRole } = render(

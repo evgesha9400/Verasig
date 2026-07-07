@@ -3,7 +3,10 @@ import { useState } from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TemplateMiningPage } from './TemplateMiningPage.jsx'
-import { FEED_MESSAGES, mineTemplateGroups } from '../../domain/template-mining/index.js'
+import {
+  FEED_MESSAGES,
+  mineTemplateGroups
+} from '../../domain/template-mining/index.js'
 
 const feed = { id: 'apex', name: 'Apex Crypto Calls' }
 
@@ -72,9 +75,7 @@ describe('TemplateMiningPage', () => {
     expect(screen.getByRole('tab', { name: /Parsed/i })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: /Back to review/i }))
-    expect(
-      screen.getByRole('button', { name: /Continue to verify/i })
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Continue to verify/i })).toBeTruthy()
   })
 
   it('Apply all accepts the suggested templates', async () => {
@@ -119,12 +120,8 @@ describe('TemplateMiningPage', () => {
 
   it('no longer offers the alternate-source disclosure', () => {
     renderPage()
-    expect(
-      screen.queryByText(/Use sample or pasted messages instead/i)
-    ).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: /Run template mining/i })
-    ).toBeNull()
+    expect(screen.queryByText(/Use sample or pasted messages instead/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Run template mining/i })).toBeNull()
   })
 
   it('never renders NaN', async () => {
@@ -233,7 +230,11 @@ describe('TemplateMiningPage — mine failure', () => {
 
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(screen.getByText(/Server exploded/)).toBeTruthy()
-    expect(fireToast).toHaveBeenCalledWith('rejected', 'Mining failed', 'Server exploded')
+    expect(fireToast).toHaveBeenCalledWith(
+      'rejected',
+      'Mining failed',
+      'Server exploded'
+    )
 
     onStartMine.mockClear()
     await user.click(screen.getByRole('button', { name: /Try again/i }))
