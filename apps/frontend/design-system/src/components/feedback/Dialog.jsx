@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 const CSS = `
 .vrs-dialog__scrim {
   position: fixed; inset: 0; z-index: var(--z-modal);
@@ -42,6 +44,19 @@ export function Dialog({
   className = '',
   children
 }) {
+  useEffect(() => {
+    if (!open) return
+    const previouslyFocused = document.activeElement
+    function onKeyDown(event) {
+      if (event.key === 'Escape') onClose && onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      previouslyFocused && previouslyFocused.focus && previouslyFocused.focus()
+    }
+  }, [open, onClose])
+
   if (!open) return null
   return (
     <div className="vrs-dialog__scrim" onClick={onClose}>
@@ -58,7 +73,12 @@ export function Dialog({
             {description && <div className="vrs-dialog__desc">{description}</div>}
           </div>
           {onClose && (
-            <button className="vrs-dialog__close" aria-label="Close" onClick={onClose}>
+            <button
+              className="vrs-dialog__close"
+              type="button"
+              aria-label="Close"
+              onClick={onClose}
+            >
               ×
             </button>
           )}

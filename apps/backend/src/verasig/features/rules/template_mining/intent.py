@@ -125,12 +125,15 @@ def classify_intent(text: str, fields: StructuredFields | None = None) -> str:
     has_direction = bool(fields.direction)
     market_marker = bool(_MARKET_MARKER.search(lower)) or bool(_MARKET_RU.search(lower))
 
+    # A fully-structured setup (instrument+direction+entry+SL+TP) is a new signal
+    # even when it contains result-ish words like "target"; decide completeness
+    # before the result heuristic can mislabel it.
+    if _is_complete_setup(fields, market_marker):
+        return "new_signal"
     if _looks_like_result(lower):
         return "result"
     if _any_match(STRONG_UPDATE_MARKERS, lower):
         return "update"
-    if _is_complete_setup(fields, market_marker):
-        return "new_signal"
     if _any_match(SOFT_UPDATE_MARKERS, lower):
         return "update"
 

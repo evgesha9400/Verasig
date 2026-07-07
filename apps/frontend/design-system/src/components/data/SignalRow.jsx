@@ -50,11 +50,26 @@ export function SignalRow({
   ...rest
 }) {
   const initials = (provider || '').slice(0, 2)
-  const cls = ['vrs-srow', `s-${status}`, onClick ? 'is-interactive' : '', className]
+  const interactive = Boolean(onClick)
+  const cls = ['vrs-srow', `s-${status}`, interactive ? 'is-interactive' : '', className]
     .filter(Boolean)
     .join(' ')
+  function onKeyDown(event) {
+    rest.onKeyDown && rest.onKeyDown(event)
+    if (event.defaultPrevented) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onClick(event)
+  }
   return (
-    <div className={cls} onClick={onClick} {...rest}>
+    <div
+      className={cls}
+      {...rest}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={interactive ? onKeyDown : undefined}
+    >
       <span className="vrs-srow__rail" aria-hidden="true" />
       <div className="vrs-srow__main">
         <div className="vrs-srow__sym">{symbol}</div>

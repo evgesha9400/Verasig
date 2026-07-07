@@ -1,5 +1,5 @@
 import { act, render } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mergeReviewedFeedState, useWorkflowState } from './useWorkflowState.js'
 
 const reviewedFeed = {
@@ -69,6 +69,28 @@ describe('useWorkflowState', () => {
   beforeEach(() => {
     installTestStorage()
     localStorage.clear()
+  })
+
+  it('clears the previous toast timer so a rapid second toast is not cut short', () => {
+    vi.useFakeTimers()
+    try {
+      const getWorkflow = renderWorkflow()
+
+      act(() => getWorkflow().fireToast('info', 'A', 'first'))
+      act(() => vi.advanceTimersByTime(2000))
+      act(() => getWorkflow().fireToast('info', 'B', 'second'))
+
+      // The first toast's original 4200ms deadline passes; its stale timer must
+      // not clear the second toast that only just appeared.
+      act(() => vi.advanceTimersByTime(2300))
+      expect(getWorkflow().toast?.title).toBe('B')
+
+      // The second toast clears on its own deadline.
+      act(() => vi.advanceTimersByTime(2000))
+      expect(getWorkflow().toast).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it.each(['verified', 'analyzed'])(

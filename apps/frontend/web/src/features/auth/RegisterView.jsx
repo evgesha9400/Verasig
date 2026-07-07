@@ -15,8 +15,10 @@ export function RegisterView({ onRegister, onLogin }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [nameTouched, setNameTouched] = useState(false)
 
   async function submitRegistration() {
+    setNameTouched(true)
     const parsed = splitFullName(name)
     if (parsed.error) {
       setError(parsed.error)
@@ -39,7 +41,10 @@ export function RegisterView({ onRegister, onLogin }) {
     }
   }
 
-  const { error: fullNameError } = splitFullName(name)
+  // Only surface the inline name error once the field has been interacted with
+  // (blurred or submit attempted), matching how the other fields gate errors.
+  const { error: nameValidationError } = splitFullName(name)
+  const fullNameError = nameTouched ? nameValidationError : null
   function handleSubmit(event) {
     event.preventDefault()
     void submitRegistration()
@@ -68,6 +73,7 @@ export function RegisterView({ onRegister, onLogin }) {
               error={fullNameError}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={() => setNameTouched(true)}
               iconLeft={<Icon name="users" size={16} />}
               placeholder="e.g. Mara Voss"
             />

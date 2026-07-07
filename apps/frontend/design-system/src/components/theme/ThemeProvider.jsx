@@ -85,14 +85,31 @@ function useStoredThemeState() {
   return useMemo(() => [theme, setTheme], [theme, setTheme])
 }
 
+function useHadStoredTheme() {
+  // Captured at first render (before the store-on-mount effect writes) so a
+  // stored/user choice is distinguishable from the 'dark' fallback.
+  return useState(() => {
+    if (typeof localStorage === 'undefined') return false
+    try {
+      const theme = localStorage.getItem(THEME_STORAGE_KEY)
+      return theme === 'light' || theme === 'dark'
+    } catch {
+      return false
+    }
+  })[0]
+}
+
 export function ThemeProvider({ initialTheme, children }) {
   const themeState = useStoredThemeState()
   const setTheme = themeState[1]
+  const hadStoredTheme = useHadStoredTheme()
 
   useEffect(() => {
-    if (!initialTheme) return
+    // Only seed from initialTheme when nothing was stored — never clobber a
+    // stored/toggled user choice on mount or prop change.
+    if (!initialTheme || hadStoredTheme) return
     setTheme(initialTheme)
-  }, [initialTheme, setTheme])
+  }, [initialTheme, hadStoredTheme, setTheme])
 
   return <ThemeContext.Provider value={themeState}>{children}</ThemeContext.Provider>
 }

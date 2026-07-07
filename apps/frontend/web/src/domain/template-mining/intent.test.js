@@ -20,6 +20,14 @@ describe('classifyIntent — new signals', () => {
   it('classifies a no-entry signal with risk levels as new_signal', () => {
     expect(intentOf('BTC LONG\nSL 67400\nTP 69000\nTP 70500')).toBe('new_signal')
   })
+
+  it('keeps a complete setup a new_signal despite result-ish words', () => {
+    // completeness is decided before the result heuristic, so "targets ... hit"
+    // in an otherwise complete fresh setup does not flip it to a result.
+    expect(
+      intentOf('XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355\nlet targets get hit')
+    ).toBe('new_signal')
+  })
 })
 
 describe('classifyIntent — results', () => {

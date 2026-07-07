@@ -39,6 +39,19 @@ describe('SourceCard', () => {
     expect(onClick).toHaveBeenCalledOnce()
   })
 
+  it('forwards the style prop on the clickable branch', () => {
+    render(
+      <SourceCard
+        name="Telegram"
+        kind="src"
+        onClick={vi.fn()}
+        style={{ width: '320px' }}
+      />
+    )
+    const card = screen.getByRole('button', { name: /telegram/i })
+    expect(card.style.width).toBe('320px')
+  })
+
   it('lets children replace the default desc/foot body', () => {
     const { container } = render(
       <SourceCard name="Bybit" kind="exchange">

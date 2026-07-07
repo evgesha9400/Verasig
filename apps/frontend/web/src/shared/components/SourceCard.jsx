@@ -61,7 +61,7 @@ export function SourceCard({
 
   if (onClick) {
     return (
-      <InteractiveCard className={cls} onClick={onClick}>
+      <InteractiveCard className={cls} style={style} onClick={onClick}>
         {content}
       </InteractiveCard>
     )

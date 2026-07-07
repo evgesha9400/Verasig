@@ -246,6 +246,10 @@ export function Icon({ name, size = 18, fill = false, style }) {
       </g>
     )
   }
+  const glyph = P[name]
+  if (!glyph && import.meta.env?.DEV) {
+    console.warn(`[Icon] unknown icon name: "${name}"`)
+  }
   return (
     <svg
       viewBox="0 0 24 24"
@@ -258,7 +262,7 @@ export function Icon({ name, size = 18, fill = false, style }) {
       strokeLinejoin="round"
       style={style}
     >
-      {P[name]}
+      {glyph}
     </svg>
   )
 }

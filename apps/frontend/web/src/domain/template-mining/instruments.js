@@ -103,7 +103,12 @@ const PAIR_CONFIDENCE = 0.85
 // exposes the capture-group span so only the ticker (not the label) is replaced.
 // Allow a #/$ prefix and digits in the ticker so "#1INCH" / "1000PEPE" are caught.
 const COIN_LABEL = /Монет[а-яё]*\s*:?\s*[#$]?([A-Za-z0-9]{2,10})/dgiu
-const BARE_TICKER = /(?<![A-Za-z0-9])([A-Z]{2,8})(?![A-Za-z0-9])/g
+// A bare ticker, optionally carrying a concatenated crypto quote ("LINKUSDT"),
+// so a slash-less pair still splits into base + quote instead of being swallowed
+// whole. Non-greedy base + longest-first quote alternation keeps the split at the
+// quote boundary (LINK|USDT, not LINKUSD|T).
+const BARE_TICKER =
+  /(?<![A-Za-z0-9])([A-Z]{2,8}?)(USDT|USDC|USD|PERP|BTC|ETH)?(?![A-Za-z0-9])/g
 const HAS_LETTER = /[A-Za-z]/
 
 function toUsdt(ticker) {
@@ -220,12 +225,16 @@ function collectBareTickerHits(text, hits) {
   let match
   BARE_TICKER.lastIndex = 0
   while ((match = BARE_TICKER.exec(text)) !== null) {
-    if (!CRYPTO_TICKERS.has(match[1])) continue
+    const base = match[1]
+    if (!CRYPTO_TICKERS.has(base)) continue
+    const quote = match[2]
     hits.push({
       start: match.index,
       end: match.index + match[0].length,
-      normalized: toUsdt(match[1]),
-      raw: match[1],
+      // an explicit concatenated quote is kept verbatim (LINKUSDT, ETHBTC);
+      // a bare base defaults to the USDT quote, as before.
+      normalized: quote ? `${base}${quote}` : toUsdt(base),
+      raw: match[0],
       confidence: PAIR_CONFIDENCE
     })
   }

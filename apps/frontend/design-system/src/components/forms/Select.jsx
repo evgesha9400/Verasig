@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 const CSS = `
 .vrs-select { position: relative; display: flex; flex-direction: column; gap: 6px; }
 .vrs-select__label { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--fw-medium); color: var(--text-body); }
@@ -31,19 +33,26 @@ export function Select({
   label,
   options,
   disabled = false,
+  id,
   className = '',
   children,
   ...rest
 }) {
+  const generatedId = useId()
+  const fieldId = id || generatedId
   const cls = ['vrs-select', disabled ? 'is-disabled' : '', className]
     .filter(Boolean)
     .join(' ')
   return (
     <div className={cls}>
-      {label && <label className="vrs-select__label">{label}</label>}
+      {label && (
+        <label className="vrs-select__label" htmlFor={fieldId}>
+          {label}
+        </label>
+      )}
       <div className="vrs-select__box">
-        <select disabled={disabled} {...rest}>
-          {options
+        <select id={fieldId} disabled={disabled} {...rest}>
+          {Array.isArray(options) && options.length
             ? options.map((o) => {
                 const value = typeof o === 'string' ? o : o.value
                 const text = typeof o === 'string' ? o : o.label

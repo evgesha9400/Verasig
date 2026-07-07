@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+
 const CSS = `
 .vrs-seg {
   display: inline-flex;
@@ -101,9 +103,16 @@ export function SegmentedControl({
   className = '',
   ...rest
 }) {
+  const radioRefs = useRef({})
+
   function choose(next) {
     if (next == null || next === value) return
     onChange && onChange(next)
+  }
+
+  function focusValue(next) {
+    const node = next != null && radioRefs.current[next]
+    node && node.focus()
   }
 
   function onKeyDown(e) {
@@ -123,7 +132,11 @@ export function SegmentedControl({
         : e.key === 'End'
           ? enabled[enabled.length - 1]
           : nextEnabledOption(options, value, direction)
-    choose(next && optionValue(next))
+    const nextValue = next && optionValue(next)
+    choose(nextValue)
+    // Roving tabindex alone repoints the focusable segment; move real DOM focus
+    // onto it so keyboard navigation actually lands where it says it does.
+    focusValue(nextValue)
   }
 
   const cls = ['vrs-seg', size !== 'md' ? `vrs-seg__${size}` : '', className]
@@ -149,6 +162,9 @@ export function SegmentedControl({
         return (
           <button
             key={nextValue}
+            ref={(node) => {
+              radioRefs.current[nextValue] = node
+            }}
             type="button"
             role="radio"
             aria-checked={selected}

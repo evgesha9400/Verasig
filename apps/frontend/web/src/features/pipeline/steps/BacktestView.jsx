@@ -110,9 +110,9 @@ function ScoreRing({ value, size = 132 }) {
 export function BacktestView({ chat, onComplete, skipRun = false }) {
   const [phase, setPhase] = useState(skipRun ? 'done' : 'running')
   const [step, setStep] = useState(skipRun ? 4 : 0)
-  const score = (skipRun && chat.score) || 88,
-    winRate = (skipRun && chat.winRate) || 66.4,
-    pnl = (skipRun && chat.pnl) || 47.3
+  const score = skipRun && chat.score != null ? chat.score : 88,
+    winRate = skipRun && chat.winRate != null ? chat.winRate : 66.4,
+    pnl = skipRun && chat.pnl != null ? chat.pnl : 47.3
 
   useEffect(() => {
     if (phase !== 'running') return

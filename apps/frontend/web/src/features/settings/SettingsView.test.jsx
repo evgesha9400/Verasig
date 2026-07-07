@@ -85,6 +85,31 @@ describe('SettingsView', () => {
     expect(screen.getByText(/may contain only letters/)).toBeTruthy()
   })
 
+  it('disables Resume subscription while the request is in flight', async () => {
+    fetch.mockReturnValue(new Promise(() => {}))
+    const cancelling = { ...user, plan: 'operator', cancelAt: 'Aug 1, 2026' }
+
+    render(
+      <SettingsView
+        authToken="jwt-token"
+        user={cancelling}
+        onUpdateUser={vi.fn()}
+        onToast={vi.fn()}
+      />
+    )
+    const resume = screen.getByRole('button', { name: /Resume subscription/i })
+    expect(resume.disabled).toBe(false)
+
+    fireEvent.click(resume)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /Resume subscription/i }).disabled
+      ).toBe(true)
+    )
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('surfaces backend validation errors in the toast path', async () => {
     const onUpdateUser = vi.fn()
     const onToast = vi.fn()

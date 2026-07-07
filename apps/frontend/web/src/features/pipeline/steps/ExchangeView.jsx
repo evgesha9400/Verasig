@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Button,
   Input,
@@ -20,7 +20,12 @@ export function ExchangeView({ onConnected, bybitConnected }) {
   const [connectingId, setConnectingId] = useState(null) // verify in progress
   const [key, setKey] = useState('J7n2Kp9XvR4mQ1wL')
   const [secret, setSecret] = useState('x9Tt3FqLm2Vb8RkD5cWnA1pZ')
+  const verifyTimerRef = useRef(null)
   const valid = key.trim().length >= 12 && secret.trim().length >= 12
+
+  // Clear any in-flight verify timer on unmount so its callback never fires a
+  // setState after the view is gone.
+  useEffect(() => () => clearTimeout(verifyTimerRef.current), [])
   const selectedDest = EXCHANGES.find((d) => d.id === selected)
   // Only Bybit exists today; its connection state is owned by the app, not duplicated here.
   const isConnectedId = (id) => id === 'bybit' && bybitConnected
@@ -51,7 +56,7 @@ export function ExchangeView({ onConnected, bybitConnected }) {
     if (!valid || connectingId) return
     const wasConnected = isConnectedId(id)
     setConnectingId(id)
-    setTimeout(() => {
+    verifyTimerRef.current = setTimeout(() => {
       setConnectingId(null)
       if (wasConnected) {
         // reconfigured in place — collapse, stay on the chooser (truth already true)

@@ -30,7 +30,7 @@ export function InteractiveCard({
     <Card
       as={tag}
       href={tag === 'a' ? href : undefined}
-      variant={selected ? 'selected' : 'interactive'}
+      interactive
       selected={selected}
       padded={false}
       className={['vrs-interactive-card', className].filter(Boolean).join(' ')}

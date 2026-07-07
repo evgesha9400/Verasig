@@ -71,8 +71,9 @@ export function OverlayManager({ overlay, onSave }) {
     )
   }
   const addPhrase = () => {
-    if (!phrase.trim()) return
-    save({ rejectPhrases: [...current.rejectPhrases, phrase.trim()] })
+    const trimmed = phrase.trim()
+    if (!trimmed || current.rejectPhrases.includes(trimmed)) return
+    save({ rejectPhrases: [...current.rejectPhrases, trimmed] })
     setPhrase('')
   }
   const removePhrase = (value) =>
@@ -157,7 +158,7 @@ export function OverlayManager({ overlay, onSave }) {
       </OverlayGroup>
 
       <OverlayGroup label="Reject phrases">
-        {current.rejectPhrases.map((value) => (
+        {[...new Set(current.rejectPhrases)].map((value) => (
           <OverlayRow
             key={value}
             label={value}

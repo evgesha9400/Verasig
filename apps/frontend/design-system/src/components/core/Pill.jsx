@@ -33,8 +33,10 @@ const CSS = `
 .vrs-pill__pending.vrs-pill__outline { border-color: color-mix(in srgb, var(--pending-500) 40%, transparent); }
 .vrs-pill__profit { color: var(--verified-500); }
 .vrs-pill__profit.vrs-pill__soft { background: color-mix(in srgb, var(--verified-500) 14%, transparent); }
+.vrs-pill__profit.vrs-pill__outline { border-color: color-mix(in srgb, var(--verified-500) 40%, transparent); }
 .vrs-pill__loss { color: var(--rejected-500); }
 .vrs-pill__loss.vrs-pill__soft { background: color-mix(in srgb, var(--rejected-500) 14%, transparent); }
+.vrs-pill__loss.vrs-pill__outline { border-color: color-mix(in srgb, var(--rejected-500) 40%, transparent); }
 `
 if (typeof document !== 'undefined' && !document.getElementById('vrs-pill-css')) {
   const s = document.createElement('style')

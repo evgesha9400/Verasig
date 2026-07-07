@@ -8,10 +8,10 @@ const CSS = `
 .vrs-card:is(button, a) { appearance: none; font: inherit; text-align: left; text-decoration: none; width: 100%; }
 .vrs-card:is(button) { cursor: default; }
 .vrs-card__pad { padding: var(--space-5); }
-.vrs-card__interactive { cursor: pointer; }
-.vrs-card__interactive:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
-.vrs-card__interactive:active { transform: translateY(1px); }
-.vrs-card__interactive:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--shadow-md); }
+.vrs-card.vrs-card__interactive { cursor: pointer; }
+.vrs-card.vrs-card__interactive:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.vrs-card.vrs-card__interactive:active { transform: translateY(1px); }
+.vrs-card.vrs-card__interactive:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--shadow-md); }
 .vrs-card__selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--glow-soft); }
 .vrs-card__overlay { background: var(--surface-overlay); box-shadow: var(--shadow-pop); }
 .vrs-card__glow { border-color: transparent; box-shadow: var(--glow-signal); }

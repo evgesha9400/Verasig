@@ -50,6 +50,10 @@ def test_returns_nothing_when_no_direction_word_or_emoji_exists():
     assert len(detect_directions("Good morning team, waiting for NY session")) == 0
 
 
+def test_does_not_treat_bare_calls_prose_as_a_direction():
+    assert len(detect_directions("premium leveraged calls and 1:1 mentoring")) == 0
+
+
 # --- emojis are lower confidence ---
 def test_reads_a_green_circle_as_buy():
     assert "BUY" in _sides("\U0001f7e2 GOLD entry 2320")

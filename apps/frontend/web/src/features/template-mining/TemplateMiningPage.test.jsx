@@ -199,6 +199,48 @@ function mountVerifyResume({ acceptedTemplateKeys }) {
   return { stream, onLoadConfirmed, onBackToReview }
 }
 
+// A failed server mine must keep the operator on an explicit error with a retry
+// affordance, not just flash a toast and leave a blank loader behind.
+function mountAuthedMine() {
+  const onStartMine = vi.fn().mockResolvedValue({ jobId: 'user:7:mine' })
+  const stream = {}
+  const onStreamMine = vi.fn((_id, handlers) => {
+    stream.handlers = handlers
+    return { close: vi.fn() }
+  })
+  const fireToast = vi.fn()
+  render(
+    <TemplateMiningPage
+      activeFeed={{ id: '7', name: 'Pilot Signals', tag: '@pilot' }}
+      authToken="jwt-token"
+      step="mine"
+      onStartMine={onStartMine}
+      onStreamMine={onStreamMine}
+      fireToast={fireToast}
+      onMined={vi.fn()}
+    />
+  )
+  return { stream, onStartMine, fireToast }
+}
+
+describe('TemplateMiningPage — mine failure', () => {
+  it('shows an error with a retry affordance and re-runs on retry', async () => {
+    const user = userEvent.setup()
+    const { stream, onStartMine, fireToast } = mountAuthedMine()
+
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    act(() => stream.handlers.onError({ message: 'Server exploded' }))
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText(/Server exploded/)).toBeTruthy()
+    expect(fireToast).toHaveBeenCalledWith('rejected', 'Mining failed', 'Server exploded')
+
+    onStartMine.mockClear()
+    await user.click(screen.getByRole('button', { name: /Try again/i }))
+    await waitFor(() => expect(onStartMine).toHaveBeenCalled())
+  })
+})
+
 describe('TemplateMiningPage — resume a verified feed', () => {
   it('reseeds the confirmed templates and shows the audit (no bounce)', async () => {
     const groups = mineTemplateGroups(FEED_MESSAGES)

@@ -35,4 +35,13 @@ describe('Pill', () => {
     const { container } = render(<Pill style={{ marginLeft: 8 }}>x</Pill>)
     expect(container.firstChild.style.marginLeft).toBe('8px')
   })
+
+  // CSS-only: the outline variant must render a visible border for profit/loss
+  // tones, not the transparent placeholder. Assert the injected rules exist.
+  it('gives profit and loss tones an outline border color', () => {
+    render(<Pill tone="profit">x</Pill>)
+    const css = document.getElementById('vrs-pill-css').textContent
+    expect(css).toContain('.vrs-pill__profit.vrs-pill__outline { border-color:')
+    expect(css).toContain('.vrs-pill__loss.vrs-pill__outline { border-color:')
+  })
 })

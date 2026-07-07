@@ -116,11 +116,20 @@ export function useWorkflowState(authToken, plan) {
 
   const prevNavRef = useRef('sources')
   const previousBackfillStatusRef = useRef(null)
+  const toastTimerRef = useRef(null)
 
   const fireToast = useCallback((tone, title, msg) => {
     setToast(createToast(title, msg, tone))
-    setTimeout(() => setToast(null), 4200)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToast(null), 4200)
   }, [])
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    },
+    []
+  )
 
   useEffect(() => {
     if (authToken) return
