@@ -56,10 +56,3 @@ export function landingStepForFeed(feed, plan) {
 export function isStepLocked(stepId, plan) {
   return stepIndex(stepId) > maxStepIndex(plan)
 }
-
-// The first step beyond the plan's reach — the upgrade boundary the user sees
-// but cannot pass. Null when the plan reaches the end of the chain.
-export function nextBlockedStep(plan) {
-  const nextIndex = maxStepIndex(plan) + 1
-  return nextIndex < PIPELINE_STEPS.length ? PIPELINE_STEPS[nextIndex].id : null
-}
