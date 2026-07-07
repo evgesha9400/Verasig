@@ -1,46 +1,25 @@
-import { requestJson } from './client.js'
+import { patch, post } from './client.js'
 
 export function updateProfile(token, profile) {
-  return requestJson('/user', {
-    method: 'PATCH',
-    token,
-    body: profile
-  })
+  return patch('/user', token, profile)
 }
 
 export function changeEmail(token, email) {
-  return requestJson('/user/email', {
-    method: 'POST',
-    token,
-    body: { email }
-  })
+  return post('/user/email', token, { email })
 }
 
 export function requestPasswordReset(token) {
-  return requestJson('/user/password/reset-request', {
-    method: 'POST',
-    token
-  })
+  return post('/user/password/reset-request', token)
 }
 
 export function changeSubscription(token, plan) {
-  return requestJson('/user/subscription/change', {
-    method: 'POST',
-    token,
-    body: { plan }
-  })
+  return post('/user/subscription/change', token, { plan })
 }
 
 export function cancelSubscription(token) {
-  return requestJson('/user/subscription/cancel', {
-    method: 'POST',
-    token
-  })
+  return post('/user/subscription/cancel', token)
 }
 
 export function resumeSubscription(token) {
-  return requestJson('/user/subscription/resume', {
-    method: 'POST',
-    token
-  })
+  return post('/user/subscription/resume', token)
 }

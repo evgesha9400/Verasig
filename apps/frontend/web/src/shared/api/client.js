@@ -89,6 +89,17 @@ function createApiError(response, payload) {
   })
 }
 
+// Method verbs over requestJson so call sites read as one line. `token` is
+// optional (the auth endpoints call without one); a missing `body` sends no body.
+export const get = (path, token) => requestJson(path, { token })
+export const post = (path, token, body) =>
+  requestJson(path, { method: 'POST', token, body })
+export const put = (path, token, body) =>
+  requestJson(path, { method: 'PUT', token, body })
+export const patch = (path, token, body) =>
+  requestJson(path, { method: 'PATCH', token, body })
+export const del = (path, token) => requestJson(path, { method: 'DELETE', token })
+
 export async function requestJson(path, options = {}) {
   const { body, headers, method = 'GET', token } = options
   const response = await fetch(createApiUrl(path), {

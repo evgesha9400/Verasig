@@ -1,4 +1,4 @@
-import { requestJson } from './client.js'
+import { get, post } from './client.js'
 
 function appendQueryParam(params, key, value) {
   if (value === undefined || value === null || value === '' || value === 'all') return
@@ -14,17 +14,9 @@ function createSignalsPath(filters = {}) {
 }
 
 export function listSignals(token, filters = {}) {
-  return requestJson(createSignalsPath(filters), { token })
-}
-
-export function getSignal(token, signalId) {
-  return requestJson(`/signals/${signalId}`, { token })
+  return get(createSignalsPath(filters), token)
 }
 
 export function linkSignalModifier(token, signalId, modId) {
-  return requestJson(`/signals/${signalId}/link-mod`, {
-    method: 'POST',
-    token,
-    body: { modId }
-  })
+  return post(`/signals/${signalId}/link-mod`, token, { modId })
 }

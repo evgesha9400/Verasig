@@ -1,26 +1,17 @@
-import { requestJson } from './client.js'
+import { get, post } from './client.js'
 
 export function login(credentials) {
-  return requestJson('/auth/login', {
-    method: 'POST',
-    body: credentials
-  })
+  return post('/auth/login', null, credentials)
 }
 
 export function register(account) {
-  return requestJson('/auth/register', {
-    method: 'POST',
-    body: account
-  })
+  return post('/auth/register', null, account)
 }
 
 export function getCurrentUser(token) {
-  return requestJson('/auth/me', { token })
+  return get('/auth/me', token)
 }
 
 export function logout(token) {
-  return requestJson('/auth/logout', {
-    method: 'POST',
-    token
-  })
+  return post('/auth/logout', token)
 }
