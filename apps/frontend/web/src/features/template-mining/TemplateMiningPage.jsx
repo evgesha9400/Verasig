@@ -65,6 +65,7 @@ export function TemplateMiningPage({
   onStartMine,
   onStreamMine,
   onLoadConfirmed,
+  onLoadMineResult,
   fireToast,
   overlay = {},
   onSaveOverlay,
@@ -80,6 +81,7 @@ export function TemplateMiningPage({
   const [internalDecisions, setInternalDecisions] = useState({})
   const [examplesFor, setExamplesFor] = useState(null) // open template's key
   const [confirmedKeys, setConfirmedKeys] = useState(null) // null = not fetched / N/A
+  const [resumeChecked, setResumeChecked] = useState(false) // cache lookup done?
   const [restoring, setRestoring] = useState(false)
   const [mineError, setMineError] = useState(null) // set when the mine job fails
   const [mineAttempt, setMineAttempt] = useState(0) // bumped to retry (remounts MineView)
@@ -174,6 +176,7 @@ export function TemplateMiningPage({
     setResult(null)
     setExamplesFor(null)
     setConfirmedKeys(null)
+    setResumeChecked(false)
     setMineError(null)
     seededFeedRef.current = null
   }, [activeFeed?.id])
@@ -190,6 +193,28 @@ export function TemplateMiningPage({
   useEffect(() => {
     if (step === 'mine' && result) navRef.current.onMined?.()
   }, [step, result])
+
+  // Reopening a verified feed lands on Verify: hydrate from the backend's cached
+  // mine snapshot instead of re-running the scan. On a hit we set `result` and skip
+  // MineView entirely; a miss (404 — feed verified before the cache existed) marks
+  // the check done and falls through to a live mine. Once per feed.
+  useEffect(() => {
+    if (!authenticated || !onLoadMineResult) return
+    if (step !== 'verify' || result || resumeChecked) return
+    let cancelled = false
+    onLoadMineResult(activeFeed.id)
+      .then((payload) => {
+        if (!cancelled && payload) handleMineDone(payload)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setResumeChecked(true)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticated, step, activeFeed?.id])
 
   // Reopening a verified feed lands here with no decisions: fetch the accepted
   // template keys the backend persisted, so the fresh mine can be reseeded. Fetched
@@ -287,6 +312,10 @@ export function TemplateMiningPage({
   // Until mining lands there is nothing to review: show the loader (server job
   // when authenticated, a brief note offline while the demo history mines).
   if (!result) {
+    // Verify-resume checks the cache first; hold the loader (don't mount MineView)
+    // until that lookup resolves, so a cache hit never kicks off a needless scan.
+    const awaitingResume =
+      authenticated && Boolean(onLoadMineResult) && step === 'verify' && !resumeChecked
     return (
       <div className="vrs-page vrs-tm">
         {mineError ? (
@@ -295,6 +324,10 @@ export function TemplateMiningPage({
             <Button variant="primary" size="sm" onClick={retryMine}>
               Try again
             </Button>
+          </div>
+        ) : awaitingResume ? (
+          <div className="vrs-empty vrs-empty--sm">
+            <div className="vrs-empty__note">Loading saved results…</div>
           </div>
         ) : authenticated ? (
           <MineView

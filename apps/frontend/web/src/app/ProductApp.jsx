@@ -37,6 +37,7 @@ import {
 import { getParserOverlay, putParserOverlay } from '../shared/api/pipelineApi.js'
 import {
   getConfirmedMining,
+  getMineResult,
   startMine,
   streamMineProgress
 } from '../shared/api/mineApi.js'
@@ -389,6 +390,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
             streamMineProgress(authToken, chatId, handlers)
           }
           onLoadConfirmed={(chatId) => getConfirmedMining(authToken, chatId)}
+          onLoadMineResult={(chatId) => getMineResult(authToken, chatId)}
           fireToast={fireToast}
           overlay={overlay}
           onSaveOverlay={saveOverlay}

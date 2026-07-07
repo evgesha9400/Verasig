@@ -26,6 +26,16 @@ export function confirmMining(token, feedId, acceptedTemplateKeys = []) {
   })
 }
 
+// Reads the last cached mine result for a feed → { groups, messages }. Reopening
+// a verified feed hydrates the Verify audit from this instead of re-mining;
+// rejects with a 404 ApiError when no snapshot is cached (fall back to a live mine).
+export function getMineResult(token, feedId) {
+  return requestJson(`/feeds/${feedId}/mine/result`, {
+    method: 'GET',
+    token
+  })
+}
+
 // Lists the accepted template keys already persisted for a feed →
 // { acceptedTemplateKeys }. The Verify audit reseeds from these when a
 // verified feed is reopened, so it resumes instead of re-mining from scratch.

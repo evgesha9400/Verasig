@@ -17,6 +17,10 @@ from fastapi import APIRouter, Depends, Request, status
 from verasig.features.feeds import message_repository
 from verasig.features.feeds.feed_job_progress import publish_logged_progress
 from verasig.features.parser_overlay.repository import read_overlay
+from verasig.features.rules.mine_result_repository import (
+    read_mine_result,
+    upsert_mine_result,
+)
 from verasig.features.rules.schemas import JobOut
 from verasig.features.rules.template_mining import (
     ChatMessage,
@@ -133,6 +137,11 @@ async def _run_mine(
             for message in messages
         ],
     }
+    # Cache the snapshot so reopening a verified feed hydrates Verify from it
+    # instead of re-running this scan (see GET /mine/result below).
+    with session_factory() as session:
+        upsert_mine_result(session, user_id, channel_id, payload)
+        session.commit()
     _publish(publisher, channel_id, "complete", len(groups))
     return payload
 
@@ -170,3 +179,21 @@ def mine_progress(
     if not request.app.state.jobs.has_job(key):
         raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
     return sse_stream(request.app.state.jobs, key)
+
+
+@router.get("/mine/result")
+def mine_result(
+    request: Request,
+    external_id: str,
+    subscription=Depends(require_feed),
+) -> dict:
+    """The last cached mine snapshot ({groups, messages}) for this feed — a pure
+    read (no re-mine); require_feed 404s a foreign feed. Reopening a verified feed
+    hydrates the Verify audit from this instead of re-running the scan; 404 when a
+    feed was verified before this cache existed, so the client falls back to a
+    live mine."""
+    with request.app.state.session_factory() as session:
+        payload = read_mine_result(session, subscription.user_id, int(external_id))
+    if payload is None:
+        raise ApiError(404, "MINE_RESULT_NOT_FOUND", "No cached mine result")
+    return payload

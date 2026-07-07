@@ -24,11 +24,14 @@ class _FakeSessionFactory:
     def __call__(self) -> "_FakeSessionFactory":
         return self
 
-    def __enter__(self) -> object:
-        return object()
+    def __enter__(self) -> "_FakeSessionFactory":
+        return self
 
     def __exit__(self, *args) -> bool:
         return False
+
+    def commit(self) -> None:
+        pass
 
 
 def _raw(message_id: int, text: str) -> SimpleNamespace:
@@ -40,11 +43,19 @@ def _run(messages, monkeypatch):
         mine_routes.message_repository, "read_messages", lambda *_: messages
     )
     monkeypatch.setattr(mine_routes, "read_overlay", lambda *_: {})
+    saved: dict = {}
+    monkeypatch.setattr(
+        mine_routes,
+        "upsert_mine_result",
+        lambda session, user_id, channel_id, payload: saved.update(
+            user_id=user_id, channel_id=channel_id, payload=payload
+        ),
+    )
     publisher = _FakePublisher()
     result = asyncio.run(
         mine_routes._run_mine(publisher, "user-1", 42, _FakeSessionFactory())
     )
-    return publisher, result
+    return publisher, result, saved
 
 
 def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
@@ -53,7 +64,7 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
         _raw(2, "XAUUSD BUY NOW\nSL 2300\nTP 2330\nTP 2350"),
         _raw(3, "gm team"),
     ]
-    publisher, result = _run(messages, monkeypatch)
+    publisher, result, saved = _run(messages, monkeypatch)
 
     assert [event["stage"] for event in publisher.events] == [
         "loading",
@@ -61,6 +72,8 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
         "grouping",
         "complete",
     ]
+    # The terminal payload is cached per feed so reopening skips the re-scan.
+    assert saved == {"user_id": "user-1", "channel_id": 42, "payload": result}
     assert isinstance(result["groups"], list)
     assert len(result["groups"]) >= 1
     group = result["groups"][0]
@@ -76,8 +89,9 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
 
 
 def test_run_mine_handles_empty_history(monkeypatch):
-    publisher, result = _run([], monkeypatch)
+    publisher, result, saved = _run([], monkeypatch)
     assert result == {"groups": [], "messages": []}
+    assert saved["payload"] == {"groups": [], "messages": []}
     assert [event["stage"] for event in publisher.events] == [
         "loading",
         "extracting",

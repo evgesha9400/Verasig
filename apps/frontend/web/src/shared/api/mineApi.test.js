@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   confirmMining,
   getConfirmedMining,
+  getMineResult,
   startMine,
   streamMineProgress
 } from './mineApi.js'
@@ -67,6 +68,20 @@ describe('mineApi', () => {
         headers: { Authorization: 'Bearer jwt-token' }
       }
     )
+  })
+
+  it('reads the cached mine result for a feed (GET, bearer auth)', async () => {
+    fetch.mockResolvedValueOnce(
+      jsonResponse({ groups: [{ templateKey: 'tpl_a' }], messages: [{ id: '1' }] })
+    )
+
+    const body = await getMineResult('jwt-token', '7')
+
+    expect(body.groups).toEqual([{ templateKey: 'tpl_a' }])
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mine/result', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer jwt-token' }
+    })
   })
 
   it('streams mine progress with the token in the query string', () => {

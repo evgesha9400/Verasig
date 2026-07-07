@@ -505,3 +505,31 @@ class ParserOverlayRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+
+class MineResultRow(Base):
+    """The last template-mining result for a feed — the mined families plus the
+    raw messages they were mined from ({groups, messages}, camelCase wire shape).
+
+    One row per feed: a fresh mine upserts it, deleting the feed cascades it away.
+    Reopening a verified feed hydrates the Verify audit from this snapshot instead
+    of re-running the (CPU-bound) scan over the whole history."""
+
+    __tablename__ = "mine_result"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            _FEED_FK, _FEED_REF, name="fk_mine_result_feed", ondelete="CASCADE"
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), primary_key=True
+    )
+    external_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )

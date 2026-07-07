@@ -37,6 +37,7 @@ _ALL_TABLES = ", ".join(
         "feed_risk_config",
         "backtest_result",
         "lifecycle_link",
+        "mine_result",
     ]
 )
 

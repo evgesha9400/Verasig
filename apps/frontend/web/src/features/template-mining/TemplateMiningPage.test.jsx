@@ -242,6 +242,62 @@ describe('TemplateMiningPage — mine failure', () => {
   })
 })
 
+// Reopening a verified feed should hydrate Verify from the backend's cached mine
+// result instead of re-running the scan. onLoadMineResult resolves with the cached
+// {groups, messages}; the live-mine job (onStartMine) must never be touched.
+function mountVerifyResumeCached({ mineResult, acceptedTemplateKeys }) {
+  const onStartMine = vi.fn().mockResolvedValue({ jobId: 'user:7:mine' })
+  const stream = {}
+  const onStreamMine = vi.fn((_id, handlers) => {
+    stream.handlers = handlers
+    return { close: vi.fn() }
+  })
+  const onLoadMineResult =
+    mineResult === undefined
+      ? vi.fn().mockRejectedValue(new Error('no cached result'))
+      : vi.fn().mockResolvedValue(mineResult)
+  const onLoadConfirmed = vi.fn().mockResolvedValue({ acceptedTemplateKeys })
+  const onBackToReview = vi.fn()
+  render(
+    <TemplateMiningPage
+      activeFeed={{ id: '7', name: 'Pilot Signals' }}
+      authToken="jwt-token"
+      step="verify"
+      onStartMine={onStartMine}
+      onStreamMine={onStreamMine}
+      onLoadMineResult={onLoadMineResult}
+      onLoadConfirmed={onLoadConfirmed}
+      onBackToReview={onBackToReview}
+    />
+  )
+  return { stream, onStartMine, onLoadMineResult, onLoadConfirmed }
+}
+
+describe('TemplateMiningPage — resume from cached mine result', () => {
+  it('hydrates the audit from the cache without re-running the scan', async () => {
+    const groups = mineTemplateGroups(FEED_MESSAGES)
+    const { onStartMine, onLoadMineResult } = mountVerifyResumeCached({
+      mineResult: { groups, messages: FEED_MESSAGES },
+      acceptedTemplateKeys: [groups[0].templateKey]
+    })
+
+    expect(await screen.findByRole('tab', { name: /Parsed/i })).toBeTruthy()
+    expect(onLoadMineResult).toHaveBeenCalledWith('7')
+    expect(onStartMine).not.toHaveBeenCalled()
+  })
+
+  it('falls back to a live mine when nothing is cached (404)', async () => {
+    const { stream, onStartMine, onLoadMineResult } = mountVerifyResumeCached({
+      mineResult: undefined,
+      acceptedTemplateKeys: []
+    })
+
+    await waitFor(() => expect(onLoadMineResult).toHaveBeenCalledWith('7'))
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    expect(onStartMine).toHaveBeenCalled()
+  })
+})
+
 describe('TemplateMiningPage — resume a verified feed', () => {
   it('reseeds the confirmed templates and shows the audit (no bounce)', async () => {
     const groups = mineTemplateGroups(FEED_MESSAGES)
