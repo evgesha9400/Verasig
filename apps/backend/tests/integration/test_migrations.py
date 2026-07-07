@@ -1,7 +1,6 @@
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect, text
-from testcontainers.postgres import PostgresContainer
+from sqlalchemy import create_engine, inspect
 
 
 def test_migrations_apply(pg_url):
@@ -205,33 +204,9 @@ _RETIRED_LAB_TABLES = {
 }
 
 
-def test_unrecognized_signal_and_extraction_method_dropped_after_upgrade():
-    """0021 drops the unrecognized_signal table and the constant
-    extracted_signal.extraction_method column — misses are an anti-join now.
-
-    Checked at 0021 itself (0022 later drops extracted_signal outright), on its
-    own container: the shared `pg_url` fixture is upgraded to head by other
-    tests in this module, and alembic upgrade never moves a DB backwards.
-    """
-    with PostgresContainer("postgres:16") as pg:
-        url = pg.get_connection_url().replace("psycopg2", "psycopg")
-        cfg = Config("alembic.ini")
-        cfg.set_main_option("sqlalchemy.url", url)
-        command.upgrade(cfg, "0021_drop_unrecognized")
-
-        engine = create_engine(url, future=True)
-        inspector = inspect(engine)
-        assert "unrecognized_signal" not in set(inspector.get_table_names())
-        extracted_columns = {
-            column["name"] for column in inspector.get_columns("extracted_signal")
-        }
-        assert "extraction_method" not in extracted_columns
-        engine.dispose()
-
-
-def test_signal_collapses_event_and_extraction_after_upgrade(pg_url):
-    """0022 collapses raw_signal_event + extracted_signal into one `signal`
-    table — every persisted signal IS an extraction, keyed by message."""
+def test_signal_table_exists_without_legacy_event_tables(pg_url):
+    """The current schema has one `signal` table — no separate event/extraction
+    tables from the pre-squash pipeline this repo no longer runs."""
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", pg_url)
     command.upgrade(cfg, "head")
@@ -275,139 +250,3 @@ def test_retired_lab_tables_absent_after_upgrade(pg_url):
     command.upgrade(cfg, "head")
     tables = set(inspect(create_engine(pg_url, future=True)).get_table_names())
     assert tables.isdisjoint(_RETIRED_LAB_TABLES)
-
-
-# ── 0010 orphan purge (regression: purge must precede the raw_message PK) ──────
-
-_USER_ID = "11111111-1111-1111-1111-111111111111"
-_LEGIT_CHANNEL = 1001  # subscribed -> survives
-_ORPHAN_CHANNEL = 2002  # no user_channel -> capture is orphaned -> purged
-
-# (id-suffix, channel): one full capture graph per channel.
-_CHANNELS = ((1, _LEGIT_CHANNEL), (2, _ORPHAN_CHANNEL))
-
-
-def _seed_capture_graph(connection, id_suffix: int, channel: int) -> None:
-    """Insert a full 0009 capture graph (message -> event -> derived rows)."""
-
-    def uid(kind: str) -> str:
-        return f"{id_suffix}{kind}000000-0000-0000-0000-000000000000"[:36]
-
-    event_id, label_id = uid("e"), uid("a")
-    connection.execute(
-        text(
-            "INSERT INTO telegram_channel "
-            "(channel_id, title, is_private, first_seen_at) "
-            "VALUES (:c, 't', false, now())"
-        ),
-        {"c": channel},
-    )
-    connection.execute(
-        text(
-            "INSERT INTO raw_telegram_message "
-            "(channel_id, message_id, posted_at, captured_at, has_media, raw_payload) "
-            "VALUES (:c, 10, now(), now(), false, '{}')"
-        ),
-        {"c": channel},
-    )
-    connection.execute(
-        text(
-            "INSERT INTO raw_signal_event "
-            "(id, channel_id, message_id, candidate_text, materialized_by, "
-            "matched_reasons, created_at) "
-            "VALUES (:id, :c, 10, 'buy', 'filter', '[]', now())"
-        ),
-        {"id": event_id, "c": channel},
-    )
-    connection.execute(
-        text(
-            "INSERT INTO extracted_signal "
-            "(id, event_id, channel_id, symbol, side, event_type, take_profits, "
-            "extraction_method, extracted_at, user_id) "
-            "VALUES (:id, :ev, :c, 'BTC', 'LONG', 'NEW_ENTRY', '[]', "
-            "'DETERMINISTIC', now(), :u)"
-        ),
-        {"id": uid("b"), "ev": event_id, "c": channel, "u": _USER_ID},
-    )
-    connection.execute(
-        text(
-            "INSERT INTO golden_label "
-            "(id, channel_id, message_id, labeled_at, user_id, label) "
-            "VALUES (:id, :c, 10, now(), :u, 'signal')"
-        ),
-        {"id": label_id, "c": channel, "u": _USER_ID},
-    )
-    connection.execute(
-        text(
-            "INSERT INTO filter_drift_warning "
-            "(id, channel_id, message_id, miss_discovered_by, event_id, "
-            "source_label_id, created_at, user_id) "
-            "VALUES (:id, :c, 10, 'test', :ev, :lbl, now(), :u)"
-        ),
-        {"id": uid("f"), "c": channel, "ev": event_id, "lbl": label_id, "u": _USER_ID},
-    )
-    connection.execute(
-        text(
-            "INSERT INTO deleted_signal_evidence "
-            "(id, channel_id, message_id, confidence, method, detected_at, "
-            "was_signal_candidate) "
-            "VALUES (:id, :c, 10, 'CONFIRMED', 'ID_GAP', now(), true)"
-        ),
-        {"id": uid("d"), "c": channel},
-    )
-
-
-def test_0010_purges_orphan_capture_before_tightening_keys():
-    """0010 must upgrade cleanly when orphan capture (no subscriber) exists, and
-    purge it while preserving the subscribed channel's rows."""
-    with PostgresContainer("postgres:16") as pg:
-        url = pg.get_connection_url().replace("psycopg2", "psycopg")
-        cfg = Config("alembic.ini")
-        cfg.set_main_option("sqlalchemy.url", url)
-        command.upgrade(cfg, "0009_backfill_job_runs")
-
-        engine = create_engine(url, future=True)
-        with engine.begin() as connection:
-            connection.execute(
-                text(
-                    "INSERT INTO user_account "
-                    "(id, email, password_hash, first_name, last_name, plan, "
-                    "created_at) "
-                    "VALUES (:u, 'a@b.co', 'h', 'A', 'B', 'observer', now())"
-                ),
-                {"u": _USER_ID},
-            )
-            for id_suffix, channel in _CHANNELS:
-                _seed_capture_graph(connection, id_suffix, channel)
-            # only the legit channel has a subscriber
-            connection.execute(
-                text(
-                    "INSERT INTO user_channel "
-                    "(user_id, channel_id, status, verify_attempt, added_at) "
-                    "VALUES (:u, :c, 'verified', 0, now())"
-                ),
-                {"u": _USER_ID, "c": _LEGIT_CHANNEL},
-            )
-
-        # Upgrade through 0010 only: later migrations backfill from tables this
-        # minimal fixture omits. 0010 is where the orphan-ordering bug lives.
-        command.upgrade(cfg, "0010_user_owned_feed")  # was: PK abort on NULL user_id
-
-        with engine.connect() as connection:
-            surviving = {
-                row[0]
-                for row in connection.execute(
-                    text("SELECT external_id FROM raw_message")
-                )
-            }
-            events = connection.execute(
-                text("SELECT count(*) FROM raw_signal_event")
-            ).scalar_one()
-            extracted = connection.execute(
-                text("SELECT count(*) FROM extracted_signal")
-            ).scalar_one()
-        engine.dispose()
-
-    assert surviving == {_LEGIT_CHANNEL}  # orphan raw_message purged
-    assert events == 1  # orphan event + its derived children purged
-    assert extracted == 1
