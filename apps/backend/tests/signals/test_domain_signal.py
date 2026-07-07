@@ -8,11 +8,9 @@ from pydantic import ValidationError
 from verasig.domain.signal import (
     EntryType,
     ExtractedSignal,
-    ExtractionMethod,
     Side,
     SignalEventType,
     TradeIntent,
-    UnrecognizedSignal,
 )
 
 
@@ -71,7 +69,6 @@ def test_extracted_signal_defaults_provenance_and_optionals():
     signal = _signal()
     assert isinstance(signal.id, UUID)
     assert signal.event_type is SignalEventType.NEW_ENTRY
-    assert signal.extraction_method is ExtractionMethod.DETERMINISTIC
     assert signal.take_profits == []
     assert signal.entry_type is None
     assert signal.stop_loss is None
@@ -93,12 +90,9 @@ def test_extracted_signal_take_profits_are_ordered_decimals():
     assert signal.take_profits == [Decimal("67000"), Decimal("68000")]
 
 
-def test_unrecognized_signal_constructs_with_reason_and_defaults():
-    unrecognized = UnrecognizedSignal(event_id=uuid4(), reason="no_match")
-    assert unrecognized.reason == "no_match"
-    assert isinstance(unrecognized.id, UUID)
-    assert unrecognized.attempted_methods == []
-    assert isinstance(unrecognized.created_at, datetime)
+def test_extracted_signal_has_no_extraction_method():
+    # extraction is always deterministic; the constant field/enum are dropped.
+    assert "extraction_method" not in ExtractedSignal.model_fields
 
 
 def test_side_has_long_and_short():
@@ -119,7 +113,3 @@ def test_signal_event_type_has_the_three_lifecycle_values():
         "MODIFY",
         "CLOSE",
     }
-
-
-def test_extraction_method_has_deterministic():
-    assert {method.value for method in ExtractionMethod} == {"DETERMINISTIC"}

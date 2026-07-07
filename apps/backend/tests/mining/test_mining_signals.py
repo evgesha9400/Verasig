@@ -8,7 +8,7 @@ fields become a RawSignalEvent + ExtractedSignal. Candidates are built directly
 from decimal import Decimal
 
 from verasig.domain.event import MaterializationPath
-from verasig.domain.signal import EntryType, ExtractionMethod, Side
+from verasig.domain.signal import EntryType, Side
 from verasig.features.mining.mining_signals import candidate_to_event_and_signal
 from verasig.features.mining.template_mining.fields import SignalEntry, StructuredFields
 from verasig.features.mining.template_mining.types import Candidate, ChatMessage
@@ -52,7 +52,6 @@ def test_maps_single_entry_to_limit_single():
     assert event.message_id == 42
     assert event.materialized_by is MaterializationPath.MINING
     assert signal.event_id == event.id
-    assert signal.extraction_method is ExtractionMethod.DETERMINISTIC
     assert signal.rule_id == "tpl_abc"
 
 

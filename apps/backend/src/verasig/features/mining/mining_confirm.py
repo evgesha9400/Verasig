@@ -21,7 +21,6 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from verasig.domain.event import RawSignalEvent
-from verasig.domain.extraction_outcome import ExtractOutcome
 from verasig.domain.feed import FeedStatus
 from verasig.domain.signal import ExtractedSignal
 from verasig.features.feeds import feed_repository, message_repository
@@ -160,8 +159,7 @@ def _persist_signals(
         if persisted_event_id is None:
             continue
         linked = signal.model_copy(update={"event_id": persisted_event_id})
-        outcome = ExtractOutcome(signal=linked)
-        outcome_repository.record_outcome(session, outcome, user_id)
+        outcome_repository.record_outcome(session, linked, user_id)
         extracted += 1
     return extracted
 

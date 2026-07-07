@@ -15,7 +15,6 @@ from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.signal import (
     EntryType,
     ExtractedSignal,
-    ExtractionMethod,
     Side,
     SignalEventType,
 )
@@ -84,7 +83,6 @@ def _signal_of(
         event_id=event.id,
         channel_id=channel_id,
         event_type=SignalEventType.NEW_ENTRY,
-        extraction_method=ExtractionMethod.DETERMINISTIC,
         rule_id=candidate.template_key,
     )
 

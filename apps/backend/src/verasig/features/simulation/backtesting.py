@@ -11,7 +11,7 @@ from verasig.domain.feed import FeedStatus
 from verasig.domain.market_ports import MarketData
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
-from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
+from verasig.domain.signal import ExtractedSignal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.feeds import (
     deletion_repository,
@@ -26,7 +26,6 @@ from verasig.features.signals import (
     outcome_repository,
 )
 from verasig.features.signals.fold import fold
-from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
 
@@ -38,7 +37,7 @@ class BacktestInputs:
     message_count: int
     events: list[RawSignalEvent]
     signals: list[ExtractedSignal]
-    unrecognized: list[UnrecognizedSignal]
+    missed_event_ids: list[UUID]
     deletions: list[DeletedSignalEvidence]
     folded_signals: list
 
@@ -70,15 +69,13 @@ def load_folded_signals(
     session_factory: sessionmaker, user_id: UUID, channel_id: int
 ) -> BacktestInputs:
     with session_factory() as session:
-        materialize_missing_signal_outcomes(session, user_id, channel_id)
-        session.commit()
         channel = feed_repository.read_feed_channel(session, user_id, channel_id)
         messages = message_repository.read_messages(session, user_id, channel_id)
         events = event_repository.read_signal_events(session, user_id, channel_id)
         signals = outcome_repository.read_extracted_signals(
             session, channel_id, user_id
         )
-        unrecognized = outcome_repository.read_unrecognized_signals(
+        missed_event_ids = outcome_repository.read_unrecognized_event_ids(
             session, channel_id, user_id
         )
         deletions = deletion_repository.read_deletion_evidence(
@@ -99,7 +96,7 @@ def load_folded_signals(
         message_count=message_count,
         events=events,
         signals=signals,
-        unrecognized=unrecognized,
+        missed_event_ids=missed_event_ids,
         deletions=deletions,
         folded_signals=fold(signals, events, messages, manual_links=manual_links),
     )
@@ -128,7 +125,7 @@ def compose_score(
         message_count=inputs.message_count,
         events=inputs.events,
         signals=inputs.signals,
-        unrecognized=inputs.unrecognized,
+        missed_event_ids=inputs.missed_event_ids,
         deletions=inputs.deletions,
         sim_outcomes=outcomes,
         computed_at=now,

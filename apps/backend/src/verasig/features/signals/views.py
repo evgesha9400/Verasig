@@ -21,7 +21,6 @@ from verasig.features.signals import (
     outcome_repository,
 )
 from verasig.features.signals.fold import fold
-from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_short, format_time
@@ -105,8 +104,6 @@ def _project_user_signals(
 
 def _project_channel(session: Session, user_id: UUID, feed, result) -> list[dict]:
     channel_id = feed.external_id
-    materialize_missing_signal_outcomes(session, user_id, channel_id)
-    session.flush()
     messages = message_repository.read_messages(session, user_id, channel_id)
     events = event_repository.read_signal_events(session, user_id, channel_id)
     signals = outcome_repository.read_extracted_signals(session, channel_id, user_id)

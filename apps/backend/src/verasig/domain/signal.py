@@ -1,12 +1,12 @@
 """Extraction contracts (data-contracts.md §1, §3).
 
 `TradeIntent` is the provenance-free parsed trade (required = symbol + side);
-both extractors (deterministic + LLM fallback) emit it from text alone, and the
-symbol is normalized here so both paths get it for free. `ExtractedSignal`
-extends `TradeIntent` with the linkage/provenance recorded against a
-`RawSignalEvent` (`event_id`, `channel_id`, `extraction_method`, `rule_id`),
-always supplied by the caller, which holds the event. `UnrecognizedSignal` is
-the evidence-of-a-gap outcome when extraction fails.
+the deterministic extractor emits it from text alone, and the symbol is
+normalized here so callers get it for free. `ExtractedSignal` extends
+`TradeIntent` with the linkage/provenance recorded against a `RawSignalEvent`
+(`event_id`, `channel_id`, `rule_id`), always supplied by the caller, which
+holds the event. A "miss" is not a stored entity — it is simply a
+`RawSignalEvent` with no `ExtractedSignal` (recovered by anti-join).
 """
 
 from datetime import datetime, timezone
@@ -32,10 +32,6 @@ class SignalEventType(StrEnum):
     NEW_ENTRY = "NEW_ENTRY"
     MODIFY = "MODIFY"
     CLOSE = "CLOSE"
-
-
-class ExtractionMethod(StrEnum):
-    DETERMINISTIC = "DETERMINISTIC"
 
 
 def _now() -> datetime:
@@ -73,14 +69,5 @@ class ExtractedSignal(TradeIntent):
     event_id: UUID
     channel_id: int
     event_type: SignalEventType = SignalEventType.NEW_ENTRY
-    extraction_method: ExtractionMethod = ExtractionMethod.DETERMINISTIC
     rule_id: str | None = None
     extracted_at: datetime = Field(default_factory=_now)
-
-
-class UnrecognizedSignal(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
-    event_id: UUID
-    reason: str  # no_symbol | no_side | no_match | fallback_failed
-    attempted_methods: list[ExtractionMethod] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=_now)

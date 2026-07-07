@@ -129,7 +129,7 @@ def test_market_data_backed_simulation_feeds_scorecard_components():
         message_count=1,
         events=[_event(event_id)],
         signals=[_signal(signal_id, event_id)],
-        unrecognized=[],
+        missed_event_ids=[],
         deletions=[],
         sim_outcomes=outcomes,
         computed_at=_BASE,

@@ -11,13 +11,7 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import (
-    EntryType,
-    ExtractedSignal,
-    ExtractionMethod,
-    Side,
-    UnrecognizedSignal,
-)
+from verasig.domain.signal import EntryType, ExtractedSignal, Side
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.provider_scores.hygiene import (
     ACTIVE_USER_PROXY_ANCHOR,
@@ -132,16 +126,6 @@ def _signal(
     )
 
 
-def _unrecognized(suffix: int) -> UnrecognizedSignal:
-    return UnrecognizedSignal(
-        id=_uuid(suffix),
-        event_id=_uuid(suffix + 200),
-        reason="no_match",
-        attempted_methods=[ExtractionMethod.DETERMINISTIC],
-        created_at=_BASE,
-    )
-
-
 def _sim_outcome(suffix: int, *, r_multiple: float, mae: float) -> SimOutcome:
     return SimOutcome(
         folded_signal_id=_uuid(suffix),
@@ -220,15 +204,11 @@ def test_completeness_excludes_empty_signal_denominator():
     assert measurement.note == "completeness: not measured — no extracted signals"
 
 
-def test_parser_confidence_measures_deterministic_share_of_all_candidates():
-    deterministic = _signal(20)
-    fallback = _signal(21)
-    # ExtractionMethod has only DETERMINISTIC today; assign a raw sentinel to
-    # exercise the "not deterministic" branch of measure_parser_confidence.
-    fallback.extraction_method = "NON_DETERMINISTIC"
+def test_parser_confidence_measures_recognized_share_of_all_candidates():
+    # recognition rate = extracted signals / (extracted + missed events).
     measurement = measure_parser_confidence(
-        signals=[deterministic, fallback],
-        unrecognized=[_unrecognized(22)],
+        signals=[_signal(20)],
+        missed_event_ids=[_uuid(21), _uuid(22)],
     )
 
     assert isinstance(measurement, HygieneMeasurement)
@@ -237,29 +217,27 @@ def test_parser_confidence_measures_deterministic_share_of_all_candidates():
     assert measurement.normalized == pytest.approx(1 / 3)
     assert measurement.evidence_refs == [
         "signal:00000000-0000-0000-0000-000000000020",
-        "signal:00000000-0000-0000-0000-000000000021",
-        "unrecognized:00000000-0000-0000-0000-000000000022",
+        "event:00000000-0000-0000-0000-000000000021",
+        "event:00000000-0000-0000-0000-000000000022",
     ]
 
 
-def test_parser_confidence_keeps_zero_deterministic_as_real_measurement():
-    fallback = _signal(23)
-    # ExtractionMethod has only DETERMINISTIC today; assign a raw sentinel to
-    # exercise the "not deterministic" branch of measure_parser_confidence.
-    fallback.extraction_method = "NON_DETERMINISTIC"
+def test_parser_confidence_keeps_zero_recognized_as_real_measurement():
+    # A feed whose every candidate is a miss scores 0 — a real measurement, not
+    # an exclusion.
     measurement = measure_parser_confidence(
-        signals=[fallback],
-        unrecognized=[_unrecognized(24)],
+        signals=[],
+        missed_event_ids=[_uuid(23)],
     )
 
     assert isinstance(measurement, HygieneMeasurement)
     assert measurement.raw_value == 0.0
     assert measurement.normalized == 0.0
-    assert measurement.evidence_refs
+    assert measurement.evidence_refs == ["event:00000000-0000-0000-0000-000000000023"]
 
 
 def test_parser_confidence_excludes_empty_candidate_denominator():
-    measurement = measure_parser_confidence(signals=[], unrecognized=[])
+    measurement = measure_parser_confidence(signals=[], missed_event_ids=[])
 
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "parser_confidence"

@@ -12,7 +12,7 @@ from verasig.domain.deletion import (
 )
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import ExtractedSignal, ExtractionMethod, UnrecognizedSignal
+from verasig.domain.signal import ExtractedSignal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 
 ACTIVE_USER_PROXY_ANCHOR = 10_000.0
@@ -71,8 +71,8 @@ def _signal_ref(signal: ExtractedSignal) -> str:
     return f"signal:{_uuid_text(signal.id)}"
 
 
-def _unrecognized_ref(item: UnrecognizedSignal) -> str:
-    return f"unrecognized:{_uuid_text(item.id)}"
+def _event_id_ref(event_id: UUID) -> str:
+    return f"event:{_uuid_text(event_id)}"
 
 
 def _outcome_ref(outcome: SimOutcome) -> str:
@@ -210,24 +210,25 @@ def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
     )
 
 
-def _is_deterministic(signal: ExtractedSignal) -> bool:
-    return signal.extraction_method is ExtractionMethod.DETERMINISTIC
-
-
 def measure_parser_confidence(
     signals: list[ExtractedSignal],
-    unrecognized: list[UnrecognizedSignal],
+    missed_event_ids: list[UUID],
 ) -> Measurement:
-    total = len(signals) + len(unrecognized)
+    """Recognition rate: extracted signals over all candidate events. A candidate
+    that yields a signal is recognized; a miss is a candidate event with no
+    extracted signal (recovered by anti-join). The deterministic miner is the
+    only extractor, so recognition rate == extracted / (extracted + missed)."""
+    extracted_count = len(signals)
+    missed_count = len(missed_event_ids)
+    total = extracted_count + missed_count
     if total == 0:
         return ExcludedMeasurement(
             name="parser_confidence",
             note="parser_confidence: not measured — no candidates",
         )
-    deterministic = sum(1 for signal in signals if _is_deterministic(signal))
-    value = deterministic / total
+    value = extracted_count / total
     refs = [_signal_ref(signal) for signal in signals]
-    refs.extend(_unrecognized_ref(item) for item in unrecognized)
+    refs.extend(_event_id_ref(event_id) for event_id in missed_event_ids)
     return HygieneMeasurement(
         name="parser_confidence",
         raw_value=value,

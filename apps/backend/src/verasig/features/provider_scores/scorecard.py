@@ -1,6 +1,7 @@
 """Weighted ProviderScore assembly (ADR 0009)."""
 
 from datetime import datetime
+from uuid import UUID
 
 from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.domain.event import RawSignalEvent
@@ -12,7 +13,7 @@ from verasig.domain.score import (
     ScoreComponent,
     ScoreWeights,
 )
-from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
+from verasig.domain.signal import ExtractedSignal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.provider_scores.hygiene import (
     ChannelLike,
@@ -128,7 +129,7 @@ def _measurements(
     message_count: int,
     events: list[RawSignalEvent],
     signals: list[ExtractedSignal],
-    unrecognized: list[UnrecognizedSignal],
+    missed_event_ids: list[UUID],
     deletions: list[DeletedSignalEvidence],
     sim_outcomes: list[SimOutcome],
 ) -> list[Measurement]:
@@ -137,7 +138,7 @@ def _measurements(
         measure_drawdown(sim_outcomes),
         measure_deletion_behaviour(events, deletions),
         measure_completeness(signals),
-        measure_parser_confidence(signals, unrecognized),
+        measure_parser_confidence(signals, missed_event_ids),
         measure_evidence_availability(channel.channel_id, message_count, deletions),
         measure_signal_frequency(events, messages),
         measure_active_user_proxy(channel, messages),
@@ -150,7 +151,7 @@ def build_provider_score(
     message_count: int,
     events: list[RawSignalEvent],
     signals: list[ExtractedSignal],
-    unrecognized: list[UnrecognizedSignal],
+    missed_event_ids: list[UUID],
     deletions: list[DeletedSignalEvidence],
     computed_at: datetime,
     sim_outcomes: list[SimOutcome] | None = None,
@@ -168,7 +169,7 @@ def build_provider_score(
             message_count,
             events,
             signals,
-            unrecognized,
+            missed_event_ids,
             deletions,
             outcomes,
         ),

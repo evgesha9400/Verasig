@@ -37,15 +37,10 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
     } <= tables
     assert "user_telegram_link" not in tables
 
-    columns_by_table = {
-        table: {column["name"] for column in inspector.get_columns(table)}
-        for table in (
-            "extracted_signal",
-            "unrecognized_signal",
-        )
+    extracted_columns = {
+        column["name"] for column in inspector.get_columns("extracted_signal")
     }
-    assert {"user_id"} <= columns_by_table["extracted_signal"]
-    assert {"user_id"} <= columns_by_table["unrecognized_signal"]
+    assert {"user_id"} <= extracted_columns
 
     backfill_columns = {
         column["name"] for column in inspector.get_columns("backfill_job_run")
@@ -74,7 +69,6 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
 
     required_user_tables = {
         "extracted_signal",
-        "unrecognized_signal",
     }
     nullable_user_tables = {
         table
@@ -89,7 +83,6 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         for table in (
             "backtest_result",
             "extracted_signal",
-            "unrecognized_signal",
             "deleted_signal_evidence",
             "backfill_job_run",
         )
@@ -98,7 +91,6 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     assert {
         "ix_backtest_result_user_channel_completed",
         "ix_extracted_signal_user_channel",
-        "ix_unrecognized_signal_user_event",
         "ix_deleted_signal_evidence_channel",
         "ix_backfill_job_run_user_channel_started",
         "ix_backfill_job_run_status",
@@ -117,7 +109,6 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
     assert {
         "ck_extracted_signal_side",
         "ck_extracted_signal_event_type",
-        "ck_extracted_signal_extraction_method",
         "ck_deleted_signal_evidence_confidence",
         "ck_deleted_signal_evidence_method",
         "ck_backfill_job_run_status",
@@ -201,7 +192,6 @@ _USER_ACCOUNT_FK_TABLES = (
     "feed",
     "feed_risk_config",
     "lifecycle_link",
-    "unrecognized_signal",
     "user_exchange_connection",
 )
 
@@ -215,6 +205,21 @@ _RETIRED_LAB_TABLES = {
     "lab_provider_credential",
     "lab_review_event",
 }
+
+
+def test_unrecognized_signal_and_extraction_method_dropped_after_upgrade(pg_url):
+    """0021 drops the unrecognized_signal table and the constant
+    extracted_signal.extraction_method column — misses are an anti-join now."""
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.upgrade(cfg, "head")
+
+    inspector = inspect(create_engine(pg_url, future=True))
+    assert "unrecognized_signal" not in set(inspector.get_table_names())
+    extracted_columns = {
+        column["name"] for column in inspector.get_columns("extracted_signal")
+    }
+    assert "extraction_method" not in extracted_columns
 
 
 def test_no_model_migration_drift_after_upgrade(pg_url):

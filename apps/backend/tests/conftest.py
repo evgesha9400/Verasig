@@ -27,7 +27,6 @@ _ALL_TABLES = ", ".join(
         "raw_message",
         "raw_signal_event",
         "extracted_signal",
-        "unrecognized_signal",
         "deleted_signal_evidence",
         "user_account",
         "source",

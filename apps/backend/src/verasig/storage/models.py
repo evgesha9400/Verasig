@@ -37,7 +37,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from verasig.domain.account import Plan
 from verasig.domain.feed import FeedStatus, HistoryDepth
 from verasig.domain.risk_config import EntryMode, ExitSource, Weighting
-from verasig.domain.signal import ExtractionMethod, Side, SignalEventType
+from verasig.domain.signal import Side, SignalEventType
 from verasig.foundation.database.session import Base
 
 
@@ -175,11 +175,6 @@ class ExtractedSignalRow(Base):
         enum_check(
             "event_type", SignalEventType, name="ck_extracted_signal_event_type"
         ),
-        enum_check(
-            "extraction_method",
-            ExtractionMethod,
-            name="ck_extracted_signal_extraction_method",
-        ),
         Index("ix_extracted_signal_user_channel", "user_id", "external_id"),
     )
 
@@ -201,34 +196,8 @@ class ExtractedSignalRow(Base):
     take_profits: Mapped[list] = mapped_column(JSONB, nullable=False)
     leverage: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     confidence: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
-    extraction_method: Mapped[str] = mapped_column(String, nullable=False)
     rule_id: Mapped[str | None] = mapped_column(String, nullable=True)
     extracted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
-class UnrecognizedSignalRow(Base):
-    __tablename__ = "unrecognized_signal"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "event_id",
-            name="uq_unrecognized_signal_user_event",
-        ),
-        Index("ix_unrecognized_signal_user_event", "user_id", "event_id"),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    event_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("raw_signal_event.id", ondelete="CASCADE"), nullable=False
-    )
-    reason: Mapped[str] = mapped_column(String, nullable=False)
-    attempted_methods: Mapped[list] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
 
