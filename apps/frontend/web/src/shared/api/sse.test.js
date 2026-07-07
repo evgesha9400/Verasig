@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { streamJobProgress } from './sse.js'
 
 class FakeEventSource {
+  static CONNECTING = 0
+  static CLOSED = 2
   constructor(url) {
     this.url = url
     this.closed = false
+    this.readyState = FakeEventSource.CONNECTING
     this.listeners = {}
     FakeEventSource.last = this
   }
@@ -13,6 +16,7 @@ class FakeEventSource {
   }
   close() {
     this.closed = true
+    this.readyState = FakeEventSource.CLOSED
   }
   emit(type, data) {
     this.listeners[type]({
@@ -44,15 +48,28 @@ describe('streamJobProgress', () => {
     expect(source.closed).toBe(true)
   })
 
-  it('closes and reports on an error event', () => {
+  it('closes and reports on a server-sent error event (carrying data)', () => {
     globalThis.EventSource = FakeEventSource
     const onError = vi.fn()
 
     streamJobProgress('jwt-token', '/feeds/7/mine/progress', { onError })
     const source = FakeEventSource.last
+    source.emit('error', { message: 'Backfill failed.' })
+
+    expect(onError).toHaveBeenCalledWith({ message: 'Backfill failed.' })
+    expect(source.closed).toBe(true)
+  })
+
+  it('ignores a transient error and lets the stream auto-reconnect', () => {
+    globalThis.EventSource = FakeEventSource
+    const onError = vi.fn()
+
+    streamJobProgress('jwt-token', '/feeds/7/mine/progress', { onError })
+    const source = FakeEventSource.last
+    // native EventSource error: no data, still connecting (about to retry)
     source.emit('error', undefined)
 
-    expect(onError).toHaveBeenCalledWith({})
-    expect(source.closed).toBe(true)
+    expect(onError).not.toHaveBeenCalled()
+    expect(source.closed).toBe(false)
   })
 })

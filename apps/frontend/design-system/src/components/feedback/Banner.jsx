@@ -69,7 +69,7 @@ export function Banner({
 }) {
   const cls = ['vrs-banner', `vrs-banner__${tone}`, className].filter(Boolean).join(' ')
   return (
-    <div className={cls} role="status" {...rest}>
+    <div className={cls} role={tone === 'rejected' ? 'alert' : 'status'} {...rest}>
       <span className="vrs-banner__accent" aria-hidden="true" />
       <span className="vrs-banner__icon">
         {icon || (

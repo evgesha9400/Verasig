@@ -1,11 +1,11 @@
 from uuid import UUID
 
+from conftest import _auth
+from conftest import _register_user as _register
+
 from verasig.domain.account import Plan
 from verasig.features.accounts import repository as account_repository
-from verasig.features.accounts.tokens import read_user_id
 from verasig.features.exchanges import repository as exchange_repository
-
-SECRET = "s" * 32
 
 
 class FakeVerifier:
@@ -21,24 +21,6 @@ class FakeVerifier:
             )
 
             raise KeyVerificationError
-
-
-def _register(client, email: str = "ada@example.com") -> tuple[str, UUID]:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    body = response.json()
-    return body["token"], read_user_id(body["token"], SECRET)
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _set_plan(app, user_id: UUID, plan: Plan) -> None:

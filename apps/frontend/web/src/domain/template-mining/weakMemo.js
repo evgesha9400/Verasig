@@ -11,10 +11,10 @@
  * @returns {V}
  */
 export function weakMemo(cache, key, build) {
-  let value = cache.get(key)
-  if (!value) {
-    value = build()
-    cache.set(key, value)
+  // key on presence, not truthiness, so a legitimately falsy built value
+  // (empty/0/'') is still cached instead of rebuilt every call.
+  if (!cache.has(key)) {
+    cache.set(key, build())
   }
-  return value
+  return cache.get(key)
 }

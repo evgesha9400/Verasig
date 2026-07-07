@@ -18,7 +18,9 @@ if (typeof document !== 'undefined' && !document.getElementById('vrs-conf-css'))
 
 function colorFor(value, threshold) {
   if (value < threshold) return 'var(--rejected-500)'
-  if (value < threshold + 8) return 'var(--pending-500)'
+  // clamp the pending band to 100 so a top score with a high threshold still
+  // reaches "verified" instead of being stuck pending (threshold + 8 > 100).
+  if (value < Math.min(100, threshold + 8)) return 'var(--pending-500)'
   return 'var(--verified-500)'
 }
 

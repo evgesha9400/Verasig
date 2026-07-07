@@ -1,6 +1,9 @@
 """Parity port of ``template.test.js``."""
 
-from verasig.features.rules.template_mining.template import normalize_template
+from verasig.features.rules.template_mining.template import (
+    hash_string,
+    normalize_template,
+)
 
 
 def _template_of(text: str) -> str:
@@ -110,3 +113,26 @@ def test_returns_a_stable_non_empty_key_for_the_same_input():
     second = normalize_template({"message": {"text": text}})
     assert first.template_key == second.template_key
     assert len(first.template_key) > 0
+
+
+def test_hash_string_matches_js_charcodeat_for_astral_chars():
+    # JS charCodeAt iterates UTF-16 code units; hash_string must mirror that so an
+    # astral char hashes identically on both sides (independent UTF-16 reference).
+    text = "𝕏BTC"
+    units = [
+        int.from_bytes(text.encode("utf-16-le")[i : i + 2], "little")
+        for i in range(0, len(text.encode("utf-16-le")), 2)
+    ]
+    h = 0
+    for unit in units:
+        h = (h * 31 + unit) & 0xFFFFFFFF
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    expected = "0"
+    if h:
+        expected = ""
+        n = h
+        while n:
+            expected = digits[n % 36] + expected
+            n //= 36
+    assert hash_string(text) == expected
+    assert hash_string(text) != hash_string("BTC")  # the astral char contributes

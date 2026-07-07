@@ -71,6 +71,10 @@ describe('detectInstruments — crypto pair formats', () => {
   it('detects an arbitrary slash pair not in the dictionary', () => {
     expect(normals('SCALP ARB/USDT long 1.124')).toContain('ARBUSDT')
   })
+
+  it('splits a slash-less concatenated pair into base + quote', () => {
+    expect(normals('LINKUSDT long')).toContain('LINKUSDT')
+  })
 })
 
 describe('detectInstruments — guards', () => {

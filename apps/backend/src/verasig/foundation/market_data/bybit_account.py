@@ -30,9 +30,13 @@ async def verify_api_keys(
         ) as client:
             response = await client.get(BYBIT_QUERY_API_PATH, headers=headers)
             response.raise_for_status()
+            payload = response.json()
     except httpx.HTTPError as error:
         raise KeyVerificationError from error
-    if response.json().get("retCode") != 0:
+    except ValueError as error:
+        # a 2xx with a non-JSON body must fail verification, not 500 on decode.
+        raise KeyVerificationError from error
+    if payload.get("retCode") != 0:
         raise KeyVerificationError
 
 

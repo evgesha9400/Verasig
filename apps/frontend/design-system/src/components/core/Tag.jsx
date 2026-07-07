@@ -28,11 +28,26 @@ if (typeof document !== 'undefined' && !document.getElementById('vrs-tag-css')) 
 
 /** Interactive tag / chip for filters, channels and providers. */
 export function Tag({ swatch, onRemove, onClick, className = '', children, ...rest }) {
-  const cls = ['vrs-tag', onClick ? 'vrs-tag__clickable' : '', className]
+  const interactive = Boolean(onClick)
+  const cls = ['vrs-tag', interactive ? 'vrs-tag__clickable' : '', className]
     .filter(Boolean)
     .join(' ')
+  function onKeyDown(event) {
+    rest.onKeyDown && rest.onKeyDown(event)
+    if (event.defaultPrevented) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onClick(event)
+  }
   return (
-    <span className={cls} onClick={onClick} {...rest}>
+    <span
+      className={cls}
+      {...rest}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={interactive ? onKeyDown : undefined}
+    >
       {swatch && (
         <span
           className="vrs-tag__sw"
@@ -44,6 +59,7 @@ export function Tag({ swatch, onRemove, onClick, className = '', children, ...re
       {onRemove && (
         <button
           className="vrs-tag__rm"
+          type="button"
           aria-label="Remove"
           onClick={(e) => {
             e.stopPropagation()

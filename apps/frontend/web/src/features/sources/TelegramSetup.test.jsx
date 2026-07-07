@@ -57,6 +57,29 @@ describe('TelegramSetup', () => {
     await waitFor(() => expect(onConnected).toHaveBeenCalledOnce(), { timeout: 1800 })
   })
 
+  it('resends the code without leaving the code phase or unmounting the OTP', async () => {
+    const onConnect = vi.fn().mockResolvedValue()
+    render(
+      <TelegramSetup onConnected={() => {}} onCancel={() => {}} onConnect={onConnect} />
+    )
+    fillCredentials()
+    fireEvent.click(screen.getByRole('button', { name: /send login code/i }))
+
+    await waitFor(() => expect(screen.getByLabelText('Digit 1')).toBeTruthy(), {
+      timeout: 1800
+    })
+    fireEvent.change(screen.getByLabelText('Digit 1'), { target: { value: '1' } })
+    onConnect.mockClear()
+
+    fireEvent.click(screen.getByText('Resend code'))
+
+    // Still on the code phase: OTP stays mounted, the creds form never returns.
+    expect(screen.getByLabelText('Digit 1')).toBeTruthy()
+    expect(screen.getByLabelText('Digit 1').value).toBe('1')
+    expect(screen.queryByLabelText('API ID')).toBeNull()
+    await waitFor(() => expect(onConnect).toHaveBeenCalledTimes(1))
+  })
+
   it('requests Telegram two-factor password when the server asks for it', async () => {
     const onVerify = vi
       .fn()

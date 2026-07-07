@@ -119,9 +119,12 @@ export function classifyIntent(text, fields = {}) {
   const hasDirection = Boolean(fields.direction)
   const marketMarker = /\b(now|cmp|market)\b/.test(lower) || /по\s*рынк/i.test(lower)
 
+  // A fully-structured setup (instrument+direction+entry+SL+TP) is a new signal
+  // even when it contains result-ish words like "target"; decide completeness
+  // before the result heuristic can mislabel it.
+  if (isCompleteSetup(fields, marketMarker)) return 'new_signal'
   if (looksLikeResult(lower)) return 'result'
   if (anyMatch(STRONG_UPDATE_MARKERS, lower)) return 'update'
-  if (isCompleteSetup(fields, marketMarker)) return 'new_signal'
   if (anyMatch(SOFT_UPDATE_MARKERS, lower)) return 'update'
 
   const structured = structureScore(fields) > 0 || marketMarker

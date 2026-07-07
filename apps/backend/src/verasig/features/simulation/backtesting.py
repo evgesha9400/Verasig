@@ -19,7 +19,11 @@ from verasig.features.feeds import (
 )
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import (
+    event_repository,
+    lifecycle_link_repository,
+    outcome_repository,
+)
 from verasig.features.signals.fold import fold
 from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.simulation import repository as backtest_repository
@@ -80,6 +84,14 @@ def load_folded_signals(
             session, user_id, channel_id
         )
         message_count = message_repository.count_messages(session, user_id, channel_id)
+        # manual lifecycle links let the fold attach modifiers to a root signal;
+        # the backtest fold must honour them exactly as the signals view does.
+        manual_links = {
+            link.external_message_id: link.root_signal_id
+            for link in lifecycle_link_repository.read_links(
+                session, user_id, channel_id
+            )
+        }
     return BacktestInputs(
         channel=channel,
         messages=messages,
@@ -88,7 +100,7 @@ def load_folded_signals(
         signals=signals,
         unrecognized=unrecognized,
         deletions=deletions,
-        folded_signals=fold(signals, events, messages),
+        folded_signals=fold(signals, events, messages, manual_links=manual_links),
     )
 
 

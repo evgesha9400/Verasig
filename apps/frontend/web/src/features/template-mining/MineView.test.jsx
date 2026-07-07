@@ -26,9 +26,7 @@ describe('MineView', () => {
     )
 
     await waitFor(() => expect(onStart).toHaveBeenCalledWith('7'))
-    await waitFor(() =>
-      expect(onStream).toHaveBeenCalledWith('7', expect.any(Object))
-    )
+    await waitFor(() => expect(onStream).toHaveBeenCalledWith('7', expect.any(Object)))
 
     act(() =>
       streamed.onProgress({ stage: 'extracting', count: 128, phase: 'Extracting…' })
@@ -54,9 +52,7 @@ describe('MineView', () => {
       />
     )
 
-    await waitFor(() =>
-      expect(onError).toHaveBeenCalledWith({ message: 'boom' })
-    )
+    await waitFor(() => expect(onError).toHaveBeenCalledWith({ message: 'boom' }))
   })
 
   it('subscribes to the stream when the job is already running (409)', async () => {
@@ -87,9 +83,7 @@ describe('MineView', () => {
       />
     )
 
-    await waitFor(() =>
-      expect(onStream).toHaveBeenCalledWith('7', expect.any(Object))
-    )
+    await waitFor(() => expect(onStream).toHaveBeenCalledWith('7', expect.any(Object)))
 
     const result = { groups: [{ template_key: 'x' }], messages: [] }
     act(() => streamed.onDone(result))

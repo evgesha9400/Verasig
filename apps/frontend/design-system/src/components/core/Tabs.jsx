@@ -59,6 +59,7 @@ export function Tabs({
         return (
           <button
             key={id}
+            type="button"
             role="tab"
             aria-selected={value === id}
             className="vrs-tab"

@@ -12,8 +12,13 @@ const EMOJI_CONFIDENCE = 0.4
 // emoji-inferred direction apart from one the author actually wrote out.
 const EMOJI_CONFIDENCE_CEILING = 0.7
 
-const BUY_WORDS = ['buy', 'long', 'bullish', 'call', 'calls']
-const SELL_WORDS = ['sell', 'short', 'bearish', 'put', 'puts']
+const BUY_WORDS = ['buy', 'long', 'bullish']
+const SELL_WORDS = ['sell', 'short', 'bearish']
+// "call"/"put" are directions only in an options price context ("CALL above 210",
+// "PUT 180") — bare prose ("premium leveraged calls") is NOT a direction. Require
+// an adjacent price after an optional above/below/at/@.
+const OPTIONS_CALL = /\b(calls?)\b(?=\s+(?:above|below|at|@)?\s*\d)/gi
+const OPTIONS_PUT = /\b(puts?)\b(?=\s+(?:above|below|at|@)?\s*\d)/gi
 // Russian: лонг = long/buy, шорт = short/sell.
 const BUY_WORDS_RU = ['лонг']
 const SELL_WORDS_RU = ['шорт']
@@ -66,6 +71,8 @@ function overlayDirectionRules(overlay) {
 const RULES = [
   { matcher: wordMatcher(BUY_WORDS), normalized: 'BUY', confidence: WORD_CONFIDENCE },
   { matcher: wordMatcher(SELL_WORDS), normalized: 'SELL', confidence: WORD_CONFIDENCE },
+  { matcher: OPTIONS_CALL, normalized: 'BUY', confidence: WORD_CONFIDENCE },
+  { matcher: OPTIONS_PUT, normalized: 'SELL', confidence: WORD_CONFIDENCE },
   {
     matcher: cyrillicMatcher(BUY_WORDS_RU),
     normalized: 'BUY',

@@ -23,6 +23,8 @@ def to_decimal(raw: str) -> Decimal | None:
     elif suffix in _MILLIONS:
         multiplier, cleaned = Decimal(1_000_000), cleaned[:-1]
     try:
-        return Decimal(cleaned) * multiplier
+        value = Decimal(cleaned) * multiplier
     except InvalidOperation:
         return None
+    # "nan"/"inf"/"infinity" parse as valid Decimals but are never real prices.
+    return value if value.is_finite() else None

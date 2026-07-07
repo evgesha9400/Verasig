@@ -167,6 +167,18 @@ def test_deletion_behaviour_scores_zero_deletions_as_one_with_event_refs():
     assert measurement.evidence_refs == ["event:00000000-0000-0000-0000-000000000001"]
 
 
+def test_deletion_behaviour_clamps_normalized_when_deletions_exceed_events():
+    # More confirmed deletions than candidate events drives 1 - rate negative; the
+    # normalized score must stay in [0, 1].
+    measurement = measure_deletion_behaviour(
+        events=[_event(1, 10)], deletions=[_deletion(2, 10), _deletion(3, 11)]
+    )
+
+    assert isinstance(measurement, HygieneMeasurement)
+    assert measurement.raw_value < 0  # raw keeps the true (negative) signal
+    assert measurement.normalized == 0.0
+
+
 def test_deletion_behaviour_excludes_empty_candidate_denominator():
     measurement = measure_deletion_behaviour(events=[], deletions=[_deletion(2, 10)])
 

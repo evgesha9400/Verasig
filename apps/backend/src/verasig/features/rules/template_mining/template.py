@@ -130,7 +130,9 @@ def _tidy_lines(text: str) -> str:
     return "\n".join(to_clean_lines(text))
 
 
-_BARE_ORDINAL = re.compile(r"\bTP\d+\b")
+# [0-9] not \d: JS `\d` is ASCII-only; \d would also match unicode digits and
+# diverge from the JS parser (JS is the parity source of truth).
+_BARE_ORDINAL = re.compile(r"\bTP[0-9]+\b")
 _ORDINAL_KEEP = re.compile(r"^:?\s*<PRICE")
 
 
@@ -146,7 +148,7 @@ def _collapse_bare_ordinals(template: str) -> str:
 
 # Leverage tokens ("20X", "17X", Cyrillic "20Х") vary per signal but are not
 # structural.
-LEVERAGE_TOKEN = re.compile(r"\d+\s*[XХ](?![A-Za-zЀ-ӿ0-9])")
+LEVERAGE_TOKEN = re.compile(r"[0-9]+\s*[XХ](?![A-Za-zЀ-ӿ0-9])")
 
 
 def _collapse_leverage(template: str) -> str:
@@ -241,7 +243,7 @@ def _collapse_price_runs(template: str) -> str:
     )
 
 
-BARE_PRICE_LINE = re.compile(r"^(?:\d+\s+)?<PRICE>$")
+BARE_PRICE_LINE = re.compile(r"^(?:[0-9]+\s+)?<PRICE>$")
 
 
 def _collapse_target_lines(template: str) -> str:
@@ -353,10 +355,23 @@ def _keep_structural_lines(template: str) -> str:
     return "\n".join(kept)
 
 
+def _utf16_code_units(text: str):
+    """JS `charCodeAt` iterates UTF-16 code units; an astral char is two
+    surrogates. Mirror that so the hash matches JS for any input, not just BMP."""
+    for ch in text:
+        code = ord(ch)
+        if code > 0xFFFF:
+            code -= 0x10000
+            yield 0xD800 + (code >> 10)
+            yield 0xDC00 + (code & 0x3FF)
+        else:
+            yield code
+
+
 def hash_string(text: str) -> str:
     h = 0
-    for ch in text:
-        h = (h * 31 + ord(ch)) & 0xFFFFFFFF
+    for unit in _utf16_code_units(text):
+        h = (h * 31 + unit) & 0xFFFFFFFF
     if h == 0:
         return "0"
     digits = "0123456789abcdefghijklmnopqrstuvwxyz"

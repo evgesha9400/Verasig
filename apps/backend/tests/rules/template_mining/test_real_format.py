@@ -107,6 +107,7 @@ def test_classifies_a_full_russian_signal_as_new_signal():
 
 def test_classifies_a_russian_result_post_as_not_new_signal():
     candidate = attempt_extract_signal(REAL_RESULT)
-    # result posts may lack a fresh direction; if parsed, they must not be new signals
-    if candidate is not None:
-        assert candidate.intent != "new_signal"
+    # a result post is never a fresh signal: either it is not extracted at all, or
+    # it is extracted with a non-"new_signal" intent. Assert unconditionally so a
+    # regression that classifies it as a new signal fails (was: vacuous when None).
+    assert candidate is None or candidate.intent != "new_signal"

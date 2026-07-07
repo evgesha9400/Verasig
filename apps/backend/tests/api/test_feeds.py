@@ -1,38 +1,11 @@
 from datetime import datetime, timezone
 
+from conftest import _auth
+from conftest import _register_token as _register
 from fakes import FakeSource, FakeTelegramAuth
+from fakes import channel as _channel
 
-from verasig.domain.channel import TelegramChannel
 from verasig.domain.channel_reference import ChannelReferenceResolutionError
-
-
-def _register(client, email: str = "ada@example.com") -> str:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    assert response.status_code == 201
-    return response.json()["token"]
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
-
-
-def _channel(channel_id: int = 7) -> TelegramChannel:
-    return TelegramChannel(
-        channel_id=channel_id,
-        handle="pilot",
-        title="Pilot Signals",
-        is_private=False,
-        subscriber_count=1234,
-        first_seen_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
-    )
 
 
 def _connect_telegram(client, app, token: str) -> None:
@@ -116,6 +89,32 @@ def test_observer_second_feed_hits_source_limit(client, app):
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "PLAN_LIMIT_SOURCES"
+
+
+def test_observer_can_re_add_existing_feed_without_hitting_limit(client, app):
+    # re-adding a feed the user already owns (same channel) is not a new source;
+    # it must not be blocked by the observer single-source limit.
+    token = _register(client)
+    _connect_telegram(client, app, token)
+    app.state.telegram_source_factory = lambda _link: FakeSource(_channel(7), [])
+    assert (
+        client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"}).status_code
+        == 201
+    )
+
+    response = client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"})
+
+    assert response.status_code == 201
+
+
+def test_non_numeric_feed_id_returns_404_not_500(client, app):
+    # require_feed casts external_id to int; a non-numeric id must 404, not 500.
+    token = _register(client)
+
+    response = client.delete("/feeds/not-a-number", headers=_auth(token))
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "FEED_NOT_FOUND"
 
 
 def test_delete_feed_purges_feed_and_masks_foreign_user(client, app):

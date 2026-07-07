@@ -17,7 +17,8 @@ from verasig.features.simulation.simulator import simulate_outcomes_from_market_
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _END = _BASE + timedelta(minutes=2)
-_FIXTURE = Path("tests/fixtures/klines/btcusdt_known_r.json")
+# relative to this file, not the cwd, so the test runs from any directory
+_FIXTURE = Path(__file__).parent.parent / "fixtures" / "klines" / "btcusdt_known_r.json"
 
 
 class FakeMarketData:

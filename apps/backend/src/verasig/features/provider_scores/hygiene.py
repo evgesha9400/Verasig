@@ -165,7 +165,9 @@ def measure_deletion_behaviour(
     return HygieneMeasurement(
         name="deletion_behaviour",
         raw_value=value,
-        normalized=value,
+        # more confirmed deletions than candidate events drives value negative;
+        # a normalized score must stay in [0, 1] (cf. measure_drawdown).
+        normalized=_clamp(value),
         evidence_refs=refs,
     )
 

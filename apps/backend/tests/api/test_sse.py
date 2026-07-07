@@ -34,3 +34,18 @@ def test_sse_streams_job_events(client, app):
     assert 'data: {"step": 2}' in body
     assert "event: done" in body
     assert 'data: {"ok": true}' in body
+
+
+def test_sse_stream_returns_typed_404_when_job_absent(client, app):
+    router = APIRouter()
+
+    @router.get("/missing/progress")
+    def progress():
+        return sse_stream(app.state.jobs, "missing")
+
+    app.include_router(router)
+
+    response = client.get("/missing/progress")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "JOB_NOT_FOUND"

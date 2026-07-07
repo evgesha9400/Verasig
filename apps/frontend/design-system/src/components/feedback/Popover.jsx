@@ -34,10 +34,31 @@ const CSS = `
 .vrs-pop__panel::before {
   content: '';
   position: absolute;
+}
+/* Bridge sits on the edge facing the trigger so the cursor can cross the gap. */
+.vrs-pop__panel[data-side='bottom']::before {
   top: -10px;
   left: 0;
   right: 0;
   height: 10px;
+}
+.vrs-pop__panel[data-side='top']::before {
+  bottom: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+}
+.vrs-pop__panel[data-side='left']::before {
+  right: -10px;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+}
+.vrs-pop__panel[data-side='right']::before {
+  left: -10px;
+  top: 0;
+  bottom: 0;
+  width: 10px;
 }
 .vrs-pop__panel[data-side='top'] {
   top: auto;

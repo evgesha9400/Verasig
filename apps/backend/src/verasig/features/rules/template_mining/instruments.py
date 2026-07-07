@@ -111,7 +111,13 @@ PAIR_CONFIDENCE = 0.85
 # Russian "Монета:/Монету:" coin label -> the ticker that follows.
 # Allow a #/$ prefix and digits in the ticker so "#1INCH" / "1000PEPE" are caught.
 COIN_LABEL = re.compile(r"Монет[а-яё]*\s*:?\s*[#$]?([A-Za-z0-9]{2,10})", re.IGNORECASE)
-BARE_TICKER = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,8})(?![A-Za-z0-9])")
+# A bare ticker, optionally carrying a concatenated crypto quote ("LINKUSDT"), so
+# a slash-less pair still splits into base + quote instead of being swallowed
+# whole. Non-greedy base + longest-first quote alternation keeps the split at the
+# quote boundary (LINK|USDT, not LINKUSD|T).
+BARE_TICKER = re.compile(
+    r"(?<![A-Za-z0-9])([A-Z]{2,8}?)(USDT|USDC|USD|PERP|BTC|ETH)?(?![A-Za-z0-9])"
+)
 HAS_LETTER = re.compile(r"[A-Za-z]")
 
 
@@ -259,14 +265,18 @@ def _collect_coin_label_hits(text: str, hits: list[_Hit]) -> None:
 
 def _collect_bare_ticker_hits(text: str, hits: list[_Hit]) -> None:
     for match in BARE_TICKER.finditer(text):
-        if match.group(1) not in CRYPTO_TICKERS:
+        base = match.group(1)
+        if base not in CRYPTO_TICKERS:
             continue
+        quote = match.group(2)
         hits.append(
             _Hit(
                 start=match.start(),
                 end=match.start() + len(match.group(0)),
-                normalized=_to_usdt(match.group(1)),
-                raw=match.group(1),
+                # an explicit concatenated quote is kept verbatim (LINKUSDT,
+                # ETHBTC); a bare base defaults to the USDT quote, as before.
+                normalized=f"{base}{quote}" if quote else _to_usdt(base),
+                raw=match.group(0),
                 confidence=PAIR_CONFIDENCE,
             )
         )

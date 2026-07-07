@@ -76,16 +76,17 @@ async def create_feed(
     user: UserAccount = Depends(get_current_user),
 ) -> dict:
     with request.app.state.session_factory() as session:
-        try:
-            require_source_capacity(user, session)
-        except PlanSourceLimitExceeded as error:
-            raise ApiError(403, "PLAN_LIMIT_SOURCES", "Source limit reached") from error
         source = _require_connected_source(request, session, user.id)
         try:
             async with source:
                 channel = await source.resolve_channel(payload.tag)
         except ChannelReferenceResolutionError as error:
             raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
+        # resolve first so a re-add of an existing feed is not counted as new capacity
+        try:
+            require_source_capacity(user, session, channel.channel_id)
+        except PlanSourceLimitExceeded as error:
+            raise ApiError(403, "PLAN_LIMIT_SOURCES", "Source limit reached") from error
         feed_repository.create_feed(session, user.id, channel, datetime.now(tz=UTC))
         session.commit()
         feeds = present_feeds(session, user.id)

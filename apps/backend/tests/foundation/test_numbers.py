@@ -23,6 +23,10 @@ def test_to_decimal_parses_numbers_commas_spaces_and_suffixes(raw, expected):
     assert to_decimal(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["", "   ", "abc", "k"])
+@pytest.mark.parametrize(
+    "raw",
+    ["", "   ", "abc", "k", "nan", "NaN", "inf", "-inf", "Infinity", "infinity"],
+)
 def test_to_decimal_returns_none_for_unparseable(raw):
+    # "nan"/"inf" parse as valid Decimals but are never real prices → None.
     assert to_decimal(raw) is None

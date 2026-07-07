@@ -26,6 +26,11 @@ export function streamJobProgress(token, path, handlers = {}) {
     source.close()
   })
   source.addEventListener('error', (event) => {
+    // EventSource fires 'error' on transient disconnects too (it then auto-
+    // reconnects). Only treat a server-sent error event (carrying data) or a
+    // fully-closed stream as terminal; let transient blips reconnect.
+    const terminal = event.data != null || source.readyState === EventSource.CLOSED
+    if (!terminal) return
     handlers.onError && handlers.onError(parseEventData(event))
     source.close()
   })

@@ -20,7 +20,9 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", Settings().database_url)
+    # set_main_option runs the value through ConfigParser interpolation, so a `%`
+    # in the URL (e.g. a url-encoded password) must be escaped as `%%`.
+    config.set_main_option("sqlalchemy.url", Settings().database_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

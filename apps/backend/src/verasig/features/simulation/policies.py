@@ -33,6 +33,9 @@ class ProviderStatedPolicy(ExecutionPolicy):
         if fill is None or stop is None or target is None:
             return _unfilled(self, folded)
         risk = _risk(fill.price, stop)
+        if risk == 0:
+            # fill == stop leaves no risk unit; the R-multiple division would raise.
+            return _unfilled(self, folded)
         for index, bar in enumerate(fill.bars):
             life_bars = fill.bars[: index + 1]
             touches_stop = _touches_stop(folded, bar, stop)

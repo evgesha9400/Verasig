@@ -135,6 +135,15 @@ describe('feedsApi', () => {
     })
   })
 
+  it('includes a falsy-but-provided depth (0), only omitting null', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:backfill' }, 202))
+
+    await startBackfill('jwt-token', '7', 'full', 0)
+
+    const sentBody = JSON.parse(fetch.mock.calls[0][1].body)
+    expect(sentBody).toEqual({ mode: 'full', depth: 0 })
+  })
+
   it('omits the depth when none is chosen', async () => {
     fetch.mockResolvedValueOnce(jsonResponse({ jobId: 'user:7:backfill' }, 202))
 

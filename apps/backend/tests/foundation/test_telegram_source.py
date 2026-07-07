@@ -14,6 +14,7 @@ from verasig.domain.telegram_ports import TelegramSource
 from verasig.foundation.telegram.telethon_source import (
     ChannelReferenceResolutionError,
     TelethonSource,
+    _BoundedKeySet,
 )
 
 
@@ -84,6 +85,8 @@ def test_conforming_source_satisfies_protocol():
 
 
 def test_source_missing_resolve_channel_does_not_satisfy_protocol():
+    # conforming in every respect EXCEPT resolve_channel — so the assertion below
+    # can only fail for that one missing method, not for an unrelated omission.
     class NoResolve:
         @staticmethod
         async def fetch_older_batches(
@@ -96,6 +99,10 @@ def test_source_missing_resolve_channel_does_not_satisfy_protocol():
             yield []
 
         @staticmethod
+        async def live_message_ids(_channel_id) -> set[int]:
+            return set()
+
+        @staticmethod
         async def live_events(_channel_ids):
             yield None
 
@@ -103,7 +110,14 @@ def test_source_missing_resolve_channel_does_not_satisfy_protocol():
 
 
 def test_source_missing_live_events_does_not_satisfy_protocol():
+    # conforming in every respect EXCEPT live_events.
     class BackfillOnly:
+        @staticmethod
+        async def resolve_channel(_reference) -> TelegramChannel:
+            return TelegramChannel(
+                channel_id=1, title="t", is_private=False, first_seen_at=_instant()
+            )
+
         @staticmethod
         async def fetch_older_batches(
             _channel_id, _before_message_id, _batch_size, _since=None
@@ -113,6 +127,10 @@ def test_source_missing_live_events_does_not_satisfy_protocol():
         @staticmethod
         async def fetch_newer_batches(_channel_id, _after_message_id, _batch_size):
             yield []
+
+        @staticmethod
+        async def live_message_ids(_channel_id) -> set[int]:
+            return set()
 
     assert not isinstance(BackfillOnly(), TelegramSource)
 
@@ -489,3 +507,38 @@ async def test_telethon_live_events_yields_delete_notice():
     assert isinstance(event, TelegramDeletionEvent)
     assert event.channel_id == 1
     assert event.message_id == 10
+
+
+async def test_poll_channel_survives_transient_poll_error():
+    # A single poll iteration raising must not kill the per-channel poll loop:
+    # it logs and retries, so live capture for that channel keeps running.
+    calls: list[int] = []
+
+    class _Stub:
+        _poll_interval_seconds = 0
+
+        async def _poll_channel_once(self, _state, channel_id: int) -> None:
+            calls.append(channel_id)
+            if len(calls) == 1:
+                raise RuntimeError("transient network blip")
+
+    task = asyncio.create_task(TelethonSource._poll_channel(_Stub(), None, 5))
+    while len(calls) < 2:  # survived the first raise and polled again
+        await asyncio.sleep(0)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert len(calls) >= 2
+
+
+def test_bounded_key_set_evicts_oldest_past_capacity():
+    # dedup memory over a live stream is capped: the oldest key falls out.
+    seen = _BoundedKeySet(max_size=2)
+    seen.add((1, 1))
+    seen.add((1, 2))
+    seen.add((1, 3))
+
+    assert (1, 1) not in seen  # evicted
+    assert (1, 2) in seen
+    assert (1, 3) in seen

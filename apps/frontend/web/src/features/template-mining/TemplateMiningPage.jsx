@@ -81,6 +81,8 @@ export function TemplateMiningPage({
   const [examplesFor, setExamplesFor] = useState(null) // open template's key
   const [confirmedKeys, setConfirmedKeys] = useState(null) // null = not fetched / N/A
   const [restoring, setRestoring] = useState(false)
+  const [mineError, setMineError] = useState(null) // set when the mine job fails
+  const [mineAttempt, setMineAttempt] = useState(0) // bumped to retry (remounts MineView)
   const seededFeedRef = useRef(null)
 
   // Controlled-with-fallback: the parent may own decisions; otherwise local.
@@ -172,6 +174,7 @@ export function TemplateMiningPage({
     setResult(null)
     setExamplesFor(null)
     setConfirmedKeys(null)
+    setMineError(null)
     seededFeedRef.current = null
   }, [activeFeed?.id])
 
@@ -228,6 +231,7 @@ export function TemplateMiningPage({
   }, [step, result, acceptedGroups.length, restoring])
 
   function handleMineDone(mineResult) {
+    setMineError(null)
     setResult({
       groups: mineResult?.groups ?? [],
       messages: mineResult?.messages ?? []
@@ -236,12 +240,16 @@ export function TemplateMiningPage({
     setExamplesFor(null)
   }
 
+  // A failed mine keeps the operator on the loader with an explicit error and a
+  // retry, rather than a transient toast that leaves a blank screen behind.
   function handleMineError(error) {
-    fireToast?.(
-      'rejected',
-      'Mining failed',
-      error?.message || 'Try again in a moment.'
-    )
+    setMineError(error?.message || 'Try again in a moment.')
+    fireToast?.('rejected', 'Mining failed', error?.message || 'Try again in a moment.')
+  }
+
+  function retryMine() {
+    setMineError(null)
+    setMineAttempt((attempt) => attempt + 1)
   }
 
   function decide(templateKey, status) {
@@ -281,8 +289,16 @@ export function TemplateMiningPage({
   if (!result) {
     return (
       <div className="vrs-page vrs-tm">
-        {authenticated ? (
+        {mineError ? (
+          <div className="vrs-empty vrs-empty--sm" role="alert">
+            <div className="vrs-empty__note">Mining failed. {mineError}</div>
+            <Button variant="primary" size="sm" onClick={retryMine}>
+              Try again
+            </Button>
+          </div>
+        ) : authenticated ? (
           <MineView
+            key={mineAttempt}
             feed={activeFeed}
             onStart={onStartMine}
             onStream={onStreamMine}

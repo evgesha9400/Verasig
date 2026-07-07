@@ -55,10 +55,10 @@ export function RadioCard({
       aria-checked={selected}
       tabIndex={as === 'div' ? 0 : undefined}
       selected={selected}
-      onClick={onClick}
-      onKeyDown={onKeyDown}
       className={['vrs-radio-card', className].filter(Boolean).join(' ')}
       {...rest}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
     >
       <span className="vrs-radio-card__mark" aria-hidden="true" />
       {children}

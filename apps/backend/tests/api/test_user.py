@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+from conftest import _auth
+
 from verasig.features.accounts.tokens import issue_email_change_token, read_user_id
 
 SECRET = "s" * 32
@@ -17,10 +19,6 @@ def _register(client) -> dict:
     )
     assert response.status_code == 201
     return response.json()
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_patch_user_name_persists(client):
@@ -139,6 +137,30 @@ def test_email_change_sets_pending_and_confirm_applies(client):
     assert confirmed.status_code == 200
     assert confirmed.json()["email"] == "next@example.com"
     assert confirmed.json()["pendingEmail"] is None
+
+
+def test_email_change_to_taken_email_returns_409(client):
+    registered = _register(client)
+    # a second account already owns the target address
+    other = client.post(
+        "/auth/register",
+        json={
+            "firstName": "Grace",
+            "lastName": "Hopper",
+            "email": "taken@example.com",
+            "password": "correct horse battery staple",
+        },
+    )
+    assert other.status_code == 201
+
+    response = client.post(
+        "/user/email",
+        headers=_auth(registered["token"]),
+        json={"email": "taken@example.com"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "AUTH_EMAIL_TAKEN"
 
 
 def test_password_reset_request_is_accepted(client):

@@ -100,10 +100,14 @@ export function Button({
   as = 'button',
   type = 'button',
   className = '',
+  style,
+  onClick,
   children,
   ...rest
 }) {
   const Tag = as
+  const isButton = Tag === 'button'
+  const isDisabled = disabled || loading
   const cls = [
     'vrs-btn',
     `vrs-btn__${variant}`,
@@ -118,8 +122,23 @@ export function Button({
   return (
     <Tag
       className={cls}
-      type={Tag === 'button' ? type : undefined}
-      disabled={Tag === 'button' ? disabled || loading : undefined}
+      type={isButton ? type : undefined}
+      disabled={isButton ? isDisabled : undefined}
+      // A non-button (e.g. as="a") can't use the disabled attribute, so mirror
+      // the affordance: announce it, dim it, and swallow activation.
+      aria-disabled={isButton ? undefined : isDisabled || undefined}
+      style={
+        !isButton && isDisabled
+          ? { opacity: 0.4, pointerEvents: 'none', ...style }
+          : style
+      }
+      onClick={(event) => {
+        if (!isButton && isDisabled) {
+          event.preventDefault()
+          return
+        }
+        onClick && onClick(event)
+      }}
       {...rest}
     >
       {loading && <span className="vrs-btn__spin" aria-hidden="true" />}

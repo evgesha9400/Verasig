@@ -18,6 +18,7 @@ from verasig.features.accounts.tokens import (
 )
 from verasig.features.accounts.user_schemas import UserOut, user_out
 from verasig.features.accounts.workflow import (
+    EmailTakenError,
     PendingEmailMismatchError,
     cancel_subscription,
     change_plan,
@@ -56,7 +57,12 @@ def request_email(
     user: UserAccount = Depends(get_current_user),
 ) -> UserOut:
     with request.app.state.session_factory() as session:
-        updated = request_email_change(session, user, payload.email)
+        try:
+            updated = request_email_change(session, user, payload.email)
+        except EmailTakenError as error:
+            raise ApiError(
+                409, "AUTH_EMAIL_TAKEN", "Email is already registered"
+            ) from error
         token = issue_email_change_token(
             user.id,
             updated.pending_email,
@@ -88,6 +94,10 @@ def confirm_email(
         except PendingEmailMismatchError as error:
             raise ApiError(
                 400, "EMAIL_CONFIRM_MISMATCH", "Email does not match"
+            ) from error
+        except EmailTakenError as error:
+            raise ApiError(
+                409, "AUTH_EMAIL_TAKEN", "Email is already registered"
             ) from error
         session.commit()
     return user_out(updated)

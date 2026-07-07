@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Dialog, Icon } from '@verasig/design-system'
 import { formatLabel } from '../../domain/template-mining/index.js'
 import { CandidateExample } from './CandidateExample.jsx'
@@ -92,6 +92,13 @@ export function TemplateExamplesDialog({
   onReset
 }) {
   const [page, setPage] = useState(0)
+
+  // A different template starts over at the first page: the previous group's
+  // page index could point past the new group's pages.
+  useEffect(() => {
+    setPage(0)
+  }, [group?.templateKey])
+
   if (!open || !group) return null
 
   const ordered = [...group.candidates].sort(
@@ -149,7 +156,7 @@ export function TemplateExamplesDialog({
         </span>
       )}
 
-      <ExtractionSummary candidate={group.examples[0]} />
+      {group.examples[0] && <ExtractionSummary candidate={group.examples[0]} />}
 
       {pageItems.map((candidate) => (
         <CandidateExample key={candidate.message.id} candidate={candidate} />

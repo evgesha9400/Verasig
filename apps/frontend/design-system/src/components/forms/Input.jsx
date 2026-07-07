@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 const CSS = `
 .vrs-field { display: flex; flex-direction: column; gap: 6px; }
 .vrs-field__label { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--fw-medium); color: var(--text-body); display: flex; gap: 6px; align-items: center; }
@@ -56,8 +58,10 @@ export function Input({
   className = '',
   ...rest
 }) {
-  const fieldId =
-    id || (label ? `vrs-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined)
+  // Prefer an explicit id (lets callers wire their own labels), else fall back
+  // to a collision-free generated id rather than one derived from the label.
+  const generatedId = useId()
+  const fieldId = id || generatedId
   const boxCls = [
     'vrs-input',
     error ? 'is-error' : '',

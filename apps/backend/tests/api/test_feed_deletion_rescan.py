@@ -2,9 +2,11 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
+from conftest import _auth
+from conftest import _register_token as _register
 from fakes import FakeSource, FakeTelegramAuth
+from fakes import channel as _channel
 
-from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts.tokens import read_user_id
@@ -13,24 +15,6 @@ from verasig.features.signals import event_repository
 
 _CHANNEL_ID = 7
 _INSTANT = datetime(2026, 6, 1, tzinfo=timezone.utc)
-
-
-def _register(client, email: str = "ada@example.com") -> str:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    assert response.status_code == 201
-    return response.json()["token"]
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 class _MessageLogHandler(logging.Handler):
@@ -66,17 +50,6 @@ def _capture_app_logs():
             logger.removeHandler(handler)
             logger.setLevel(previous_levels[logger])
             logger.disabled = previous_disabled[logger]
-
-
-def _channel() -> TelegramChannel:
-    return TelegramChannel(
-        channel_id=_CHANNEL_ID,
-        handle="pilot",
-        title="Pilot Signals",
-        is_private=False,
-        subscriber_count=1234,
-        first_seen_at=_INSTANT,
-    )
 
 
 def _message(message_id: int, text: str) -> RawTelegramMessage:

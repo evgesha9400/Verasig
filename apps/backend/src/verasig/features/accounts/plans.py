@@ -24,9 +24,17 @@ PLAN_LIMITS = {
 }
 
 
-def require_source_capacity(user: UserAccount, session: Session) -> None:
+def require_source_capacity(
+    user: UserAccount, session: Session, channel_id: int | None = None
+) -> None:
     limit = PLAN_LIMITS[user.plan].sources
     if limit is None:
+        return
+    # re-adding a feed the user already owns is not a new source; it must not be
+    # blocked by the limit (nor double-counted against it).
+    if channel_id is not None and (
+        feed_repository.read_feed(session, user.id, channel_id) is not None
+    ):
         return
     if feed_repository.count_feeds(session, user.id) >= limit:
         raise PlanSourceLimitExceeded

@@ -25,6 +25,7 @@ def _row_to_run(row: BackfillJobRunRow) -> BackfillJobRun:
         cursor_message_id=row.cursor_external_message_id,
         error_code=row.error_code,
         error_message=row.error_message,
+        previous_status=row.previous_feed_status,
     )
 
 
@@ -78,6 +79,7 @@ def create_run(
     channel_id: int,
     started_at: datetime,
     mode: BackfillMode = BackfillMode.RESUME,
+    previous_status: str | None = None,
 ) -> BackfillJobRun:
     fetched, oldest, cursor = _initial_progress(session, user_id, channel_id, mode)
     row = BackfillJobRunRow(
@@ -92,6 +94,7 @@ def create_run(
         cursor_external_message_id=cursor,
         error_code=None,
         error_message=None,
+        previous_feed_status=previous_status,
     )
     session.add(row)
     session.flush()

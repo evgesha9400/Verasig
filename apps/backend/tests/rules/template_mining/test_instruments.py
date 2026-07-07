@@ -72,6 +72,10 @@ def test_detects_an_arbitrary_slash_pair_not_in_the_dictionary():
     assert "ARBUSDT" in _normals("SCALP ARB/USDT long 1.124")
 
 
+def test_splits_a_slash_less_concatenated_pair_into_base_and_quote():
+    assert "LINKUSDT" in _normals("LINKUSDT long")
+
+
 # --- guards ---
 def test_does_not_treat_ordinary_six_letter_word_as_a_forex_pair():
     assert len(detect_instruments("MARKET orders only please")) == 0

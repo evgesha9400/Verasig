@@ -1,19 +1,5 @@
-def _register(client, email="ada@example.com"):
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    assert response.status_code == 201
-    return response.json()["token"]
-
-
-def _auth(token):
-    return {"Authorization": f"Bearer {token}"}
+from conftest import _auth
+from conftest import _register_token as _register
 
 
 def test_overlay_defaults_empty_then_round_trips(client):

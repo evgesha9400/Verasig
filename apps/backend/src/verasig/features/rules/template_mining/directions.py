@@ -21,8 +21,8 @@ EMOJI_CONFIDENCE = 0.4
 # emoji-inferred direction apart from one the author actually wrote out.
 EMOJI_CONFIDENCE_CEILING = 0.7
 
-BUY_WORDS = ["buy", "long", "bullish", "call", "calls"]
-SELL_WORDS = ["sell", "short", "bearish", "put", "puts"]
+BUY_WORDS = ["buy", "long", "bullish"]
+SELL_WORDS = ["sell", "short", "bearish"]
 # Russian: лонг = long/buy, шорт = short/sell.
 BUY_WORDS_RU = ["лонг"]
 SELL_WORDS_RU = ["шорт"]
@@ -98,9 +98,25 @@ def _overlay_direction_rules(overlay: dict | None) -> list[_Rule]:
     ]
 
 
+# "call"/"put" are directions only in an options price context ("CALL above 210",
+# "PUT 180") — bare prose ("premium leveraged calls") is NOT a direction. Require
+# an adjacent price after an optional above/below/at/@. [0-9] mirrors JS `\d`.
+_OPTIONS_CALL = re.compile(
+    rf"(?<![{_ASCII_WORD}])(calls?)(?![{_ASCII_WORD}])"
+    r"(?=\s+(?:above|below|at|@)?\s*[0-9])",
+    re.IGNORECASE,
+)
+_OPTIONS_PUT = re.compile(
+    rf"(?<![{_ASCII_WORD}])(puts?)(?![{_ASCII_WORD}])"
+    r"(?=\s+(?:above|below|at|@)?\s*[0-9])",
+    re.IGNORECASE,
+)
+
 RULES = [
     _Rule(_word_matcher(BUY_WORDS), "BUY", WORD_CONFIDENCE),
     _Rule(_word_matcher(SELL_WORDS), "SELL", WORD_CONFIDENCE),
+    _Rule(_OPTIONS_CALL, "BUY", WORD_CONFIDENCE),
+    _Rule(_OPTIONS_PUT, "SELL", WORD_CONFIDENCE),
     _Rule(_cyrillic_matcher(BUY_WORDS_RU), "BUY", WORD_CONFIDENCE),
     _Rule(_cyrillic_matcher(SELL_WORDS_RU), "SELL", WORD_CONFIDENCE),
     _Rule(_emoji_matcher(BUY_EMOJIS), "BUY", EMOJI_CONFIDENCE),

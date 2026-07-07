@@ -395,7 +395,13 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
               tone="pending"
               title={`Subscription ends ${user.cancelAt}`}
               actions={
-                <Button variant="secondary" size="sm" onClick={resumeSubscription}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={busy === 'subscription'}
+                  disabled={busy === 'subscription'}
+                  onClick={resumeSubscription}
+                >
                   Resume subscription
                 </Button>
               }

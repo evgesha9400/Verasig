@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const CSS = `
 .vrs-otp {
@@ -43,11 +43,13 @@ if (typeof document !== 'undefined' && !document.getElementById('vrs-otp-css')) 
   document.head.appendChild(s)
 }
 
-function charsFromValue(value, length) {
-  const chars = String(value || '')
-    .replace(/\D/g, '')
-    .slice(0, length)
-    .split('')
+function sanitize(raw, inputMode) {
+  const text = String(raw || '')
+  return inputMode === 'numeric' ? text.replace(/\D/g, '') : text
+}
+
+function charsFromValue(value, length, inputMode) {
+  const chars = sanitize(value, inputMode).slice(0, length).split('')
   return Array.from({ length }, (_, index) => chars[index] || '')
 }
 
@@ -61,9 +63,20 @@ export function OTPInput({
   ...rest
 }) {
   const refs = useRef([])
-  const chars = charsFromValue(value, length)
+  // Per-cell values are the source of truth so empty middle cells are never
+  // collapsed by round-tripping through a single joined string.
+  const [chars, setChars] = useState(() => charsFromValue(value, length, inputMode))
+
+  // Re-seed cells only when the controlled value diverges from what we hold.
+  useEffect(() => {
+    if (sanitize(value, inputMode) !== chars.join('')) {
+      setChars(charsFromValue(value, length, inputMode))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, length, inputMode])
 
   function emit(nextChars) {
+    setChars(nextChars)
     onChange && onChange(nextChars.join(''))
   }
 
@@ -73,7 +86,7 @@ export function OTPInput({
   }
 
   function setDigit(index, rawValue) {
-    const digits = rawValue.replace(/\D/g, '').split('')
+    const digits = sanitize(rawValue, inputMode).split('')
     if (digits.length > 1) {
       const next = [...chars]
       digits.slice(0, length - index).forEach((digit, offset) => {
@@ -92,8 +105,7 @@ export function OTPInput({
 
   function onPaste(index, event) {
     const paste = event.clipboardData?.getData('text') || ''
-    const pastedDigits = paste
-      .replace(/\D/g, '')
+    const pastedDigits = sanitize(paste, inputMode)
       .slice(0, length - index)
       .split('')
     if (pastedDigits.length === 0) return

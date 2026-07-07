@@ -21,6 +21,21 @@ def test_parse_channel_reference_accepts_telegram_link():
     assert channel_lookup_handle(parsed) == "pilot_signals"
 
 
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://t.me/joinchat/AAAAAEHbBc",
+        "https://t.me/+AbCdEf123",
+        "https://t.me/c/1234567890",
+    ],
+)
+def test_invite_and_private_links_have_no_public_handle(link):
+    # joinchat/…, +… and c/… links are private invites, not @-usernames.
+    parsed = parse_channel_reference(link)
+    assert parsed.kind is ChannelReferenceKind.LINK
+    assert channel_lookup_handle(parsed) is None
+
+
 def test_parse_channel_reference_accepts_numeric_id():
     parsed = parse_channel_reference("123")
     assert parsed.kind is ChannelReferenceKind.ID

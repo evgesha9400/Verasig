@@ -37,4 +37,25 @@ describe('OverlayManager', () => {
       expect.objectContaining({ rejectPhrases: ['giveaway', 'promo'] })
     )
   })
+
+  it('renders duplicate reject phrases only once (stable, deduped keys)', () => {
+    render(
+      <OverlayManager
+        overlay={{ ...OVERLAY, rejectPhrases: ['giveaway', 'giveaway'] }}
+        onSave={vi.fn()}
+      />
+    )
+    expect(
+      screen.getAllByRole('button', { name: /Remove reject phrase giveaway/i })
+    ).toHaveLength(1)
+  })
+
+  it('does not re-add an existing reject phrase', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    render(<OverlayManager overlay={OVERLAY} onSave={onSave} />)
+    await user.type(screen.getByPlaceholderText(/Add reject phrase/i), 'giveaway')
+    await user.click(screen.getByRole('button', { name: /^Add reject phrase$/i }))
+    expect(onSave).not.toHaveBeenCalled()
+  })
 })

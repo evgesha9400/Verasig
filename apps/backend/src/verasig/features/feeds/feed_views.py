@@ -44,15 +44,15 @@ def _message_stats(
 
 
 def _latest_results(session: Session, user_id: UUID) -> dict[int, BacktestResultRow]:
+    # DISTINCT ON keeps only the newest run per feed at the DB, instead of loading
+    # every historical run and deduping in Python.
     rows = session.scalars(
         select(BacktestResultRow)
         .where(BacktestResultRow.user_id == user_id)
+        .distinct(BacktestResultRow.external_id)
         .order_by(BacktestResultRow.external_id, BacktestResultRow.completed_at.desc())
     ).all()
-    latest: dict[int, BacktestResultRow] = {}
-    for row in rows:
-        latest.setdefault(row.external_id, row)
-    return latest
+    return {row.external_id: row for row in rows}
 
 
 def present_feeds(session: Session, user_id: UUID) -> list[dict]:

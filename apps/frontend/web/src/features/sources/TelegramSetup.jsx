@@ -52,6 +52,21 @@ export function TelegramSetup({
     }
   }
 
+  // Re-request the login code without leaving the code phase, so the OTP input
+  // stays mounted and the digits already entered are preserved.
+  async function resendCode() {
+    setErr(null)
+    try {
+      await onConnect({
+        apiId: Number(apiId.trim()),
+        apiHash: apiHash.trim(),
+        phone: phone.trim()
+      })
+    } catch (error) {
+      setErr(errorMessage(error))
+    }
+  }
+
   const codeComplete = code.length === 5
   async function verify() {
     if (!codeComplete) return
@@ -197,7 +212,7 @@ export function TelegramSetup({
               )}
               <div className="vrs-help" style={{ textAlign: 'center' }}>
                 Demo: enter any 5 digits. Didn’t get it?{' '}
-                <TextLink onClick={sendCode}>Resend code</TextLink> ·{' '}
+                <TextLink onClick={resendCode}>Resend code</TextLink> ·{' '}
                 <TextLink
                   onClick={() => {
                     setErr(null)

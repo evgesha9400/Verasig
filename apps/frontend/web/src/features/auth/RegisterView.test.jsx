@@ -134,6 +134,17 @@ describe('RegisterView', () => {
     expect(await screen.findAllByText('Email is already registered')).toBeTruthy()
   })
 
+  it('does not show the full name error before the field is interacted with', () => {
+    render(<RegisterView onRegister={() => {}} onLogin={() => {}} />)
+    expect(screen.queryByText('Full name is required.')).toBeNull()
+  })
+
+  it('shows the full name error after the field is blurred', () => {
+    render(<RegisterView onRegister={() => {}} onLogin={() => {}} />)
+    fireEvent.blur(screen.getByLabelText(/full name/i))
+    expect(screen.getByText('Full name is required.')).toBeTruthy()
+  })
+
   it('calls onLogin when Log in link is clicked', () => {
     const onLogin = vi.fn()
 

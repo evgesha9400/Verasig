@@ -26,6 +26,11 @@ describe('detectDirections — case and absence', () => {
       0
     )
   })
+  it('does not treat bare "calls" prose as a direction', () => {
+    expect(detectDirections('premium leveraged calls and 1:1 mentoring')).toHaveLength(
+      0
+    )
+  })
 })
 
 describe('detectDirections — emojis are lower confidence', () => {

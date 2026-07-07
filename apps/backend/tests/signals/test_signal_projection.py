@@ -83,6 +83,72 @@ def test_present_signals_ignores_deletion_when_not_signal_candidate(db_session):
     assert result["signals"] == []
 
 
+def test_present_signals_orders_newest_first(db_session):
+    from datetime import timedelta
+
+    _seed(db_session)
+    # a second, later signal from a different message must sort ahead of the first
+    later = _BASE + timedelta(days=1)
+    event_id = UUID("60000000-0000-0000-0000-0000000000a2")
+    signal_id = UUID("60000000-0000-0000-0000-0000000000a3")
+    with db_session.begin_nested():
+        message_repository.insert_messages(
+            db_session,
+            _USER_ID,
+            [
+                RawTelegramMessage(
+                    channel_id=7,
+                    message_id=20,
+                    text="ETH long entry",
+                    posted_at=later,
+                    captured_at=later,
+                    reply_to_message_id=None,
+                    has_media=False,
+                    raw_payload={},
+                )
+            ],
+        )
+        event_repository.insert_signal_events(
+            db_session,
+            _USER_ID,
+            [
+                RawSignalEvent(
+                    id=event_id,
+                    channel_id=7,
+                    message_id=20,
+                    candidate_text="ETH long entry",
+                    materialized_by=MaterializationPath.SEED_HEURISTIC,
+                    created_at=later,
+                )
+            ],
+        )
+        outcome_repository.insert_extracted_signals(
+            db_session,
+            [
+                ExtractedSignal(
+                    id=signal_id,
+                    event_id=event_id,
+                    channel_id=7,
+                    symbol="ETHUSDT",
+                    side=Side.LONG,
+                    entry_type=EntryType.LIMIT_SINGLE,
+                    entry_low=Decimal("3000"),
+                    entry_high=Decimal("3000"),
+                    stop_loss=Decimal("2900"),
+                    take_profits=[Decimal("3300")],
+                    extracted_at=later,
+                )
+            ],
+            _USER_ID,
+        )
+
+    result = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)
+
+    ids = [signal["id"] for signal in result["signals"]]
+    assert ids[0] == str(signal_id)  # newest first
+    assert str(_SIGNAL_ID) in ids
+
+
 def _seed(
     session,
     *,

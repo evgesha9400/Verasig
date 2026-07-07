@@ -111,6 +111,32 @@ describe('TemplateExamplesDialog', () => {
     expect(screen.getAllByText('Instrument').length).toBeGreaterThan(0)
   })
 
+  it('resets to the first page when the selected group changes', async () => {
+    const user = userEvent.setup()
+    const groupA = makeGroup(7)
+    const { rerender } = renderDialog(groupA)
+    await user.click(screen.getByRole('button', { name: /Next/i }))
+    expect(screen.getByText(/6\s*[–-]\s*7 of 7/)).toBeTruthy()
+
+    const groupB = groupOf(
+      Array.from({ length: 7 }, (_, i) => makeCandidate(i + 1)),
+      0
+    )
+    groupB.templateKey = 'tpl_y'
+    rerender(
+      <TemplateExamplesDialog
+        group={groupB}
+        open
+        onClose={vi.fn()}
+        status="unreviewed"
+        onAccept={vi.fn()}
+        onReject={vi.fn()}
+        onReset={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/1\s*[–-]\s*5 of 7/)).toBeTruthy()
+  })
+
   it('lets the reviewer decide from the footer', async () => {
     const user = userEvent.setup()
     const onAccept = vi.fn()

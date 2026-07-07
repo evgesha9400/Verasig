@@ -836,6 +836,7 @@ export const MOD_KINDS = {
   partial: { label: 'Partial close', icon: 'target', tone: 'verified' },
   close: { label: 'Close', icon: 'check', tone: 'verified' },
   move_stop: { label: 'Move stop', icon: 'shield', tone: 'info' },
+  move_target: { label: 'Move target', icon: 'target', tone: 'info' },
   cancel: { label: 'Cancelled', icon: 'x', tone: 'neutral' }
 }
 

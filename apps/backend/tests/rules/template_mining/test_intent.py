@@ -21,6 +21,15 @@ def test_classifies_a_no_entry_signal_with_risk_levels_as_new_signal():
     assert _intent_of("BTC LONG\nSL 67400\nTP 69000\nTP 70500") == "new_signal"
 
 
+def test_complete_setup_stays_new_signal_despite_result_words():
+    # completeness is decided before the result heuristic, so "targets ... hit" in
+    # an otherwise complete fresh setup does not flip it to a result.
+    assert (
+        _intent_of("XAUUSD BUY NOW\nSL 2312\nTP 2340\nTP 2355\nlet targets get hit")
+        == "new_signal"
+    )
+
+
 # --- results ---
 def test_treats_a_tp_hit_as_a_result():
     assert _intent_of("XAUUSD BUY hit TP1 ✅") == "result"

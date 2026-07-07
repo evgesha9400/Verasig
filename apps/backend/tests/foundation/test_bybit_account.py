@@ -50,3 +50,18 @@ async def test_verify_api_keys_rejects_nonzero_ret_code():
             transport=httpx.MockTransport(handler),
             timestamp_ms=lambda: 1234567890,
         )
+
+
+@pytest.mark.asyncio
+async def test_verify_api_keys_rejects_non_json_2xx_body():
+    # a 2xx with a non-JSON body must fail verification, not 500 on json() decode.
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html>maintenance</html>")
+
+    with pytest.raises(KeyVerificationError):
+        await verify_api_keys(
+            "api-key",
+            "api-secret",
+            transport=httpx.MockTransport(handler),
+            timestamp_ms=lambda: 1234567890,
+        )

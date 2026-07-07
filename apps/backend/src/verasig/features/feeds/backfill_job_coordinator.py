@@ -62,7 +62,6 @@ class BackfillJobCoordinator:
         self._session_factory = session_factory
         self._jobs = jobs
         self._batch_size = batch_size
-        self._previous_status_by_run_id: dict[UUID, str | None] = {}
         self._capture_generation_live: set[UUID] = set()
 
     def start(
@@ -97,7 +96,6 @@ class BackfillJobCoordinator:
         # after a reachability guard, and secures no evidence (that is Check gaps).
         source = make_source()
         run, previous_status = self._create_run(user_id, channel_id, mode)
-        self._previous_status_by_run_id[run.id] = previous_status
         key = backfill_job_key(user_id, channel_id)
         logger.info(
             "backfill.start new run: channel=%s mode=%s run=%s",
@@ -138,12 +136,11 @@ class BackfillJobCoordinator:
             cancelled = backfill_job_repository.mark_run_cancelled(
                 session, run.id, _now()
             )
-            previous_status = self._previous_status_by_run_id.get(run.id)
             feed_repository.set_status(
                 session,
                 user_id,
                 channel_id,
-                _feed_status_after_backfill(previous_status, "cancelled"),
+                _feed_status_after_backfill(run.previous_status, "cancelled"),
             )
             session.commit()
             return cancelled
@@ -170,9 +167,7 @@ class BackfillJobCoordinator:
                     session,
                     run.user_id,
                     run.channel_id,
-                    _feed_status_after_backfill(
-                        self._previous_status_by_run_id.get(run.id), "failed"
-                    ),
+                    _feed_status_after_backfill(run.previous_status, "failed"),
                 )
                 self._forget_run(run.id)
             session.commit()
@@ -202,11 +197,7 @@ class BackfillJobCoordinator:
                         SERVICE_INTERRUPTED,
                         "Backfill was interrupted by a service restart.",
                     )
-                previous_status = (
-                    self._previous_status_by_run_id.get(run.id)
-                    if run is not None
-                    else None
-                )
+                previous_status = run.previous_status if run is not None else None
                 row.status = _feed_status_after_backfill(previous_status, "failed")
                 if run is not None:
                     self._forget_run(run.id)
@@ -283,7 +274,7 @@ class BackfillJobCoordinator:
             feed = feed_repository.read_feed(session, user_id, channel_id)
             previous_status = feed.status if feed is not None else None
             run = backfill_job_repository.create_run(
-                session, user_id, channel_id, _now(), mode
+                session, user_id, channel_id, _now(), mode, previous_status
             )
             feed_repository.set_status(session, user_id, channel_id, "backfilling")
             session.commit()
@@ -422,7 +413,6 @@ class BackfillJobCoordinator:
 
     def _forget_run(self, run_id: UUID) -> None:
         """Drop a finished run's per-run bookkeeping."""
-        self._previous_status_by_run_id.pop(run_id, None)
         self._capture_generation_live.discard(run_id)
 
     def _finish_succeeded(

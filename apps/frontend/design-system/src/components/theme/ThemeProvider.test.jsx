@@ -1,6 +1,6 @@
 import { render, cleanup, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ThemeProvider, useTheme } from './ThemeProvider.jsx'
+import { THEME_STORAGE_KEY, ThemeProvider, useTheme } from './ThemeProvider.jsx'
 
 function accentTokens() {
   const style = document.documentElement.style
@@ -96,6 +96,28 @@ describe('ThemeProvider accent palette', () => {
     expect(tokens.signal500).toBe('#5197FF')
     expect(tokens.signal600).toBe('#2F6FE0')
     expect(tokens.verified).toBe('#5197FF')
+  })
+})
+
+describe('ThemeProvider initialTheme seeding', () => {
+  it('does not clobber a stored/toggled user theme on mount', async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, 'light')
+
+    render(
+      <ThemeProvider initialTheme="dark">
+        <div />
+      </ThemeProvider>
+    )
+
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+    )
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+  })
+
+  it('seeds from initialTheme when nothing is stored', async () => {
+    await renderTheme('light')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 })
 

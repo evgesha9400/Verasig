@@ -116,10 +116,10 @@ def _persist_deletion(
         message = message_repository.read_message(
             session, user_id, event.channel_id, event.message_id
         )
-        candidates = message_repository.candidate_message_ids(
-            session, user_id, event.channel_id
+        was_candidate = message_repository.is_candidate_message(
+            session, user_id, event.channel_id, event.message_id
         )
-        evidence = _live_deletion_evidence(event, message, candidates)
+        evidence = _live_deletion_evidence(event, message, was_candidate)
         written = deletion_repository.upsert_deletion_evidence(
             session, user_id, [evidence]
         )
@@ -130,7 +130,7 @@ def _persist_deletion(
 def _live_deletion_evidence(
     event: TelegramDeletionEvent,
     message,
-    candidate_message_ids: set[int],
+    was_signal_candidate: bool,
 ) -> DeletedSignalEvidence:
     return DeletedSignalEvidence(
         channel_id=event.channel_id,
@@ -140,5 +140,5 @@ def _live_deletion_evidence(
         original_text=None if message is None else message.text,
         first_seen_at=None if message is None else message.captured_at,
         detected_at=event.detected_at,
-        was_signal_candidate=event.message_id in candidate_message_ids,
+        was_signal_candidate=was_signal_candidate,
     )

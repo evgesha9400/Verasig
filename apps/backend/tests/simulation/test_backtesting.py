@@ -22,7 +22,11 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import (
+    event_repository,
+    lifecycle_link_repository,
+    outcome_repository,
+)
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.backtesting import load_folded_signals, run_backtest
 
@@ -171,6 +175,34 @@ def test_load_folded_signals_uses_stored_deletion_candidacy(session_factory):
 
     # candidacy comes from the stored evidence (miner-set), not a re-derived label
     assert inputs.deletions[0].was_signal_candidate is True
+
+
+def test_load_folded_signals_honours_manual_lifecycle_link(session_factory):
+    # An unthreaded modifier joined to the root by a manual link must fold into the
+    # root's timeline — exactly as the signals view does. Before the fix the
+    # backtest fold ignored manual links and left the modifier out.
+    account = _seed(session_factory)
+    modifier = RawTelegramMessage(
+        channel_id=7,
+        message_id=2,
+        text="move SL to BE",
+        posted_at=_BASE + timedelta(seconds=30),
+        captured_at=_BASE + timedelta(seconds=30),
+        has_media=False,
+        raw_payload={},
+    )
+    with session_factory() as session:
+        message_repository.insert_messages(session, account.id, [modifier])
+        lifecycle_link_repository.insert_link(
+            session, account.id, 7, 2, _uuid(2), _BASE + timedelta(seconds=30)
+        )
+        session.commit()
+
+    inputs = load_folded_signals(session_factory, account.id, 7)
+
+    assert len(inputs.folded_signals) == 1
+    assert len(inputs.folded_signals[0].timeline) == 2
+    assert inputs.folded_signals[0].timeline[1].source_message_id == 2
 
 
 def _seed(session_factory) -> UserAccount:

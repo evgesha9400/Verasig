@@ -260,6 +260,37 @@ def upgrade() -> None:
         )
     )
 
+    # Purge capture for channels nobody subscribes to (orphans left by the old
+    # per-channel delete). This MUST precede the raw_message composite PK, the
+    # re-rooted FKs, and the NOT-NULL tightening below, because orphan rows keep
+    # user_id NULL. The CASCADE FKs are not in place yet (dropped above, recreated
+    # after the PK), so delete children explicitly, leaf -> root.
+    orphan_events = "SELECT id FROM raw_signal_event WHERE user_id IS NULL"
+    orphan_message = (
+        "SELECT 1 FROM raw_message m WHERE m.user_id IS NULL "
+        "AND m.external_id = {t}.external_id "
+        "AND m.external_message_id = {t}.external_message_id"
+    )
+    for child in ("extracted_signal", "unrecognized_signal", "parser_drift_warning"):
+        op.execute(sa.text(f"DELETE FROM {child} WHERE event_id IN ({orphan_events})"))
+    op.execute(
+        sa.text(
+            "DELETE FROM filter_drift_warning w WHERE "
+            f"w.event_id IN ({orphan_events}) "
+            f"OR EXISTS ({orphan_message.format(t='w')}) "
+            "OR w.source_label_id IN (SELECT g.id FROM golden_label g "
+            f"WHERE EXISTS ({orphan_message.format(t='g')}))"
+        )
+    )
+    op.execute(
+        sa.text(
+            f"DELETE FROM golden_label g WHERE EXISTS ({orphan_message.format(t='g')})"
+        )
+    )
+    op.execute(sa.text("DELETE FROM raw_signal_event WHERE user_id IS NULL"))
+    op.execute(sa.text("DELETE FROM deleted_signal_evidence WHERE user_id IS NULL"))
+    op.execute(sa.text("DELETE FROM raw_message WHERE user_id IS NULL"))
+
     op.create_primary_key(
         "raw_message_pkey",
         "raw_message",
@@ -315,10 +346,6 @@ def upgrade() -> None:
     for table, old, new in _RENAMED_CHECKS:
         op.execute(sa.text(f"ALTER TABLE {table} RENAME CONSTRAINT {old} TO {new}"))
 
-    # purge orphan capture (channels nobody subscribes to); event children cascade
-    op.execute(sa.text("DELETE FROM raw_signal_event WHERE user_id IS NULL"))
-    op.execute(sa.text("DELETE FROM deleted_signal_evidence WHERE user_id IS NULL"))
-    op.execute(sa.text("DELETE FROM raw_message WHERE user_id IS NULL"))
     op.drop_table("telegram_channel")
 
     for table in ("raw_message", "raw_signal_event", "deleted_signal_evidence"):
