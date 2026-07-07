@@ -39,6 +39,8 @@ def present_signals(
     signals = _project_user_signals(session, user_id, feed_id)
     if status is not None:
         signals = [signal for signal in signals if signal["status"] == status]
+    # newest first, so the observer truncation below keeps the most recent signals
+    signals.sort(key=lambda signal: signal["at"], reverse=True)
     limit_reached = plan is Plan.OBSERVER and len(signals) > OBSERVER_SIGNAL_LIMIT
     if limit_reached:
         signals = signals[:OBSERVER_SIGNAL_LIMIT]
@@ -158,6 +160,7 @@ def _signal_row(
         "symbol": folded.symbol,
         "text": message.text or event_text_by_signal_id.get(first.source_signal_id),
         **_outcome_fields(outcome, deleted),
+        "at": first.at.isoformat(),  # sortable key; display uses date/time below
         "date": format_short(first.at),
         "time": format_time(first.at),
         "entry": _entry_text(first),
@@ -220,6 +223,11 @@ def _mod_kind(side: Side, step: FoldStep, patch: LifecyclePatch) -> str:
         return "partial"
     if patch.add_multiplier is not None:
         return _average_kind(side, step)
+    if patch.set_stop_loss is not None or patch.stop_to_breakeven:
+        return "move_stop"
+    if patch.set_take_profits is not None:
+        # a take-profit-only update is not a stop move; label it distinctly.
+        return "move_target"
     return "move_stop"
 
 

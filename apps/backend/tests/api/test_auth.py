@@ -54,6 +54,23 @@ def test_register_rejects_password_shorter_than_eight_characters(client):
     assert response.status_code == 422
 
 
+def test_register_rejects_malformed_email(client):
+    payload = _register_payload()
+    payload["email"] = "not-an-email"
+
+    response = client.post("/auth/register", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_login_rejects_malformed_email(client):
+    response = client.post(
+        "/auth/login", json={"email": "not-an-email", "password": "whatever"}
+    )
+
+    assert response.status_code == 422
+
+
 def test_register_rejects_password_longer_than_bcrypt_limit(client):
     # bcrypt raises on >72-byte input; reject at the schema edge with 422, not 500.
     payload = _register_payload()

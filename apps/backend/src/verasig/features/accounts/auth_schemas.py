@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator, model_validator
+from pydantic import EmailStr, Field, field_validator, model_validator
 
 from verasig.features.accounts.name_validation import (
     validate_account_name,
@@ -11,7 +11,7 @@ from verasig.foundation.http.schemas import CamelModel
 class RegisterIn(CamelModel):
     first_name: str
     last_name: str
-    email: str
+    email: EmailStr
     # bcrypt only hashes the first 72 bytes and raises on longer input; reject
     # over-length here so it 422s at the edge instead of 500ing in the hasher.
     password: str = Field(min_length=8, max_length=72)
@@ -33,7 +33,7 @@ class RegisterIn(CamelModel):
 
 
 class LoginIn(CamelModel):
-    email: str
+    email: EmailStr
     # match register: never pass an over-length password to bcrypt (it raises).
     password: str = Field(max_length=72)
 

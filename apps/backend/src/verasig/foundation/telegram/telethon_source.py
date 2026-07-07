@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -32,13 +33,37 @@ from verasig.domain.telegram_ports import TelegramSource
 
 logger = logging.getLogger(__name__)
 
+# Dedup memory per live session is capped so a long-lived stream cannot grow it
+# without bound; the oldest keys fall out once the cap is reached.
+_SEEN_KEY_LIMIT = 50_000
+
+
+class _BoundedKeySet:
+    """An insertion-ordered set that drops its oldest keys past `max_size`."""
+
+    def __init__(self, max_size: int) -> None:
+        self._keys: OrderedDict[tuple[int, int], None] = OrderedDict()
+        self._max_size = max_size
+
+    def __contains__(self, key: tuple[int, int]) -> bool:
+        return key in self._keys
+
+    def add(self, key: tuple[int, int]) -> None:
+        self._keys[key] = None
+        if len(self._keys) > self._max_size:
+            self._keys.popitem(last=False)
+
 
 @dataclass
 class _LiveEventState:
     channel_ids: set[int]
     queue: asyncio.Queue[TelegramLiveEvent] = field(default_factory=asyncio.Queue)
-    seen_messages: set[tuple[int, int]] = field(default_factory=set)
-    seen_deletions: set[tuple[int, int]] = field(default_factory=set)
+    seen_messages: _BoundedKeySet = field(
+        default_factory=lambda: _BoundedKeySet(_SEEN_KEY_LIMIT)
+    )
+    seen_deletions: _BoundedKeySet = field(
+        default_factory=lambda: _BoundedKeySet(_SEEN_KEY_LIMIT)
+    )
     last_seen_message_ids: dict[int, int] = field(default_factory=dict)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 

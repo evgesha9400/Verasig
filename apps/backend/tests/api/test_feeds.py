@@ -118,6 +118,32 @@ def test_observer_second_feed_hits_source_limit(client, app):
     assert response.json()["error"]["code"] == "PLAN_LIMIT_SOURCES"
 
 
+def test_observer_can_re_add_existing_feed_without_hitting_limit(client, app):
+    # re-adding a feed the user already owns (same channel) is not a new source;
+    # it must not be blocked by the observer single-source limit.
+    token = _register(client)
+    _connect_telegram(client, app, token)
+    app.state.telegram_source_factory = lambda _link: FakeSource(_channel(7), [])
+    assert (
+        client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"}).status_code
+        == 201
+    )
+
+    response = client.post("/feeds", headers=_auth(token), json={"tag": "@pilot"})
+
+    assert response.status_code == 201
+
+
+def test_non_numeric_feed_id_returns_404_not_500(client, app):
+    # require_feed casts external_id to int; a non-numeric id must 404, not 500.
+    token = _register(client)
+
+    response = client.delete("/feeds/not-a-number", headers=_auth(token))
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "FEED_NOT_FOUND"
+
+
 def test_delete_feed_purges_feed_and_masks_foreign_user(client, app):
     owner = _register(client, "owner@example.com")
     other = _register(client, "other@example.com")

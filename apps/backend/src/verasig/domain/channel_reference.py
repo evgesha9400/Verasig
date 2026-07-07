@@ -96,7 +96,8 @@ def _normalize_handle(text: str) -> str:
 def _link_handle(text: str) -> str | None:
     parsed = _parse_telegram_url(text)
     path = parsed.path.strip("/")
-    if not path or path.startswith("c/"):
+    # c/… private ids, joinchat/… and +… invite links are not @-usernames.
+    if not path or path.startswith(("c/", "joinchat/", "+")):
         return None
     return path.split("/", maxsplit=1)[0]
 

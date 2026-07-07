@@ -130,7 +130,9 @@ def _tidy_lines(text: str) -> str:
     return "\n".join(to_clean_lines(text))
 
 
-_BARE_ORDINAL = re.compile(r"\bTP\d+\b")
+# [0-9] not \d: JS `\d` is ASCII-only; \d would also match unicode digits and
+# diverge from the JS parser (JS is the parity source of truth).
+_BARE_ORDINAL = re.compile(r"\bTP[0-9]+\b")
 _ORDINAL_KEEP = re.compile(r"^:?\s*<PRICE")
 
 
@@ -146,7 +148,7 @@ def _collapse_bare_ordinals(template: str) -> str:
 
 # Leverage tokens ("20X", "17X", Cyrillic "20Х") vary per signal but are not
 # structural.
-LEVERAGE_TOKEN = re.compile(r"\d+\s*[XХ](?![A-Za-zЀ-ӿ0-9])")
+LEVERAGE_TOKEN = re.compile(r"[0-9]+\s*[XХ](?![A-Za-zЀ-ӿ0-9])")
 
 
 def _collapse_leverage(template: str) -> str:
@@ -241,7 +243,7 @@ def _collapse_price_runs(template: str) -> str:
     )
 
 
-BARE_PRICE_LINE = re.compile(r"^(?:\d+\s+)?<PRICE>$")
+BARE_PRICE_LINE = re.compile(r"^(?:[0-9]+\s+)?<PRICE>$")
 
 
 def _collapse_target_lines(template: str) -> str:

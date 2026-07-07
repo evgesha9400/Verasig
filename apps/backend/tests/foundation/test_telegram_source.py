@@ -14,6 +14,7 @@ from verasig.domain.telegram_ports import TelegramSource
 from verasig.foundation.telegram.telethon_source import (
     ChannelReferenceResolutionError,
     TelethonSource,
+    _BoundedKeySet,
 )
 
 
@@ -84,6 +85,8 @@ def test_conforming_source_satisfies_protocol():
 
 
 def test_source_missing_resolve_channel_does_not_satisfy_protocol():
+    # conforming in every respect EXCEPT resolve_channel — so the assertion below
+    # can only fail for that one missing method, not for an unrelated omission.
     class NoResolve:
         @staticmethod
         async def fetch_older_batches(
@@ -96,6 +99,10 @@ def test_source_missing_resolve_channel_does_not_satisfy_protocol():
             yield []
 
         @staticmethod
+        async def live_message_ids(_channel_id) -> set[int]:
+            return set()
+
+        @staticmethod
         async def live_events(_channel_ids):
             yield None
 
@@ -103,7 +110,14 @@ def test_source_missing_resolve_channel_does_not_satisfy_protocol():
 
 
 def test_source_missing_live_events_does_not_satisfy_protocol():
+    # conforming in every respect EXCEPT live_events.
     class BackfillOnly:
+        @staticmethod
+        async def resolve_channel(_reference) -> TelegramChannel:
+            return TelegramChannel(
+                channel_id=1, title="t", is_private=False, first_seen_at=_instant()
+            )
+
         @staticmethod
         async def fetch_older_batches(
             _channel_id, _before_message_id, _batch_size, _since=None
@@ -113,6 +127,10 @@ def test_source_missing_live_events_does_not_satisfy_protocol():
         @staticmethod
         async def fetch_newer_batches(_channel_id, _after_message_id, _batch_size):
             yield []
+
+        @staticmethod
+        async def live_message_ids(_channel_id) -> set[int]:
+            return set()
 
     assert not isinstance(BackfillOnly(), TelegramSource)
 
@@ -512,3 +530,15 @@ async def test_poll_channel_survives_transient_poll_error():
         await task
 
     assert len(calls) >= 2
+
+
+def test_bounded_key_set_evicts_oldest_past_capacity():
+    # dedup memory over a live stream is capped: the oldest key falls out.
+    seen = _BoundedKeySet(max_size=2)
+    seen.add((1, 1))
+    seen.add((1, 2))
+    seen.add((1, 3))
+
+    assert (1, 1) not in seen  # evicted
+    assert (1, 2) in seen
+    assert (1, 3) in seen
