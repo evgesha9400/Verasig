@@ -32,12 +32,10 @@ class SignalEventType(StrEnum):
     NEW_ENTRY = "NEW_ENTRY"
     MODIFY = "MODIFY"
     CLOSE = "CLOSE"
-    UNRECOGNIZED = "UNRECOGNIZED"
 
 
 class ExtractionMethod(StrEnum):
     DETERMINISTIC = "DETERMINISTIC"
-    LLM_FALLBACK = "LLM_FALLBACK"
 
 
 def _now() -> datetime:
@@ -75,7 +73,6 @@ class ExtractedSignal(TradeIntent):
     event_id: UUID
     channel_id: int
     event_type: SignalEventType = SignalEventType.NEW_ENTRY
-    references_message_id: int | None = None
     extraction_method: ExtractionMethod = ExtractionMethod.DETERMINISTIC
     rule_id: str | None = None
     extracted_at: datetime = Field(default_factory=_now)

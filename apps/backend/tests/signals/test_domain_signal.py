@@ -113,17 +113,13 @@ def test_entry_type_has_market_single_and_range():
     }
 
 
-def test_signal_event_type_has_the_four_lifecycle_values():
+def test_signal_event_type_has_the_three_lifecycle_values():
     assert {kind.value for kind in SignalEventType} == {
         "NEW_ENTRY",
         "MODIFY",
         "CLOSE",
-        "UNRECOGNIZED",
     }
 
 
-def test_extraction_method_has_deterministic_and_fallback():
-    assert {method.value for method in ExtractionMethod} == {
-        "DETERMINISTIC",
-        "LLM_FALLBACK",
-    }
+def test_extraction_method_has_deterministic():
+    assert {method.value for method in ExtractionMethod} == {"DETERMINISTIC"}

@@ -223,7 +223,9 @@ def test_completeness_excludes_empty_signal_denominator():
 def test_parser_confidence_measures_deterministic_share_of_all_candidates():
     deterministic = _signal(20)
     fallback = _signal(21)
-    fallback.extraction_method = ExtractionMethod.LLM_FALLBACK
+    # ExtractionMethod has only DETERMINISTIC today; assign a raw sentinel to
+    # exercise the "not deterministic" branch of measure_parser_confidence.
+    fallback.extraction_method = "NON_DETERMINISTIC"
     measurement = measure_parser_confidence(
         signals=[deterministic, fallback],
         unrecognized=[_unrecognized(22)],
@@ -242,7 +244,9 @@ def test_parser_confidence_measures_deterministic_share_of_all_candidates():
 
 def test_parser_confidence_keeps_zero_deterministic_as_real_measurement():
     fallback = _signal(23)
-    fallback.extraction_method = ExtractionMethod.LLM_FALLBACK
+    # ExtractionMethod has only DETERMINISTIC today; assign a raw sentinel to
+    # exercise the "not deterministic" branch of measure_parser_confidence.
+    fallback.extraction_method = "NON_DETERMINISTIC"
     measurement = measure_parser_confidence(
         signals=[fallback],
         unrecognized=[_unrecognized(24)],

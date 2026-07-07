@@ -104,10 +104,9 @@ def test_null_user_id_insert_fails_at_db_level(db_session):
                 """
                 INSERT INTO raw_signal_event
                     (id, user_id, external_id, external_message_id, candidate_text,
-                     materialized_by, matched_reasons, created_at)
+                     materialized_by, created_at)
                 VALUES
-                    (:id, NULL, :external_id, 1, 'BTC long', 'SEED_HEURISTIC',
-                     CAST('[]' AS jsonb), :now)
+                    (:id, NULL, :external_id, 1, 'BTC long', 'SEED_HEURISTIC', :now)
                 """
             ),
             {"id": uuid4(), "external_id": _CHANNEL_ID, "now": _NOW},
@@ -150,10 +149,10 @@ def test_orphan_captured_message_links_fail_at_db_level(db_session):
                 """
                 INSERT INTO raw_signal_event
                     (id, user_id, external_id, external_message_id, candidate_text,
-                     materialized_by, matched_reasons, created_at)
+                     materialized_by, created_at)
                 VALUES
-                    (:id, :user_id, :external_id, 404, 'BTC long', 'SEED_HEURISTIC',
-                     CAST('[]' AS jsonb), :now)
+                    (:id, :user_id, :external_id, 404, 'BTC long',
+                     'SEED_HEURISTIC', :now)
                 """
             ),
             {

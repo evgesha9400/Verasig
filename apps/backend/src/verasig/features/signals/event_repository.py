@@ -30,9 +30,6 @@ def insert_signal_events(
                     "external_message_id": event.message_id,
                     "candidate_text": event.candidate_text,
                     "materialized_by": event.materialized_by.value,
-                    "matched_reasons": [
-                        reason.value for reason in event.matched_reasons
-                    ],
                     "created_at": event.created_at,
                 }
                 for event in events
@@ -62,7 +59,6 @@ def read_signal_events(
             message_id=row.external_message_id,
             candidate_text=row.candidate_text,
             materialized_by=row.materialized_by,
-            matched_reasons=row.matched_reasons,
             created_at=row.created_at,
         )
         for row in rows

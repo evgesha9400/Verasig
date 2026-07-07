@@ -158,7 +158,6 @@ class RawSignalEventRow(Base):
     external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
     materialized_by: Mapped[str] = mapped_column(String, nullable=False)
-    matched_reasons: Mapped[list] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -195,7 +194,6 @@ class ExtractedSignalRow(Base):
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False)
     event_type: Mapped[str] = mapped_column(String, nullable=False)
-    references_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     entry_type: Mapped[str | None] = mapped_column(String, nullable=True)
     entry_low: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     entry_high: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
