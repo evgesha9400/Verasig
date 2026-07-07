@@ -45,6 +45,8 @@ graphify-out/manifest.json
 .graphify_ast.json
 .graphify_incremental.json
 apps/graphify-out/
+# Codegraph
+.codegraph/
 
 # IDE metadata (JetBrains)
 .idea/
