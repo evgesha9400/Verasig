@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import { StageStrip } from '../../../shared/jobs/StageStrip.jsx'
 
 function messageFromError(error) {
   return error?.message || 'Backfill failed.'
@@ -37,24 +38,6 @@ const CAPTURE_STAGES = [
   { id: 'capture', label: 'Fetching history' },
   { id: 'index', label: 'Indexing' }
 ]
-
-function StageStrip({ stage }) {
-  const activeIndex = CAPTURE_STAGES.findIndex((item) => item.id === stage)
-  return (
-    <div className="vrs-bf-stages">
-      {CAPTURE_STAGES.map((item, index) => (
-        <span
-          key={item.id}
-          className={`vrs-bf-stage ${index === activeIndex ? 'is-active' : ''} ${
-            index < activeIndex ? 'is-done' : ''
-          }`.trim()}
-        >
-          {item.label}
-        </span>
-      ))}
-    </div>
-  )
-}
 
 /* Verasig prototype — backfill infinite loader */
 export function BackfillView({
@@ -301,7 +284,7 @@ export function BackfillView({
         )}
       </div>
 
-      <StageStrip stage={stage} />
+      <StageStrip stages={CAPTURE_STAGES} stage={stage} />
       <div className="vrs-bf-track" />
       <div className="vrs-bf-log">{logLine}</div>
 
