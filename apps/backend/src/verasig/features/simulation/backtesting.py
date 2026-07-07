@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.domain.event import RawSignalEvent
+from verasig.domain.feed import FeedStatus
 from verasig.domain.market_ports import MarketData
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
@@ -158,7 +159,7 @@ def persist_result(
             [_outcome_json(outcome) for outcome in summary.outcomes],
             now,
         )
-        feed_repository.set_status(session, user_id, channel_id, "analyzed")
+        feed_repository.set_status(session, user_id, channel_id, FeedStatus.ANALYZED)
         session.commit()
 
 

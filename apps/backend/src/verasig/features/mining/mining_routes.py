@@ -10,6 +10,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
+from verasig.domain.feed import FeedStatus
 from verasig.features.feeds.backfill_job_run import backfill_job_key
 from verasig.features.mining.mining_confirm import (
     MiningConfirmResult,
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/feeds/{external_id}/mining")
 
 def _guard_not_backfilling(request: Request, feed) -> None:
     key = backfill_job_key(feed.user_id, feed.external_id)
-    if feed.status == "backfilling" or request.app.state.jobs.has_job(key):
+    if feed.status == FeedStatus.BACKFILLING or request.app.state.jobs.has_job(key):
         raise ApiError(
             409,
             "MINING_CONFIRM_CONFLICT",

@@ -35,6 +35,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from verasig.domain.account import Plan
+from verasig.domain.feed import FeedStatus, HistoryDepth
 from verasig.domain.risk_config import EntryMode, ExitSource, Weighting
 from verasig.domain.signal import ExtractionMethod, Side, SignalEventType
 from verasig.foundation.database.session import Base
@@ -55,11 +56,6 @@ _MESSAGE_REF = (
     "raw_message.external_id",
     "raw_message.external_message_id",
 )
-_FEED_STATUS = (
-    "status IN ('new', 'backfilling', 'backfilled', 'verified', "
-    "'analyzed', 'cancelled', 'failed')"
-)
-_FEED_HISTORY_DEPTH = "history_depth IN ('6m', '1y', 'all')"
 
 
 class FeedRow(Base):
@@ -75,8 +71,8 @@ class FeedRow(Base):
 
     __tablename__ = "feed"
     __table_args__ = (
-        CheckConstraint(_FEED_STATUS, name="ck_feed_status"),
-        CheckConstraint(_FEED_HISTORY_DEPTH, name="ck_feed_history_depth"),
+        enum_check("status", FeedStatus, name="ck_feed_status"),
+        enum_check("history_depth", HistoryDepth, name="ck_feed_history_depth"),
     )
 
     user_id: Mapped[UUID] = mapped_column(

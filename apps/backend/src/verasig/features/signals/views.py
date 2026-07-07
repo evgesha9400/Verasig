@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from verasig.domain.account import Plan
+from verasig.domain.feed import REVIEWED_STATUSES
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
@@ -26,7 +27,7 @@ from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_short, format_time
 
 OBSERVER_SIGNAL_LIMIT = 200
-SIGNAL_FEED_STATUSES = {"verified", "analyzed"}
+SIGNAL_FEED_STATUSES = REVIEWED_STATUSES
 
 
 def present_signals(

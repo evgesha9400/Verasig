@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from verasig.domain.feed import REVIEWED_STATUSES
 from verasig.features.feeds import deletion_repository
 from verasig.shared.time import format_long
 from verasig.storage.models import (
@@ -102,7 +103,7 @@ def _present_feed(
         "score": 0 if deletion.signal_deletion else score,
         "winRate": float(result.win_rate) if result else None,
         "pnl": float(result.pnl) if result else None,
-        "hasRisk": feed.status in {"verified", "analyzed"},
+        "hasRisk": feed.status in REVIEWED_STATUSES,
         "signalDeletion": deletion.signal_deletion,
         "deletedCount": deletion.deleted_count,
         "deletedSignalCount": deletion.deleted_signal_count,

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 
 from verasig.domain.account import UserAccount
 from verasig.domain.channel_reference import ChannelReferenceResolutionError
+from verasig.domain.feed import REVIEWED_STATUSES
 from verasig.features.accounts.plans import (
     PlanSourceLimitExceeded,
     require_source_capacity,
@@ -44,7 +45,7 @@ from verasig.foundation.telegram.session import make_user_source
 router = APIRouter(prefix="/feeds")
 logger = logging.getLogger(__name__)
 
-DELETION_RESCAN_READY_STATUSES = {"verified", "analyzed"}
+DELETION_RESCAN_READY_STATUSES = REVIEWED_STATUSES
 DELETION_RESCAN_PROGRESS_INTERVAL = 200
 
 

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from verasig.domain.event import RawSignalEvent
 from verasig.domain.extraction_outcome import ExtractOutcome
+from verasig.domain.feed import FeedStatus
 from verasig.domain.signal import ExtractedSignal
 from verasig.features.feeds import feed_repository, message_repository
 from verasig.features.mining.mining_signals import candidate_to_event_and_signal
@@ -169,6 +170,6 @@ def _mark_verified(
     session_factory: sessionmaker, user_id: UUID, external_id: int
 ) -> str:
     with session_factory() as session:
-        feed_repository.set_status(session, user_id, external_id, "verified")
+        feed_repository.set_status(session, user_id, external_id, FeedStatus.VERIFIED)
         session.commit()
-    return "verified"
+    return FeedStatus.VERIFIED
