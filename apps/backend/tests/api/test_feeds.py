@@ -1,38 +1,11 @@
 from datetime import datetime, timezone
 
+from conftest import _auth
+from conftest import _register_token as _register
 from fakes import FakeSource, FakeTelegramAuth
+from fakes import channel as _channel
 
-from verasig.domain.channel import TelegramChannel
 from verasig.domain.channel_reference import ChannelReferenceResolutionError
-
-
-def _register(client, email: str = "ada@example.com") -> str:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    assert response.status_code == 201
-    return response.json()["token"]
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
-
-
-def _channel(channel_id: int = 7) -> TelegramChannel:
-    return TelegramChannel(
-        channel_id=channel_id,
-        handle="pilot",
-        title="Pilot Signals",
-        is_private=False,
-        subscriber_count=1234,
-        first_seen_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
-    )
 
 
 def _connect_telegram(client, app, token: str) -> None:

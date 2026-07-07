@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+from conftest import _auth
+
 from verasig.features.accounts.tokens import issue_email_change_token, read_user_id
 
 SECRET = "s" * 32
@@ -17,10 +19,6 @@ def _register(client) -> dict:
     )
     assert response.status_code == 201
     return response.json()
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_patch_user_name_persists(client):

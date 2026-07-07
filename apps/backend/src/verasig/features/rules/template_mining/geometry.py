@@ -216,7 +216,7 @@ def _check_stop_vs_targets(
 def validate_price_geometry(input_) -> GeometryResult:
     fields = _resolve_fields(input_)
     direction = fields.direction
-    stop_loss = fields.stop_loss if fields.stop_loss is not None else None
+    stop_loss = fields.stop_loss
     take_profits = fields.take_profits if isinstance(fields.take_profits, list) else []
     bounds = _entry_bounds(fields.entry)
     issues: list[ParserIssue] = []

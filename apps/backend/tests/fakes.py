@@ -6,6 +6,7 @@ records every `after_message_id` it was asked for (refetch assertions).
 """
 
 from collections.abc import AsyncIterator, Callable
+from datetime import datetime, timezone
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
@@ -16,6 +17,39 @@ from verasig.domain.telegram_ports import (
     TwoFactorUnsupportedError,
 )
 from verasig.foundation.market_data.static_exchange import normalize_base_symbol
+
+
+def channel(channel_id: int = 7) -> TelegramChannel:
+    """Canonical "Pilot Signals" channel shared by the feed/mining API tests."""
+    return TelegramChannel(
+        channel_id=channel_id,
+        handle="pilot",
+        title="Pilot Signals",
+        is_private=False,
+        subscriber_count=1234,
+        first_seen_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+
+
+def messages() -> list[RawTelegramMessage]:
+    """Canonical three-message set (two signals + noise) for the mining tests."""
+    texts = {
+        1: "BTC LONG entry 100 sl 95 tp 110",
+        2: "gm everyone",
+        3: "ETH LONG entry 200 sl 190 tp 210",
+    }
+    return [
+        RawTelegramMessage(
+            channel_id=7,
+            message_id=message_id,
+            text=text,
+            posted_at=datetime(2026, 6, message_id, tzinfo=timezone.utc),
+            captured_at=datetime(2026, 6, message_id, tzinfo=timezone.utc),
+            has_media=False,
+            raw_payload={},
+        )
+        for message_id, text in texts.items()
+    ]
 
 
 class FakeStreamInterrupted(RuntimeError):

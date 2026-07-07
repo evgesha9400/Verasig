@@ -52,7 +52,11 @@ def present_signals(
 
 
 def present_signal(session: Session, user_id: UUID, signal_id: UUID) -> dict | None:
-    result = present_signals(session, user_id, plan=Plan.DESK)
+    # project only the signal's own feed, not every feed the user owns.
+    channel_id = outcome_repository.read_signal_channel(session, user_id, signal_id)
+    if channel_id is None:
+        return None
+    result = present_signals(session, user_id, feed_id=str(channel_id), plan=Plan.DESK)
     return next(
         (signal for signal in result["signals"] if signal["id"] == str(signal_id)),
         None,

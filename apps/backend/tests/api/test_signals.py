@@ -2,13 +2,14 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
+from conftest import _auth
+from conftest import _register_user as _register
 from seed import insert_source
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, ExtractedSignal, Side
-from verasig.features.accounts.tokens import read_user_id
 from verasig.features.feeds import (
     feed_repository,
     message_repository,
@@ -16,28 +17,9 @@ from verasig.features.feeds import (
 from verasig.features.signals import event_repository, outcome_repository
 from verasig.features.simulation import repository as backtest_repository
 
-SECRET = "s" * 32
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _EVENT_ID = UUID("70000000-0000-0000-0000-000000000001")
 _SIGNAL_ID = UUID("70000000-0000-0000-0000-000000000002")
-
-
-def _register(client, email: str = "ada@example.com") -> tuple[str, UUID]:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    body = response.json()
-    return body["token"], read_user_id(body["token"], SECRET)
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_signal_routes_list_detail_filter_and_link_mod(client, app):

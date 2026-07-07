@@ -28,8 +28,7 @@ export function SignalsView({
     () => Object.fromEntries(feeds.map((f) => [f.id, f])),
     [feeds]
   )
-  const feedSource = (f) => (f && f.source) || 'telegram' // Telegram is the only connected source today
-
+  // feedSource is a module-level helper (below); no per-render local copy needed.
   const [source, setSource] = useState((initial && initial.source) || 'all')
   const [feed, setFeed] = useState((initial && initial.feed) || 'all')
   const [tab, setTab] = useState((initial && initial.tab) || 'all') // all | tested | untested | skipped | deleted
@@ -264,8 +263,8 @@ export function SignalsView({
           </svg>
           <div className="vrs-empty__title">No signals yet</div>
           <div className="vrs-empty__note">
-            Backfill, mine, and verify a feed under Sources. Once a feed is
-            verified, its extracted signals stream here.
+            Backfill, mine, and verify a feed under Sources. Once a feed is verified,
+            its extracted signals stream here.
           </div>
           <Button
             variant="secondary"

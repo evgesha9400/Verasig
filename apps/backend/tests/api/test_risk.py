@@ -2,33 +2,14 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
+from conftest import _auth
+from conftest import _register_user as _register
 from seed import insert_source
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.risk_config import EntryMode, ExitSource, RiskConfig, Weighting
-from verasig.features.accounts.tokens import read_user_id
 from verasig.features.feeds import feed_repository
 from verasig.features.risk import repository as risk_repository
-
-SECRET = "s" * 32
-
-
-def _register(client, email: str = "ada@example.com") -> tuple[str, UUID]:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    body = response.json()
-    return body["token"], read_user_id(body["token"], SECRET)
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _seed_subscription(app, user_id: UUID) -> None:

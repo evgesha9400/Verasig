@@ -7,7 +7,7 @@ translates and is scoped by `user_id`.
 
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -147,6 +147,24 @@ def read_message_page(
         .limit(limit)
     ).all()
     return [_row_to_message(row) for row in rows]
+
+
+def is_candidate_message(
+    session: Session, user_id: UUID, external_id: int, message_id: int
+) -> bool:
+    """Whether one message materialized a signal event — a single EXISTS instead
+    of scanning every candidate id just to classify one deletion."""
+    return bool(
+        session.scalar(
+            select(
+                exists().where(
+                    RawSignalEventRow.user_id == user_id,
+                    RawSignalEventRow.external_id == external_id,
+                    RawSignalEventRow.external_message_id == message_id,
+                )
+            )
+        )
+    )
 
 
 def candidate_message_ids(

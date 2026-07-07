@@ -3,28 +3,12 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
+from conftest import _auth
+from conftest import _register_token as _register
 from fakes import FakeSource, FakeTelegramAuth
+from fakes import channel as _channel
 
-from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
-
-
-def _register(client, email: str = "ada@example.com") -> str:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": email,
-            "password": "correct horse battery staple",
-        },
-    )
-    assert response.status_code == 201
-    return response.json()["token"]
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 class _MessageLogHandler(logging.Handler):
@@ -47,30 +31,22 @@ _APP_LOGGER_NAMES = (
 def _capture_app_logs():
     handler = _MessageLogHandler()
     loggers = [logging.getLogger(name) for name in _APP_LOGGER_NAMES]
+    root = logging.getLogger("verasig")  # child loggers propagate their records here
     previous_levels = {logger: logger.level for logger in loggers}
     previous_disabled = {logger: logger.disabled for logger in loggers}
     for logger in loggers:
         logger.setLevel(logging.INFO)
         logger.disabled = False
-        logger.addHandler(handler)
+    # attach the handler only to the common ancestor: a child logger's record is
+    # otherwise captured twice — once on the child, once via propagation up here.
+    root.addHandler(handler)
     try:
         yield handler.messages
     finally:
+        root.removeHandler(handler)
         for logger in loggers:
-            logger.removeHandler(handler)
             logger.setLevel(previous_levels[logger])
             logger.disabled = previous_disabled[logger]
-
-
-def _channel() -> TelegramChannel:
-    return TelegramChannel(
-        channel_id=7,
-        handle="pilot",
-        title="Pilot Signals",
-        is_private=False,
-        subscriber_count=1234,
-        first_seen_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
-    )
 
 
 def _messages() -> list[RawTelegramMessage]:

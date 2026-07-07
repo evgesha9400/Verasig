@@ -60,6 +60,17 @@ def insert_extracted_signals(
     return len(session.execute(statement).fetchall())
 
 
+def read_signal_channel(session: Session, user_id: UUID, signal_id: UUID) -> int | None:
+    """The channel a signal belongs to, so a single signal can be projected
+    against only its own feed instead of every feed the user owns."""
+    return session.scalar(
+        select(ExtractedSignalRow.external_id).where(
+            ExtractedSignalRow.id == signal_id,
+            ExtractedSignalRow.user_id == user_id,
+        )
+    )
+
+
 def read_extracted_signals(
     session: Session, channel_id: int, user_id: UUID
 ) -> list[ExtractedSignal]:

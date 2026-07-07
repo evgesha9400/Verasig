@@ -1,22 +1,6 @@
+from conftest import _auth
+from conftest import _register_token as _register
 from fakes import FakeTelegramAuth
-
-
-def _register(client) -> str:
-    response = client.post(
-        "/auth/register",
-        json={
-            "firstName": "Ada",
-            "lastName": "Lovelace",
-            "email": "ada@example.com",
-            "password": "correct horse battery staple",
-        },
-    )
-    assert response.status_code == 201
-    return response.json()["token"]
-
-
-def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_telegram_status_without_link(client):
