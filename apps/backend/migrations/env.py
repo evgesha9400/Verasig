@@ -17,7 +17,11 @@ from verasig.foundation.database.metadata import metadata as target_metadata
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True, which would silence every app
+    # logger already imported when migrations run (e.g. `verasig.*`) since they
+    # are not declared in alembic.ini. Running a migration must not mutate the
+    # app's logging — keep existing loggers enabled.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 if not config.get_main_option("sqlalchemy.url"):
     # set_main_option runs the value through ConfigParser interpolation, so a `%`
