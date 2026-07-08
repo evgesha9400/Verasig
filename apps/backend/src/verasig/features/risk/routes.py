@@ -17,7 +17,9 @@ def get_risk(
     subscription=Depends(require_feed),
 ) -> RiskConfigBody:
     with request.app.state.session_factory() as session:
-        config = read_risk_config(session, subscription.user_id, int(external_id))
+        config = read_risk_config(
+            session, subscription.user_id, subscription.external_id
+        )
     return to_body(config or RiskConfig())
 
 
@@ -32,7 +34,7 @@ def put_risk(
         config = upsert_risk_config(
             session,
             subscription.user_id,
-            int(external_id),
+            subscription.external_id,
             to_config(payload),
             datetime.now(tz=UTC),
         )

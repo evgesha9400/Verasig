@@ -26,7 +26,6 @@ from verasig.features.feeds.feed_job_progress import (
     should_publish_count,
 )
 from verasig.features.feeds.feed_views import present_feeds
-from verasig.features.feeds.message_views import read_history
 from verasig.features.feeds.schemas import BackfillStartIn, FeedCreateIn
 from verasig.features.sources.telegram_adapter import read_connection
 from verasig.foundation.http.auth_dependencies import (
@@ -105,20 +104,11 @@ def delete_feed(
     _subscription=Depends(require_feed),
 ) -> Response:
     with request.app.state.session_factory() as session:
-        feed_repository.delete_feed(session, _subscription.user_id, int(external_id))
+        feed_repository.delete_feed(
+            session, _subscription.user_id, _subscription.external_id
+        )
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-# The full backfilled history (every message, unfiltered) for the parser-first
-# miner, which classifies messages itself rather than reading the labeling deck.
-@router.get("/{external_id}/messages/history")
-def message_history(
-    request: Request,
-    subscription=Depends(require_feed),
-) -> dict:
-    with request.app.state.session_factory() as session:
-        return {"messages": read_history(session, subscription)}
 
 
 @router.post("/{external_id}/backfill", status_code=status.HTTP_202_ACCEPTED)
@@ -128,7 +118,7 @@ async def start_backfill(
     payload: BackfillStartIn | None = None,
     subscription=Depends(require_feed),
 ) -> dict:
-    channel_id = int(external_id)
+    channel_id = subscription.external_id
     mode = payload.mode if payload else BackfillMode.RESUME
     depth = payload.depth if payload else None
 
@@ -148,7 +138,9 @@ def cancel_backfill(
     external_id: str,
     subscription=Depends(require_feed),
 ) -> Response:
-    request.app.state.backfill_jobs.cancel(subscription.user_id, int(external_id))
+    request.app.state.backfill_jobs.cancel(
+        subscription.user_id, subscription.external_id
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -248,7 +240,7 @@ async def start_deletion_rescan(
     external_id: str,
     subscription=Depends(require_feed),
 ) -> dict:
-    channel_id = int(external_id)
+    channel_id = subscription.external_id
 
     with request.app.state.session_factory() as session:
         _require_deletion_rescan_ready(subscription)
@@ -275,7 +267,7 @@ def deletion_rescan_progress(
     external_id: str,
     subscription=Depends(require_feed),
 ):
-    key = _deletion_rescan_job_key(subscription.user_id, int(external_id))
+    key = _deletion_rescan_job_key(subscription.user_id, subscription.external_id)
     return sse_stream(request.app.state.jobs, key)
 
 
@@ -285,7 +277,7 @@ def backfill_progress(
     external_id: str,
     subscription=Depends(require_feed),
 ):
-    channel_id = int(external_id)
+    channel_id = subscription.external_id
     request.app.state.backfill_jobs.mark_inactive_backfilling_failed(
         subscription.user_id, channel_id
     )

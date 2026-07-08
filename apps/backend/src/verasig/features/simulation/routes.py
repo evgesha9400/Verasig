@@ -62,7 +62,7 @@ async def start_backtest(
     external_id: str,
     subscription=Depends(require_feed),
 ) -> JobOut:
-    key = _job_key(subscription.user_id, int(external_id))
+    key = _job_key(subscription.user_id, subscription.external_id)
     start_job_or_409(
         request.app.state.jobs,
         key,
@@ -70,7 +70,7 @@ async def start_backtest(
             publisher,
             request.app.state.session_factory,
             subscription.user_id,
-            int(external_id),
+            subscription.external_id,
             request.app.state.market_data_factory,
             datetime.now(tz=UTC),
         ),
@@ -84,5 +84,5 @@ def backtest_progress(
     external_id: str,
     subscription=Depends(require_feed),
 ):
-    key = _job_key(subscription.user_id, int(external_id))
+    key = _job_key(subscription.user_id, subscription.external_id)
     return sse_stream(request.app.state.jobs, key)

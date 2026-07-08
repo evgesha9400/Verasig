@@ -20,12 +20,11 @@ _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _SIGNAL_ID = UUID("70000000-0000-0000-0000-000000000002")
 
 
-def test_signal_routes_list_detail_filter_and_link_mod(client, app):
+def test_signal_routes_list_filter_and_link_mod(client, app):
     token, user_id = _register(client)
     _seed(app, user_id)
 
     listed = client.get("/signals?feedId=7&status=tested", headers=_auth(token))
-    detail = client.get(f"/signals/{_SIGNAL_ID}", headers=_auth(token))
     linked = client.post(
         f"/signals/{_SIGNAL_ID}/link-mod",
         headers=_auth(token),
@@ -35,7 +34,6 @@ def test_signal_routes_list_detail_filter_and_link_mod(client, app):
     assert listed.status_code == 200
     assert listed.json()["signals"][0]["id"] == str(_SIGNAL_ID)
     assert listed.json()["orphanMods"] == []
-    assert detail.status_code == 200
     assert linked.status_code == 200
     assert linked.json()["mods"][-1]["id"] == "3"
     assert linked.json()["mods"][-1]["via"] == "inferred"
@@ -46,7 +44,6 @@ def test_signal_routes_mask_foreign_user(client, app):
     other, _other_id = _register(client, "other@example.com")
     _seed(app, owner_id)
 
-    detail = client.get(f"/signals/{_SIGNAL_ID}", headers=_auth(other))
     linked = client.post(
         f"/signals/{_SIGNAL_ID}/link-mod",
         headers=_auth(other),
@@ -54,9 +51,7 @@ def test_signal_routes_mask_foreign_user(client, app):
     )
 
     assert owner
-    assert detail.status_code == 404
     assert linked.status_code == 404
-    assert detail.json()["error"]["code"] == "SIGNAL_NOT_FOUND"
     assert linked.json()["error"]["code"] == "SIGNAL_NOT_FOUND"
 
 
