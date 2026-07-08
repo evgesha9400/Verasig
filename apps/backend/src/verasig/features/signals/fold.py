@@ -1,24 +1,22 @@
 """Signal-lifecycle fold (data-contracts.md §5; ADR 0007).
 
-`fold` threads each entry `ExtractedSignal`'s `reply_to` chain (transitive,
+`fold` threads each entry `Signal`'s `reply_to` chain (transitive,
 symbol-guarded by construction) into a time-ordered `FoldedSignal`: it seeds the
 effective position from the entry, then applies each in-thread patch in
 `posted_at` order, snapshotting the effective stop / take-profits / size / average
 entry after every step. Pure + offline; the fold is never stored, only stamped
 with `fold_version` so a past fold is reproducible.
 
-Join chain: `ExtractedSignal.event_id → RawSignalEvent.id → RawSignalEvent`,
-then `RawSignalEvent.message_id → RawTelegramMessage` (for `reply_to` + `posted_at`).
+Join chain: `Signal.message_id → RawTelegramMessage` (for `reply_to` + `posted_at`).
 """
 
 from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
-from verasig.domain.event import RawSignalEvent
 from verasig.domain.lifecycle import FOLD_VERSION, FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, SignalEventType
+from verasig.domain.signal import EntryType, Signal, SignalEventType
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 
 
@@ -30,21 +28,14 @@ class _Position:
     entry: Decimal | None
 
 
-def _entry_message_ids(
-    signals: list[ExtractedSignal], events: list[RawSignalEvent]
-) -> dict[int, ExtractedSignal]:
-    event_by_id = {event.id: event for event in events}
-    return {
-        event_by_id[signal.event_id].message_id: signal
-        for signal in signals
-        if signal.event_id in event_by_id
-    }
+def _entry_message_ids(signals: list[Signal]) -> dict[int, Signal]:
+    return {signal.message_id: signal for signal in signals}
 
 
 def _nearest_root_message_id(
     message: RawTelegramMessage,
     messages_by_id: dict[int, RawTelegramMessage],
-    entry_message_ids: dict[int, ExtractedSignal],
+    entry_message_ids: dict[int, Signal],
 ) -> int | None:
     """Walk up the reply chain to the first entry root (transitive, cycle-guarded)."""
     seen: set[int] = set()
@@ -59,7 +50,7 @@ def _nearest_root_message_id(
 
 
 def _members_by_root(
-    entry_message_ids: dict[int, ExtractedSignal],
+    entry_message_ids: dict[int, Signal],
     messages_by_id: dict[int, RawTelegramMessage],
     messages: list[RawTelegramMessage],
     manual_links: dict[int, UUID],
@@ -83,13 +74,13 @@ def _members_by_root(
     return members
 
 
-def _seed_entry_price(signal: ExtractedSignal) -> Decimal | None:
+def _seed_entry_price(signal: Signal) -> Decimal | None:
     if signal.entry_type is EntryType.MARKET:
         return None
     return signal.entry_low
 
 
-def _seed_position(signal: ExtractedSignal) -> _Position:
+def _seed_position(signal: Signal) -> _Position:
     return _Position(
         stop_loss=signal.stop_loss,
         take_profits=list(signal.take_profits),
@@ -99,7 +90,7 @@ def _seed_position(signal: ExtractedSignal) -> _Position:
 
 
 def _entry_step(
-    signal: ExtractedSignal, root_message: RawTelegramMessage, position: _Position
+    signal: Signal, root_message: RawTelegramMessage, position: _Position
 ) -> FoldStep:
     return FoldStep(
         at=root_message.posted_at,
@@ -177,7 +168,7 @@ def _apply_size_op(
 
 
 def _apply_patch(
-    signal: ExtractedSignal,
+    signal: Signal,
     message: RawTelegramMessage,
     patch: LifecyclePatch,
     position: _Position,
@@ -201,7 +192,7 @@ def _apply_patch(
 
 
 def _fold_one(
-    signal: ExtractedSignal,
+    signal: Signal,
     root_message: RawTelegramMessage,
     members: list[RawTelegramMessage],
     version: int,
@@ -228,14 +219,13 @@ def _fold_one(
 
 
 def fold(
-    signals: list[ExtractedSignal],
-    events: list[RawSignalEvent],
+    signals: list[Signal],
     messages: list[RawTelegramMessage],
     version: int = FOLD_VERSION,
     manual_links: dict[int, UUID] | None = None,
 ) -> list[FoldedSignal]:
     """Fold each entry signal + its reply-chain patches into a FoldedSignal."""
-    entry_message_ids = _entry_message_ids(signals, events)
+    entry_message_ids = _entry_message_ids(signals)
     messages_by_id = {message.message_id: message for message in messages}
     members = _members_by_root(
         entry_message_ids, messages_by_id, messages, manual_links or {}

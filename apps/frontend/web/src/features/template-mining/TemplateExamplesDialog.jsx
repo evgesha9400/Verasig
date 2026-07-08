@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Dialog, Icon } from '@verasig/design-system'
-import { formatLabel } from '../../domain/template-mining/index.js'
+import { formatLabel } from './templateLabel.js'
 import { CandidateExample } from './CandidateExample.jsx'
 import { Pager } from './Pager.jsx'
 import { SignalFieldRow } from './SignalFieldRow.jsx'

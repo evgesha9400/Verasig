@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getSignal, linkSignalModifier, listSignals } from './signalsApi.js'
+import { linkSignalModifier, listSignals } from './signalsApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -31,17 +31,6 @@ describe('signalsApi', () => {
         headers: { Authorization: 'Bearer jwt-token' }
       }
     )
-  })
-
-  it('gets a signal detail row', async () => {
-    fetch.mockResolvedValueOnce(jsonResponse({ id: 'sig-1' }))
-
-    await getSignal('jwt-token', 'sig-1')
-
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/signals/sig-1', {
-      method: 'GET',
-      headers: { Authorization: 'Bearer jwt-token' }
-    })
   })
 
   it('links an orphan modifier to a signal', async () => {

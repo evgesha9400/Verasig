@@ -1,5 +1,5 @@
 import { Badge, Button, Card, ConfidenceBar, Icon } from '@verasig/design-system'
-import { formatLabel } from '../../domain/template-mining/index.js'
+import { formatLabel } from './templateLabel.js'
 import { ACTION_LABEL, ACTION_TONE } from './format.js'
 
 /* Verasig — Template Mining: one template, the unit of review.

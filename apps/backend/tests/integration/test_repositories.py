@@ -6,10 +6,9 @@ from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import EntryMode, RiskConfig
-from verasig.domain.signal import ExtractedSignal, Side
+from verasig.domain.signal import Side, Signal
 from verasig.features.accounts import repository as account_repository
 from verasig.features.exchanges import repository as exchange_repository
 from verasig.features.feeds import (
@@ -19,7 +18,6 @@ from verasig.features.feeds import (
 from verasig.features.feeds.history_depth import HistoryDepth
 from verasig.features.risk import repository as risk_repository
 from verasig.features.signals import (
-    event_repository,
     lifecycle_link_repository,
     outcome_repository,
 )
@@ -266,21 +264,14 @@ def test_exchange_risk_backtest_and_lifecycle_repositories_round_trip(db_session
     insert_source(db_session, account.id)
     feed_repository.create_feed(db_session, account.id, _channel(), _instant())
     message_repository.insert_messages(db_session, account.id, [_message(77)])
-    event = RawSignalEvent(
+    signal = Signal(
         channel_id=1,
         message_id=77,
         candidate_text="BTC long",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_instant(),
-    )
-    event_repository.insert_signal_events(db_session, account.id, [event])
-    signal = ExtractedSignal(
-        event_id=event.id,
-        channel_id=1,
         symbol="BTCUSDT",
         side=Side.LONG,
     )
-    outcome_repository.insert_extracted_signals(db_session, [signal], account.id)
+    outcome_repository.insert_signals(db_session, [signal], account.id)
     db_session.commit()
 
     exchange = exchange_repository.upsert_connection(

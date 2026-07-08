@@ -16,9 +16,8 @@ from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import ExtractedSignal, Side
+from verasig.domain.signal import Side, Signal
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import (
     backfill_job_repository,
@@ -27,7 +26,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.recapture import ChannelUnreachableError, guard_and_wipe
-from verasig.features.signals import event_repository, outcome_repository
+from verasig.features.signals import outcome_repository
 
 
 def _instant() -> datetime:
@@ -76,19 +75,15 @@ def _seed_feed_with_full_capture(session_factory) -> object:
             account.id,
             [_message(1), _message(2, "BTC long 65k"), _message(3)],
         )
-        event = RawSignalEvent(
-            channel_id=1,
-            message_id=2,
-            candidate_text="BTC long 65k",
-            materialized_by=MaterializationPath.SEED_HEURISTIC,
-            created_at=_instant(),
-        )
-        event_repository.insert_signal_events(session, account.id, [event])
-        outcome_repository.insert_extracted_signals(
+        outcome_repository.insert_signals(
             session,
             [
-                ExtractedSignal(
-                    event_id=event.id, channel_id=1, symbol="BTC", side=Side.LONG
+                Signal(
+                    channel_id=1,
+                    message_id=2,
+                    candidate_text="BTC long 65k",
+                    symbol="BTC",
+                    side=Side.LONG,
                 )
             ],
             account.id,
@@ -109,8 +104,7 @@ async def test_guard_and_wipe_purges_capture_but_keeps_evidence_and_runs(
 
     with session_factory() as session:
         assert message_repository.count_messages(session, user_id, 1) == 0
-        assert event_repository.read_signal_events(session, user_id, 1) == []
-        assert outcome_repository.read_extracted_signals(session, 1, user_id) == []
+        assert outcome_repository.read_signals(session, 1, user_id) == []
         assert backfill_job_repository.read_latest_run(session, user_id, 1) is not None
         assert feed_repository.read_cursor(session, user_id, 1) is None
         # a clean wipe secures NO deletion evidence (that is the Check gaps rescan)

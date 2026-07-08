@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   confirmMining,
   getConfirmedMining,
+  getMineAudit,
   getMineResult,
   startMine,
   streamMineProgress
@@ -25,7 +26,7 @@ describe('mineApi', () => {
     const body = await startMine('jwt-token', '7')
 
     expect(body.jobId).toBe('user:7:mine')
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mine', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mining/preview', {
       method: 'POST',
       headers: { Authorization: 'Bearer jwt-token' }
     })
@@ -78,9 +79,32 @@ describe('mineApi', () => {
     const body = await getMineResult('jwt-token', '7')
 
     expect(body.groups).toEqual([{ templateKey: 'tpl_a' }])
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mine/result', {
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mining/result', {
       method: 'GET',
       headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
+  it('runs the accepted templates over the full history (POST, bearer auth)', async () => {
+    const audit = {
+      parsedSignals: [],
+      ambiguousCandidates: [],
+      rejectedCandidates: [],
+      rareTemplates: [],
+      potentialMisses: []
+    }
+    fetch.mockResolvedValueOnce(jsonResponse(audit))
+
+    const body = await getMineAudit('jwt-token', '7', ['tpl_a', 'tpl_b'])
+
+    expect(body).toEqual(audit)
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mining/audit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt-token'
+      },
+      body: JSON.stringify({ acceptedTemplateKeys: ['tpl_a', 'tpl_b'] })
     })
   })
 
@@ -117,7 +141,7 @@ describe('mineApi', () => {
     events[0].emit('done', { groups: [{ template_key: 'tpl_x' }], messages: [] })
 
     expect(events[0].url).toBe(
-      'http://localhost:8000/feeds/7/mine/progress?token=jwt-token'
+      'http://localhost:8000/feeds/7/mining/preview/progress?token=jwt-token'
     )
     expect(onProgress).toHaveBeenCalledWith({ stage: 'extracting', count: 42 })
     expect(onDone).toHaveBeenCalledWith({

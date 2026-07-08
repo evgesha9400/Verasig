@@ -3,7 +3,6 @@ import {
   isStepLocked,
   landingStepForFeed,
   maxStepIndex,
-  nextBlockedStep,
   PLAN_MAX_STEP
 } from './stepAccess.js'
 
@@ -75,16 +74,5 @@ describe('stepAccess — locking', () => {
     for (const step of ['mine', 'verify', 'exchange', 'backtest', 'execution']) {
       expect(isStepLocked(step, 'desk')).toBe(false)
     }
-  })
-})
-
-describe('stepAccess — next blocked step', () => {
-  it('is the first step past the plan cap', () => {
-    expect(nextBlockedStep('observer')).toBe('exchange')
-    expect(nextBlockedStep('operator')).toBe('execution')
-  })
-
-  it('is null when the plan reaches the end of the chain', () => {
-    expect(nextBlockedStep('desk')).toBe(null)
   })
 })

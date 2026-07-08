@@ -25,6 +25,7 @@ from verasig.domain.channel_reference import (
     normalize_channel_title,
     parse_channel_reference,
 )
+from verasig.domain.feed import FeedStatus
 from verasig.domain.source import TELEGRAM
 from verasig.features.feeds.history_depth import HistoryDepth
 from verasig.features.sources import source_repository
@@ -68,13 +69,13 @@ def _upsert_feed(
     # resolved as an ORM attribute in `set_`. Plain column-name keys avoid that.
     refreshed = {"title": channel.title, "metadata": _metadata(channel)}
     if reset_status:
-        refreshed["status"] = "new"
+        refreshed["status"] = FeedStatus.NEW
     statement = pg_insert(FeedRow.__table__).values(
         user_id=user_id,
         external_id=channel.channel_id,
         source_id=_require_source_id(session, user_id),
         title=channel.title,
-        status="new",
+        status=FeedStatus.NEW,
         captured_through_external_message_id=None,
         metadata=_metadata(channel),
         first_seen_at=channel.first_seen_at,

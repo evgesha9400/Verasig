@@ -13,6 +13,7 @@ re-add starts a fresh backfill from a NULL cursor.
 
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import (
@@ -33,7 +34,19 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from verasig.domain.account import Plan
+from verasig.domain.feed import FeedStatus, HistoryDepth
+from verasig.domain.risk_config import EntryMode, ExitSource, Weighting
+from verasig.domain.signal import Side, SignalEventType
 from verasig.foundation.database.session import Base
+
+
+def enum_check(column: str, enum: type[StrEnum], *, name: str) -> CheckConstraint:
+    """A CHECK constraint whose allowed set is generated from the domain StrEnum —
+    the single source of truth, so the DB constraint can never drift from Python."""
+    allowed = ", ".join(f"'{member.value}'" for member in enum)
+    return CheckConstraint(f"{column} IN ({allowed})", name=name)
+
 
 _FEED_FK = ("user_id", "external_id")
 _FEED_REF = ("feed.user_id", "feed.external_id")
@@ -43,11 +56,6 @@ _MESSAGE_REF = (
     "raw_message.external_id",
     "raw_message.external_message_id",
 )
-_FEED_STATUS = (
-    "status IN ('new', 'backfilling', 'backfilled', 'verified', "
-    "'analyzed', 'cancelled', 'failed')"
-)
-_FEED_HISTORY_DEPTH = "history_depth IN ('6m', '1y', 'all')"
 
 
 class FeedRow(Base):
@@ -63,8 +71,8 @@ class FeedRow(Base):
 
     __tablename__ = "feed"
     __table_args__ = (
-        CheckConstraint(_FEED_STATUS, name="ck_feed_status"),
-        CheckConstraint(_FEED_HISTORY_DEPTH, name="ck_feed_history_depth"),
+        enum_check("status", FeedStatus, name="ck_feed_status"),
+        enum_check("history_depth", HistoryDepth, name="ck_feed_history_depth"),
     )
 
     user_id: Mapped[UUID] = mapped_column(
@@ -120,74 +128,43 @@ class RawMessageRow(Base):
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
 
-# --- Candidate events + extraction outputs ------------------------------------
-# JSONB holds list/map fields; enums stored as their value.
+# --- Signals: one row per candidate message that yielded an extraction --------
+# The miner is the only extractor and Confirm persists a candidate message and
+# its extracted trade together, 1:1, in one transaction — so there is no
+# separate "candidate event" row. Every persisted `signal` IS an extraction;
+# there are no stored "misses". JSONB holds list fields; enums store as value.
 
 
-class RawSignalEventRow(Base):
-    __tablename__ = "raw_signal_event"
+class SignalRow(Base):
+    __tablename__ = "signal"
     __table_args__ = (
         UniqueConstraint(
             "user_id",
             "external_id",
             "external_message_id",
-            name="uq_raw_signal_event_msg",
+            name="uq_signal_msg",
         ),
         ForeignKeyConstraint(
-            _MESSAGE_FK,
-            _MESSAGE_REF,
-            name="fk_raw_signal_event_message",
-            ondelete="CASCADE",
+            _MESSAGE_FK, _MESSAGE_REF, name="fk_signal_message", ondelete="CASCADE"
         ),
         ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_raw_signal_event_feed", ondelete="CASCADE"
+            _FEED_FK, _FEED_REF, name="fk_signal_feed", ondelete="CASCADE"
         ),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
-    external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
-    materialized_by: Mapped[str] = mapped_column(String, nullable=False)
-    matched_reasons: Mapped[list] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-
-
-class ExtractedSignalRow(Base):
-    __tablename__ = "extracted_signal"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "event_id",
-            name="uq_extracted_signal_user_event",
-        ),
-        CheckConstraint("side IN ('LONG', 'SHORT')", name="ck_extracted_signal_side"),
-        CheckConstraint(
-            "event_type IN ('NEW_ENTRY', 'MODIFY', 'CLOSE', 'UNRECOGNIZED')",
-            name="ck_extracted_signal_event_type",
-        ),
-        CheckConstraint(
-            "extraction_method IN ('DETERMINISTIC', 'LLM_FALLBACK')",
-            name="ck_extracted_signal_extraction_method",
-        ),
-        Index("ix_extracted_signal_user_channel", "user_id", "external_id"),
+        enum_check("side", Side, name="ck_signal_side"),
+        enum_check("event_type", SignalEventType, name="ck_signal_event_type"),
+        Index("ix_signal_user_channel", "user_id", "external_id"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
     )
-    event_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("raw_signal_event.id", ondelete="CASCADE"), nullable=False
-    )
     external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    external_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    candidate_text: Mapped[str] = mapped_column(Text, nullable=False)
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     side: Mapped[str] = mapped_column(String, nullable=False)
     event_type: Mapped[str] = mapped_column(String, nullable=False)
-    references_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     entry_type: Mapped[str | None] = mapped_column(String, nullable=True)
     entry_low: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     entry_high: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
@@ -195,33 +172,10 @@ class ExtractedSignalRow(Base):
     take_profits: Mapped[list] = mapped_column(JSONB, nullable=False)
     leverage: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     confidence: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
-    extraction_method: Mapped[str] = mapped_column(String, nullable=False)
     rule_id: Mapped[str | None] = mapped_column(String, nullable=True)
     extracted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-
-
-class UnrecognizedSignalRow(Base):
-    __tablename__ = "unrecognized_signal"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id",
-            "event_id",
-            name="uq_unrecognized_signal_user_event",
-        ),
-        Index("ix_unrecognized_signal_user_event", "user_id", "event_id"),
-    )
-
-    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
-    )
-    event_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("raw_signal_event.id", ondelete="CASCADE"), nullable=False
-    )
-    reason: Mapped[str] = mapped_column(String, nullable=False)
-    attempted_methods: Mapped[list] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -277,12 +231,7 @@ class DeletedSignalEvidenceRow(Base):
 
 class UserAccountRow(Base):
     __tablename__ = "user_account"
-    __table_args__ = (
-        CheckConstraint(
-            "plan IN ('observer', 'operator', 'desk')",
-            name="ck_user_account_plan",
-        ),
-    )
+    __table_args__ = (enum_check("plan", Plan, name="ck_user_account_plan"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
@@ -398,18 +347,9 @@ class UserExchangeConnectionRow(Base):
 class FeedRiskConfigRow(Base):
     __tablename__ = "feed_risk_config"
     __table_args__ = (
-        CheckConstraint(
-            "entry_mode IN ('first', 'mid', 'ladder')",
-            name="ck_feed_risk_config_entry_mode",
-        ),
-        CheckConstraint(
-            "weighting IN ('equal', 'martingale')",
-            name="ck_feed_risk_config_weighting",
-        ),
-        CheckConstraint(
-            "exit_source IN ('signal', 'custom')",
-            name="ck_feed_risk_config_exit_source",
-        ),
+        enum_check("entry_mode", EntryMode, name="ck_feed_risk_config_entry_mode"),
+        enum_check("weighting", Weighting, name="ck_feed_risk_config_weighting"),
+        enum_check("exit_source", ExitSource, name="ck_feed_risk_config_exit_source"),
         ForeignKeyConstraint(
             _FEED_FK, _FEED_REF, name="fk_feed_risk_config_feed", ondelete="CASCADE"
         ),
@@ -471,7 +411,7 @@ class LifecycleLinkRow(Base):
         ),
         ForeignKeyConstraint(
             ["root_signal_id"],
-            ["extracted_signal.id"],
+            ["signal.id"],
             name="fk_lifecycle_link_root_signal",
             ondelete="CASCADE",
         ),

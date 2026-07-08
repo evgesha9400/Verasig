@@ -7,16 +7,13 @@ the reference `now` is injected so the cutoff is deterministic.
 """
 
 from datetime import datetime, timedelta
-from enum import StrEnum
+
+from verasig.domain.feed import HistoryDepth
 
 _SIX_MONTHS = timedelta(days=183)
 _ONE_YEAR = timedelta(days=365)
 
-
-class HistoryDepth(StrEnum):
-    SIX_MONTHS = "6m"
-    ONE_YEAR = "1y"
-    ALL = "all"
+__all__ = ["HistoryDepth", "depth_cutoff"]
 
 
 def depth_cutoff(depth: HistoryDepth, now: datetime) -> datetime | None:

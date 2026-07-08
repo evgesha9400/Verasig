@@ -6,7 +6,6 @@ from verasig.domain.account import UserAccount
 from verasig.features.signals.schemas import LinkModIn
 from verasig.features.signals.views import (
     link_modifier,
-    present_signal,
     present_signals,
 )
 from verasig.foundation.http.auth_dependencies import get_current_user
@@ -26,20 +25,6 @@ def list_signals(
         result = present_signals(session, user.id, feed_id, status, user.plan)
         session.commit()
         return result
-
-
-@router.get("/{signal_id}")
-def get_signal(
-    request: Request,
-    signal_id: UUID,
-    user: UserAccount = Depends(get_current_user),
-) -> dict:
-    with request.app.state.session_factory() as session:
-        signal = present_signal(session, user.id, signal_id)
-        session.commit()
-    if signal is None:
-        raise ApiError(404, "SIGNAL_NOT_FOUND", "Signal not found")
-    return signal
 
 
 @router.post("/{signal_id}/link-mod")

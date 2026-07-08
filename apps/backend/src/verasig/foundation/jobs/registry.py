@@ -3,8 +3,15 @@ import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import partial
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
+
+
+def job_key(user_id: UUID, channel_id: int, kind: str) -> str:
+    """The one job-key format shared by every feed-scoped job (mine, backfill,
+    backtest, deletion-rescan): ``{user}:{channel}:{kind}``."""
+    return f"{user_id}:{channel_id}:{kind}"
 
 
 class JobAlreadyRunningError(Exception):

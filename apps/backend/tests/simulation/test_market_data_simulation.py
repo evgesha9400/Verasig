@@ -7,10 +7,9 @@ from uuid import UUID
 import pytest
 
 from verasig.domain.channel import TelegramChannel
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import EntryType, ExtractedSignal, Side, SignalEventType
+from verasig.domain.signal import EntryType, Side, Signal, SignalEventType
 from verasig.domain.simulation import Kline
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
@@ -86,22 +85,12 @@ def _message() -> RawTelegramMessage:
     )
 
 
-def _event(event_id: UUID) -> RawSignalEvent:
-    return RawSignalEvent(
-        id=event_id,
+def _signal(signal_id: UUID) -> Signal:
+    return Signal(
+        id=signal_id,
         channel_id=7,
         message_id=1,
         candidate_text="BTC long entry 100 sl 95 tp 110",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
-    )
-
-
-def _signal(signal_id: UUID, event_id: UUID) -> ExtractedSignal:
-    return ExtractedSignal(
-        id=signal_id,
-        event_id=event_id,
-        channel_id=7,
         symbol="BTCUSDT",
         side=Side.LONG,
         entry_type=EntryType.LIMIT_SINGLE,
@@ -115,7 +104,6 @@ def _signal(signal_id: UUID, event_id: UUID) -> ExtractedSignal:
 
 def test_market_data_backed_simulation_feeds_scorecard_components():
     signal_id = _uuid(1)
-    event_id = _uuid(2)
     market_data = FakeMarketData(_load_klines())
 
     outcomes = simulate_outcomes_from_market_data(
@@ -123,13 +111,14 @@ def test_market_data_backed_simulation_feeds_scorecard_components():
         market_data=market_data,
         end=_END,
     )
+    signal = _signal(signal_id)
     score, explanation = build_provider_score(
         channel=_channel(),
         messages=[_message()],
         message_count=1,
-        events=[_event(event_id)],
-        signals=[_signal(signal_id, event_id)],
-        unrecognized=[],
+        events=[signal],
+        signals=[signal],
+        missed_event_ids=[],
         deletions=[],
         sim_outcomes=outcomes,
         computed_at=_BASE,

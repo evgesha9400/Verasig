@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getParserOverlay, listFeedHistory, putParserOverlay } from './pipelineApi.js'
+import { getParserOverlay, putParserOverlay } from './pipelineApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -10,25 +10,6 @@ function jsonResponse(body, status = 200) {
 
 beforeEach(() => {
   globalThis.fetch = vi.fn()
-})
-
-describe('pipelineApi — feed history', () => {
-  it('lists the full feed history for mining (no limit, dedicated endpoint)', async () => {
-    fetch.mockResolvedValueOnce(
-      jsonResponse({ messages: [{ id: '1' }, { id: '2' }, { id: '3' }] })
-    )
-
-    const body = await listFeedHistory('jwt-token', '7')
-
-    expect(body.messages).toHaveLength(3)
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/feeds/7/messages/history',
-      {
-        method: 'GET',
-        headers: { Authorization: 'Bearer jwt-token' }
-      }
-    )
-  })
 })
 
 describe('pipelineApi — overlay', () => {

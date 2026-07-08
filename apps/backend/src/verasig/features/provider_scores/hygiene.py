@@ -10,9 +10,8 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import ExtractedSignal, ExtractionMethod, UnrecognizedSignal
+from verasig.domain.signal import Signal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 
 ACTIVE_USER_PROXY_ANCHOR = 10_000.0
@@ -46,7 +45,7 @@ def _uuid_text(value: UUID) -> str:
     return value.urn.removeprefix("urn:uuid:")
 
 
-def _event_ref(event: RawSignalEvent) -> str:
+def _event_ref(event: Signal) -> str:
     return f"event:{_uuid_text(event.id)}"
 
 
@@ -67,12 +66,12 @@ def _append_unique(refs: list[str], ref: str) -> None:
         refs.append(ref)
 
 
-def _signal_ref(signal: ExtractedSignal) -> str:
+def _signal_ref(signal: Signal) -> str:
     return f"signal:{_uuid_text(signal.id)}"
 
 
-def _unrecognized_ref(item: UnrecognizedSignal) -> str:
-    return f"unrecognized:{_uuid_text(item.id)}"
+def _event_id_ref(event_id: UUID) -> str:
+    return f"event:{_uuid_text(event_id)}"
 
 
 def _outcome_ref(outcome: SimOutcome) -> str:
@@ -149,7 +148,7 @@ def _confirmed_signal_deletions(
 
 
 def measure_deletion_behaviour(
-    events: list[RawSignalEvent],
+    events: list[Signal],
     deletions: list[DeletedSignalEvidence],
 ) -> Measurement:
     if not events:
@@ -172,19 +171,19 @@ def measure_deletion_behaviour(
     )
 
 
-def _has_entry(signal: ExtractedSignal) -> bool:
+def _has_entry(signal: Signal) -> bool:
     return signal.entry_type is not None or signal.entry_low is not None
 
 
-def _has_stop(signal: ExtractedSignal) -> bool:
+def _has_stop(signal: Signal) -> bool:
     return signal.stop_loss is not None
 
 
-def _has_take_profit(signal: ExtractedSignal) -> bool:
+def _has_take_profit(signal: Signal) -> bool:
     return len(signal.take_profits) > 0
 
 
-def _completion_ratio(signal: ExtractedSignal) -> float:
+def _completion_ratio(signal: Signal) -> float:
     present = sum(
         [
             _has_entry(signal),
@@ -195,7 +194,7 @@ def _completion_ratio(signal: ExtractedSignal) -> float:
     return present / 3
 
 
-def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
+def measure_completeness(signals: list[Signal]) -> Measurement:
     if not signals:
         return ExcludedMeasurement(
             name="completeness",
@@ -210,24 +209,25 @@ def measure_completeness(signals: list[ExtractedSignal]) -> Measurement:
     )
 
 
-def _is_deterministic(signal: ExtractedSignal) -> bool:
-    return signal.extraction_method is ExtractionMethod.DETERMINISTIC
-
-
 def measure_parser_confidence(
-    signals: list[ExtractedSignal],
-    unrecognized: list[UnrecognizedSignal],
+    signals: list[Signal],
+    missed_event_ids: list[UUID],
 ) -> Measurement:
-    total = len(signals) + len(unrecognized)
+    """Recognition rate: extracted signals over all candidate events. A candidate
+    that yields a signal is recognized; a miss is a candidate event with no
+    extracted signal (recovered by anti-join). The deterministic miner is the
+    only extractor, so recognition rate == extracted / (extracted + missed)."""
+    extracted_count = len(signals)
+    missed_count = len(missed_event_ids)
+    total = extracted_count + missed_count
     if total == 0:
         return ExcludedMeasurement(
             name="parser_confidence",
             note="parser_confidence: not measured — no candidates",
         )
-    deterministic = sum(1 for signal in signals if _is_deterministic(signal))
-    value = deterministic / total
+    value = extracted_count / total
     refs = [_signal_ref(signal) for signal in signals]
-    refs.extend(_unrecognized_ref(item) for item in unrecognized)
+    refs.extend(_event_id_ref(event_id) for event_id in missed_event_ids)
     return HygieneMeasurement(
         name="parser_confidence",
         raw_value=value,
@@ -318,7 +318,7 @@ def _normalize_signal_frequency(raw_value: float) -> float:
 
 
 def measure_signal_frequency(
-    events: list[RawSignalEvent],
+    events: list[Signal],
     messages: list[RawTelegramMessage],
 ) -> Measurement:
     if not messages:

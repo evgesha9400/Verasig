@@ -5,13 +5,14 @@ import {
   Checkbox,
   Icon,
   Input,
+  Loader,
   Select,
   Tabs
 } from '@verasig/design-system'
-import { byCoverageThenConfidence } from '../../domain/template-mining/index.js'
 import { Pager } from './Pager.jsx'
 import {
   INTENT_LABEL,
+  byCoverageThenConfidence,
   byMessageDateDesc,
   formatConfidence,
   formatEntry,
@@ -64,7 +65,7 @@ const thenBy = (primary, secondary) => (a, b) => primary(a, b) || secondary(a, b
 // single search/filter path serves every bucket. The row whose template parsed
 // the most messages in this backtest leads (most-likely template first), then
 // confidence within a template — matches the family grid and compiled-rules order.
-function parsedRows(signals, messageById, ruleById, countByRule) {
+function parsedRows(signals, messageById, templateById, countByRule) {
   const coverageOf = (signal) => countByRule.get(signal.parserRuleId) || 0
   const dateOf = (signal) => messageById.get(signal.sourceMessageIds[0])?.date
   return [...signals]
@@ -86,11 +87,11 @@ function parsedRows(signals, messageById, ruleById, countByRule) {
         .join(' · ')
       const sourceMessage = messageById.get(signal.sourceMessageIds[0])
       const sourceText = sourceMessage?.text || ''
-      const rule = ruleById.get(signal.parserRuleId)
+      const template = templateById.get(signal.parserRuleId)
       return {
         key: `${signal.sourceMessageIds.join('-')}-${index}`,
         text,
-        template: rule?.name,
+        template: template?.name,
         templateId: signal.parserRuleId,
         // Recovered by a general family it does not exactly match — flag it so the
         // reviewer can scrutinize looser matches without leaving the Parsed bucket.
@@ -102,15 +103,15 @@ function parsedRows(signals, messageById, ruleById, countByRule) {
           signal,
           messageText: sourceText,
           messageDate: sourceMessage?.date,
-          template: rule?.name
+          template: template?.name
         }
       }
     })
 }
 
-function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
+function ambiguousRows(candidates, templateIdByTemplateKey, countByRule) {
   const coverageOf = (candidate) =>
-    countByRule.get(ruleByTemplateKey.get(candidate.templateKey)) || 0
+    countByRule.get(templateIdByTemplateKey.get(candidate.templateKey)) || 0
   const dateOf = (candidate) => candidate.message.date
   return [...candidates]
     .sort(
@@ -126,7 +127,7 @@ function ambiguousRows(candidates, ruleByTemplateKey, countByRule) {
         key: `${candidate.message.id}-${index}`,
         text,
         issue,
-        templateId: ruleByTemplateKey.get(candidate.templateKey),
+        templateId: templateIdByTemplateKey.get(candidate.templateKey),
         haystack:
           `${candidate.message.text} ${INTENT_LABEL[candidate.intent]} ${issue?.kind || ''} ${issue?.label || ''}`.toLowerCase(),
         detail: { kind: 'candidate', candidate }
@@ -269,8 +270,10 @@ function ReviewHead({ subtitle, actions }) {
 export function AuditReview({
   audit,
   messages = [],
-  rules = [],
+  templates = [],
   hasAccepted,
+  loading = false,
+  error = null,
   onFinish,
   onKeepVerified
 }) {
@@ -288,16 +291,19 @@ export function AuditReview({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages]
   )
-  const ruleById = useMemo(() => new Map(rules.map((rule) => [rule.id, rule])), [rules])
-  const ruleByTemplateKey = useMemo(
-    () => new Map(rules.map((rule) => [rule.templateKey, rule.id])),
-    [rules]
+  const templateById = useMemo(
+    () => new Map(templates.map((template) => [template.id, template])),
+    [templates]
+  )
+  const templateIdByTemplateKey = useMemo(
+    () => new Map(templates.map((template) => [template.templateKey, template.id])),
+    [templates]
   )
 
-  // How many signals each accepted rule parsed in this backtest — its coverage.
-  // Drives both the parsed-row ordering (most-covering family first) and the
-  // template-filter labels (several families can share one display name).
-  const parsedCountByRule = useMemo(() => {
+  // How many signals each accepted template parsed in this backtest — its
+  // coverage. Drives both the parsed-row ordering (most-covering family first)
+  // and the template-filter labels (several families can share one display name).
+  const parsedCountByTemplate = useMemo(() => {
     const counts = new Map()
     for (const signal of audit.parsedSignals) {
       counts.set(signal.parserRuleId, (counts.get(signal.parserRuleId) || 0) + 1)
@@ -318,22 +324,34 @@ export function AuditReview({
   // Only the active tab's rows are ever rendered, so only build that bucket.
   const activeRows = useMemo(() => {
     if (tab === 'parsed') {
-      return parsedRows(audit.parsedSignals, messageById, ruleById, parsedCountByRule)
+      return parsedRows(
+        audit.parsedSignals,
+        messageById,
+        templateById,
+        parsedCountByTemplate
+      )
     }
     if (tab === 'ambiguous') {
       return ambiguousRows(
         audit.ambiguousCandidates,
-        ruleByTemplateKey,
-        parsedCountByRule
+        templateIdByTemplateKey,
+        parsedCountByTemplate
       )
     }
     if (tab === 'rejected') return rejectedRows(audit.rejectedCandidates)
     if (tab === 'rare') return rareRows(audit.rareTemplates)
     return missRows(audit.potentialMisses)
-  }, [tab, audit, messageById, ruleById, ruleByTemplateKey, parsedCountByRule])
+  }, [
+    tab,
+    audit,
+    messageById,
+    templateById,
+    templateIdByTemplateKey,
+    parsedCountByTemplate
+  ])
 
   const activeTab = TABS.find((entry) => entry.id === tab)
-  const templateEnabled = activeTab.templated && rules.length > 0
+  const templateEnabled = activeTab.templated && templates.length > 0
   const effectiveTemplate = templateEnabled ? templateId : 'all'
 
   const filtered = useMemo(() => {
@@ -377,9 +395,9 @@ export function AuditReview({
 
   const templateOptions = [
     { value: 'all', label: 'All templates' },
-    ...rules.map((rule) => ({
-      value: rule.id,
-      label: `${rule.name} · ${parsedCountByRule.get(rule.id) || 0} parsed`
+    ...templates.map((template) => ({
+      value: template.id,
+      label: `${template.name} · ${parsedCountByTemplate.get(template.id) || 0} parsed`
     }))
   ]
   const tabItems = TABS.map((entry) => ({
@@ -391,7 +409,11 @@ export function AuditReview({
   return (
     <section className="vrs-tm-review">
       <ReviewHead
-        subtitle="Search and filter every message the parser sorted"
+        subtitle={
+          loading
+            ? 'Refreshing the audit for your latest template decisions…'
+            : 'Search and filter every message the parser sorted'
+        }
         actions={
           <>
             {onKeepVerified && (
@@ -405,6 +427,14 @@ export function AuditReview({
           </>
         }
       />
+
+      {error && (
+        <div className="vrs-empty vrs-empty--sm" role="alert">
+          <div className="vrs-empty__note">
+            Couldn&apos;t refresh the audit. {error}
+          </div>
+        </div>
+      )}
 
       <div className="vrs-tm-review__bar">
         <div className="vrs-tm-review__filters">
@@ -441,7 +471,9 @@ export function AuditReview({
         />
       </div>
 
-      {pageRows.length === 0 ? (
+      {loading ? (
+        <Loader variant="bar" size="sm" title="Refreshing the audit…" />
+      ) : pageRows.length === 0 ? (
         <div className="vrs-empty vrs-empty--sm">
           <div className="vrs-empty__note">No results match your filters.</div>
         </div>

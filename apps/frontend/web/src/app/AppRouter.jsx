@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ThemeProvider } from '@verasig/design-system'
+import { Loader, ThemeProvider } from '@verasig/design-system'
 import { LoginView } from '../features/auth/LoginView.jsx'
 import { RegisterView } from '../features/auth/RegisterView.jsx'
 import { getCurrentUser, login, logout, register } from '../shared/api/authApi.js'
@@ -23,9 +23,12 @@ function SessionBoot() {
   return (
     <div className="auth-wrap">
       <main className="auth-main">
-        <div className="auth-form-wrap" role="status">
-          Checking session...
-        </div>
+        <Loader
+          variant="bar"
+          size="lg"
+          title="Welcome back"
+          note="Checking your session…"
+        />
       </main>
     </div>
   )

@@ -211,21 +211,33 @@ export function useWorkflowState(authToken, plan) {
     setNav('signals')
   }
 
-  function startBackfill(feed, depth = '1y') {
-    previousBackfillStatusRef.current = null
-    setBackfillMode('resume')
-    setBackfillDepth(depth)
+  // Every backfill entry point does the same six things; they differ only in the
+  // mode, whether a reviewed feed keeps its status (refresh/full preserve it so a
+  // completed fetch lands back on the reviewed feed, not a re-mine), an optional
+  // depth, and an optional kickoff toast.
+  function beginBackfill({
+    feed,
+    mode,
+    depth = null,
+    keepStatus = false,
+    toast = null
+  }) {
+    previousBackfillStatusRef.current =
+      keepStatus && isReviewedFeed(feed) ? feed.status : null
+    setBackfillMode(mode)
+    if (depth != null) setBackfillDepth(depth)
     setActiveFeedId(feed.id)
     patchFeed(feed.id, { status: 'backfilling' })
     setScreen('backfill')
+    if (toast) fireToast(...toast)
+  }
+
+  function startBackfill(feed, depth = '1y') {
+    beginBackfill({ feed, mode: 'resume', depth })
   }
 
   function retryBackfill(feed) {
-    previousBackfillStatusRef.current = null
-    setBackfillMode('resume')
-    setActiveFeedId(feed.id)
-    patchFeed(feed.id, { status: 'backfilling' })
-    setScreen('backfill')
+    beginBackfill({ feed, mode: 'resume' })
   }
 
   function resumeFeed(feed) {
@@ -256,30 +268,30 @@ export function useWorkflowState(authToken, plan) {
   }
 
   function fetchNewMessages(feed) {
-    previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
-    setBackfillMode('refresh')
-    setActiveFeedId(feed.id)
-    patchFeed(feed.id, { status: 'backfilling' })
-    setScreen('backfill')
-    fireToast(
-      'info',
-      'Fetching new messages',
-      `Pulling new messages from ${feed.name}.`
-    )
+    beginBackfill({
+      feed,
+      mode: 'refresh',
+      keepStatus: true,
+      toast: [
+        'info',
+        'Fetching new messages',
+        `Pulling new messages from ${feed.name}.`
+      ]
+    })
   }
 
   function refetchFullHistory(feed, depth = '1y') {
-    previousBackfillStatusRef.current = isReviewedFeed(feed) ? feed.status : null
-    setBackfillMode('full')
-    setBackfillDepth(depth)
-    setActiveFeedId(feed.id)
-    patchFeed(feed.id, { status: 'backfilling' })
-    setScreen('backfill')
-    fireToast(
-      'info',
-      'Re-fetching history',
-      `Re-pulling the full history of ${feed.name}.`
-    )
+    beginBackfill({
+      feed,
+      mode: 'full',
+      depth,
+      keepStatus: true,
+      toast: [
+        'info',
+        'Re-fetching history',
+        `Re-pulling the full history of ${feed.name}.`
+      ]
+    })
   }
 
   function removeFeed(id) {
@@ -351,85 +363,89 @@ export function useWorkflowState(authToken, plan) {
     setScreen('backtest')
   }
 
-  function onBackfillComplete(result) {
+  // The three backfill outcomes share one shape: patch the feed to its terminal
+  // status (or restore the reviewed status a refresh/full run preserved), clear the
+  // resume state, route, and toast. `fetched`/`lastDate`, the fresh-run terminal
+  // status + screen, and the toasts are all the handler supplies. Toasts are built
+  // from `current` (the active feed) so the copy can name it.
+  function finishBackfill({
+    terminalStatus,
+    fetched,
+    lastDate,
+    screenWhenFresh,
+    toastFresh = null,
+    toastKept = null
+  }) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
-    const previousStatus = previousBackfillStatusRef.current
-    const keepsReview = previousStatus !== null
-    const summary =
-      typeof result === 'number'
-        ? { fetched: result, lastDate: current?.lastDate || null }
-        : result || {}
+    const keepsReview = previousBackfillStatusRef.current !== null
     patchFeed(activeFeedId, {
-      status: keepsReview ? previousStatus : 'backfilled',
-      fetched: summary.fetched ?? current?.fetched ?? 0,
-      lastDate: summary.lastDate ?? current?.lastDate ?? null
-    })
-    previousBackfillStatusRef.current = null
-    setBackfillMode('resume')
-    setScreen(keepsReview ? 'feeds' : 'mine')
-    if (keepsReview) {
-      fireToast(
-        'verified',
-        'Messages fetched',
-        `${current ? current.name : 'Feed'} was refreshed. Verification is still saved.`
-      )
-    }
-  }
-
-  function onBackfillCancel(count, date) {
-    const current = feeds.find((feed) => feed.id === activeFeedId)
-    const previousStatus = previousBackfillStatusRef.current
-    const keepsReview = previousStatus !== null
-    patchFeed(activeFeedId, {
-      status: keepsReview ? previousStatus : 'cancelled',
-      fetched: count,
-      lastDate: date || null
-    })
-    previousBackfillStatusRef.current = null
-    setBackfillMode('resume')
-    setScreen('feeds')
-    if (keepsReview) {
-      fireToast(
-        'pending',
-        'Fetch cancelled',
-        `${current ? current.name : 'Feed'} was not refreshed. Verification is still saved.`
-      )
-    } else {
-      fireToast(
-        'pending',
-        'Backfill paused',
-        `Saved at ${count.toLocaleString()} messages. Retry any time.`
-      )
-    }
-  }
-
-  function onBackfillError(error = {}) {
-    const current = feeds.find((feed) => feed.id === activeFeedId)
-    const previousStatus = previousBackfillStatusRef.current
-    const keepsReview = previousStatus !== null
-    const fetched = error.fetched ?? current?.fetched ?? 0
-    const lastDate = error.lastDate ?? current?.lastDate ?? null
-    patchFeed(activeFeedId, {
-      status: keepsReview ? previousStatus : 'failed',
+      status: keepsReview ? previousBackfillStatusRef.current : terminalStatus,
       fetched,
       lastDate
     })
     previousBackfillStatusRef.current = null
     setBackfillMode('resume')
-    setScreen('feeds')
-    if (keepsReview) {
-      fireToast(
-        'rejected',
-        'Fetch failed',
-        `${current ? current.name : 'Feed'} was not refreshed. Verification is still saved.`
-      )
-    } else {
-      fireToast(
+    setScreen(keepsReview ? 'feeds' : screenWhenFresh)
+    const toast = keepsReview ? toastKept : toastFresh
+    if (toast) fireToast(...toast(current))
+  }
+
+  function onBackfillComplete(result) {
+    const current = feeds.find((feed) => feed.id === activeFeedId)
+    const summary =
+      typeof result === 'number'
+        ? { fetched: result, lastDate: current?.lastDate || null }
+        : result || {}
+    finishBackfill({
+      terminalStatus: 'backfilled',
+      fetched: summary.fetched ?? current?.fetched ?? 0,
+      lastDate: summary.lastDate ?? current?.lastDate ?? null,
+      screenWhenFresh: 'mine',
+      toastKept: (feed) => [
+        'verified',
+        'Messages fetched',
+        `${feed ? feed.name : 'Feed'} was refreshed. Verification is still saved.`
+      ]
+    })
+  }
+
+  function onBackfillCancel(count, date) {
+    finishBackfill({
+      terminalStatus: 'cancelled',
+      fetched: count,
+      lastDate: date || null,
+      screenWhenFresh: 'feeds',
+      toastFresh: () => [
+        'pending',
+        'Backfill paused',
+        `Saved at ${count.toLocaleString()} messages. Retry any time.`
+      ],
+      toastKept: (feed) => [
+        'pending',
+        'Fetch cancelled',
+        `${feed ? feed.name : 'Feed'} was not refreshed. Verification is still saved.`
+      ]
+    })
+  }
+
+  function onBackfillError(error = {}) {
+    const current = feeds.find((feed) => feed.id === activeFeedId)
+    finishBackfill({
+      terminalStatus: 'failed',
+      fetched: error.fetched ?? current?.fetched ?? 0,
+      lastDate: error.lastDate ?? current?.lastDate ?? null,
+      screenWhenFresh: 'feeds',
+      toastFresh: () => [
         'rejected',
         'Backfill failed',
         error?.message || 'Retry when the source is available again.'
-      )
-    }
+      ],
+      toastKept: (feed) => [
+        'rejected',
+        'Fetch failed',
+        `${feed ? feed.name : 'Feed'} was not refreshed. Verification is still saved.`
+      ]
+    })
   }
 
   function onBacktestComplete(result) {

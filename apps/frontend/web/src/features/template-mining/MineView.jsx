@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { Loader } from '@verasig/design-system'
+import { StageStrip } from '../../shared/jobs/StageStrip.jsx'
+import { useJobStream } from '../../shared/jobs/useJobStream.js'
 
 /* Verasig — server-side template-mining loader. Starts the mine job and streams
    its staged progress until the mined families arrive, then hands the result up.
@@ -12,88 +15,31 @@ const MINE_STAGES = [
   { id: 'grouping', label: 'Grouping families' }
 ]
 
-function StageStrip({ stage }) {
-  const activeIndex = MINE_STAGES.findIndex((item) => item.id === stage)
-  return (
-    <div className="vrs-bf-stages">
-      {MINE_STAGES.map((item, index) => (
-        <span
-          key={item.id}
-          className={`vrs-bf-stage ${index === activeIndex ? 'is-active' : ''} ${
-            index < activeIndex ? 'is-done' : ''
-          }`.trim()}
-        >
-          {item.label}
-        </span>
-      ))}
-    </div>
-  )
-}
-
 export function MineView({ feed, onStart, onStream, onDone, onError }) {
   const [count, setCount] = useState(0)
   const [stage, setStage] = useState('loading')
   const [logLine, setLogLine] = useState('Starting the miner…')
-  const handlersRef = useRef({ onStart, onStream, onDone, onError })
 
-  useEffect(() => {
-    handlersRef.current = { onStart, onStream, onDone, onError }
-  }, [onStart, onStream, onDone, onError])
-
-  useEffect(() => {
-    let closed = false
-    let subscription = null
-
-    // A 409 means the job is already running — e.g. StrictMode re-invokes this
-    // effect and re-POSTs while the first job is still live. Its progress stream
-    // replays state to a late subscriber, so swallow the conflict and subscribe
-    // anyway; re-raise anything else as a genuine start failure.
-    async function startMineTolerating409() {
-      try {
-        await handlersRef.current.onStart(feed.id)
-      } catch (error) {
-        if (error?.status !== 409) throw error
+  useJobStream({
+    feedId: feed.id,
+    start: onStart,
+    stream: onStream,
+    tolerate409: true,
+    onProgress: (progress) => {
+      if (progress.stage) setStage(progress.stage)
+      if (progress.phase) setLogLine(progress.phase)
+      // Message count is meaningful through extraction; grouping reports a family
+      // count, so leave the scanned total steady after that.
+      if (
+        typeof progress.count === 'number' &&
+        (progress.stage === 'loading' || progress.stage === 'extracting')
+      ) {
+        setCount(progress.count)
       }
-    }
-
-    async function run() {
-      try {
-        await startMineTolerating409()
-        if (closed) return
-        subscription = handlersRef.current.onStream(feed.id, {
-          onProgress: (progress) => {
-            if (progress.stage) setStage(progress.stage)
-            if (progress.phase) setLogLine(progress.phase)
-            // Message count is meaningful through extraction; grouping reports a
-            // family count, so leave the scanned total steady after that.
-            if (
-              typeof progress.count === 'number' &&
-              (progress.stage === 'loading' || progress.stage === 'extracting')
-            ) {
-              setCount(progress.count)
-            }
-          },
-          onDone: (result) => {
-            handlersRef.current.onDone(result || { groups: [], messages: [] })
-          },
-          onError: (error) => {
-            handlersRef.current.onError(error || {})
-          }
-        })
-      } catch (error) {
-        if (!closed) {
-          handlersRef.current.onError({ message: error?.message || 'Mining failed.' })
-        }
-      }
-    }
-
-    void run()
-    return () => {
-      closed = true
-      subscription && subscription.close()
-    }
-    // Keyed on the feed only: re-runs when the active feed changes.
-  }, [feed.id])
+    },
+    onDone: (result) => onDone(result || { groups: [], messages: [] }),
+    onError: (error) => onError(error || {})
+  })
 
   return (
     <div className="vrs-backfill vrs-fade-in">
@@ -112,8 +58,8 @@ export function MineView({ feed, onStart, onStream, onDone, onError }) {
         </div>
       </div>
 
-      <StageStrip stage={stage} />
-      <div className="vrs-bf-track" />
+      <StageStrip stages={MINE_STAGES} stage={stage} />
+      <Loader variant="bar" size="md" />
       <div className="vrs-bf-log">{logLine}</div>
     </div>
   )

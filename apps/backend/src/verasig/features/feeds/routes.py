@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 
 from verasig.domain.account import UserAccount
 from verasig.domain.channel_reference import ChannelReferenceResolutionError
+from verasig.domain.feed import REVIEWED_STATUSES
 from verasig.features.accounts.plans import (
     PlanSourceLimitExceeded,
     require_source_capacity,
@@ -25,7 +26,6 @@ from verasig.features.feeds.feed_job_progress import (
     should_publish_count,
 )
 from verasig.features.feeds.feed_views import present_feeds
-from verasig.features.feeds.message_views import read_history
 from verasig.features.feeds.schemas import BackfillStartIn, FeedCreateIn
 from verasig.features.sources.telegram_adapter import read_connection
 from verasig.foundation.http.auth_dependencies import (
@@ -33,14 +33,18 @@ from verasig.foundation.http.auth_dependencies import (
     require_feed,
 )
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.http.sse import sse_single_event, sse_stream
-from verasig.foundation.jobs.registry import JobAlreadyRunningError, JobTerminalError
+from verasig.foundation.http.sse import (
+    sse_single_event,
+    sse_stream,
+    start_job_or_409,
+)
+from verasig.foundation.jobs.registry import JobTerminalError, job_key
 from verasig.foundation.telegram.session import make_user_source
 
 router = APIRouter(prefix="/feeds")
 logger = logging.getLogger(__name__)
 
-DELETION_RESCAN_READY_STATUSES = {"verified", "analyzed"}
+DELETION_RESCAN_READY_STATUSES = REVIEWED_STATUSES
 DELETION_RESCAN_PROGRESS_INTERVAL = 200
 
 
@@ -100,20 +104,11 @@ def delete_feed(
     _subscription=Depends(require_feed),
 ) -> Response:
     with request.app.state.session_factory() as session:
-        feed_repository.delete_feed(session, _subscription.user_id, int(external_id))
+        feed_repository.delete_feed(
+            session, _subscription.user_id, _subscription.external_id
+        )
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-# The full backfilled history (every message, unfiltered) for the parser-first
-# miner, which classifies messages itself rather than reading the labeling deck.
-@router.get("/{external_id}/messages/history")
-def message_history(
-    request: Request,
-    subscription=Depends(require_feed),
-) -> dict:
-    with request.app.state.session_factory() as session:
-        return {"messages": read_history(session, subscription)}
 
 
 @router.post("/{external_id}/backfill", status_code=status.HTTP_202_ACCEPTED)
@@ -123,7 +118,7 @@ async def start_backfill(
     payload: BackfillStartIn | None = None,
     subscription=Depends(require_feed),
 ) -> dict:
-    channel_id = int(external_id)
+    channel_id = subscription.external_id
     mode = payload.mode if payload else BackfillMode.RESUME
     depth = payload.depth if payload else None
 
@@ -143,12 +138,14 @@ def cancel_backfill(
     external_id: str,
     subscription=Depends(require_feed),
 ) -> Response:
-    request.app.state.backfill_jobs.cancel(subscription.user_id, int(external_id))
+    request.app.state.backfill_jobs.cancel(
+        subscription.user_id, subscription.external_id
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _deletion_rescan_job_key(user_id, external_id: int) -> str:
-    return f"{user_id}:{external_id}:deletion-rescan"
+    return job_key(user_id, external_id, "deletion-rescan")
 
 
 def _require_deletion_rescan_ready(feed) -> None:
@@ -243,26 +240,24 @@ async def start_deletion_rescan(
     external_id: str,
     subscription=Depends(require_feed),
 ) -> dict:
-    channel_id = int(external_id)
+    channel_id = subscription.external_id
 
     with request.app.state.session_factory() as session:
         _require_deletion_rescan_ready(subscription)
         source = _require_connected_source(request, session, subscription.user_id)
 
     key = _deletion_rescan_job_key(subscription.user_id, channel_id)
-    try:
-        request.app.state.jobs.start(
-            key,
-            lambda publisher: _run_deletion_rescan_job(
-                publisher,
-                source,
-                subscription.user_id,
-                channel_id,
-                request.app.state.session_factory,
-            ),
-        )
-    except JobAlreadyRunningError as error:
-        raise ApiError(409, "JOB_ALREADY_RUNNING", "Job is already running") from error
+    start_job_or_409(
+        request.app.state.jobs,
+        key,
+        lambda publisher: _run_deletion_rescan_job(
+            publisher,
+            source,
+            subscription.user_id,
+            channel_id,
+            request.app.state.session_factory,
+        ),
+    )
     return {"jobId": key}
 
 
@@ -272,9 +267,7 @@ def deletion_rescan_progress(
     external_id: str,
     subscription=Depends(require_feed),
 ):
-    key = _deletion_rescan_job_key(subscription.user_id, int(external_id))
-    if not request.app.state.jobs.has_job(key):
-        raise ApiError(404, "JOB_NOT_FOUND", "Job not found")
+    key = _deletion_rescan_job_key(subscription.user_id, subscription.external_id)
     return sse_stream(request.app.state.jobs, key)
 
 
@@ -284,7 +277,7 @@ def backfill_progress(
     external_id: str,
     subscription=Depends(require_feed),
 ):
-    channel_id = int(external_id)
+    channel_id = subscription.external_id
     request.app.state.backfill_jobs.mark_inactive_backfilling_failed(
         subscription.user_id, channel_id
     )

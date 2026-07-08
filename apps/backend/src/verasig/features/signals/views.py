@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from verasig.domain.account import Plan
+from verasig.domain.feed import REVIEWED_STATUSES
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
@@ -15,18 +16,16 @@ from verasig.features.feeds import (
 )
 from verasig.features.feeds.feed_views import feed_initials, feed_tint
 from verasig.features.signals import (
-    event_repository,
     lifecycle_link_repository,
     outcome_repository,
 )
 from verasig.features.signals.fold import fold
-from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_short, format_time
 
 OBSERVER_SIGNAL_LIMIT = 200
-SIGNAL_FEED_STATUSES = {"verified", "analyzed"}
+SIGNAL_FEED_STATUSES = REVIEWED_STATUSES
 
 
 def present_signals(
@@ -104,29 +103,16 @@ def _project_user_signals(
 
 def _project_channel(session: Session, user_id: UUID, feed, result) -> list[dict]:
     channel_id = feed.external_id
-    materialize_missing_signal_outcomes(session, user_id, channel_id)
-    session.flush()
     messages = message_repository.read_messages(session, user_id, channel_id)
-    events = event_repository.read_signal_events(session, user_id, channel_id)
-    signals = outcome_repository.read_extracted_signals(session, channel_id, user_id)
+    signals = outcome_repository.read_signals(session, channel_id, user_id)
     manual_links = {
         link.external_message_id: link.root_signal_id
         for link in lifecycle_link_repository.read_links(session, user_id, channel_id)
     }
-    folded = fold(signals, events, messages, manual_links=manual_links)
+    folded = fold(signals, messages, manual_links=manual_links)
     message_by_id = {message.message_id: message for message in messages}
-    events_by_id = {event.id: event for event in events}
-    event_message_ids = {event.id: event.message_id for event in events}
-    event_text_by_signal_id = {
-        signal.id: events_by_id[signal.event_id].candidate_text
-        for signal in signals
-        if signal.event_id in events_by_id
-    }
-    signal_message_ids = {
-        signal.id: event_message_ids[signal.event_id]
-        for signal in signals
-        if signal.event_id in event_message_ids
-    }
+    event_text_by_signal_id = {signal.id: signal.candidate_text for signal in signals}
+    signal_message_ids = {signal.id: signal.message_id for signal in signals}
     outcome_by_signal_id = _outcomes_by_signal_id(result)
     deleted_message_ids = _deleted_message_ids(session, user_id, channel_id)
     return [

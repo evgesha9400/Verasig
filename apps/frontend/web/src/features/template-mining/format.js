@@ -61,6 +61,12 @@ export function formatMessageDate(date) {
   return parsed.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+// The audit review ranks rows within a page by whichever accepted family
+// covers more messages, ties broken by confidence.
+export function byCoverageThenConfidence(coverageOf, confidenceOf) {
+  return (a, b) => coverageOf(b) - coverageOf(a) || confidenceOf(b) - confidenceOf(a)
+}
+
 // Comparator: newest message first. Two parseable dates → later timestamp leads; a
 // dated item leads an undated one; two undated items hold their input order (stable,
 // so a coverage/confidence tiebreak downstream still decides dateless rows).

@@ -9,15 +9,8 @@ from verasig.domain.deletion import (
     DeletionConfidence,
     DeletionMethod,
 )
-from verasig.domain.event import MaterializationPath, RawSignalEvent
 from verasig.domain.message import RawTelegramMessage
-from verasig.domain.signal import (
-    EntryType,
-    ExtractedSignal,
-    ExtractionMethod,
-    Side,
-    UnrecognizedSignal,
-)
+from verasig.domain.signal import EntryType, Side, Signal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.provider_scores.hygiene import (
     ACTIVE_USER_PROXY_ANCHOR,
@@ -41,14 +34,15 @@ def _uuid(suffix: int) -> UUID:
     return UUID(f"00000000-0000-0000-0000-{suffix:012d}")
 
 
-def _event(suffix: int, message_id: int) -> RawSignalEvent:
-    return RawSignalEvent(
+def _event(suffix: int, message_id: int) -> Signal:
+    return Signal(
         id=_uuid(suffix),
         channel_id=7,
         message_id=message_id,
         candidate_text="BTC long",
-        materialized_by=MaterializationPath.SEED_HEURISTIC,
-        created_at=_BASE,
+        symbol="BTC",
+        side=Side.LONG,
+        extracted_at=_BASE,
     )
 
 
@@ -117,11 +111,12 @@ def _signal(
     entry_low: str | None = None,
     stop_loss: str | None = None,
     take_profits: list[str] | None = None,
-) -> ExtractedSignal:
-    return ExtractedSignal(
+) -> Signal:
+    return Signal(
         id=_uuid(suffix),
-        event_id=_uuid(suffix + 100),
         channel_id=7,
+        message_id=suffix,
+        candidate_text="BTC long",
         symbol="BTC",
         side=Side.LONG,
         entry_type=entry_type,
@@ -129,16 +124,6 @@ def _signal(
         stop_loss=stop_loss,
         take_profits=[] if take_profits is None else take_profits,
         extracted_at=_BASE,
-    )
-
-
-def _unrecognized(suffix: int) -> UnrecognizedSignal:
-    return UnrecognizedSignal(
-        id=_uuid(suffix),
-        event_id=_uuid(suffix + 200),
-        reason="no_match",
-        attempted_methods=[ExtractionMethod.DETERMINISTIC],
-        created_at=_BASE,
     )
 
 
@@ -220,13 +205,11 @@ def test_completeness_excludes_empty_signal_denominator():
     assert measurement.note == "completeness: not measured — no extracted signals"
 
 
-def test_parser_confidence_measures_deterministic_share_of_all_candidates():
-    deterministic = _signal(20)
-    fallback = _signal(21)
-    fallback.extraction_method = ExtractionMethod.LLM_FALLBACK
+def test_parser_confidence_measures_recognized_share_of_all_candidates():
+    # recognition rate = extracted signals / (extracted + missed events).
     measurement = measure_parser_confidence(
-        signals=[deterministic, fallback],
-        unrecognized=[_unrecognized(22)],
+        signals=[_signal(20)],
+        missed_event_ids=[_uuid(21), _uuid(22)],
     )
 
     assert isinstance(measurement, HygieneMeasurement)
@@ -235,27 +218,27 @@ def test_parser_confidence_measures_deterministic_share_of_all_candidates():
     assert measurement.normalized == pytest.approx(1 / 3)
     assert measurement.evidence_refs == [
         "signal:00000000-0000-0000-0000-000000000020",
-        "signal:00000000-0000-0000-0000-000000000021",
-        "unrecognized:00000000-0000-0000-0000-000000000022",
+        "event:00000000-0000-0000-0000-000000000021",
+        "event:00000000-0000-0000-0000-000000000022",
     ]
 
 
-def test_parser_confidence_keeps_zero_deterministic_as_real_measurement():
-    fallback = _signal(23)
-    fallback.extraction_method = ExtractionMethod.LLM_FALLBACK
+def test_parser_confidence_keeps_zero_recognized_as_real_measurement():
+    # A feed whose every candidate is a miss scores 0 — a real measurement, not
+    # an exclusion.
     measurement = measure_parser_confidence(
-        signals=[fallback],
-        unrecognized=[_unrecognized(24)],
+        signals=[],
+        missed_event_ids=[_uuid(23)],
     )
 
     assert isinstance(measurement, HygieneMeasurement)
     assert measurement.raw_value == 0.0
     assert measurement.normalized == 0.0
-    assert measurement.evidence_refs
+    assert measurement.evidence_refs == ["event:00000000-0000-0000-0000-000000000023"]
 
 
 def test_parser_confidence_excludes_empty_candidate_denominator():
-    measurement = measure_parser_confidence(signals=[], unrecognized=[])
+    measurement = measure_parser_confidence(signals=[], missed_event_ids=[])
 
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "parser_confidence"

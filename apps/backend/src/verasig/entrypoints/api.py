@@ -9,9 +9,9 @@ from verasig.features.accounts import auth_routes, user_routes
 from verasig.features.exchanges import routes as exchange_routes
 from verasig.features.feeds import routes as feed_routes
 from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
+from verasig.features.mining import mine_routes, mining_routes
 from verasig.features.parser_overlay import routes as parser_overlay_routes
 from verasig.features.risk import routes as risk_routes
-from verasig.features.rules import mine_routes, mining_routes
 from verasig.features.signals import routes as signal_routes
 from verasig.features.simulation import routes as simulation_routes
 from verasig.features.sources import routes as source_routes

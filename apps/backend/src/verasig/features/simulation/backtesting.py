@@ -6,11 +6,11 @@ from uuid import UUID
 from sqlalchemy.orm import sessionmaker
 
 from verasig.domain.deletion import DeletedSignalEvidence
-from verasig.domain.event import RawSignalEvent
+from verasig.domain.feed import FeedStatus
 from verasig.domain.market_ports import MarketData
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.risk_config import RiskConfig
-from verasig.domain.signal import ExtractedSignal, UnrecognizedSignal
+from verasig.domain.signal import Signal
 from verasig.domain.simulation import SimOutcome, SimOutcomeKind
 from verasig.features.feeds import (
     deletion_repository,
@@ -20,12 +20,10 @@ from verasig.features.feeds import (
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
 from verasig.features.signals import (
-    event_repository,
     lifecycle_link_repository,
     outcome_repository,
 )
 from verasig.features.signals.fold import fold
-from verasig.features.signals.materialization import materialize_missing_signal_outcomes
 from verasig.features.simulation import repository as backtest_repository
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
 
@@ -35,9 +33,7 @@ class BacktestInputs:
     channel: object
     messages: list[RawTelegramMessage]
     message_count: int
-    events: list[RawSignalEvent]
-    signals: list[ExtractedSignal]
-    unrecognized: list[UnrecognizedSignal]
+    signals: list[Signal]
     deletions: list[DeletedSignalEvidence]
     folded_signals: list
 
@@ -69,17 +65,9 @@ def load_folded_signals(
     session_factory: sessionmaker, user_id: UUID, channel_id: int
 ) -> BacktestInputs:
     with session_factory() as session:
-        materialize_missing_signal_outcomes(session, user_id, channel_id)
-        session.commit()
         channel = feed_repository.read_feed_channel(session, user_id, channel_id)
         messages = message_repository.read_messages(session, user_id, channel_id)
-        events = event_repository.read_signal_events(session, user_id, channel_id)
-        signals = outcome_repository.read_extracted_signals(
-            session, channel_id, user_id
-        )
-        unrecognized = outcome_repository.read_unrecognized_signals(
-            session, channel_id, user_id
-        )
+        signals = outcome_repository.read_signals(session, channel_id, user_id)
         deletions = deletion_repository.read_deletion_evidence(
             session, user_id, channel_id
         )
@@ -96,11 +84,9 @@ def load_folded_signals(
         channel=channel,
         messages=messages,
         message_count=message_count,
-        events=events,
         signals=signals,
-        unrecognized=unrecognized,
         deletions=deletions,
-        folded_signals=fold(signals, events, messages, manual_links=manual_links),
+        folded_signals=fold(signals, messages, manual_links=manual_links),
     )
 
 
@@ -121,13 +107,15 @@ def simulate_outcomes(
 def compose_score(
     inputs: BacktestInputs, outcomes: list[SimOutcome], now: datetime
 ) -> BacktestSummary:
+    # Every signal is an extraction now (no stored "misses"), so the score's
+    # candidate-event input is exactly the signal set, and nothing is missed.
     score, _explanation = build_provider_score(
         channel=inputs.channel,
         messages=inputs.messages,
         message_count=inputs.message_count,
-        events=inputs.events,
+        events=inputs.signals,
         signals=inputs.signals,
-        unrecognized=inputs.unrecognized,
+        missed_event_ids=[],
         deletions=inputs.deletions,
         sim_outcomes=outcomes,
         computed_at=now,
@@ -158,7 +146,7 @@ def persist_result(
             [_outcome_json(outcome) for outcome in summary.outcomes],
             now,
         )
-        feed_repository.set_status(session, user_id, channel_id, "analyzed")
+        feed_repository.set_status(session, user_id, channel_id, FeedStatus.ANALYZED)
         session.commit()
 
 

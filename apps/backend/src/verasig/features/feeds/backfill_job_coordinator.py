@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
+from verasig.domain.feed import FeedStatus
 from verasig.domain.telegram_ports import TelegramSource
 from verasig.features.feeds import (
     backfill_job_repository,
@@ -176,7 +177,7 @@ class BackfillJobCoordinator:
         self, user_id: UUID | None = None, channel_id: int | None = None
     ) -> None:
         with self._session_factory() as session:
-            statement = select(FeedRow).where(FeedRow.status == "backfilling")
+            statement = select(FeedRow).where(FeedRow.status == FeedStatus.BACKFILLING)
             if user_id is not None:
                 statement = statement.where(FeedRow.user_id == user_id)
             if channel_id is not None:
@@ -276,7 +277,9 @@ class BackfillJobCoordinator:
             run = backfill_job_repository.create_run(
                 session, user_id, channel_id, _now(), mode, previous_status
             )
-            feed_repository.set_status(session, user_id, channel_id, "backfilling")
+            feed_repository.set_status(
+                session, user_id, channel_id, FeedStatus.BACKFILLING
+            )
             session.commit()
             return run, previous_status
 
