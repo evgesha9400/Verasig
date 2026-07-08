@@ -121,7 +121,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
       name: 'Observer',
       price: 0,
       blurb: 'Watch before you trust.',
-      feats: ['1 source', '200 signals / mo', 'Manual review only']
+      feats: ['1 source', '200 most recent signals', 'Manual review only']
     },
     {
       id: 'operator',
@@ -487,8 +487,8 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
           </>
         }
       >
-        After Jul 8 your account drops to Observer: 1 source, 200 signals a month, no
-        exchange routing. Your sources, labels and backtest history are kept. You can
+        After Jul 8 your account drops to Observer: 1 source, 200 most recent signals,
+        no exchange routing. Your sources, labels and backtest history are kept. You can
         resume any time before then.
       </Dialog>
     </div>

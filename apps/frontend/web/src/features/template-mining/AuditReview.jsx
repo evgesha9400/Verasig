@@ -10,6 +10,8 @@ import {
   Tabs
 } from '@verasig/design-system'
 import { Pager } from '../../shared/components/Pager.jsx'
+import { PlanLimitNotice } from '../../shared/components/PlanLimitNotice.jsx'
+import { signalLimitFor } from '../../domain/plan/planLimits.js'
 import {
   INTENT_LABEL,
   byCoverageThenConfidence,
@@ -274,6 +276,8 @@ export function AuditReview({
   hasAccepted,
   loading = false,
   error = null,
+  plan,
+  onUpgrade,
   onFinish,
   onKeepVerified
 }) {
@@ -354,14 +358,23 @@ export function AuditReview({
   const templateEnabled = activeTab.templated && templates.length > 0
   const effectiveTemplate = templateEnabled ? templateId : 'all'
 
+  // Observer cap: only the N most-recent parsed signals are the observer's — the
+  // same value limit the Signals page enforces. parsedRows is already date-desc,
+  // so slice the head. Other buckets are not "signals" and stay uncapped.
+  const signalLimit = signalLimitFor(plan)
+  const parsedTotal = tab === 'parsed' ? activeRows.length : 0
+  const limitReached =
+    tab === 'parsed' && signalLimit != null && parsedTotal > signalLimit
+  const visibleRows = limitReached ? activeRows.slice(0, signalLimit) : activeRows
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return activeRows.filter(
+    return visibleRows.filter(
       (row) =>
         (!needle || row.haystack.includes(needle)) &&
         (effectiveTemplate === 'all' || row.templateId === effectiveTemplate)
     )
-  }, [activeRows, query, effectiveTemplate])
+  }, [visibleRows, query, effectiveTemplate])
 
   // Any filter change returns the list to the first page.
   useEffect(() => {
@@ -470,6 +483,15 @@ export function AuditReview({
           onChange={(event) => toggleAll(event.target.checked)}
         />
       </div>
+
+      {/* Parsed-tab only: the observer's most-recent-N signal cap. */}
+      <PlanLimitNotice
+        shown={limitReached}
+        total={parsedTotal}
+        limit={signalLimit}
+        plan={plan}
+        onUpgrade={onUpgrade}
+      />
 
       {loading ? (
         <Loader variant="bar" size="sm" title="Refreshing the audit…" />

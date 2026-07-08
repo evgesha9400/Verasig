@@ -407,6 +407,8 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onKeepVerified={(acceptedTemplateKeys) =>
             stopAfterVerify(acceptedTemplateKeys)
           }
+          plan={user.plan}
+          onUpgrade={openSettings}
         />
       )
     } else if (
