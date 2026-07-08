@@ -9,6 +9,7 @@ from verasig.domain.feed import REVIEWED_STATUSES
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
+from verasig.features.accounts.plans import PLAN_LIMITS
 from verasig.features.feeds import (
     deletion_repository,
     feed_repository,
@@ -24,8 +25,12 @@ from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_short, format_time
 
-OBSERVER_SIGNAL_LIMIT = 200
 SIGNAL_FEED_STATUSES = REVIEWED_STATUSES
+
+
+def signal_limit_for(plan: Plan) -> int | None:
+    """The plan's cap on signals shown, or None when the plan is unlimited."""
+    return PLAN_LIMITS[plan].signals
 
 
 def present_signals(
@@ -38,14 +43,18 @@ def present_signals(
     signals = _project_user_signals(session, user_id, feed_id)
     if status is not None:
         signals = [signal for signal in signals if signal["status"] == status]
-    # newest first, so the observer truncation below keeps the most recent signals
+    # newest first, so the truncation below keeps the most recent signals
     signals.sort(key=lambda signal: signal["at"], reverse=True)
-    limit_reached = plan is Plan.OBSERVER and len(signals) > OBSERVER_SIGNAL_LIMIT
+    total = len(signals)
+    limit = signal_limit_for(plan)
+    limit_reached = limit is not None and total > limit
     if limit_reached:
-        signals = signals[:OBSERVER_SIGNAL_LIMIT]
+        signals = signals[:limit]
     return {
         "signals": signals,
         "orphanMods": [],
+        "total": total,
+        "limit": limit,
         "limitReached": limit_reached,
     }
 
