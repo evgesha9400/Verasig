@@ -5,6 +5,7 @@ import {
   Checkbox,
   Icon,
   Input,
+  Loader,
   Select,
   Tabs
 } from '@verasig/design-system'
@@ -470,7 +471,9 @@ export function AuditReview({
         />
       </div>
 
-      {pageRows.length === 0 ? (
+      {loading ? (
+        <Loader variant="bar" size="sm" title="Refreshing the audit…" />
+      ) : pageRows.length === 0 ? (
         <div className="vrs-empty vrs-empty--sm">
           <div className="vrs-empty__note">No results match your filters.</div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@verasig/design-system'
+import { Button, Loader } from '@verasig/design-system'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { MineView } from './MineView.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
@@ -344,9 +344,7 @@ export function TemplateMiningPage({
             </Button>
           </div>
         ) : awaitingResume ? (
-          <div className="vrs-empty vrs-empty--sm">
-            <div className="vrs-empty__note">Loading saved results…</div>
-          </div>
+          <Loader variant="dot" size="sm" title="Loading saved results…" />
         ) : canMine ? (
           <MineView
             key={mineAttempt}
@@ -367,11 +365,7 @@ export function TemplateMiningPage({
 
   return (
     <div className="vrs-page vrs-tm">
-      {step === 'mine' && (
-        <div className="vrs-empty vrs-empty--sm">
-          <div className="vrs-empty__note">Opening review…</div>
-        </div>
-      )}
+      {step === 'mine' && <Loader variant="dot" size="sm" title="Opening review…" />}
 
       {step === 'review' && (
         <>

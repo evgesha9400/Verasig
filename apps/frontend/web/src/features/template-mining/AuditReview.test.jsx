@@ -193,6 +193,47 @@ describe('AuditReview', () => {
     expect(screen.getByText(/No results match/i)).toBeTruthy()
   })
 
+  it('shows the loader (not the empty state) while the audit is loading', () => {
+    // An empty audit + loading=true must read as "refreshing", never "no results".
+    render(
+      <AuditReview
+        audit={{
+          parsedSignals: [],
+          ambiguousCandidates: [],
+          rejectedCandidates: [],
+          rareTemplates: [],
+          potentialMisses: []
+        }}
+        messages={[]}
+        templates={RULES}
+        hasAccepted={true}
+        loading={true}
+      />
+    )
+    expect(screen.getByText('Refreshing the audit…')).toBeTruthy()
+    expect(screen.queryByText(/No results match/i)).toBeNull()
+  })
+
+  it('shows the empty state (not the loader) once loading finishes with no rows', () => {
+    render(
+      <AuditReview
+        audit={{
+          parsedSignals: [],
+          ambiguousCandidates: [],
+          rejectedCandidates: [],
+          rareTemplates: [],
+          potentialMisses: []
+        }}
+        messages={[]}
+        templates={RULES}
+        hasAccepted={true}
+        loading={false}
+      />
+    )
+    expect(screen.getByText(/No results match/i)).toBeTruthy()
+    expect(screen.queryByText('Refreshing the audit…')).toBeNull()
+  })
+
   it('labels ambiguous price-geometry issues and highlights the bad field', async () => {
     const user = userEvent.setup()
     const { container } = renderReview()

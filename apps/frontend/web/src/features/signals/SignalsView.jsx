@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Select, Tabs, Badge, Button, Icon, Pill } from '@verasig/design-system'
+import { Select, Tabs, Badge, Button, Icon, Pill, Loader } from '@verasig/design-system'
 import {
   SIGNALS,
   SOURCES,
@@ -229,13 +229,12 @@ export function SignalsView({
   if (backendSignals.loading) {
     return (
       <div className="vrs-page">
-        <div className="vrs-empty vrs-empty--lg">
-          <span className="vrs-dot-pulse" />
-          <div className="vrs-empty__title">Loading signals</div>
-          <div className="vrs-empty__note">
-            Reading extracted signals from verified feeds.
-          </div>
-        </div>
+        <Loader
+          variant="bar"
+          size="lg"
+          title="Loading signals"
+          note="Reading extracted signals from verified feeds."
+        />
       </div>
     )
   }

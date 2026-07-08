@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Loader } from '@verasig/design-system'
 import { StageStrip } from '../../shared/jobs/StageStrip.jsx'
 import { useJobStream } from '../../shared/jobs/useJobStream.js'
 
@@ -58,7 +59,7 @@ export function MineView({ feed, onStart, onStream, onDone, onError }) {
       </div>
 
       <StageStrip stages={MINE_STAGES} stage={stage} />
-      <div className="vrs-bf-track" />
+      <Loader variant="bar" size="md" />
       <div className="vrs-bf-log">{logLine}</div>
     </div>
   )

@@ -668,34 +668,6 @@
   color: var(--text-faint);
   margin-top: 8px;
 }
-.vrs-bf-track {
-  width: 420px;
-  max-width: 90vw;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--surface-raised);
-  overflow: hidden;
-  position: relative;
-}
-.vrs-bf-track::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 38%;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--signal-500), transparent);
-  animation: vrs-bf-sweep 1.5s var(--ease-in-out) infinite;
-}
-@keyframes vrs-bf-sweep {
-  0% {
-    left: -40%;
-  }
-  100% {
-    left: 100%;
-  }
-}
 .vrs-bf-title {
   font-family: var(--font-display);
   font-size: var(--text-2xl);
@@ -1348,26 +1320,6 @@ button.vrs-pipe__step:active {
   color: var(--text-muted);
   font-size: 0.95em;
 }
-.vrs-dot-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 0 var(--signal-glow);
-  animation: vrs-pulse 1.2s var(--ease-out) infinite;
-}
-@keyframes vrs-pulse {
-  0% {
-    box-shadow: 0 0 0 0 var(--signal-glow);
-  }
-  70% {
-    box-shadow: 0 0 0 7px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
-
 @media (max-width: 760px) {
   .vrs-shell {
     grid-template-columns: 1fr;

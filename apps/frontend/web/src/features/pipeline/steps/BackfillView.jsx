@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
+import { Loader } from '@verasig/design-system'
 import { StageStrip } from '../../../shared/jobs/StageStrip.jsx'
 
 function messageFromError(error) {
@@ -285,7 +286,7 @@ export function BackfillView({
       </div>
 
       <StageStrip stages={CAPTURE_STAGES} stage={stage} />
-      <div className="vrs-bf-track" />
+      <Loader variant="bar" size="md" />
       <div className="vrs-bf-log">{logLine}</div>
 
       <Button
