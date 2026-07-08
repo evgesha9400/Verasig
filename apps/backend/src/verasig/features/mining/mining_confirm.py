@@ -48,7 +48,9 @@ def confirm_mined_signals(
     accepted_template_keys: Sequence[str],
 ) -> MiningConfirmResult:
     accepted = set(accepted_template_keys)
-    groups = _mine_feed(session_factory, user_id, external_id)
+    _messages, groups, _overlay = mine_feed_messages(
+        session_factory, user_id, external_id
+    )
     kept = [group for group in groups if group.template_key in accepted]
     signals = _signals_of(kept, external_id)
     extracted = _replace_feed_signals(session_factory, user_id, external_id, signals)
@@ -78,14 +80,18 @@ def read_confirmed_template_keys(
         )
 
 
-def _mine_feed(
+def mine_feed_messages(
     session_factory: sessionmaker, user_id: UUID, external_id: int
-) -> list[TemplateGroup]:
+) -> tuple[list[ChatMessage], list[TemplateGroup], dict]:
+    """Re-mine a feed's stored messages (byte-identical port, so the
+    ``template_key``s match what the client reviewed). Shared by confirm and the
+    Verify audit — both need the SAME re-mine of the SAME stored history, and the
+    same overlay the mine ran with."""
     with session_factory() as session:
         messages = message_repository.read_messages(session, user_id, external_id)
         overlay = read_overlay(session, user_id)
     chat_messages = [_to_chat_message(message) for message in messages]
-    return mine_template_groups(chat_messages, overlay)
+    return chat_messages, mine_template_groups(chat_messages, overlay), overlay
 
 
 def _to_chat_message(message) -> ChatMessage:

@@ -3,13 +3,13 @@ import { streamJobProgress } from './sse.js'
 
 // Starts the server-side template-mining job for a feed → { jobId }.
 export function startMine(token, feedId) {
-  return post(`/feeds/${feedId}/mine`, token)
+  return post(`/feeds/${feedId}/mining/preview`, token)
 }
 
 // Streams the mine job's staged progress. `onDone(result)` receives
 // { groups, messages }; `onProgress` gets { stage, phase, step, totalSteps, count }.
 export function streamMineProgress(token, feedId, handlers = {}) {
-  return streamJobProgress(token, `/feeds/${feedId}/mine/progress`, handlers)
+  return streamJobProgress(token, `/feeds/${feedId}/mining/preview/progress`, handlers)
 }
 
 // Confirms the accepted templates. The backend re-mines (identical template keys
@@ -23,7 +23,7 @@ export function confirmMining(token, feedId, acceptedTemplateKeys = []) {
 // a verified feed hydrates the Verify audit from this instead of re-mining;
 // rejects with a 404 ApiError when no snapshot is cached (fall back to a live mine).
 export function getMineResult(token, feedId) {
-  return get(`/feeds/${feedId}/mine/result`, token)
+  return get(`/feeds/${feedId}/mining/result`, token)
 }
 
 // Lists the accepted template keys already persisted for a feed →
@@ -31,4 +31,12 @@ export function getMineResult(token, feedId) {
 // verified feed is reopened, so it resumes instead of re-mining from scratch.
 export function getConfirmedMining(token, feedId) {
   return get(`/feeds/${feedId}/mining/confirmed`, token)
+}
+
+// Runs the accepted templates over the feed's full stored history server-side →
+// { parsedSignals, ambiguousCandidates, rejectedCandidates, rareTemplates,
+// potentialMisses } — the same audit shape the browser used to compute
+// client-side from applyAcceptedRules.
+export function getMineAudit(token, feedId, acceptedTemplateKeys = []) {
+  return post(`/feeds/${feedId}/mining/audit`, token, { acceptedTemplateKeys })
 }

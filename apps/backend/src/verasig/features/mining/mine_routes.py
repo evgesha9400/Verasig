@@ -1,4 +1,5 @@
-"""Mine endpoints: run the template miner as a background job with SSE progress.
+"""Mine (preview) endpoints: run the template miner as a background job with SSE
+progress.
 
 Mirrors the shared job pattern (see the backfill/deletion-rescan jobs): POST
 starts a one-shot mining job on `app.state.jobs`; GET streams its staged progress
@@ -6,6 +7,10 @@ and terminal result over SSE. The miner is a pure, deterministic port of the
 frontend template-mining module — this module only loads the feed's messages,
 drives progress, and serializes the mined template families for the browser to
 review. No LLM.
+
+Mounted under the same ``/mining`` prefix as ``mining_routes`` (confirm/confirmed/
+audit): ``POST /mining/preview`` starts the scan, ``GET /mining/preview/progress``
+streams it, ``GET /mining/result`` reads the cached snapshot.
 """
 
 import asyncio
@@ -20,11 +25,8 @@ from verasig.features.mining.mine_result_repository import (
     read_mine_result,
     upsert_mine_result,
 )
-from verasig.features.mining.template_mining import (
-    ChatMessage,
-    mine_template_groups,
-    template_group_to_dict,
-)
+from verasig.features.mining.mining_schemas import MineResultOut
+from verasig.features.mining.template_mining import ChatMessage, mine_template_groups
 from verasig.features.parser_overlay.repository import read_overlay
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
@@ -33,7 +35,7 @@ from verasig.foundation.http.sse import sse_stream, start_job_or_409
 from verasig.foundation.jobs.registry import JobPublisher, job_key
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/feeds/{external_id}")
+router = APIRouter(prefix="/feeds/{external_id}/mining")
 
 # Coarse, ordered stages the UI shows as a progress strip (like backfill's).
 MINE_STAGES = (
@@ -47,28 +49,6 @@ MINE_STAGE_BY_KEY = {
     stage: {"phase": phase, "step": index}
     for index, (stage, phase) in enumerate(MINE_STAGES, start=1)
 }
-
-
-def _to_camel(snake: str) -> str:
-    head, *rest = snake.split("_")
-    return head + "".join(word[:1].upper() + word[1:] for word in rest)
-
-
-# The browser consumes the miner's JS camelCase shape. One exception:
-# intentDistribution's inner keys are a fixed enum read verbatim (new_signal, …),
-# so camelize that key but leave its value's keys untouched.
-_PRESERVE_VALUE_KEYS = {"intent_distribution"}
-
-
-def _camelize(value):
-    if isinstance(value, dict):
-        return {
-            _to_camel(key): inner if key in _PRESERVE_VALUE_KEYS else _camelize(inner)
-            for key, inner in value.items()
-        }
-    if isinstance(value, list):
-        return [_camelize(item) for item in value]
-    return value
 
 
 def mine_job_key(user_id: UUID, channel_id: int) -> str:
@@ -127,15 +107,12 @@ async def _run_mine(
     _publish(publisher, channel_id, "grouping", len(groups))
     # Carry the raw messages too: the browser's verify audit re-runs the parser
     # over the full history (a client-side preview of the server-side confirm).
-    payload = {
-        "groups": [_camelize(template_group_to_dict(group)) for group in groups],
-        "messages": [
-            {"id": message.id, "text": message.text, "date": message.date}
-            for message in messages
-        ],
-    }
+    out = MineResultOut.model_validate(
+        {"groups": groups, "messages": messages}, from_attributes=True
+    )
+    payload = out.model_dump(by_alias=True, mode="json")
     # Cache the snapshot so reopening a verified feed hydrates Verify from it
-    # instead of re-running this scan (see GET /mine/result below).
+    # instead of re-running this scan (see GET /mining/result below).
     with session_factory() as session:
         upsert_mine_result(session, user_id, channel_id, payload)
         session.commit()
@@ -143,7 +120,7 @@ async def _run_mine(
     return payload
 
 
-@router.post("/mine", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/preview", status_code=status.HTTP_202_ACCEPTED)
 async def start_mine(
     request: Request,
     external_id: str,
@@ -164,7 +141,7 @@ async def start_mine(
     return JobOut(job_id=key)
 
 
-@router.get("/mine/progress")
+@router.get("/preview/progress")
 def mine_progress(
     request: Request,
     external_id: str,
@@ -174,7 +151,7 @@ def mine_progress(
     return sse_stream(request.app.state.jobs, key)
 
 
-@router.get("/mine/result")
+@router.get("/result")
 def mine_result(
     request: Request,
     external_id: str,
