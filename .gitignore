@@ -35,6 +35,8 @@ IDEAS.md
 
 # Local tool state
 .playwright-mcp/
+.superpowers/
+/*.png
 graphify-out/
 graphify-out/.graphify_python
 graphify-out/.graphify_*.json
