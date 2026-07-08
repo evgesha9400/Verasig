@@ -13,14 +13,14 @@ class PlanSourceLimitExceeded(Exception):
 @dataclass(frozen=True)
 class PlanLimits:
     sources: int | None
-    signals_per_month: int | None
+    signals: int | None
     exchanges: int | None
 
 
 PLAN_LIMITS = {
-    Plan.OBSERVER: PlanLimits(sources=1, signals_per_month=200, exchanges=0),
-    Plan.OPERATOR: PlanLimits(sources=10, signals_per_month=None, exchanges=1),
-    Plan.DESK: PlanLimits(sources=None, signals_per_month=None, exchanges=None),
+    Plan.OBSERVER: PlanLimits(sources=1, signals=200, exchanges=0),
+    Plan.OPERATOR: PlanLimits(sources=10, signals=None, exchanges=1),
+    Plan.DESK: PlanLimits(sources=None, signals=None, exchanges=None),
 }
 
 

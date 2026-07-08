@@ -36,6 +36,8 @@ def test_present_signals_projects_lifecycle_outcomes(db_session):
     signal = result["signals"][0]
     assert result["orphanMods"] == []
     assert result["limitReached"] is False
+    assert result["limit"] is None  # operator is unlimited
+    assert result["total"] == len(result["signals"])
     assert signal["id"] == str(_SIGNAL_ID)
     assert signal["feedId"] == "7"
     assert signal["feedName"] == "Pilot"
@@ -131,6 +133,95 @@ def test_present_signals_orders_newest_first(db_session):
     ids = [signal["id"] for signal in result["signals"]]
     assert ids[0] == str(signal_id)  # newest first
     assert str(_SIGNAL_ID) in ids
+
+
+def test_present_signals_caps_observer_and_reports_full_total(db_session):
+    _seed_many(db_session, count=205)
+
+    result = present_signals(db_session, _USER_ID, plan=Plan.OBSERVER)
+
+    assert result["limit"] == 200
+    assert result["total"] == 205  # pre-cap count
+    assert len(result["signals"]) == 200
+    assert result["limitReached"] is True
+
+
+def test_present_signals_under_limit_for_observer(db_session):
+    _seed_many(db_session, count=3)
+
+    result = present_signals(db_session, _USER_ID, plan=Plan.OBSERVER)
+
+    assert result["limit"] == 200
+    assert result["total"] == 3
+    assert result["limitReached"] is False
+
+
+def _seed_many(session, *, count: int) -> None:
+    from datetime import timedelta
+
+    account_repository.insert_account(
+        session,
+        UserAccount(
+            id=_USER_ID,
+            email="user@example.com",
+            password_hash="hash",
+            first_name="Ada",
+            last_name="Lovelace",
+            plan=Plan.OBSERVER,
+            pending_email=None,
+            cancel_at=None,
+            created_at=_BASE,
+        ),
+    )
+    insert_source(session, _USER_ID)
+    feed_repository.create_feed(
+        session,
+        _USER_ID,
+        TelegramChannel(
+            channel_id=7,
+            handle="pilot",
+            title="Pilot",
+            is_private=False,
+            first_seen_at=_BASE,
+        ),
+        _BASE,
+    )
+    messages = []
+    signals = []
+    for index in range(count):
+        at = _BASE + timedelta(minutes=index)
+        messages.append(
+            RawTelegramMessage(
+                channel_id=7,
+                message_id=1000 + index,
+                text="BTC long entry",
+                posted_at=at,
+                captured_at=at,
+                reply_to_message_id=None,
+                has_media=False,
+                raw_payload={},
+            )
+        )
+        signals.append(
+            Signal(
+                id=UUID(int=index + 1),
+                channel_id=7,
+                message_id=1000 + index,
+                candidate_text="BTC long entry",
+                symbol="BTCUSDT",
+                side=Side.LONG,
+                entry_type=EntryType.LIMIT_SINGLE,
+                entry_low=Decimal("100"),
+                entry_high=Decimal("100"),
+                stop_loss=Decimal("95"),
+                take_profits=[Decimal("110")],
+                extracted_at=at,
+            )
+        )
+    message_repository.insert_messages(session, _USER_ID, messages)
+    outcome_repository.insert_signals(session, signals, _USER_ID)
+    feed_repository.set_status(session, _USER_ID, 7, "analyzed")
+    session.commit()
 
 
 def _seed(

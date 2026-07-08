@@ -116,6 +116,40 @@ describe('AuditReview', () => {
     expect(screen.queryByText(/SYM1USDT SELL/)).toBeNull()
   })
 
+  it('caps the observer parsed bucket to 200 and shows the notice', async () => {
+    const many = Array.from({ length: 205 }, (_, idx) =>
+      parsedSignal(idx + 1, 'rule_a')
+    )
+    const messages = many.map((s, idx) => ({
+      id: `m${idx + 1}`,
+      text: `Монета ${s.instrument}`
+    }))
+    const onUpgrade = vi.fn()
+    render(
+      <AuditReview
+        audit={{ ...AUDIT, parsedSignals: many }}
+        messages={messages}
+        templates={RULES}
+        hasAccepted
+        plan="observer"
+        onUpgrade={onUpgrade}
+      />
+    )
+
+    expect(screen.getByText(/200 most recent of 205 detected signals/)).toBeTruthy()
+    // Pager total reflects the capped set, not the full 205.
+    expect(screen.getByText(/1\s*[–-]\s*25 of 200/)).toBeTruthy()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Upgrade' }))
+    expect(onUpgrade).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not cap or show the notice for a paid plan', () => {
+    renderReview({ plan: 'operator' })
+    expect(screen.queryByText(/most recent of/)).toBeNull()
+    expect(screen.getByText(/1\s*[–-]\s*25 of 30/)).toBeTruthy()
+  })
+
   it('search filters across the whole bucket, not just the visible page', async () => {
     const user = userEvent.setup()
     renderReview()

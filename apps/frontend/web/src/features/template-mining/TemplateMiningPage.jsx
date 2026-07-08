@@ -73,6 +73,8 @@ export function TemplateMiningPage({
   onBackToReview,
   onFinish,
   onKeepVerified,
+  plan,
+  onUpgrade,
   decisions: controlledDecisions,
   onDecisionsChange
 }) {
@@ -443,6 +445,8 @@ export function TemplateMiningPage({
             hasAccepted={acceptedGroups.length > 0}
             loading={auditLoading}
             error={auditError}
+            plan={plan}
+            onUpgrade={onUpgrade}
             onFinish={() =>
               onFinish?.(acceptedGroups.map((group) => group.templateKey))
             }
