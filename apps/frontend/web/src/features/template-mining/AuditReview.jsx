@@ -9,7 +9,7 @@ import {
   Select,
   Tabs
 } from '@verasig/design-system'
-import { Pager } from './Pager.jsx'
+import { Pager } from '../../shared/components/Pager.jsx'
 import {
   INTENT_LABEL,
   byCoverageThenConfidence,

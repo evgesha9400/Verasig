@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Dialog, Icon } from '@verasig/design-system'
 import { formatLabel } from './templateLabel.js'
 import { CandidateExample } from './CandidateExample.jsx'
-import { Pager } from './Pager.jsx'
+import { Pager } from '../../shared/components/Pager.jsx'
 import { SignalFieldRow } from './SignalFieldRow.jsx'
 import {
   INTENT_LABEL,

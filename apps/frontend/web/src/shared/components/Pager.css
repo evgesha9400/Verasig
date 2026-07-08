@@ -1,0 +1,19 @@
+/* Verasig — shared list pager. Presentational; used by Verify and Signals. */
+.vrs-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+.vrs-pager__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+/* Dim a pager button at its bound without disabling it natively — it stays
+   focusable (no keyboard focus loss) while the click handler clamps to a no-op. */
+.vrs-pager [aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: default;
+}

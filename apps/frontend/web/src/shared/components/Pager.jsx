@@ -1,6 +1,8 @@
 import { Button, Icon } from '@verasig/design-system'
 
-/* Verasig — Template Mining: shared list pager.
+import './Pager.css'
+
+/* Verasig — shared list pager.
    Presentational — the parent owns the page state and the slice; this renders
    the controls plus a live "X–Y of N" status. Renders nothing when a single
    page covers everything. Boundary buttons use aria-disabled (not native
@@ -11,7 +13,7 @@ export function Pager({ page, pageCount, windowStart, pageSize, total, onPageCha
   const atStart = page === 0
   const atEnd = page >= pageCount - 1
   return (
-    <div className="vrs-tm-pager" role="group" aria-label="Pages">
+    <div className="vrs-pager" role="group" aria-label="Pages">
       <Button
         variant="ghost"
         size="sm"
@@ -22,7 +24,7 @@ export function Pager({ page, pageCount, windowStart, pageSize, total, onPageCha
         Prev
       </Button>
       <span
-        className="vrs-tm-pager__label"
+        className="vrs-pager__label"
         role="status"
         aria-live="polite"
         aria-atomic="true"
