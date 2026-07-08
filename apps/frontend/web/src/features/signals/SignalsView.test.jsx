@@ -98,24 +98,36 @@ function backendBody(overrides = {}) {
   }
 }
 
+function manySignals(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    ...btcSignal,
+    id: `sig-${index + 1}`,
+    time: `12:${String(index).padStart(2, '0')}`
+  }))
+}
+
 function renderView({
   authToken = 'jwt-token',
   onListSignals = vi.fn().mockResolvedValue(backendBody()),
   onLinkSignalModifier = vi.fn().mockResolvedValue({}),
   viewFeeds = feeds,
+  plan = 'operator',
+  onUpgrade = vi.fn(),
   initial
 } = {}) {
-  render(
+  const utils = render(
     <SignalsView
       authToken={authToken}
       feeds={viewFeeds}
       initial={initial}
+      plan={plan}
+      onUpgrade={onUpgrade}
       onListSignals={onListSignals}
       onLinkSignalModifier={onLinkSignalModifier}
       onGoToSources={() => {}}
     />
   )
-  return { onListSignals, onLinkSignalModifier }
+  return { ...utils, onListSignals, onLinkSignalModifier, onUpgrade }
 }
 
 describe('SignalsView', () => {
@@ -217,5 +229,53 @@ describe('SignalsView', () => {
     })
     expect(feedSelect.value).toBe('7')
     expect(await screen.findByText('Closed by author')).toBeTruthy()
+  })
+
+  it('paginates the list at 25 per page and advances on Next', async () => {
+    const onListSignals = vi
+      .fn()
+      .mockResolvedValue(backendBody({ signals: manySignals(30), orphanMods: [] }))
+    const { container } = renderView({ onListSignals })
+
+    await screen.findAllByText('BTC/USDT')
+    const label = () => container.querySelector('.vrs-pager__label').textContent
+
+    expect(container.querySelectorAll('.vrs-sigrow').length).toBe(25)
+    expect(label()).toContain('of 30')
+    expect(label().startsWith('1')).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+
+    expect(container.querySelectorAll('.vrs-sigrow').length).toBe(5)
+    expect(label().startsWith('26')).toBe(true)
+  })
+
+  it('renders the plan-limit notice with the full total when capped', async () => {
+    const onListSignals = vi.fn().mockResolvedValue(
+      backendBody({ signals: manySignals(3), limitReached: true, total: 644, limit: 200 })
+    )
+    renderView({ onListSignals, plan: 'observer' })
+
+    expect(
+      await screen.findByText(/200 most recent of 644 detected signals/)
+    ).toBeTruthy()
+    expect(screen.getByText(/Observer/)).toBeTruthy()
+  })
+
+  it('does not render the plan-limit notice when under the limit', async () => {
+    renderView()
+
+    await screen.findByRole('button', { name: /BTC\/USDT/i })
+    expect(screen.queryByText(/most recent of/)).toBeNull()
+  })
+
+  it('calls onUpgrade when the notice Upgrade action is clicked', async () => {
+    const onListSignals = vi.fn().mockResolvedValue(
+      backendBody({ signals: manySignals(3), limitReached: true, total: 644, limit: 200 })
+    )
+    const { onUpgrade } = renderView({ onListSignals, plan: 'observer' })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upgrade' }))
+    expect(onUpgrade).toHaveBeenCalledTimes(1)
   })
 })

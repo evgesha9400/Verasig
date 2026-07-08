@@ -385,6 +385,8 @@ describe('AppRoutes', () => {
             }
           ],
           orphanMods: [],
+          total: 1,
+          limit: null,
           limitReached: false
         })
     })

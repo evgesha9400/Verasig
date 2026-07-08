@@ -269,6 +269,8 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         authToken={authToken}
         feeds={feeds}
         initial={signalsPreset}
+        plan={user.plan}
+        onUpgrade={openSettings}
         onGoToSources={() => {
           setNav('sources')
           setScreen(telegramConnected ? 'feeds' : 'sources')

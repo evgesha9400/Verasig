@@ -8,6 +8,10 @@ import {
   ORPHAN_LINKED_MOD
 } from '../../domain/demo-data/seed.js'
 import { linkSignalModifier, listSignals } from '../../shared/api/signalsApi.js'
+import { Pager } from '../../shared/components/Pager.jsx'
+import { PlanLimitNotice } from '../../shared/components/PlanLimitNotice.jsx'
+
+const PAGE_SIZE = 25
 
 /* Verasig prototype — Signals page: extracted output of analyzed feeds, filterable by source & feed.
    Signals can carry `mods` — follow-up updates (close / avg down / avg up / move stop / cancel)
@@ -19,6 +23,8 @@ export function SignalsView({
   onGoToSources,
   initial,
   authToken,
+  plan,
+  onUpgrade,
   onListSignals = listSignals,
   onLinkSignalModifier = linkSignalModifier
 }) {
@@ -37,11 +43,14 @@ export function SignalsView({
   const [orphanState, setOrphanState] = useState('open') // open | linked | dismissed
   const [dismissedOrphans, setDismissedOrphans] = useState(() => new Set())
   const [linkingOrphanId, setLinkingOrphanId] = useState(null)
+  const [page, setPage] = useState(0)
   const [backendSignals, setBackendSignals] = useState({
     loading: useBackend,
     error: null,
     signals: [],
     orphanMods: [],
+    total: 0,
+    limit: null,
     limitReached: false
   })
 
@@ -53,6 +62,11 @@ export function SignalsView({
     if (initial.tab != null) setTab(initial.tab)
     setOpenId(null)
   }, [initial])
+
+  // Any filter/tab change returns the list to the first page.
+  useEffect(() => {
+    setPage(0)
+  }, [tab, source, feed])
 
   const signalFeedKey = useMemo(
     () => signalFeeds.map((f) => `${f.id}:${f.status}`).join('|'),
@@ -66,6 +80,8 @@ export function SignalsView({
         error: null,
         signals: [],
         orphanMods: [],
+        total: 0,
+        limit: null,
         limitReached: false
       })
       return undefined
@@ -82,6 +98,8 @@ export function SignalsView({
           error: null,
           signals: body.signals || [],
           orphanMods: body.orphanMods || [],
+          total: body.total ?? (body.signals || []).length,
+          limit: body.limit ?? null,
           limitReached: Boolean(body.limitReached)
         })
       })
@@ -107,6 +125,8 @@ export function SignalsView({
       error: null,
       signals: body.signals || [],
       orphanMods: body.orphanMods || [],
+      total: body.total ?? (body.signals || []).length,
+      limit: body.limit ?? null,
       limitReached: Boolean(body.limitReached)
     })
     return body
@@ -181,6 +201,12 @@ export function SignalsView({
           : tab === 'deleted'
             ? scoped.filter((s) => s.deleted)
             : scoped
+
+  // Client-side pagination — same window math as the Verify review (25/page).
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount - 1)
+  const windowStart = safePage * PAGE_SIZE
+  const pageRows = visible.slice(windowStart, windowStart + PAGE_SIZE)
 
   // Orphan card visibility: pending updates belong to a feed — show while that feed is in scope.
   const orphan = orphanMods.find((item) => {
@@ -389,6 +415,15 @@ export function SignalsView({
         </div>
       )}
 
+      {/* plan cap — global, feed-independent: states the 200-of-N truncation */}
+      <PlanLimitNotice
+        shown={backendSignals.limitReached}
+        total={backendSignals.total}
+        limit={backendSignals.limit}
+        plan={plan}
+        onUpgrade={onUpgrade}
+      />
+
       {/* column header */}
       <div className="vrs-sig-head">
         <span className="vrs-sig-head__sym">Signal</span>
@@ -414,7 +449,7 @@ export function SignalsView({
             </div>
           </div>
         ) : (
-          visible.map((s) => {
+          pageRows.map((s) => {
             const f = displayFeed(s, feedById[s.feedId])
             const open = openId === s.id
             const skipped = s.status === 'skipped' && !s.cancelled
@@ -785,6 +820,15 @@ export function SignalsView({
           })
         )}
       </div>
+
+      <Pager
+        page={safePage}
+        pageCount={pageCount}
+        windowStart={windowStart}
+        pageSize={PAGE_SIZE}
+        total={visible.length}
+        onPageChange={setPage}
+      />
     </div>
   )
 }
