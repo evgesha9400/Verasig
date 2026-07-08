@@ -1,30 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@verasig/design-system'
-import {
-  FEED_MESSAGES,
-  mineTemplateGroups,
-  compileRuleFromTemplate,
-  applyAcceptedRules
-} from '../../domain/template-mining/index.js'
 import { MiningMetrics } from './MiningMetrics.jsx'
 import { MineView } from './MineView.jsx'
 import { TemplateGroupCard } from './TemplateGroupCard.jsx'
 import { TemplateExamplesDialog } from './TemplateExamplesDialog.jsx'
 import { OverlayManager } from './OverlayManager.jsx'
 import { AuditReview } from './AuditReview.jsx'
+import { describeAcceptedTemplates } from './templateLabel.js'
 import { formatPercent } from './format.js'
 import './template-mining.css'
 
 /* Verasig — Parser-first Template Mining.
    Mine, Review and Verify are top-level pipeline steps driven by the `step` prop
-   and the shared top-level stepper. When authenticated, mining runs server-side
-   (MineView streams the job); offline it falls back to the bundled demo history
-   so the prototype still runs. This component owns the shared mining state
-   (result, decisions) and renders the view for the current step; advancing calls
-   up to the parent. Rules and audit recompute reactively, so revisiting
-   Review/Verify is safe. Reopening a verified feed lands on Verify: the page
-   re-mines, then reseeds the accepted templates recovered from the backend
-   (onLoadConfirmed) so the audit repopulates instead of bouncing to Review. */
+   and the shared top-level stepper. Mining and the Verify audit both run
+   server-side: MineView streams the mine job, and the audit is fetched fresh
+   from the backend (onLoadAudit) whenever the accepted-template set changes.
+   This component owns the shared mining state (result, decisions, fetched
+   audit) and renders the view for the current step; advancing calls up to the
+   parent. Reopening a verified feed lands on Verify: the page re-mines, then
+   reseeds the accepted templates recovered from the backend (onLoadConfirmed)
+   so the audit repopulates instead of bouncing to Review. */
 
 const EMPTY_AUDIT = {
   parsedSignals: [],
@@ -33,6 +28,10 @@ const EMPTY_AUDIT = {
   rareTemplates: [],
   potentialMisses: []
 }
+
+// A request per keystroke/toggle would hammer the backend; the audit is only
+// ever read a moment after the operator settles on a decision.
+const AUDIT_DEBOUNCE_MS = 300
 
 function TemplateSection({ title, subtitle, groups, action, cardProps }) {
   if (groups.length === 0) return null
@@ -60,12 +59,12 @@ function TemplateSection({ title, subtitle, groups, action, cardProps }) {
 
 export function TemplateMiningPage({
   activeFeed,
-  authToken,
   step = 'mine',
   onStartMine,
   onStreamMine,
   onLoadConfirmed,
   onLoadMineResult,
+  onLoadAudit,
   fireToast,
   overlay = {},
   onSaveOverlay,
@@ -85,14 +84,18 @@ export function TemplateMiningPage({
   const [restoring, setRestoring] = useState(false)
   const [mineError, setMineError] = useState(null) // set when the mine job fails
   const [mineAttempt, setMineAttempt] = useState(0) // bumped to retry (remounts MineView)
+  const [audit, setAudit] = useState(null) // fetched server audit, or null before first fetch
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState(null)
   const seededFeedRef = useRef(null)
+  const auditRequestRef = useRef(0)
 
   // Controlled-with-fallback: the parent may own decisions; otherwise local.
   const decisions = controlledDecisions ?? internalDecisions
   const setDecisions = onDecisionsChange ?? setInternalDecisions
 
-  // Server-side mining when signed in against a real feed; demo history offline.
-  const authenticated = Boolean(authToken && activeFeed?.id && onStartMine)
+  // Mining always runs server-side, against a real, authenticated feed.
+  const canMine = Boolean(activeFeed?.id && onStartMine)
 
   const groups = useMemo(() => result?.groups ?? [], [result])
 
@@ -122,16 +125,50 @@ export function TemplateMiningPage({
     () => acceptedGroups.map((group) => group.templateKey).join('|'),
     [acceptedGroups]
   )
-  const rules = useMemo(
-    () => acceptedGroups.map((group) => compileRuleFromTemplate(group, overlay)),
+  // Display-only: labels the server audit's parserRuleId back to the family
+  // that produced it (Template filter + per-row badge in AuditReview).
+  const templates = useMemo(
+    () => describeAcceptedTemplates(acceptedGroups),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [acceptedTemplateKeys, overlay]
+    [acceptedTemplateKeys]
   )
 
-  const audit = useMemo(() => {
-    if (!result || rules.length === 0) return null
-    return applyAcceptedRules(result.messages, rules, overlay)
-  }, [result, rules, overlay])
+  // The Verify audit is server-computed; fetch it whenever the accepted set
+  // changes while it's needed (Review's coverage metric, and the Verify
+  // screen), debounced so a run of toggles doesn't fire a request each.
+  const auditNeeded = (step === 'review' || step === 'verify') && Boolean(result)
+  useEffect(() => {
+    if (!auditNeeded) return
+    if (!acceptedTemplateKeys) {
+      setAudit(EMPTY_AUDIT)
+      setAuditLoading(false)
+      setAuditError(null)
+      return
+    }
+    if (!onLoadAudit || !activeFeed?.id) return
+    setAuditLoading(true)
+    setAuditError(null)
+    const requestId = ++auditRequestRef.current
+    const timer = setTimeout(() => {
+      onLoadAudit(
+        activeFeed.id,
+        acceptedGroups.map((group) => group.templateKey)
+      )
+        .then((data) => {
+          if (requestId !== auditRequestRef.current) return
+          setAudit(data ?? EMPTY_AUDIT)
+        })
+        .catch((error) => {
+          if (requestId !== auditRequestRef.current) return
+          setAuditError(error?.message || 'Try again in a moment.')
+        })
+        .finally(() => {
+          if (requestId === auditRequestRef.current) setAuditLoading(false)
+        })
+    }, AUDIT_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditNeeded, acceptedTemplateKeys, activeFeed?.id, onLoadAudit])
 
   const metrics = useMemo(() => {
     if (!result) return null
@@ -149,22 +186,6 @@ export function TemplateMiningPage({
     }
   }, [result, groups, audit, acceptedGroups, groupsByStatus])
 
-  function finishMining(minedMessages) {
-    if (!minedMessages || minedMessages.length === 0) {
-      fireToast?.('pending', 'Nothing to mine', 'This source has no messages yet.')
-      return
-    }
-    const mined = mineTemplateGroups(minedMessages, overlay)
-    setResult({ groups: mined, messages: minedMessages })
-    setDecisions({})
-    setExamplesFor(null)
-    fireToast?.(
-      'verified',
-      'Template mining complete',
-      `${mined.length} templates from ${minedMessages.length} messages.`
-    )
-  }
-
   // Navigation callbacks read through a ref so effects don't refire on the
   // parent re-creating them each render.
   const navRef = useRef({})
@@ -178,16 +199,11 @@ export function TemplateMiningPage({
     setConfirmedKeys(null)
     setResumeChecked(false)
     setMineError(null)
+    setAudit(null)
+    setAuditLoading(false)
+    setAuditError(null)
     seededFeedRef.current = null
   }, [activeFeed?.id])
-
-  // Offline/demo (no backend): mine the bundled history once per feed. The
-  // authenticated path is driven by MineView (server job) instead.
-  useEffect(() => {
-    if (authenticated) return
-    finishMining(FEED_MESSAGES)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, activeFeed?.id])
 
   // Advance to Review as soon as mining lands (only while on the Mine screen).
   useEffect(() => {
@@ -199,7 +215,7 @@ export function TemplateMiningPage({
   // MineView entirely; a miss (404 — feed verified before the cache existed) marks
   // the check done and falls through to a live mine. Once per feed.
   useEffect(() => {
-    if (!authenticated || !onLoadMineResult) return
+    if (!onLoadMineResult) return
     if (step !== 'verify' || result || resumeChecked) return
     let cancelled = false
     onLoadMineResult(activeFeed.id)
@@ -214,13 +230,13 @@ export function TemplateMiningPage({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, step, activeFeed?.id])
+  }, [step, activeFeed?.id])
 
   // Reopening a verified feed lands here with no decisions: fetch the accepted
   // template keys the backend persisted, so the fresh mine can be reseeded. Fetched
   // once per feed (confirmedKeys flips off null); fail-open to none on error.
   useEffect(() => {
-    if (!authenticated || !onLoadConfirmed) return
+    if (!onLoadConfirmed) return
     if (step !== 'verify' || confirmedKeys !== null) return
     if (Object.keys(decisions).length > 0) return
     setRestoring(true)
@@ -228,7 +244,7 @@ export function TemplateMiningPage({
       .then((body) => setConfirmedKeys(body?.acceptedTemplateKeys ?? []))
       .catch(() => setConfirmedKeys([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticated, step, activeFeed?.id])
+  }, [step, activeFeed?.id])
 
   // Once the fresh mine and the confirmed keys are both in, reseed each confirmed
   // key the mine still produces as accepted — once per feed — then release the
@@ -263,6 +279,8 @@ export function TemplateMiningPage({
     })
     setDecisions({})
     setExamplesFor(null)
+    setAudit(null)
+    setAuditError(null)
   }
 
   // A failed mine keeps the operator on the loader with an explicit error and a
@@ -309,13 +327,13 @@ export function TemplateMiningPage({
     ? groups.find((group) => group.templateKey === examplesFor)
     : null
 
-  // Until mining lands there is nothing to review: show the loader (server job
-  // when authenticated, a brief note offline while the demo history mines).
+  // Until mining lands there is nothing to review: show the loader (the
+  // server mine job, or a wait note while a cache lookup / feed is pending).
   if (!result) {
     // Verify-resume checks the cache first; hold the loader (don't mount MineView)
     // until that lookup resolves, so a cache hit never kicks off a needless scan.
     const awaitingResume =
-      authenticated && Boolean(onLoadMineResult) && step === 'verify' && !resumeChecked
+      Boolean(onLoadMineResult) && step === 'verify' && !resumeChecked
     return (
       <div className="vrs-page vrs-tm">
         {mineError ? (
@@ -329,7 +347,7 @@ export function TemplateMiningPage({
           <div className="vrs-empty vrs-empty--sm">
             <div className="vrs-empty__note">Loading saved results…</div>
           </div>
-        ) : authenticated ? (
+        ) : canMine ? (
           <MineView
             key={mineAttempt}
             feed={activeFeed}
@@ -340,7 +358,7 @@ export function TemplateMiningPage({
           />
         ) : (
           <div className="vrs-empty vrs-empty--sm">
-            <div className="vrs-empty__note">Mining the connected feed…</div>
+            <div className="vrs-empty__note">Waiting for a connected feed…</div>
           </div>
         )}
       </div>
@@ -427,8 +445,10 @@ export function TemplateMiningPage({
           <AuditReview
             audit={audit || EMPTY_AUDIT}
             messages={result.messages}
-            rules={rules}
+            templates={templates}
             hasAccepted={acceptedGroups.length > 0}
+            loading={auditLoading}
+            error={auditError}
             onFinish={() =>
               onFinish?.(acceptedGroups.map((group) => group.templateKey))
             }

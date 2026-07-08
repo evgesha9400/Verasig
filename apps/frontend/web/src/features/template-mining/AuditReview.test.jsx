@@ -85,7 +85,7 @@ function renderReview(extraProps = {}) {
     <AuditReview
       audit={AUDIT}
       messages={MESSAGES}
-      rules={RULES}
+      templates={RULES}
       hasAccepted={true}
       {...extraProps}
     />
@@ -246,7 +246,7 @@ describe('AuditReview', () => {
       potentialMisses: []
     }
     const { container } = render(
-      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+      <AuditReview audit={audit} messages={[]} templates={RULES} hasAccepted={true} />
     )
     const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
       (node) => node.textContent
@@ -285,7 +285,7 @@ describe('AuditReview', () => {
       potentialMisses: []
     }
     const { container } = render(
-      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+      <AuditReview audit={audit} messages={[]} templates={RULES} hasAccepted={true} />
     )
     const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
       (node) => node.textContent
@@ -343,7 +343,7 @@ describe('AuditReview', () => {
       { id: 'rule_small', name: 'Small', templateKey: 'tpl_small' }
     ]
     const { container } = render(
-      <AuditReview audit={audit} messages={[]} rules={rules} hasAccepted={true} />
+      <AuditReview audit={audit} messages={[]} templates={rules} hasAccepted={true} />
     )
     await user.click(screen.getByRole('tab', { name: /Ambiguous/i }))
     const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
@@ -382,7 +382,12 @@ describe('AuditReview', () => {
       { id: 'new', text: 'newer', date: '2026-06-05T00:00:00Z' }
     ]
     const { container } = render(
-      <AuditReview audit={audit} messages={messages} rules={RULES} hasAccepted={true} />
+      <AuditReview
+        audit={audit}
+        messages={messages}
+        templates={RULES}
+        hasAccepted={true}
+      />
     )
     const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
       (node) => node.textContent
@@ -417,7 +422,12 @@ describe('AuditReview', () => {
     }
     const messages = [{ id: 'm1', text: 'the original', date: '2026-06-01T08:42:00Z' }]
     const { container } = render(
-      <AuditReview audit={audit} messages={messages} rules={RULES} hasAccepted={true} />
+      <AuditReview
+        audit={audit}
+        messages={messages}
+        templates={RULES}
+        hasAccepted={true}
+      />
     )
     await user.click(screen.getByRole('button', { name: /BTCUSDT BUY/ }))
     const date = container.querySelector('.vrs-tm-ex__date')
@@ -444,7 +454,7 @@ describe('AuditReview', () => {
       potentialMisses: []
     }
     const { container } = render(
-      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+      <AuditReview audit={audit} messages={[]} templates={RULES} hasAccepted={true} />
     )
     await user.click(screen.getByRole('tab', { name: /Rejected/i }))
     const texts = [...container.querySelectorAll('.vrs-tm-review__row-text')].map(
@@ -484,7 +494,7 @@ describe('AuditReview', () => {
       potentialMisses: []
     }
     const { container } = render(
-      <AuditReview audit={audit} messages={[]} rules={RULES} hasAccepted={true} />
+      <AuditReview audit={audit} messages={[]} templates={RULES} hasAccepted={true} />
     )
     const rows = [...container.querySelectorAll('.vrs-tm-review__item')]
     const fallbackRow = rows.find((r) => /AAAUSDT/.test(r.textContent))
@@ -494,7 +504,9 @@ describe('AuditReview', () => {
   })
 
   it('prompts to accept a family when nothing is accepted yet', () => {
-    render(<AuditReview audit={AUDIT} messages={[]} rules={[]} hasAccepted={false} />)
+    render(
+      <AuditReview audit={AUDIT} messages={[]} templates={[]} hasAccepted={false} />
+    )
     expect(screen.getByText(/Accept at least one template family/i)).toBeTruthy()
     expect(screen.queryByRole('tab', { name: /Parsed/i })).toBeNull()
   })
@@ -504,7 +516,7 @@ describe('AuditReview', () => {
       <AuditReview
         audit={AUDIT}
         messages={[]}
-        rules={[]}
+        templates={[]}
         hasAccepted={false}
         onFinish={vi.fn()}
         onKeepVerified={vi.fn()}
