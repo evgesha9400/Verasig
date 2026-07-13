@@ -64,3 +64,6 @@ apps/frontend/web/e2e/.auth/
 apps/frontend/web/test-results/
 apps/frontend/web/playwright-report/
 apps/frontend/web/playwright/.cache/
+
+# local NOTES.md processing queue (personal, not versioned)
+NOTES.md
