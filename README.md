@@ -1,6 +1,47 @@
 # Verasig
 
-Proof-first signal provider intelligence.
+**Proof-first intelligence on trading signal providers.**
+
+Verasig reconstructs a signal provider's *real* track record — including the losing
+calls they quietly deleted — so you can judge who to trust before you follow a
+single trade. It captures every signal as it is published, scores each provider on
+manipulation-resistant metrics, and presents the verdict in one dashboard.
+
+## Why Verasig
+
+- **Providers curate their history.** Screenshots are cherry-picked and losing
+  calls get deleted, inflating advertised win rates.
+- **Proof, not promises.** Every score traces back to signals Verasig captured
+  first-hand, not to the provider's marketing.
+- **One dashboard.** Connect a channel, let Verasig capture and score it, and read
+  an evidence-backed verdict — no spreadsheets, no manual tallying.
+
+## What it does
+
+- **Capture** — ingests every message from public *and* private (paid) Telegram
+  channels via a user-account session, so bot-blocking channels are still covered.
+- **Parse** — turns each raw message into a canonical signal (symbol, side, entry,
+  stop, targets, confidence), deterministic rules first with an LLM fallback for
+  new formats.
+- **Score** — rates each provider on PnL, active-user count, drawdown, and
+  deleted-signal behaviour, so a single number is hard to game.
+- **Dashboard** — a provider performance view for subscribers to inspect signals
+  before trusting a source.
+
+## Who it's for
+
+- **Traders** vetting paid signal groups before they subscribe.
+- **Signal sellers** who want an evidence-backed performance page that subscribers
+  can independently verify.
+
+## Status
+
+Observe-only scoring on Bybit (tooling-only stance; live execution stays out of
+scope until observe-only scoring proves its value). First source is Telegram.
+
+---
+
+The rest of this document is the developer guide.
 
 ## Repo structure
 
