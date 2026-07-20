@@ -70,10 +70,6 @@ def _signal_ref(signal: Signal) -> str:
     return f"signal:{_uuid_text(signal.id)}"
 
 
-def _event_id_ref(event_id: UUID) -> str:
-    return f"event:{_uuid_text(event_id)}"
-
-
 def _outcome_ref(outcome: SimOutcome) -> str:
     return f"signal:{_uuid_text(outcome.folded_signal_id)}"
 
@@ -210,15 +206,13 @@ def measure_completeness(signals: list[Signal]) -> Measurement:
 
 
 def measure_parser_confidence(
+    channel_id: int,
     signals: list[Signal],
-    missed_event_ids: list[UUID],
+    missed_message_ids: list[int],
 ) -> Measurement:
-    """Recognition rate: extracted signals over all candidate events. A candidate
-    that yields a signal is recognized; a miss is a candidate event with no
-    extracted signal (recovered by anti-join). The deterministic miner is the
-    only extractor, so recognition rate == extracted / (extracted + missed)."""
+    """Recognition rate from the exact confirmed review's candidate messages."""
     extracted_count = len(signals)
-    missed_count = len(missed_event_ids)
+    missed_count = len(missed_message_ids)
     total = extracted_count + missed_count
     if total == 0:
         return ExcludedMeasurement(
@@ -227,7 +221,9 @@ def measure_parser_confidence(
         )
     value = extracted_count / total
     refs = [_signal_ref(signal) for signal in signals]
-    refs.extend(_event_id_ref(event_id) for event_id in missed_event_ids)
+    refs.extend(
+        f"message:{channel_id}/{message_id}" for message_id in missed_message_ids
+    )
     return HygieneMeasurement(
         name="parser_confidence",
         raw_value=value,

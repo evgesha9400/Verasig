@@ -1,15 +1,17 @@
 """Mining Confirm endpoint end-to-end (ADR 0015, miner-based).
 
-POST /feeds/{id}/mining/confirm re-mines the feed's stored messages, persists the
-accepted template families' signals into the SAME rows the Signals view reads,
-marks the feed verified server-side, and thereby unlocks Check gaps.
+POST /feeds/{id}/mining/confirm validates an exact MiningReview, atomically
+persists its accepted template families' signals into the same rows the Signals
+view reads, and marks the feed verified server-side.
 """
+
+from uuid import uuid4
 
 from conftest import (
     _auth,
     _backfill_to_done,
     _connect_and_subscribe,
-    _mined_keys,
+    _mine_review,
 )
 from conftest import (
     _register_token as _register,
@@ -32,12 +34,13 @@ def _set_feed_status(app, token: str, status: str) -> None:
 def test_confirm_persists_signals_and_marks_verified(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-    keys = _mined_keys(client, app, token)
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
 
     response = client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
     listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
 
@@ -52,12 +55,13 @@ def test_confirm_persists_signals_and_marks_verified(client, app):
 def test_confirmed_signals_are_readable_via_the_signals_view(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-    keys = _mined_keys(client, app, token)
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
 
     client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
     signals = client.get("/signals?feedId=7", headers=_auth(token)).json()["signals"]
 
@@ -69,11 +73,12 @@ def test_confirmed_signals_are_readable_via_the_signals_view(client, app):
 def test_confirm_with_no_accepted_keys_persists_nothing(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
+    review = _mine_review(client, token)
 
     response = client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": []},
     )
     signals = client.get("/signals?feedId=7", headers=_auth(token)).json()["signals"]
 
@@ -86,11 +91,15 @@ def test_confirm_with_no_accepted_keys_persists_nothing(client, app):
 def test_confirm_with_unknown_keys_persists_nothing(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
+    review = _mine_review(client, token)
 
     response = client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": ["tpl_does_not_exist"]},
+        json={
+            "reviewId": review["reviewId"],
+            "acceptedTemplateKeys": ["tpl_does_not_exist"],
+        },
     )
 
     assert response.status_code == 200
@@ -101,17 +110,18 @@ def test_confirm_with_unknown_keys_persists_nothing(client, app):
 def test_reconfirm_same_keys_is_idempotent(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-    keys = _mined_keys(client, app, token)
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
 
     client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
     client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
     signals = client.get("/signals?feedId=7", headers=_auth(token)).json()["signals"]
 
@@ -126,7 +136,7 @@ def test_confirm_conflicts_while_backfilling(client, app):
     response = client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": str(uuid4()), "acceptedTemplateKeys": []},
     )
 
     assert response.status_code == 409
@@ -137,12 +147,13 @@ def test_confirm_unlocks_check_gaps(client, app):
     _backfill_to_done(
         client, app, token, FakeSource(_channel(), _messages(), live_ids={1, 2, 3})
     )
+    review = _mine_review(client, token)
 
     before = client.post("/feeds/7/deletion-rescan", headers=_auth(token))
     client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": []},
     )
     after = client.post("/feeds/7/deletion-rescan", headers=_auth(token))
 
@@ -155,6 +166,45 @@ def test_confirm_on_foreign_feed_is_404(client, app):
     response = client.post(
         "/feeds/999/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": str(uuid4()), "acceptedTemplateKeys": []},
     )
     assert response.status_code == 404
+
+
+def test_stale_confirm_keeps_existing_signals_and_status(client, app):
+    token = _register(client)
+    _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
+    first_review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in first_review["groups"]]
+    confirmed = client.post(
+        "/feeds/7/mining/confirm",
+        headers=_auth(token),
+        json={
+            "reviewId": first_review["reviewId"],
+            "acceptedTemplateKeys": keys,
+        },
+    )
+    assert confirmed.status_code == 200
+    before = client.get("/signals?feedId=7", headers=_auth(token)).json()["signals"]
+
+    stale_review = _mine_review(client, token)
+    client.put(
+        "/parser-overlay",
+        headers=_auth(token),
+        json={"overlay": {"rejectPhrases": ["promo"]}},
+    )
+    response = client.post(
+        "/feeds/7/mining/confirm",
+        headers=_auth(token),
+        json={
+            "reviewId": stale_review["reviewId"],
+            "acceptedTemplateKeys": [],
+        },
+    )
+
+    after = client.get("/signals?feedId=7", headers=_auth(token)).json()["signals"]
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "MINING_REVIEW_STALE"
+    assert after == before
+    assert listed["status"] == "verified"

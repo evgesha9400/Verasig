@@ -136,6 +136,15 @@ def read_feed(session: Session, user_id: UUID, external_id: int) -> FeedRow | No
     return session.get(FeedRow, (user_id, external_id))
 
 
+def lock_feed(session: Session, user_id: UUID, external_id: int) -> FeedRow | None:
+    """Serialize status/projection transitions for one feed."""
+    return session.scalar(
+        select(FeedRow)
+        .where(FeedRow.user_id == user_id, FeedRow.external_id == external_id)
+        .with_for_update()
+    )
+
+
 def _row_to_channel(row: FeedRow) -> TelegramChannel:
     """Translate a stored feed back into the domain `TelegramChannel`."""
     return TelegramChannel(
@@ -211,6 +220,14 @@ def reset_cursor(session: Session, user_id: UUID, external_id: int) -> None:
     row = read_feed(session, user_id, external_id)
     if row is not None:
         row.captured_through_external_message_id = None
+
+
+def advance_capture_generation(
+    session: Session, user_id: UUID, external_id: int
+) -> None:
+    row = read_feed(session, user_id, external_id)
+    if row is not None:
+        row.capture_generation += 1
 
 
 def find_feed(session: Session, user_id: UUID, reference: str | int) -> FeedRow | None:

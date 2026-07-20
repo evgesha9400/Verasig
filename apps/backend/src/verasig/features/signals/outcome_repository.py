@@ -2,7 +2,7 @@
 
 Every persisted `signal` IS an extraction — the miner is the only source, and
 Confirm replaces a feed's whole signal set as one atomic projection (delete +
-insert; see `mining_confirm.confirm_mined_signals`), so there is no
+insert; see `mining_confirm.confirm_review`), so there is no
 upsert-by-message dance and no de-selected family can survive a smaller
 reconfirm.
 """

@@ -21,6 +21,10 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.mining.mining_confirm import confirm_review
+from verasig.features.mining.mining_review import create_review, read_input
+from verasig.features.mining.template_mining import mine_template_groups
+from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.signals import (
     lifecycle_link_repository,
     outcome_repository,
@@ -191,6 +195,49 @@ def test_load_folded_signals_honours_manual_lifecycle_link(session_factory):
     assert len(inputs.folded_signals) == 1
     assert len(inputs.folded_signals[0].timeline) == 2
     assert inputs.folded_signals[0].timeline[1].source_message_id == 2
+
+
+def test_backtest_uses_confirmed_review_misses_for_parser_confidence(session_factory):
+    account = _seed(session_factory)
+    near_miss = RawTelegramMessage(
+        channel_id=7,
+        message_id=2,
+        text="LONG entry 101",
+        posted_at=_BASE + timedelta(seconds=30),
+        captured_at=_BASE + timedelta(seconds=30),
+        has_media=False,
+        raw_payload={},
+    )
+    with session_factory() as session:
+        message_repository.insert_messages(session, account.id, [near_miss])
+        review_input = read_input(session, account.id, 7)
+        groups = mine_template_groups(review_input.messages, review_input.overlay)
+        review = create_review(session, account.id, 7, review_input, groups)
+        session.commit()
+    keys = [group.template_key for group in review.groups]
+    confirm_review(session_factory, account.id, 7, review.review_id, keys)
+
+    inputs = load_folded_signals(session_factory, account.id, 7)
+    score, explanation = build_provider_score(
+        channel=inputs.channel,
+        messages=inputs.messages,
+        message_count=inputs.message_count,
+        events=inputs.signals,
+        signals=inputs.signals,
+        missed_message_ids=inputs.missed_message_ids,
+        deletions=inputs.deletions,
+        computed_at=_NOW,
+    )
+    parser = next(
+        component
+        for component in explanation.breakdown
+        if component.name == "parser_confidence"
+    )
+
+    assert inputs.missed_message_ids == [2]
+    assert parser.raw_value == 0.5
+    assert parser.evidence_refs[-1] == "message:7/2"
+    assert score.score < 1.0
 
 
 def _seed(session_factory) -> UserAccount:

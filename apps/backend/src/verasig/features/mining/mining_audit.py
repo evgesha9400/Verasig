@@ -7,11 +7,10 @@ sorts each one into an audit bucket - a parsed signal, an ambiguous candidate,
 a rejected update/result, a rare unaccepted format, or a partial-evidence
 potential miss. No LLM.
 
-``compute_audit`` is the one pure entry point: given the feed's messages, its
-freshly-mined template groups, and the operator's accepted template keys, it
-returns the same audit shape the browser used to compute client-side. The
-route (``mining_routes.py``) is a thin wrapper that re-mines the feed and
-calls this function.
+``compute_audit`` is the one pure entry point: given the messages and template
+groups captured in a MiningReview plus the operator's accepted template keys,
+it returns the same audit shape the browser used to compute client-side. The
+route (``mining_routes.py``) validates and loads that exact review snapshot.
 """
 
 from __future__ import annotations

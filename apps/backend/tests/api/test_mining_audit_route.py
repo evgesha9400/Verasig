@@ -1,16 +1,17 @@
 """Mining Audit endpoint end-to-end (server-side Verify audit).
 
-POST /feeds/{id}/mining/audit re-mines the feed's stored messages, keeps the
-accepted template families, and runs them over every message — the SAME
-camelCase audit shape the browser used to compute client-side via
-applyAcceptedRules. A pure read: unlike confirm, it never touches feed status
-or persisted signals.
+POST /feeds/{id}/mining/audit validates an exact MiningReview and runs its accepted
+template families over its stored messages. It returns the same camelCase audit
+shape the browser used to compute client-side via applyAcceptedRules. Unlike
+confirm, it never touches feed status or persisted signals.
 """
+
+from uuid import uuid4
 
 from conftest import (
     _auth,
     _backfill_to_done,
-    _mined_keys,
+    _mine_review,
 )
 from conftest import (
     _register_token as _register,
@@ -23,12 +24,13 @@ from fakes import messages as _messages
 def test_audit_returns_the_browsers_camel_case_shape(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-    keys = _mined_keys(client, app, token)
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
 
     response = client.post(
         "/feeds/7/mining/audit",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
 
     assert response.status_code == 200
@@ -62,10 +64,11 @@ def test_audit_with_no_accepted_keys_parses_nothing(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
 
+    review = _mine_review(client, token)
     response = client.post(
         "/feeds/7/mining/audit",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": []},
     )
 
     assert response.status_code == 200
@@ -75,12 +78,13 @@ def test_audit_with_no_accepted_keys_parses_nothing(client, app):
 def test_audit_does_not_persist_or_change_feed_status(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-    keys = _mined_keys(client, app, token)
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
 
     client.post(
         "/feeds/7/mining/audit",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
 
     listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
@@ -94,6 +98,30 @@ def test_audit_on_foreign_feed_is_404(client, app):
     response = client.post(
         "/feeds/999/mining/audit",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": str(uuid4()), "acceptedTemplateKeys": []},
     )
     assert response.status_code == 404
+
+
+def test_audit_rejects_a_review_after_overlay_replacement(client, app):
+    token = _register(client)
+    _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
+    client.put(
+        "/parser-overlay",
+        headers=_auth(token),
+        json={"overlay": {"rejectPhrases": ["promo"]}},
+    )
+
+    response = client.post(
+        "/feeds/7/mining/audit",
+        headers=_auth(token),
+        json={
+            "reviewId": review["reviewId"],
+            "acceptedTemplateKeys": keys,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "MINING_REVIEW_STALE"

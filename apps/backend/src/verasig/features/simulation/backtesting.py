@@ -17,6 +17,7 @@ from verasig.features.feeds import (
     feed_repository,
     message_repository,
 )
+from verasig.features.mining.mining_review import read_confirmed_missed_message_ids
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
 from verasig.features.signals import (
@@ -34,6 +35,7 @@ class BacktestInputs:
     messages: list[RawTelegramMessage]
     message_count: int
     signals: list[Signal]
+    missed_message_ids: list[int]
     deletions: list[DeletedSignalEvidence]
     folded_signals: list
 
@@ -68,6 +70,9 @@ def load_folded_signals(
         channel = feed_repository.read_feed_channel(session, user_id, channel_id)
         messages = message_repository.read_messages(session, user_id, channel_id)
         signals = outcome_repository.read_signals(session, channel_id, user_id)
+        missed_message_ids = read_confirmed_missed_message_ids(
+            session, user_id, channel_id
+        )
         deletions = deletion_repository.read_deletion_evidence(
             session, user_id, channel_id
         )
@@ -85,6 +90,7 @@ def load_folded_signals(
         messages=messages,
         message_count=message_count,
         signals=signals,
+        missed_message_ids=missed_message_ids,
         deletions=deletions,
         folded_signals=fold(signals, messages, manual_links=manual_links),
     )
@@ -107,15 +113,15 @@ def simulate_outcomes(
 def compose_score(
     inputs: BacktestInputs, outcomes: list[SimOutcome], now: datetime
 ) -> BacktestSummary:
-    # Every signal is an extraction now (no stored "misses"), so the score's
-    # candidate-event input is exactly the signal set, and nothing is missed.
+    # Misses come from the exact confirmed review's candidate audit, not from
+    # generic chatter or an always-empty extraction-outcome table.
     score, _explanation = build_provider_score(
         channel=inputs.channel,
         messages=inputs.messages,
         message_count=inputs.message_count,
         events=inputs.signals,
         signals=inputs.signals,
-        missed_event_ids=[],
+        missed_message_ids=inputs.missed_message_ids,
         deletions=inputs.deletions,
         sim_outcomes=outcomes,
         computed_at=now,

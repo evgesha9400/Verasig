@@ -10,7 +10,7 @@ review. No LLM.
 
 Mounted under the same ``/mining`` prefix as ``mining_routes`` (confirm/confirmed/
 audit): ``POST /mining/preview`` starts the scan, ``GET /mining/preview/progress``
-streams it, ``GET /mining/result`` reads the cached snapshot.
+streams it, and ``GET /mining/result`` reads the latest current review.
 """
 
 import asyncio
@@ -19,15 +19,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
 
-from verasig.features.feeds import message_repository
 from verasig.features.feeds.feed_job_progress import publish_logged_progress
-from verasig.features.mining.mine_result_repository import (
-    read_mine_result,
-    upsert_mine_result,
+from verasig.features.mining.mining_review import (
+    MiningReviewNotFoundError,
+    MiningReviewStaleError,
+    create_review,
+    read_input,
+    require_latest_current_review,
 )
 from verasig.features.mining.mining_schemas import MineResultOut
-from verasig.features.mining.template_mining import ChatMessage, mine_template_groups
-from verasig.features.parser_overlay.repository import read_overlay
+from verasig.features.mining.template_mining import mine_template_groups
 from verasig.foundation.http.auth_dependencies import require_feed
 from verasig.foundation.http.errors import ApiError
 from verasig.foundation.http.schemas import JobOut
@@ -53,14 +54,6 @@ MINE_STAGE_BY_KEY = {
 
 def mine_job_key(user_id: UUID, channel_id: int) -> str:
     return job_key(user_id, channel_id, "mine")
-
-
-def _to_chat_message(message) -> ChatMessage:
-    return ChatMessage(
-        id=str(message.message_id),
-        text=message.text or "",
-        date=message.posted_at.isoformat() if message.posted_at else None,
-    )
 
 
 def _progress_payload(stage: str, count: int) -> dict:
@@ -98,24 +91,26 @@ async def _run_mine(
 ) -> dict:
     _publish(publisher, channel_id, "loading", 0)
     with session_factory() as session:
-        raw_messages = message_repository.read_messages(session, user_id, channel_id)
-        overlay = read_overlay(session, user_id)
-    messages = [_to_chat_message(message) for message in raw_messages]
-    _publish(publisher, channel_id, "extracting", len(messages))
+        review_input = read_input(session, user_id, channel_id)
+    _publish(publisher, channel_id, "extracting", len(review_input.messages))
     # CPU-bound pure port — run off the event loop so progress can flush.
-    groups = await asyncio.to_thread(mine_template_groups, messages, overlay)
+    groups = await asyncio.to_thread(
+        mine_template_groups, review_input.messages, review_input.overlay
+    )
     _publish(publisher, channel_id, "grouping", len(groups))
-    # Carry the raw messages too: the browser's verify audit re-runs the parser
-    # over the full history (a client-side preview of the server-side confirm).
+    with session_factory() as session:
+        review = create_review(session, user_id, channel_id, review_input, groups)
+        session.commit()
     out = MineResultOut.model_validate(
-        {"groups": groups, "messages": messages}, from_attributes=True
+        {
+            "review_id": review.review_id,
+            "input_revision": review.input_revision,
+            "groups": review.groups,
+            "messages": review.messages,
+        },
+        from_attributes=True,
     )
     payload = out.model_dump(by_alias=True, mode="json")
-    # Cache the snapshot so reopening a verified feed hydrates Verify from it
-    # instead of re-running this scan (see GET /mining/result below).
-    with session_factory() as session:
-        upsert_mine_result(session, user_id, channel_id, payload)
-        session.commit()
     _publish(publisher, channel_id, "complete", len(groups))
     return payload
 
@@ -157,13 +152,24 @@ def mine_result(
     external_id: str,
     subscription=Depends(require_feed),
 ) -> dict:
-    """The last cached mine snapshot ({groups, messages}) for this feed — a pure
-    read (no re-mine); require_feed 404s a foreign feed. Reopening a verified feed
-    hydrates the Verify audit from this instead of re-running the scan; 404 when a
-    feed was verified before this cache existed, so the client falls back to a
-    live mine."""
+    """Read the latest current MiningReview for this feed without re-mining."""
     with request.app.state.session_factory() as session:
-        payload = read_mine_result(session, subscription.user_id, int(external_id))
-    if payload is None:
-        raise ApiError(404, "MINE_RESULT_NOT_FOUND", "No cached mine result")
-    return payload
+        try:
+            review = require_latest_current_review(
+                session, subscription.user_id, int(external_id)
+            )
+        except MiningReviewNotFoundError:
+            review = None
+        except MiningReviewStaleError as error:
+            raise ApiError(409, "MINING_REVIEW_STALE", str(error)) from error
+    if review is None:
+        raise ApiError(404, "MINE_RESULT_NOT_FOUND", "No current mining review")
+    return MineResultOut.model_validate(
+        {
+            "review_id": review.review_id,
+            "input_revision": review.input_revision,
+            "groups": review.groups,
+            "messages": review.messages,
+        },
+        from_attributes=True,
+    ).model_dump(by_alias=True, mode="json")

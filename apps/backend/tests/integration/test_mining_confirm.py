@@ -1,14 +1,17 @@
 """Mining Confirm persists accepted families' signals (ADR 0015, miner-based).
 
-`confirm_mined_signals` re-mines the feed's stored messages, keeps the accepted
+`confirm_review` consumes a revisioned review, keeps the accepted
 template families, persists each candidate as one ``Signal`` — the SAME rows the
 Signals view reads — by replacing the feed's whole signal projection (delete +
 insert), and marks the feed verified.
 """
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime, timezone
+from threading import Event
 from uuid import uuid4
 
+import pytest
 from seed import insert_source
 
 from verasig.domain.account import Plan, UserAccount
@@ -16,14 +19,17 @@ from verasig.domain.channel import TelegramChannel
 from verasig.domain.message import RawTelegramMessage
 from verasig.features.accounts import repository as account_repository
 from verasig.features.feeds import feed_repository, message_repository
+from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
+from verasig.features.feeds.backfill_job_run import BackfillMode
+from verasig.features.mining import mining_review_repository
 from verasig.features.mining.mining_confirm import (
-    _to_chat_message,
-    confirm_mined_signals,
+    confirm_review,
 )
+from verasig.features.mining.mining_review import create_review, read_input
 from verasig.features.mining.template_mining import mine_template_groups
-from verasig.features.parser_overlay.repository import read_overlay
 from verasig.features.signals import outcome_repository
 from verasig.features.signals.views import present_signals
+from verasig.foundation.jobs.registry import JobRegistry
 
 
 def _instant() -> datetime:
@@ -103,19 +109,21 @@ def _seed_backfilled_feed_with_two_families(session_factory) -> object:
         return account.id
 
 
-def _all_keys(session_factory, user_id) -> list[str]:
+def _create_review(session_factory, user_id):
     with session_factory() as session:
-        messages = message_repository.read_messages(session, user_id, 1)
-        overlay = read_overlay(session, user_id)
-    groups = mine_template_groups([_to_chat_message(m) for m in messages], overlay)
-    return [group.template_key for group in groups]
+        review_input = read_input(session, user_id, 1)
+        groups = mine_template_groups(review_input.messages, review_input.overlay)
+        review = create_review(session, user_id, 1, review_input, groups)
+        session.commit()
+    return review
 
 
 def test_confirm_persists_miner_signals_and_marks_verified(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
-    keys = _all_keys(session_factory, user_id)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
 
-    result = confirm_mined_signals(session_factory, user_id, 1, keys)
+    result = confirm_review(session_factory, user_id, 1, review.review_id, keys)
 
     with session_factory() as session:
         extracted = outcome_repository.read_signals(session, 1, user_id)
@@ -128,9 +136,10 @@ def test_confirm_persists_miner_signals_and_marks_verified(session_factory):
 
 def test_confirmed_signals_surface_through_the_signals_view(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
-    keys = _all_keys(session_factory, user_id)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
 
-    confirm_mined_signals(session_factory, user_id, 1, keys)
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
 
     with session_factory() as session:
         result = present_signals(session, user_id, plan=Plan.OPERATOR)
@@ -140,9 +149,10 @@ def test_confirmed_signals_surface_through_the_signals_view(session_factory):
 
 def test_confirm_maps_structured_fields_onto_the_signal(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
-    keys = _all_keys(session_factory, user_id)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
 
-    confirm_mined_signals(session_factory, user_id, 1, keys)
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
 
     with session_factory() as session:
         extracted = outcome_repository.read_signals(session, 1, user_id)
@@ -154,8 +164,9 @@ def test_confirm_maps_structured_fields_onto_the_signal(session_factory):
 
 def test_confirm_with_empty_keys_persists_nothing_but_verifies(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
+    review = _create_review(session_factory, user_id)
 
-    result = confirm_mined_signals(session_factory, user_id, 1, [])
+    result = confirm_review(session_factory, user_id, 1, review.review_id, [])
 
     with session_factory() as session:
         extracted = outcome_repository.read_signals(session, 1, user_id)
@@ -167,10 +178,11 @@ def test_confirm_with_empty_keys_persists_nothing_but_verifies(session_factory):
 
 def test_reconfirm_is_idempotent(session_factory):
     user_id = _seed_backfilled_feed(session_factory)
-    keys = _all_keys(session_factory, user_id)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
 
-    confirm_mined_signals(session_factory, user_id, 1, keys)
-    confirm_mined_signals(session_factory, user_id, 1, keys)
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
 
     with session_factory() as session:
         extracted = outcome_repository.read_signals(session, 1, user_id)
@@ -186,19 +198,99 @@ def test_reconfirm_with_a_smaller_accepted_set_removes_deselected_signals(
     next time the feed was reopened. A replace (delete + insert) makes the
     stored set always exactly the accepted set."""
     user_id = _seed_backfilled_feed_with_two_families(session_factory)
-    keys = _all_keys(session_factory, user_id)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
     assert len(keys) == 2  # two distinct template families
 
-    confirm_mined_signals(session_factory, user_id, 1, keys)
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
     with session_factory() as session:
         before = outcome_repository.read_signals(session, 1, user_id)
     assert {signal.symbol for signal in before} == {"BTCUSDT", "EURUSDUSDT"}
 
     smaller = keys[:1]
-    result = confirm_mined_signals(session_factory, user_id, 1, smaller)
+    result = confirm_review(session_factory, user_id, 1, review.review_id, smaller)
 
     with session_factory() as session:
         after = outcome_repository.read_signals(session, 1, user_id)
     assert result.signals_extracted == 1
     assert len(after) == 1  # the de-selected family's signal is actually gone
     assert {signal.rule_id for signal in after} == set(smaller)
+
+
+def test_confirm_failure_rolls_back_projection_status_and_review_evidence(
+    session_factory, monkeypatch
+):
+    user_id = _seed_backfilled_feed(session_factory)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
+    with session_factory() as session:
+        feed_repository.set_status(session, user_id, 1, "analyzed")
+        before = outcome_repository.read_signals(session, 1, user_id)
+        session.commit()
+
+    def fail_after_projection(*_args, **_kwargs):
+        raise RuntimeError("injected confirm failure")
+
+    monkeypatch.setattr(
+        mining_review_repository, "mark_review_confirmed", fail_after_projection
+    )
+
+    with pytest.raises(RuntimeError, match="injected confirm failure"):
+        confirm_review(session_factory, user_id, 1, review.review_id, [])
+
+    with session_factory() as session:
+        after = outcome_repository.read_signals(session, 1, user_id)
+        feed = feed_repository.read_feed(session, user_id, 1)
+        review_row = mining_review_repository.read_review_row(
+            session, user_id, 1, review.review_id
+        )
+    assert [signal.id for signal in after] == [signal.id for signal in before]
+    assert feed.status == "analyzed"
+    assert review_row.accepted_template_keys == keys
+
+
+def test_confirm_and_backfill_serialize_on_the_feed_row(session_factory, monkeypatch):
+    user_id = _seed_backfilled_feed(session_factory)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
+    projection_started = Event()
+    release_confirm = Event()
+    original_delete = outcome_repository.delete_signals_for_channel
+
+    def block_after_lock(session, owner_id, external_id):
+        original_delete(session, owner_id, external_id)
+        projection_started.set()
+        assert release_confirm.wait(timeout=5)
+
+    monkeypatch.setattr(
+        outcome_repository, "delete_signals_for_channel", block_after_lock
+    )
+    coordinator = BackfillJobCoordinator(session_factory, JobRegistry(), batch_size=200)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        confirm_future = executor.submit(
+            confirm_review,
+            session_factory,
+            user_id,
+            1,
+            review.review_id,
+            keys,
+        )
+        assert projection_started.wait(timeout=5)
+        backfill_future = executor.submit(
+            coordinator._create_run, user_id, 1, BackfillMode.REFRESH
+        )
+        with pytest.raises(TimeoutError):
+            backfill_future.result(timeout=0.2)
+        release_confirm.set()
+        confirmed = confirm_future.result(timeout=5)
+        _run, previous_status = backfill_future.result(timeout=5)
+
+    with session_factory() as session:
+        feed = feed_repository.read_feed(session, user_id, 1)
+        signals = outcome_repository.read_signals(session, 1, user_id)
+    assert confirmed.feed_status == "verified"
+    assert previous_status == "verified"
+    assert feed.status == "backfilling"
+    assert len(signals) == 2

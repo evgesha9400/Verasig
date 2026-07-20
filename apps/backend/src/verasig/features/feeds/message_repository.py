@@ -120,10 +120,12 @@ def read_messages(
     session: Session, user_id: UUID, external_id: int
 ) -> list[RawTelegramMessage]:
     rows = session.scalars(
-        select(RawMessageRow).where(
+        select(RawMessageRow)
+        .where(
             RawMessageRow.user_id == user_id,
             RawMessageRow.external_id == external_id,
         )
+        .order_by(RawMessageRow.external_message_id)
     ).all()
     return [_row_to_message(row) for row in rows]
 

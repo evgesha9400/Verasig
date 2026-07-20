@@ -7,9 +7,12 @@ a JSON-serializable `{groups: [...]}` terminal payload, and graceful empty input
 
 import asyncio
 import json
-from types import SimpleNamespace
+from datetime import UTC, datetime
+from uuid import UUID
 
 from verasig.features.mining import mine_routes
+from verasig.features.mining.mining_review import MiningReview, MiningReviewInput
+from verasig.features.mining.template_mining import ChatMessage
 
 
 class _FakePublisher:
@@ -34,23 +37,35 @@ class _FakeSessionFactory:
         pass
 
 
-def _raw(message_id: int, text: str) -> SimpleNamespace:
-    return SimpleNamespace(message_id=message_id, text=text, posted_at=None)
+def _raw(message_id: int, text: str) -> ChatMessage:
+    return ChatMessage(id=str(message_id), text=text)
 
 
 def _run(messages, monkeypatch):
-    monkeypatch.setattr(
-        mine_routes.message_repository, "read_messages", lambda *_: messages
+    review_input = MiningReviewInput(
+        messages=messages,
+        overlay={},
+        capture_generation=0,
+        input_revision="a" * 64,
     )
-    monkeypatch.setattr(mine_routes, "read_overlay", lambda *_: {})
+    monkeypatch.setattr(mine_routes, "read_input", lambda *_: review_input)
     saved: dict = {}
-    monkeypatch.setattr(
-        mine_routes,
-        "upsert_mine_result",
-        lambda session, user_id, channel_id, payload: saved.update(
-            user_id=user_id, channel_id=channel_id, payload=payload
-        ),
-    )
+
+    def create(_session, user_id, channel_id, received_input, groups):
+        review = MiningReview(
+            review_id=UUID("10000000-0000-0000-0000-000000000001"),
+            user_id=user_id,
+            external_id=channel_id,
+            input_revision=received_input.input_revision,
+            groups=groups,
+            messages=received_input.messages,
+            overlay=received_input.overlay,
+            created_at=datetime(2026, 7, 21, tzinfo=UTC),
+        )
+        saved.update(user_id=user_id, channel_id=channel_id, review=review)
+        return review
+
+    monkeypatch.setattr(mine_routes, "create_review", create)
     publisher = _FakePublisher()
     result = asyncio.run(
         mine_routes._run_mine(publisher, "user-1", 42, _FakeSessionFactory())
@@ -72,8 +87,11 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
         "grouping",
         "complete",
     ]
-    # The terminal payload is cached per feed so reopening skips the re-scan.
-    assert saved == {"user_id": "user-1", "channel_id": 42, "payload": result}
+    assert saved["user_id"] == "user-1"
+    assert saved["channel_id"] == 42
+    assert saved["review"].review_id == UUID("10000000-0000-0000-0000-000000000001")
+    assert result["reviewId"] == "10000000-0000-0000-0000-000000000001"
+    assert result["inputRevision"] == "a" * 64
     assert isinstance(result["groups"], list)
     assert len(result["groups"]) >= 1
     group = result["groups"][0]
@@ -90,8 +108,9 @@ def test_run_mine_publishes_ordered_stages_and_returns_groups(monkeypatch):
 
 def test_run_mine_handles_empty_history(monkeypatch):
     publisher, result, saved = _run([], monkeypatch)
-    assert result == {"groups": [], "messages": []}
-    assert saved["payload"] == {"groups": [], "messages": []}
+    assert result["groups"] == []
+    assert result["messages"] == []
+    assert saved["review"].messages == []
     assert [event["stage"] for event in publisher.events] == [
         "loading",
         "extracting",
