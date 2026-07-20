@@ -12,16 +12,18 @@ export function streamMineProgress(token, feedId, handlers = {}) {
   return streamJobProgress(token, `/feeds/${feedId}/mining/preview/progress`, handlers)
 }
 
-// Confirms the accepted templates. The backend re-mines (identical template keys
-// by parity), persists the miner's signals, and marks the feed verified →
+// Confirms accepted templates from an exact current review. The backend persists
+// that review's signals and marks the feed verified →
 // { feedStatus, templatesAccepted, signalsExtracted }.
-export function confirmMining(token, feedId, acceptedTemplateKeys = []) {
-  return post(`/feeds/${feedId}/mining/confirm`, token, { acceptedTemplateKeys })
+export function confirmMining(token, feedId, reviewId, acceptedTemplateKeys = []) {
+  return post(`/feeds/${feedId}/mining/confirm`, token, {
+    reviewId,
+    acceptedTemplateKeys
+  })
 }
 
-// Reads the last cached mine result for a feed → { groups, messages }. Reopening
-// a verified feed hydrates the Verify audit from this instead of re-mining;
-// rejects with a 404 ApiError when no snapshot is cached (fall back to a live mine).
+// Reads the latest current review for a feed → { reviewId, inputRevision, groups,
+// messages }. Rejects with a 404 ApiError when there is no current review.
 export function getMineResult(token, feedId) {
   return get(`/feeds/${feedId}/mining/result`, token)
 }
@@ -33,10 +35,13 @@ export function getConfirmedMining(token, feedId) {
   return get(`/feeds/${feedId}/mining/confirmed`, token)
 }
 
-// Runs the accepted templates over the feed's full stored history server-side →
+// Runs accepted templates over the exact current review snapshot server-side →
 // { parsedSignals, ambiguousCandidates, rejectedCandidates, rareTemplates,
 // potentialMisses } — the same audit shape the browser used to compute
 // client-side from applyAcceptedRules.
-export function getMineAudit(token, feedId, acceptedTemplateKeys = []) {
-  return post(`/feeds/${feedId}/mining/audit`, token, { acceptedTemplateKeys })
+export function getMineAudit(token, feedId, reviewId, acceptedTemplateKeys = []) {
+  return post(`/feeds/${feedId}/mining/audit`, token, {
+    reviewId,
+    acceptedTemplateKeys
+  })
 }

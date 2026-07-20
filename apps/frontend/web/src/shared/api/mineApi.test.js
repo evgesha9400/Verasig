@@ -41,7 +41,7 @@ describe('mineApi', () => {
       })
     )
 
-    const body = await confirmMining('jwt-token', '7', ['tpl_a', 'tpl_b'])
+    const body = await confirmMining('jwt-token', '7', 'review-1', ['tpl_a', 'tpl_b'])
 
     expect(body.feedStatus).toBe('verified')
     expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mining/confirm', {
@@ -50,7 +50,10 @@ describe('mineApi', () => {
         'Content-Type': 'application/json',
         Authorization: 'Bearer jwt-token'
       },
-      body: JSON.stringify({ acceptedTemplateKeys: ['tpl_a', 'tpl_b'] })
+      body: JSON.stringify({
+        reviewId: 'review-1',
+        acceptedTemplateKeys: ['tpl_a', 'tpl_b']
+      })
     })
   })
 
@@ -71,7 +74,7 @@ describe('mineApi', () => {
     )
   })
 
-  it('reads the cached mine result for a feed (GET, bearer auth)', async () => {
+  it('reads the latest current mining review (GET, bearer auth)', async () => {
     fetch.mockResolvedValueOnce(
       jsonResponse({ groups: [{ templateKey: 'tpl_a' }], messages: [{ id: '1' }] })
     )
@@ -95,7 +98,7 @@ describe('mineApi', () => {
     }
     fetch.mockResolvedValueOnce(jsonResponse(audit))
 
-    const body = await getMineAudit('jwt-token', '7', ['tpl_a', 'tpl_b'])
+    const body = await getMineAudit('jwt-token', '7', 'review-1', ['tpl_a', 'tpl_b'])
 
     expect(body).toEqual(audit)
     expect(fetch).toHaveBeenCalledWith('http://localhost:8000/feeds/7/mining/audit', {
@@ -104,7 +107,10 @@ describe('mineApi', () => {
         'Content-Type': 'application/json',
         Authorization: 'Bearer jwt-token'
       },
-      body: JSON.stringify({ acceptedTemplateKeys: ['tpl_a', 'tpl_b'] })
+      body: JSON.stringify({
+        reviewId: 'review-1',
+        acceptedTemplateKeys: ['tpl_a', 'tpl_b']
+      })
     })
   })
 
