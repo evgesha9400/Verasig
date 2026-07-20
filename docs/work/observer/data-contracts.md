@@ -1,6 +1,6 @@
 # Observer Data Contracts
 
-Canonical Pydantic contracts (`domain/`) + service interfaces. **Contracts are frozen before implementation** (TDD writes tests against these). SQLAlchemy ORM rows in `storage/models.py` mirror these 1:1; enum-backed CHECK constraints are generated from the domain `StrEnum`s (`enum_check()`), so they cannot drift from Python. **Raw capture** (`raw_message`) is append-only (insert-only; no UPDATE/DELETE) — see [ADR 0001](../../adr/0001-two-layer-raw-capture.md). **`signal`** is a recomputable projection over it, one row per message that the miner turned into a trade: a re-confirm **replaces** the feed's whole signal projection (delete + re-insert), not an upsert. A "miss" — a candidate message the miner did not extract — is not stored; it is the **absence** of a `signal` row for that message, recovered by an anti-join against `raw_message`. See [ADR 0017](../../adr/0017-signal-schema-collapse-and-absence-based-misses.md), which supersedes [ADR 0006](../../adr/0006-extraction-outcomes-shape-and-lifecycle.md), amends [ADR 0001](../../adr/0001-two-layer-raw-capture.md), and updates [ADR 0015](../../adr/0015-mining-confirm-persists-rules-and-rederives.md).
+Canonical Pydantic contracts (`domain/`) + service interfaces. SQLAlchemy ORM rows in `storage/models.py` implement the durable shapes; enum-backed CHECK constraints are generated from the domain `StrEnum`s (`enum_check()`), so they cannot drift from Python. **Raw capture** (`raw_message`) is append-only within one capture generation — see [ADR 0001](../../adr/0001-two-layer-raw-capture.md). **`signal`** is a recomputable projection over it, one row per message that the miner turned into a trade. Mining Confirm addresses an immutable `MiningReview`; after revision validation it replaces the feed's whole signal projection, records confirmed miss evidence, and marks the feed verified in one transaction. A "miss" is the **absence** of a `signal` row for a reviewed candidate message. See [ADR 0017](../../adr/0017-signal-schema-collapse-and-absence-based-misses.md) and [ADR 0018](../../adr/0018-revisioned-mining-review.md).
 
 Notation: `?` = optional, `[]` = list, enums in `UPPER`.
 
@@ -45,6 +45,10 @@ RawTelegramMessage:                  # immutable, append-only, 100% capture
     raw_payload: json                # full Telethon dict, verbatim
 ```
 
+The persisted `feed` row also owns `capture_generation`, an integer advanced
+before each full-history recapture. It is storage revision state, not Telegram
+channel metadata, and contributes to every mining `inputRevision`.
+
 There is no separate "candidate event" row: the miner mines and extracts a
 message in one pass, so a message either has a `Signal` (§3) or it doesn't —
 there is nothing to materialize independently of the extraction itself.
@@ -73,13 +77,51 @@ Signal(TradeIntent):                 # a TradeIntent RECORDED against the messag
     extracted_at: datetime
 ```
 
-**One table, keyed by message ([ADR 0017](../../adr/0017-signal-schema-collapse-and-absence-based-misses.md)):** the miner is the only extractor and Mining Confirm mines + extracts a message in one pass, so there is no separate candidate-event row to link against — `Signal` carries its own message identity directly. A row only ever exists for a **successful** extraction; there is no `UnrecognizedSignal` or similar miss row.
+**One table, keyed by message ([ADR 0017](../../adr/0017-signal-schema-collapse-and-absence-based-misses.md)):** the miner is the only extractor and Mining Confirm mines + extracts a message in one pass, so there is no separate candidate-event row to link against — `Signal` carries its own message identity directly. A row only ever exists for a **successful** extraction; misses have no persisted outcome row.
 
-**Misses are absence, not data.** A "miss" — a candidate message the miner did not turn into a signal — is answered by asking "does a `Signal` exist for this message?"; a `NOT EXISTS` / anti-join over `raw_message` against `signal` recovers the miss set on demand. Nothing is written for a miss, and nothing needs to be cleaned up when a later re-mine turns a former miss into a signal (or vice versa).
+**Misses are absence in the signal projection.** A candidate message is a miss
+when it has no `Signal`; no outcome row is written or cleaned up. For confirmed
+parser confidence, the candidate denominator and missed message ids come from the
+addressed confirmed `MiningReview`, not an anti-join over the entire raw corpus.
 
-**Confirm is replace-the-projection, not upsert.** `POST /feeds/{external_id}/mining/confirm` re-mines the feed's stored messages, keeps the accepted template families, and — in one transaction — deletes every `signal` row for `(user_id, external_id)` and re-inserts exactly the accepted candidates' signals ([ADR 0017](../../adr/0017-signal-schema-collapse-and-absence-based-misses.md)). This makes the persisted set always exactly the accepted set: a re-confirm with a smaller accepted set actually removes the de-selected families' signals, instead of leaving them orphaned.
+**Confirm is replace-the-projection, not upsert.** `POST /feeds/{external_id}/mining/confirm` loads the addressed `MiningReview`; it does not re-mine live messages. After validating that review's revision, Confirm deletes every `signal` row for `(user_id, external_id)` and inserts exactly the accepted reviewed candidates' signals. A smaller accepted set therefore removes de-selected families instead of leaving orphaned signals.
 
-## 4. Lifecycle (folded view)
+## 4. Mining review and confirmation
+
+```python
+MiningReview:                        # immutable reviewed input + mined output (ADR 0018)
+    review_id: uuid                  # JSON: reviewId; required by Audit and Confirm
+    user_id: uuid
+    external_id: int
+    input_revision: str              # JSON: inputRevision; SHA-256 digest
+    messages: list[ChatMessage]      # exact ordered id/text/date corpus shown
+    groups: list[TemplateGroup]      # exact mined families shown
+    overlay: dict                    # exact parser overlay used
+    created_at: datetime
+
+MiningReviewConfirmation:            # evidence recorded against the addressed review
+    accepted_template_keys: list[str]
+    missed_message_ids: list[int]    # confirmed candidate misses for scoring
+    confirmed_at: datetime
+```
+
+`inputRevision` digests the ordered message identity, text, and date; the parser
+overlay; and the feed's `capture_generation`. A full-history re-fetch advances
+that generation even if the recaptured bytes are identical. Audit and Confirm
+recompute the live revision and return `409 MINING_REVIEW_STALE` without mutation
+when the corpus, overlay, or generation changed.
+
+Confirm holds the feed-row lock while it validates the addressed review,
+replaces the `signal` projection, records accepted template keys and confirmed
+miss ids, and sets `FeedStatus.VERIFIED`. These writes commit atomically. Backfill
+creation uses the same lock, so capture cannot start through a partial Confirm.
+
+Confirmed misses are the addressed review's ambiguous candidates, rare-template
+candidates, and potential misses after excluding every message that produced a
+persisted signal. Parser confidence reads these stored ids from the latest current
+confirmed review; it does not reclassify a later corpus.
+
+## 5. Lifecycle (folded view)
 
 ```python
 FoldedSignal:                        # derived; recomputable from durable inputs, NEVER stored (ADR 0007)
@@ -109,7 +151,7 @@ FoldStep:                            # the effective position state AFTER this s
 - Effective state carries forward cumulatively; `move SL to BE` ⇒ `effective_stop_loss := effective_entry` (unresolved if a market leg is unresolved); a reduce lowers `effective_size` without moving `effective_entry`; a full close (or `effective_size → 0`) sets `closed_at`.
 - Market-price legs (`leg_price = None`) and the resulting `effective_entry = None` are resolved by work item 9 sim against klines — the existing `EntryType.MARKET` fill pattern.
 
-## 5. Deletion
+## 6. Deletion
 
 ```python
 DeletedSignalEvidence:
@@ -131,7 +173,7 @@ DeletedSignalEvidence:
 
 **Storage (durable, NOT recomputable — a third table class):** unlike the recomputable `signal` projection ([ADR 0017](../../adr/0017-signal-schema-collapse-and-absence-based-misses.md)) and the in-memory fold ([ADR 0007](../../adr/0007-lifecycle-fold-pure-recomputable.md)), `DeletedSignalEvidence` is **persisted** because the live snapshot it is computed against is ephemeral (it cannot be reconstructed from durable inputs). One row per `(channel_id, message_id)`: a rescan is idempotent (`+0`); a `SUSPECTED` may upgrade to `CONFIRMED` but a `CONFIRMED` never downgrades; the first-noticed `detected_at` is preserved. **All** confirmed deletions are stored (audit), but only `was_signal_candidate` ones feed the work item-8 deletion-behaviour score — chatter deletions affect nothing; `SUSPECTED` is surfaced per channel.
 
-## 6. Scoring
+## 7. Scoring
 
 ```python
 ScoreComponent:
@@ -167,7 +209,7 @@ ProviderScoreExplanation:
 - **evidence_refs grammar (100% traceable):** typed-prefix strings — `channel:<id>` · `message:<channel>/<msg>` · `signal:<uuid>` (a persisted `Signal`) · `event:<uuid>` (a `Signal`'s own id, or a missed candidate's message id, used as the recomputable-candidate reference) · `deletion:<uuid>`. Refs name every row used to **measure** the value (numerator + denominator), so a measured `0.0` still traces; bulk message-corpus denominators anchor on `channel:<id>` (a deterministic `count_messages` query) instead of enumerating thousands of rows.
 - **Surface:** offline `verasig score <ref>` reads via repos, calls the pure builder, prints `format_score` + `format_explanation` (notes incl.); unknown channel exits 1 — mirrors `stats`/`lifecycle`/`deletions`.
 
-## 7. Simulation
+## 8. Simulation
 
 ```python
 SimOutcome:
@@ -190,7 +232,7 @@ Kline:
     volume: Decimal
 ```
 
-## 8. Service interfaces (the seams TDD tests inject fakes at)
+## 9. Service interfaces (the seams TDD tests inject fakes at)
 
 ```python
 # domain/market_ports.py
@@ -227,7 +269,7 @@ class TelegramSource(Protocol):
     # backfill: chunked + resumable — yields one committable batch at a time, never full history
     def backfill_batches(self, channel_id: int, after_message_id: int?,
                          batch_size: int) -> AsyncIterator[list[RawTelegramMessage]]: ...
-    # deletion rescan: the channel's CURRENT live message-id set, for snapshot-diff (work item 7, ADR 0008)
+    # deletion rescan: the channel's CURRENT live message-id set, for snapshot-diff (ADR 0008)
     async def live_message_ids(self, channel_id: int) -> set[int]: ...
     # live: ONE global socket, many channels; hybrid push + short-poll behind this method
     def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramLiveEvent]: ...

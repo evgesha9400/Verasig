@@ -17,11 +17,11 @@ A stream a user follows through a `Source` — **user-owned**, keyed by `user_id
 _Avoid_: subscription, chat, channel cache.
 
 **Fetch new messages**:
-Resume capture for a `Feed` from its current cursor. It updates captured messages and deletion evidence, but does **not** invalidate existing labels, verification, or analysis by default; re-labeling and re-verification are user-initiated through **Review labels**. Contrast **Re-fetch full history**, which starts capture over from scratch.
+Resume capture for a `Feed` from its current cursor. It appends captured messages but does **not** replace the current `signal` projection or reset the feed's status. Any prior `MiningReview` no longer matches the expanded corpus and cannot be confirmed; the operator must run **Template mining** again to review the new input. Contrast **Re-fetch full history**, which starts capture over from scratch.
 _Avoid_: re-label, re-verify, reset.
 
 **Re-fetch full history**:
-Start a `Feed`'s capture over as a new generation ([ADR 0014](../adr/0014-full-refetch-wipes-and-recaptures.md)). It first secures deletion evidence (a mandatory pre-wipe `Rescan`, aborting on an empty live snapshot), then atomically wipes the feed's captured messages and cascaded derived rows and clears the cursor, then recaptures at the chosen **History depth**. The message counter restarts at zero. `DeletedSignalEvidence` and backfill-run history survive (they FK to `feed`, not `raw_message`). This is the only way to deepen a shallow capture. Append-only capture ([ADR 0001](../adr/0001-two-layer-raw-capture.md)) still holds **within** a generation.
+Start a `Feed`'s capture over as a new generation ([ADR 0014](../adr/0014-full-refetch-wipes-and-recaptures.md)). It first verifies that the channel is reachable; only then does it atomically wipe captured messages and cascaded derived rows, clear the cursor, advance the capture generation, and recapture at the chosen **History depth**. A pre-wipe `Rescan` is **not** part of this operation; **Check gaps** is the separate, operator-initiated evidence scan. The message counter restarts at zero. `DeletedSignalEvidence` and backfill-run history survive because they belong to the `Feed`, not a `raw_message`. This is the only way to deepen a shallow capture. Append-only capture ([ADR 0001](../adr/0001-two-layer-raw-capture.md)) still holds **within** a generation.
 _Avoid_: reset (that is feed delete), rebackfill-as-no-op (the old FULL semantics).
 
 **History depth**:
@@ -34,11 +34,7 @@ _Avoid_: group, chat.
 
 **RawTelegramMessage**:
 One captured message exactly as received, stored immutably and append-only. The 100%-capture layer. Carries provenance, text, sender, timestamps, `reply_to`, and media-present flags. Persisted user-owned as a `raw_message` row (`external_id` / `external_message_id`).
-_Avoid_: message record, raw event (that is something else — see below).
-
-**RawSignalEvent**:
-A `RawTelegramMessage` the miner confirmed as a signal candidate, plus the exact text slice it extracted from. Written by **Mining confirm** — one row per accepted `Template family` candidate. Its presence is the authority for signal candidacy: deletion badges read `was_signal_candidate`, set from whether a deleted message had a `RawSignalEvent`.
-_Avoid_: signal, raw message. Note: this **supersedes** the old definition where `RawSignalEvent` meant "original source content" — that role now belongs to `RawTelegramMessage`.
+_Avoid_: message record, raw event.
 
 ### Extraction
 
@@ -46,22 +42,22 @@ _Avoid_: signal, raw message. Note: this **supersedes** the old definition where
 The provider's trade as parsed from message text — direction and price levels, independent of which message it came from. Required: `symbol` and `side`; optional: entry, stop, targets, leverage, provider-stated confidence. This is what the miner produces from message text; it carries **no** event linkage and **no** extraction provenance.
 _Avoid_: signal, order, trade (bare).
 
-**ExtractedSignal**:
-A `TradeIntent` **recorded against** a `RawSignalEvent` — the canonical extraction output. Adds the event linkage (`event_id`, `channel_id`), the lifecycle role (`event_type`, defaulting `NEW_ENTRY`), and provenance (`extraction_method`, `rule_id`). **Mining confirm** produces it directly from an accepted `Template family` candidate. Replaces the docs' old term `Signal`.
-_Avoid_: Signal, parsed signal, trade.
+**Signal**:
+A `TradeIntent` recorded directly against the `RawTelegramMessage` it came from. It is the single persisted extraction projection, keyed by user, feed, and message and carrying the exact candidate text, lifecycle role, template key, and extraction time. **Mining confirm** replaces a feed's complete `signal` projection with exactly the accepted families in one transaction ([ADR 0017](../adr/0017-signal-schema-collapse-and-absence-based-misses.md)).
+_Avoid_: raw signal, extracted signal, candidate event.
 
-**UnrecognizedSignal**:
-The gap-fill outcome projected by `materialize_missing_signal_outcomes` for any `RawSignalEvent` the miner did not turn into an `ExtractedSignal` — keeping every event's outcome exactly one-of `{ExtractedSignal, UnrecognizedSignal}`.
-_Avoid_: failed signal, error.
+**Miss**:
+A reviewed candidate message that produced no `Signal`. A miss is the absence of a `signal` row, not a persisted outcome. Mining confirm records the exact confirmed review's missed message ids as evidence for parser confidence; later reads do not infer misses from a new corpus.
+_Avoid_: unrecognized signal, failed-signal row.
 
 **side**:
 Trade direction, normalized to `LONG` or `SHORT`. `buy` maps to `LONG`, `sell` maps to `SHORT`.
 
 **Signal lifecycle**:
-The ordered chain of an entry `ExtractedSignal` plus later modification/close messages that reference it (via Telegram `reply_to`). A signal is multi-message **only when explicit linking evidence exists** — no phantom lifecycles. A complete one-shot signal stays single. Folded into a `FoldedSignal` by the lifecycle service.
+The ordered chain of an entry `Signal` plus later modification/close messages that reference it (via Telegram `reply_to`). A signal is multi-message **only when explicit linking evidence exists** — no phantom lifecycles. A complete one-shot signal stays single. Folded into a `FoldedSignal` by the lifecycle service.
 
 **SignalModification**:
-A later message in a signal's reply chain that patches the live position — move stop (incl. to breakeven), set/move take-profits, **scale in (average) or reduce by a stated multiplier**, or fully close. Classified `MODIFY` or `CLOSE`. A modification need **not** be an `ExtractedSignal` (a reply like "move SL to BE" carries no `side`); it is recognized at fold-time from the `reply_to` chain, not by the parser.
+A later message in a signal's reply chain that patches the live position — move stop (incl. to breakeven), set/move take-profits, **scale in (average) or reduce by a stated multiplier**, or fully close. Classified `MODIFY` or `CLOSE`. A modification need **not** be a `Signal` (a reply like "move SL to BE" carries no `side`); it is recognized at fold-time from the `reply_to` chain, not by the miner.
 _Avoid_: edit, correction.
 
 **FoldedSignal**:
@@ -92,12 +88,12 @@ _Avoid_: verify, distill, save.
 Proof that a message a provider posted later disappeared — typically a losing signal erased to clean up a track record. Two confidence tiers:
 - `CONFIRMED` — a message we had **captured** is now absent from the channel; its original content is **retained** as proof.
 - `SUSPECTED` — a gap in the message numbering, absent from **both** our capture and the channel now; a likely pre-capture deletion whose content we never had.
-Only deletions of **signal** messages feed a provider's `ProviderScore`; deleting non-signal chatter counts for nothing. `SUSPECTED` evidence is reported per `TelegramChannel`.
+Only deletions whose `was_signal_candidate` flag was set from a persisted `Signal` at detection time feed a provider's `ProviderScore`; deleting non-signal chatter counts for nothing. `SUSPECTED` evidence is reported per `TelegramChannel`.
 _Avoid_: deletion, removed message.
 
 **Rescan**:
-Re-reading a `TelegramChannel`'s **current** live message set and comparing it to what we captured, to find `DeletedSignalEvidence`. The capture layer is append-only, so a deletion is only visible by this live comparison — never by re-reading our own store. A **Re-fetch full history** runs a Rescan first, to secure evidence before it wipes.
-_Avoid_: refetch (capture re-reads its own store only as part of **Re-fetch full history**).
+Re-reading a `TelegramChannel`'s **current** live message set and comparing it to what we captured, to find `DeletedSignalEvidence`. The capture layer is append-only, so a deletion is only visible by this live comparison — never by re-reading our own store. This operator-initiated **Check gaps** action is separate from **Re-fetch full history**.
+_Avoid_: refetch, pre-wipe step.
 
 ### Scoring
 
@@ -116,7 +112,7 @@ _Avoid_: active users, audience (unqualified).
 ### Simulation
 
 **Simulated outcome**:
-The result of replaying an `ExtractedSignal` (or folded lifecycle) against Bybit public historical klines under an `ExecutionPolicy`. No real or demo orders — observe-only. Conservative: same-candle stop+target ties resolve stop-first.
+The result of replaying a `Signal` (or folded lifecycle) against Bybit public historical klines under an `ExecutionPolicy`. No real or demo orders — observe-only. Conservative: same-candle stop+target ties resolve stop-first.
 
 **ExecutionPolicy**:
 The pluggable rule set that turns a signal into a simulated trade (entry fill, stop, targets, sizing, exit). v0 = `ProviderStatedPolicy` (uses the provider's own risk management). A future policy may override it with our own risk management.
@@ -129,7 +125,7 @@ Maximum favorable / adverse excursion over a signal's simulated life. MAE drives
 
 ## Flagged ambiguities
 
-- **Signal**: ambiguous in older docs (raw vs parsed). Resolved: the canonical parsed object is `ExtractedSignal`; raw capture is `RawTelegramMessage`. The bare word "Signal" is retired.
+- **Signal**: the canonical persisted extraction projection keyed directly to its `RawTelegramMessage`. ADR 0017 retires the earlier multi-table candidate/outcome terminology.
 - **chat vs feed vs channel**: the user-followed stream is a `Feed` (the API/UI term + the storage row); its in-code domain object is `TelegramChannel` (keeps `channel_id`); a `Source` is the connection above it. "chat" is retired from the wire — the old `/chats` API is now `/feeds`.
 - **`signals` vs `failure_signal`**: `signals` always means trade signals; `failure_signal` (operational failure indication) is out of Verasig's scope.
 - **"Demo outcome" (value-proposition.md)**: there is no demo execution. "Outcome" means `Simulated outcome` from historical klines.
@@ -144,7 +140,7 @@ Frontend and execution-engine design specs live in [`docs/design/`](../design/):
 ## Example dialogue
 
 > **Operator:** This channel posted "BTC long, 65k" with no stop. Is that a bad signal?
-> **Domain expert:** It's an incomplete `ExtractedSignal` — `symbol` and `side` are present, so it's recognized, not an `UnrecognizedSignal`. But check the `Signal lifecycle`: if a later message replied to it adding a stop, the folded signal is complete.
+> **Domain expert:** It is an incomplete `Signal` — `symbol` and `side` are present, so the miner could persist it. But check the `Signal lifecycle`: if a later message replied to it adding a stop, the folded signal is complete.
 > **Operator:** And if they deleted the original after it went against them?
 > **Domain expert:** If we'd captured it first, the re-scan produces `CONFIRMED` `DeletedSignalEvidence` with the original text retained — that feeds the deletion-behaviour component of their `ProviderScore`. If we never captured it, the best we get is a `SUSPECTED` id-gap.
 > **Operator:** How do we know it actually made money?

@@ -26,7 +26,7 @@ Verasig/
 - `apps/frontend/` owns all frontend code, frontend package management, and runtime design-system modules.
 - `docs/` owns product, architecture, domain, and implementation records.
 - `libs/contracts/` is reserved for shared backend/frontend payload contracts.
-- `graphify-out/` owns canonical graph outputs only.
+- `graphify-out/` owns local generated graph outputs and remains gitignored.
 - `apps/backend/secrets/` is local runtime input and must stay ignored.
 
 ## Backend
@@ -38,25 +38,39 @@ apps/backend/
 |       |-- domain/
 |       |-- entrypoints/
 |       |-- features/
+|       |   |-- accounts/
+|       |   |-- exchanges/
+|       |   |-- feeds/
+|       |   |-- mining/
+|       |   |-- parser_overlay/
+|       |   |-- provider_scores/
+|       |   |-- risk/
+|       |   |-- signals/
+|       |   |-- simulation/
+|       |   `-- sources/
 |       |-- foundation/
 |       |-- shared/
 |       |-- storage/
 |       `-- config.py
 |-- migrations/
+|   `-- versions/
+|       |-- 0001_init.py
+|       `-- 0002_revisioned_mining_review.py
 |-- tests/
 |   |-- accounts/
 |   |-- api/
 |   |-- exchanges/
 |   |-- feeds/
+|   |-- fixtures/
 |   |-- foundation/
 |   |-- integration/
+|   |-- lab/
+|   |-- mining/
 |   |-- provider_scores/
 |   |-- risk/
-|   |-- rules/
 |   |-- signals/
 |   |-- simulation/
-|   |-- sources/
-|   `-- fixtures/
+|   `-- sources/
 |-- Dockerfile
 |-- .dockerignore
 |-- .env.example
@@ -72,7 +86,7 @@ apps/backend/
 - `domain/` owns pure contracts, enums, value objects, and Protocol seams.
 - `domain/*_ports.py` owns focused pure Protocol seams.
 - `features/` owns feature routes, schemas, workflows, views, and repositories.
-- `foundation/` owns concrete external adapters, database/session setup, HTTP helpers, security, market data, LLM, Telegram integration, and job coordination.
+- `foundation/` owns concrete external adapters, database/session setup, HTTP helpers, security, market data, Telegram integration, and job coordination.
 - `shared/` owns generic parsing, number, and time helpers.
 - `storage/models.py` owns the centralized SQLAlchemy row registry.
 - `entrypoints/api.py` owns FastAPI composition and should stay thin over feature routes and foundation adapters.
@@ -82,6 +96,7 @@ apps/backend/
 - No `application/` layer exists; ADR 0010 explicitly defers that split.
 - Feature packages use names such as `routes`, `schemas`, `workflow`, `repository`, `views`, and focused pure module names.
 - Legacy `api/`, `services/`, and focused `storage/*_repository.py` wrapper surfaces must not be recreated.
+- Legacy rule, label, drift, and fallback-extractor feature surfaces must not be recreated; `mining/` is the extractor and `signals/` owns its persisted projection.
 - No backend tests live under `src/`.
 
 ## Frontend
@@ -93,7 +108,9 @@ apps/frontend/
 |   |   |-- app/
 |   |   |-- assets/
 |   |   |-- domain/
-|   |   `-- features/
+|   |   |-- features/
+|   |   `-- shared/
+|   |-- e2e/
 |   |-- index.html
 |   |-- package.json
 |   `-- vite.config.js
@@ -118,9 +135,11 @@ apps/frontend/
 - `design-system/` owns reusable runtime UI modules and tokens.
 - `web/src/app/` owns the entrypoint, route constants, route-level auth decisions, product composition root, shell layout, and local session state.
 - `web/src/domain/` owns UI-independent demo data and workflow constants.
+- `web/src/shared/` owns cross-feature API clients, hooks, and presentation helpers.
 - `web/src/features/auth/` owns public login and registration views.
 - `web/src/features/marketing/` owns the public landing page.
 - `web/src/features/pipeline/` owns workflow step screens.
+- `web/src/features/template-mining/` owns Mine, Review, and Verify views over server-produced reviews.
 - `web/src/features/sources/`, `signals/`, `exchanges/`, and `settings/` own product capability screens.
 - `design-system/src/` owns implementation files.
 - `design-system/index.js`, `styles.css`, and `tokens/*` are stable public package entrypoints.
@@ -140,8 +159,8 @@ graphify-out/
 `-- graph.json
 ```
 
-- Track `GRAPH_REPORT.md`, `graph.html`, and `graph.json` when the project graph is intentionally refreshed.
-- Ignore Graphify cache, manifests, cost trackers, and transient `.graphify_*.json` files.
+- Keep all Graphify outputs local and ignored; updates must remain unstaged.
+- `GRAPH_REPORT.md`, `graph.html`, and `graph.json` are the review surfaces inside that ignored directory.
 
 ## Generated Artifact Rules
 
@@ -153,15 +172,16 @@ graphify-out/
 
 ## Naming Rules
 
-- `TelegramChannel` means a monitored Telegram source.
+- `Feed` means the user-owned provider stream exposed by the API and UI.
+- `TelegramChannel` means the Telegram adapter's domain view of a `Feed`.
 - `RawTelegramMessage` means immutable captured source content.
-- `RawSignalEvent` means an advisory signal candidate.
 - `TradeIntent` means parsed trade intent without event linkage.
-- `ExtractedSignal` means a `TradeIntent` recorded against a `RawSignalEvent`.
+- `Signal` means the persisted, recomputable `TradeIntent` projection keyed directly to its source message.
+- `MiningReview` means immutable reviewed input and mined output addressed by `reviewId` and guarded by `inputRevision`.
 - `FoldedSignal` means the recomputed lifecycle view.
 - `DeletedSignalEvidence` means durable non-recomputable deletion proof.
 - `ProviderScore` means the recomputed provider quality score.
-- Do not use the bare word `Signal` for persisted domain objects.
+- Misses are absent `signal` rows; confirmed miss evidence belongs to the addressed `MiningReview`.
 
 ## Deferred Splits
 
