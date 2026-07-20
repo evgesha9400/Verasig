@@ -252,7 +252,12 @@ describe('SignalsView', () => {
 
   it('renders the plan-limit notice with the full total when capped', async () => {
     const onListSignals = vi.fn().mockResolvedValue(
-      backendBody({ signals: manySignals(3), limitReached: true, total: 644, limit: 200 })
+      backendBody({
+        signals: manySignals(3),
+        limitReached: true,
+        total: 644,
+        limit: 200
+      })
     )
     renderView({ onListSignals, plan: 'observer' })
 
@@ -271,7 +276,12 @@ describe('SignalsView', () => {
 
   it('calls onUpgrade when the notice Upgrade action is clicked', async () => {
     const onListSignals = vi.fn().mockResolvedValue(
-      backendBody({ signals: manySignals(3), limitReached: true, total: 644, limit: 200 })
+      backendBody({
+        signals: manySignals(3),
+        limitReached: true,
+        total: 644,
+        limit: 200
+      })
     )
     const { onUpgrade } = renderView({ onListSignals, plan: 'observer' })
 

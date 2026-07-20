@@ -181,6 +181,16 @@ function mineJobMocks() {
   return { onStartMine, onStreamMine, stream }
 }
 
+function deferred() {
+  let resolve
+  let reject
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 // Renders the page, lets the server mine job complete with the fixture result,
 // and returns the interaction helpers every Review/Verify test needs.
 async function renderMinedPage(props = {}) {
@@ -283,10 +293,9 @@ describe('TemplateMiningPage', () => {
     expect(within(advanced).getByText('Coin aliases')).toBeTruthy()
   })
 
-  it('wires the audit gate to onFinish and onKeepVerified', async () => {
-    const onFinish = vi.fn()
-    const onKeepVerified = vi.fn()
-    const { user } = await renderMinedPage({ onFinish, onKeepVerified })
+  it('sends one awaited confirmation command with the selected destination', async () => {
+    const onConfirmVerification = vi.fn().mockResolvedValue()
+    const { user } = await renderMinedPage({ onConfirmVerification })
     await acceptFirstTemplate(user)
     await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
     await screen.findByRole('tab', { name: /Parsed/i })
@@ -295,9 +304,112 @@ describe('TemplateMiningPage', () => {
     await user.click(
       within(review).getByRole('button', { name: /Confirm & route to Exchange/i })
     )
-    expect(onFinish).toHaveBeenCalledTimes(1)
-    await user.click(within(review).getByRole('button', { name: /Keep verified/i }))
-    expect(onKeepVerified).toHaveBeenCalledTimes(1)
+    expect(onConfirmVerification).toHaveBeenCalledWith({
+      acceptedTemplateKeys: ['tpl_accept'],
+      destination: 'exchange'
+    })
+  })
+
+  it('keeps Verify mounted and disables both actions while confirmation is pending', async () => {
+    const confirmation = deferred()
+    const onConfirmVerification = vi.fn().mockReturnValue(confirmation.promise)
+    const { user } = await renderMinedPage({ onConfirmVerification })
+    await acceptFirstTemplate(user)
+    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
+    await screen.findByRole('tab', { name: /Parsed/i })
+
+    await user.click(screen.getByRole('button', { name: /Keep verified/i }))
+
+    expect(screen.getByText('Review results')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Keep verified/i }).disabled).toBe(true)
+    expect(
+      screen.getByRole('button', { name: /Confirming verification/i }).disabled
+    ).toBe(true)
+    expect(onConfirmVerification).toHaveBeenCalledTimes(1)
+
+    await act(async () => confirmation.resolve())
+  })
+
+  it('shows a confirmation rejection inline and permits retry', async () => {
+    const onConfirmVerification = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Confirmation unavailable.'))
+      .mockResolvedValueOnce()
+    const { user } = await renderMinedPage({ onConfirmVerification })
+    await acceptFirstTemplate(user)
+    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
+    await screen.findByRole('tab', { name: /Parsed/i })
+
+    await user.click(screen.getByRole('button', { name: /Keep verified/i }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Confirmation unavailable.'
+    )
+    expect(screen.getByText('Review results')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Keep verified/i }).disabled).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /Keep verified/i }))
+    await waitFor(() => expect(onConfirmVerification).toHaveBeenCalledTimes(2))
+  })
+
+  it('clears stale mining state and starts exactly one mine after overlay save', async () => {
+    const { onStartMine, onStreamMine, stream } = mineJobMocks()
+    const onSaveOverlay = vi.fn().mockResolvedValue()
+    const user = userEvent.setup()
+    render(
+      <Harness
+        onStartMine={onStartMine}
+        onStreamMine={onStreamMine}
+        onLoadAudit={vi.fn().mockResolvedValue(auditFixture())}
+        onSaveOverlay={onSaveOverlay}
+      />
+    )
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    act(() => stream.handlers.onDone(mineResultFixture()))
+    await screen.findByText('Suggested accept')
+    await acceptFirstTemplate(user)
+    await user.type(screen.getByPlaceholderText(/Add reject phrase/i), 'promo')
+    await user.click(screen.getByRole('button', { name: /^Add reject phrase$/i }))
+
+    await waitFor(() => expect(onSaveOverlay).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onStartMine).toHaveBeenCalledTimes(2))
+    expect(screen.getByText(/Mining Apex Crypto Calls/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Continue to verify/i })).toBeNull()
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onStartMine).toHaveBeenCalledTimes(2)
+
+    act(() => stream.handlers.onDone(mineResultFixture()))
+    await screen.findByRole('button', { name: /Continue to verify/i })
+    expect(screen.getByRole('button', { name: /Continue to verify/i }).disabled).toBe(
+      true
+    )
+  })
+
+  it('retains overlay edits and does not re-mine after a failed save', async () => {
+    const { onStartMine, onStreamMine, stream } = mineJobMocks()
+    const onSaveOverlay = vi.fn().mockRejectedValue(new Error('Overlay unavailable.'))
+    const user = userEvent.setup()
+    render(
+      <Harness
+        onStartMine={onStartMine}
+        onStreamMine={onStreamMine}
+        onLoadAudit={vi.fn().mockResolvedValue(auditFixture())}
+        onSaveOverlay={onSaveOverlay}
+      />
+    )
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    act(() => stream.handlers.onDone(mineResultFixture()))
+    await screen.findByText('Suggested accept')
+    const input = screen.getByPlaceholderText(/Add reject phrase/i)
+    await user.type(input, 'promo')
+    await user.click(screen.getByRole('button', { name: /^Add reject phrase$/i }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Overlay unavailable.'
+    )
+    expect(input.value).toBe('promo')
+    expect(onStartMine).toHaveBeenCalledTimes(1)
   })
 
   it('no longer offers the alternate-source disclosure', async () => {

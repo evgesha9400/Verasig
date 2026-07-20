@@ -113,15 +113,23 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
   }, [authToken])
 
   async function saveOverlay(next) {
+    if (!authToken) {
+      setOverlay(next)
+      return next
+    }
+
     try {
       const body = await putParserOverlay(authToken, next)
-      setOverlay(body.overlay || next)
+      const savedOverlay = body.overlay || next
+      setOverlay(savedOverlay)
+      return savedOverlay
     } catch (error) {
       fireToast(
         'rejected',
         'Could not save',
         error?.message || 'Try again in a moment.'
       )
+      throw error
     }
   }
 
@@ -150,8 +158,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     reopenMining,
     removeFeed,
     checkGaps: previewCheckGaps,
-    stopAfterVerify,
-    routeAfterVerify,
+    confirmVerification,
     onBackfillComplete,
     onBackfillCancel,
     onBackfillError,
@@ -403,10 +410,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           onMined={() => setScreen('review')}
           onContinueToVerify={() => setScreen('verify')}
           onBackToReview={() => setScreen('review')}
-          onFinish={routeAfterVerify}
-          onKeepVerified={(acceptedTemplateKeys) =>
-            stopAfterVerify(acceptedTemplateKeys)
-          }
+          onConfirmVerification={confirmVerification}
           plan={user.plan}
           onUpgrade={openSettings}
         />

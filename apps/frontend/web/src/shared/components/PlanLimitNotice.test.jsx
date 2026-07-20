@@ -13,7 +13,13 @@ describe('PlanLimitNotice', () => {
 
   it('states the limit, total and plan when shown', () => {
     render(
-      <PlanLimitNotice shown total={644} limit={200} plan="observer" onUpgrade={() => {}} />
+      <PlanLimitNotice
+        shown
+        total={644}
+        limit={200}
+        plan="observer"
+        onUpgrade={() => {}}
+      />
     )
     expect(screen.getByText(/200 most recent of 644 detected signals/)).toBeTruthy()
     expect(screen.getByText(/Observer/)).toBeTruthy()
@@ -22,7 +28,13 @@ describe('PlanLimitNotice', () => {
   it('fires onUpgrade when Upgrade is clicked', () => {
     const onUpgrade = vi.fn()
     render(
-      <PlanLimitNotice shown total={644} limit={200} plan="observer" onUpgrade={onUpgrade} />
+      <PlanLimitNotice
+        shown
+        total={644}
+        limit={200}
+        plan="observer"
+        onUpgrade={onUpgrade}
+      />
     )
     fireEvent.click(screen.getByText('Upgrade'))
     expect(onUpgrade).toHaveBeenCalledTimes(1)

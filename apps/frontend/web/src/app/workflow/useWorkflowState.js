@@ -56,31 +56,6 @@ function isReviewedFeed(feed) {
   return Boolean(feed) && (isReviewedStatus(feed.status) || feed.hasRisk)
 }
 
-export function mergeReviewedFeedState(currentFeeds, refreshedFeeds) {
-  if (!Array.isArray(currentFeeds)) return refreshedFeeds
-  if (!Array.isArray(refreshedFeeds)) return refreshedFeeds
-  const currentById = new Map(currentFeeds.map((feed) => [feed.id, feed]))
-  return refreshedFeeds.map((refreshedFeed) => {
-    const currentFeed = currentById.get(refreshedFeed.id)
-    if (!currentFeed) return refreshedFeed
-    if (!isReviewedFeed(currentFeed)) return refreshedFeed
-    if (isReviewedFeed(refreshedFeed)) {
-      return {
-        ...refreshedFeed,
-        hasRisk:
-          refreshedFeed.hasRisk ||
-          currentFeed.hasRisk ||
-          isReviewedStatus(refreshedFeed.status)
-      }
-    }
-    return {
-      ...refreshedFeed,
-      status: currentFeed.status,
-      hasRisk: true
-    }
-  })
-}
-
 async function readSourceState(authToken) {
   const [telegram, feeds] = await Promise.all([
     getTelegramStatus(authToken),
@@ -117,6 +92,7 @@ export function useWorkflowState(authToken, plan) {
   const prevNavRef = useRef('sources')
   const previousBackfillStatusRef = useRef(null)
   const toastTimerRef = useRef(null)
+  const confirmationRef = useRef(null)
 
   const fireToast = useCallback((tone, title, msg) => {
     setToast(createToast(title, msg, tone))
@@ -151,7 +127,7 @@ export function useWorkflowState(authToken, plan) {
 
     const sourceState = await readSourceState(authToken)
     setTelegramConnected(sourceState.telegram.connected)
-    setFeeds((currentFeeds) => mergeReviewedFeedState(currentFeeds, sourceState.feeds))
+    setFeeds(sourceState.feeds)
     return sourceState
   }
 
@@ -164,9 +140,7 @@ export function useWorkflowState(authToken, plan) {
       .then((sourceState) => {
         if (!active) return
         setTelegramConnected(sourceState.telegram.connected)
-        setFeeds((currentFeeds) =>
-          mergeReviewedFeedState(currentFeeds, sourceState.feeds)
-        )
+        setFeeds(sourceState.feeds)
       })
       .catch((error) => {
         if (!active) return
@@ -323,39 +297,54 @@ export function useWorkflowState(authToken, plan) {
     }
   }
 
-  // Persist the accepted templates server-side: the backend re-mines (identical
-  // template keys by parity), extracts + stores the signals, and marks the feed
-  // verified. Optimistic UI patches first; this reconciles from the server.
-  async function persistVerified(acceptedTemplateKeys) {
-    if (!authToken || !activeFeedId) return
-    try {
-      await confirmMining(authToken, activeFeedId, acceptedTemplateKeys || [])
-      await refreshSources()
-    } catch (error) {
-      fireToast(
-        'rejected',
-        'Could not save verification',
-        error?.message || 'Try again in a moment.'
-      )
-    }
-  }
-
-  function stopAfterVerify(acceptedTemplateKeys = []) {
+  function finishVerification(destination) {
     const current = feeds.find((feed) => feed.id === activeFeedId)
-    patchFeed(activeFeedId, { status: 'verified', hasRisk: true })
-    setScreen('feeds')
+    setScreen(destination)
     fireToast(
       'verified',
       'Source verified',
       `${current ? current.name : 'Feed'} is verified and saved. Backtest it any time from the feed options.`
     )
-    void persistVerified(acceptedTemplateKeys)
   }
 
-  function routeAfterVerify(acceptedTemplateKeys = []) {
+  async function confirmAuthenticatedVerification(acceptedTemplateKeys, destination) {
+    const confirmation = await confirmMining(
+      authToken,
+      activeFeedId,
+      acceptedTemplateKeys
+    )
+    if (confirmation?.feedStatus !== 'verified') {
+      throw new Error('The server did not confirm this feed as verified.')
+    }
+
+    const sourceState = await refreshSources()
+    const confirmedFeed = sourceState.feeds.find((feed) => feed.id === activeFeedId)
+    if (confirmedFeed?.status !== 'verified') {
+      throw new Error('The server did not confirm this feed as verified.')
+    }
+
+    finishVerification(destination)
+    return { confirmation, sourceState }
+  }
+
+  async function confirmDemoVerification(destination) {
     patchFeed(activeFeedId, { status: 'verified', hasRisk: true })
-    setScreen('exchange')
-    void persistVerified(acceptedTemplateKeys)
+    finishVerification(destination)
+  }
+
+  function confirmVerification({ acceptedTemplateKeys = [], destination = 'feeds' }) {
+    if (!activeFeedId) {
+      return Promise.reject(new Error('Select a feed before confirming verification.'))
+    }
+    if (confirmationRef.current) return confirmationRef.current
+
+    const command = authToken
+      ? confirmAuthenticatedVerification(acceptedTemplateKeys, destination)
+      : confirmDemoVerification(destination)
+    confirmationRef.current = command.finally(() => {
+      confirmationRef.current = null
+    })
+    return confirmationRef.current
   }
 
   function backtestFeed(feed) {
@@ -566,8 +555,7 @@ export function useWorkflowState(authToken, plan) {
     reopenMining,
     removeFeed,
     checkGaps,
-    stopAfterVerify,
-    routeAfterVerify,
+    confirmVerification,
     backtestFeed,
     onBackfillComplete,
     onBackfillCancel,

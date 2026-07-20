@@ -17,8 +17,8 @@ export function PlanLimitNotice({ shown, total, limit, plan, onUpgrade }) {
         </Button>
       }
     >
-      Showing the {limit} most recent of {total} detected signals. Your {planLabel}{' '}
-      plan limits this view.
+      Showing the {limit} most recent of {total} detected signals. Your {planLabel} plan
+      limits this view.
     </Banner>
   )
 }
