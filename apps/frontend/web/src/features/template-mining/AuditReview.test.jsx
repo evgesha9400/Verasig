@@ -635,4 +635,29 @@ describe('AuditReview', () => {
     )
     expect(screen.queryByRole('button', { name: /Keep verified/i })).toBeNull()
   })
+
+  it('disables both confirmation actions and shows progress while pending', () => {
+    renderReview({
+      onFinish: vi.fn(),
+      onKeepVerified: vi.fn(),
+      confirmationPending: true
+    })
+
+    expect(
+      screen.getByRole('button', { name: /Confirming verification/i }).disabled
+    ).toBe(true)
+    expect(screen.getByRole('button', { name: /Keep verified/i }).disabled).toBe(true)
+  })
+
+  it('renders a retryable confirmation failure inline', () => {
+    renderReview({
+      onFinish: vi.fn(),
+      confirmationError: 'Confirmation unavailable.'
+    })
+
+    expect(screen.getByRole('alert').textContent).toContain('Confirmation unavailable.')
+    expect(
+      screen.getByRole('button', { name: /Confirm & route to Exchange/i }).disabled
+    ).toBe(false)
+  })
 })

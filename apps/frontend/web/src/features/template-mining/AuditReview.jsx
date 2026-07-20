@@ -276,6 +276,8 @@ export function AuditReview({
   hasAccepted,
   loading = false,
   error = null,
+  confirmationPending = false,
+  confirmationError = null,
   plan,
   onUpgrade,
   onFinish,
@@ -430,12 +432,24 @@ export function AuditReview({
         actions={
           <>
             {onKeepVerified && (
-              <Button variant="primary" size="sm" onClick={onKeepVerified}>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={confirmationPending}
+                onClick={onKeepVerified}
+              >
                 Keep verified
               </Button>
             )}
-            <Button variant="secondary" size="sm" onClick={onFinish}>
-              Confirm &amp; route to Exchange
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={confirmationPending}
+              onClick={onFinish}
+            >
+              {confirmationPending
+                ? 'Confirming verification…'
+                : 'Confirm & route to Exchange'}
             </Button>
           </>
         }
@@ -445,6 +459,14 @@ export function AuditReview({
         <div className="vrs-empty vrs-empty--sm" role="alert">
           <div className="vrs-empty__note">
             Couldn&apos;t refresh the audit. {error}
+          </div>
+        </div>
+      )}
+
+      {confirmationError && (
+        <div className="vrs-empty vrs-empty--sm" role="alert">
+          <div className="vrs-empty__note">
+            Couldn&apos;t confirm verification. {confirmationError} Try again.
           </div>
         </div>
       )}

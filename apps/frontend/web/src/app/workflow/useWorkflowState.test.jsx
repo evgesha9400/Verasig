@@ -1,6 +1,13 @@
-import { act, render } from '@testing-library/react'
+import { act, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mergeReviewedFeedState, useWorkflowState } from './useWorkflowState.js'
+import { listFeeds } from '../../shared/api/feedsApi.js'
+import { getTelegramStatus } from '../../shared/api/telegramApi.js'
+import { confirmMining } from '../../shared/api/mineApi.js'
+import { useWorkflowState } from './useWorkflowState.js'
+
+vi.mock('../../shared/api/feedsApi.js', () => ({ listFeeds: vi.fn() }))
+vi.mock('../../shared/api/telegramApi.js', () => ({ getTelegramStatus: vi.fn() }))
+vi.mock('../../shared/api/mineApi.js', () => ({ confirmMining: vi.fn() }))
 
 const reviewedFeed = {
   id: 'reviewed-feed',
@@ -21,16 +28,26 @@ const reviewedFeed = {
   deletedCount: 0
 }
 
-function renderWorkflow() {
+function renderWorkflow(authToken = null) {
   let workflow
 
   function Harness() {
-    workflow = useWorkflowState(null)
+    workflow = useWorkflowState(authToken)
     return null
   }
 
   render(<Harness />)
   return () => workflow
+}
+
+function deferred() {
+  let resolve
+  let reject
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
 }
 
 function createTestStorage() {
@@ -69,6 +86,9 @@ describe('useWorkflowState', () => {
   beforeEach(() => {
     installTestStorage()
     localStorage.clear()
+    vi.clearAllMocks()
+    getTelegramStatus.mockResolvedValue({ connected: true })
+    listFeeds.mockResolvedValue({ feeds: [] })
   })
 
   it('clears the previous toast timer so a rapid second toast is not cut short', () => {
@@ -202,44 +222,20 @@ describe('useWorkflowState', () => {
     expect(workflow.screen).toBe('backfill')
   })
 
-  it('keeps reviewed local status when a refreshed feed briefly returns backfilled', () => {
-    const merged = mergeReviewedFeedState(
-      [{ ...reviewedFeed, status: 'verified', hasRisk: true }],
-      [
-        {
-          ...reviewedFeed,
-          status: 'backfilled',
-          hasRisk: false,
-          fetched: 12,
-          lastDate: 'Jun 3, 2026'
-        }
-      ]
-    )
+  it('uses the exact authenticated feed state returned by refresh', async () => {
+    const serverFeed = {
+      ...reviewedFeed,
+      status: 'backfilled',
+      hasRisk: false,
+      fetched: 12,
+      lastDate: 'Jun 3, 2026'
+    }
+    listFeeds.mockResolvedValueOnce({ feeds: [serverFeed] })
+    const getWorkflow = renderWorkflow('jwt-token')
 
-    expect(merged[0].status).toBe('verified')
-    expect(merged[0].hasRisk).toBe(true)
-    expect(merged[0].fetched).toBe(12)
-    expect(merged[0].lastDate).toBe('Jun 3, 2026')
-  })
-
-  it('keeps rules-backed backfilled feeds reviewable after source refresh', () => {
-    const merged = mergeReviewedFeedState(
-      [{ ...reviewedFeed, status: 'backfilled', hasRisk: true }],
-      [
-        {
-          ...reviewedFeed,
-          status: 'backfilled',
-          hasRisk: false,
-          fetched: 12,
-          lastDate: 'Jun 3, 2026'
-        }
-      ]
-    )
-
-    expect(merged[0].status).toBe('backfilled')
-    expect(merged[0].hasRisk).toBe(true)
-    expect(merged[0].fetched).toBe(12)
-    expect(merged[0].lastDate).toBe('Jun 3, 2026')
+    await waitFor(() => expect(getWorkflow().feeds).toEqual([serverFeed]))
+    expect(getWorkflow().feeds[0].status).toBe('backfilled')
+    expect(getWorkflow().feeds[0].hasRisk).toBe(false)
   })
 
   it('opens backfilled feeds at Mine regardless of prior rules', () => {
@@ -277,36 +273,155 @@ describe('useWorkflowState', () => {
     expect(workflow.screen).toBe('feeds')
   })
 
-  it('keeps Route & backtest feeds verified before later fetching new messages', () => {
+  it('keeps Verify and the feed unchanged while confirmation is pending', async () => {
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: false }
+    const confirmation = deferred()
+    listFeeds.mockResolvedValueOnce({ feeds: [feed] })
+    confirmMining.mockReturnValueOnce(confirmation.promise)
+    const getWorkflow = renderWorkflow('jwt-token')
+    await waitFor(() => expect(getWorkflow().feeds).toEqual([feed]))
+    act(() => {
+      getWorkflow().setActiveFeedId(feed.id)
+      getWorkflow().setScreen('verify')
+    })
+
+    let command
+    act(() => {
+      command = getWorkflow().confirmVerification({
+        acceptedTemplateKeys: ['tpl_accept'],
+        destination: 'feeds'
+      })
+    })
+
+    expect(getWorkflow().screen).toBe('verify')
+    expect(getWorkflow().feeds).toEqual([feed])
+
+    confirmation.reject(new Error('cancel pending test'))
+    await expect(command).rejects.toThrow('cancel pending test')
+  })
+
+  it('rejects confirmation without changing status or navigation and permits retry', async () => {
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: false }
+    listFeeds.mockResolvedValueOnce({ feeds: [feed] })
+    confirmMining
+      .mockRejectedValueOnce(new Error('Confirmation unavailable.'))
+      .mockResolvedValueOnce({ feedStatus: 'verified' })
+    listFeeds.mockResolvedValueOnce({
+      feeds: [{ ...feed, status: 'verified', hasRisk: false }]
+    })
+    const getWorkflow = renderWorkflow('jwt-token')
+    await waitFor(() => expect(getWorkflow().feeds).toEqual([feed]))
+    act(() => {
+      getWorkflow().setActiveFeedId(feed.id)
+      getWorkflow().setScreen('verify')
+    })
+
+    await expect(
+      getWorkflow().confirmVerification({
+        acceptedTemplateKeys: ['tpl_accept'],
+        destination: 'feeds'
+      })
+    ).rejects.toThrow('Confirmation unavailable.')
+    expect(getWorkflow().screen).toBe('verify')
+    expect(getWorkflow().feeds).toEqual([feed])
+
+    await act(async () => {
+      await getWorkflow().confirmVerification({
+        acceptedTemplateKeys: ['tpl_accept'],
+        destination: 'feeds'
+      })
+    })
+    expect(confirmMining).toHaveBeenCalledTimes(2)
+    expect(getWorkflow().screen).toBe('feeds')
+  })
+
+  it('awaits server verification and exact refresh before navigation and toast', async () => {
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: false }
+    const verifiedServerFeed = {
+      ...feed,
+      status: 'verified',
+      hasRisk: false,
+      fetched: 19
+    }
+    const order = []
+    listFeeds
+      .mockResolvedValueOnce({ feeds: [feed] })
+      .mockImplementationOnce(async () => {
+        order.push('refresh')
+        return { feeds: [verifiedServerFeed] }
+      })
+    confirmMining.mockImplementationOnce(async () => {
+      order.push('confirm')
+      return { feedStatus: 'verified' }
+    })
+    const getWorkflow = renderWorkflow('jwt-token')
+    await waitFor(() => expect(getWorkflow().feeds).toEqual([feed]))
+    act(() => {
+      getWorkflow().setActiveFeedId(feed.id)
+      getWorkflow().setScreen('verify')
+    })
+
+    await act(async () => {
+      await getWorkflow().confirmVerification({
+        acceptedTemplateKeys: ['tpl_accept'],
+        destination: 'exchange'
+      })
+    })
+
+    expect(order).toEqual(['confirm', 'refresh'])
+    expect(getWorkflow().feeds).toEqual([verifiedServerFeed])
+    expect(getWorkflow().feeds[0].hasRisk).toBe(false)
+    expect(getWorkflow().screen).toBe('exchange')
+    expect(getWorkflow().toast.title).toBe('Source verified')
+  })
+
+  it('does not accept a confirmation whose refreshed server feed is backfilled', async () => {
+    const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: false }
+    listFeeds
+      .mockResolvedValueOnce({ feeds: [feed] })
+      .mockResolvedValueOnce({ feeds: [{ ...feed, fetched: 21 }] })
+    confirmMining.mockResolvedValueOnce({ feedStatus: 'verified' })
+    const getWorkflow = renderWorkflow('jwt-token')
+    await waitFor(() => expect(getWorkflow().feeds).toEqual([feed]))
+    act(() => {
+      getWorkflow().setActiveFeedId(feed.id)
+      getWorkflow().setScreen('verify')
+    })
+
+    let commandError
+    await act(async () => {
+      try {
+        await getWorkflow().confirmVerification({
+          acceptedTemplateKeys: ['tpl_accept'],
+          destination: 'feeds'
+        })
+      } catch (error) {
+        commandError = error
+      }
+    })
+
+    expect(commandError?.message).toMatch(/server did not confirm/i)
+    expect(getWorkflow().screen).toBe('verify')
+    expect(getWorkflow().feeds[0]).toEqual({ ...feed, fetched: 21 })
+  })
+
+  it('preserves explicit local demo confirmation behavior', async () => {
     const getWorkflow = renderWorkflow()
     const feed = { ...reviewedFeed, status: 'backfilled', hasRisk: false }
+    act(() => {
+      getWorkflow().upsertFeed(feed)
+      getWorkflow().setActiveFeedId(feed.id)
+      getWorkflow().setScreen('verify')
+    })
 
-    act(() => getWorkflow().upsertFeed(feed))
-    act(() => getWorkflow().setActiveFeedId(feed.id))
-    act(() => getWorkflow().routeAfterVerify())
+    await act(async () => {
+      await getWorkflow().confirmVerification({ destination: 'feeds' })
+    })
 
-    const verifiedFeed = getWorkflow().feeds.find(
-      (candidate) => candidate.id === feed.id
+    expect(getWorkflow().feeds.find((candidate) => candidate.id === feed.id)).toEqual(
+      expect.objectContaining({ status: 'verified', hasRisk: true })
     )
-    expect(verifiedFeed.status).toBe('verified')
-    expect(verifiedFeed.hasRisk).toBe(true)
-    expect(getWorkflow().screen).toBe('exchange')
-
-    act(() => getWorkflow().fetchNewMessages(verifiedFeed))
-    act(() =>
-      getWorkflow().onBackfillComplete({
-        fetched: 12,
-        lastDate: 'Jun 3, 2026',
-        status: 'succeeded'
-      })
-    )
-
-    const refreshedFeed = getWorkflow().feeds.find(
-      (candidate) => candidate.id === feed.id
-    )
-    act(() => getWorkflow().resumeFeed(refreshedFeed))
-
-    expect(refreshedFeed.status).toBe('verified')
-    expect(getWorkflow().screen).toBe('verify')
+    expect(getWorkflow().screen).toBe('feeds')
+    expect(confirmMining).not.toHaveBeenCalled()
   })
 })

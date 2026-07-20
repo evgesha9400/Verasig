@@ -71,8 +71,7 @@ export function TemplateMiningPage({
   onMined,
   onContinueToVerify,
   onBackToReview,
-  onFinish,
-  onKeepVerified,
+  onConfirmVerification,
   plan,
   onUpgrade,
   decisions: controlledDecisions,
@@ -89,8 +88,14 @@ export function TemplateMiningPage({
   const [audit, setAudit] = useState(null) // fetched server audit, or null before first fetch
   const [auditLoading, setAuditLoading] = useState(false)
   const [auditError, setAuditError] = useState(null)
+  const [confirmationPending, setConfirmationPending] = useState(false)
+  const [confirmationError, setConfirmationError] = useState(null)
+  const [overlayPending, setOverlayPending] = useState(false)
+  const [overlayError, setOverlayError] = useState(null)
   const seededFeedRef = useRef(null)
   const auditRequestRef = useRef(0)
+  const confirmationRef = useRef(null)
+  const overlayMutationRef = useRef(null)
 
   // Controlled-with-fallback: the parent may own decisions; otherwise local.
   const decisions = controlledDecisions ?? internalDecisions
@@ -204,6 +209,10 @@ export function TemplateMiningPage({
     setAudit(null)
     setAuditLoading(false)
     setAuditError(null)
+    setConfirmationPending(false)
+    setConfirmationError(null)
+    setOverlayPending(false)
+    setOverlayError(null)
     seededFeedRef.current = null
   }, [activeFeed?.id])
 
@@ -314,7 +323,60 @@ export function TemplateMiningPage({
   }
 
   function goToVerify() {
-    if (acceptedGroups.length > 0) onContinueToVerify?.()
+    if (acceptedGroups.length > 0 && !overlayPending) onContinueToVerify?.()
+  }
+
+  function confirmVerification(destination) {
+    if (confirmationRef.current || !onConfirmVerification) {
+      return confirmationRef.current
+    }
+
+    setConfirmationPending(true)
+    setConfirmationError(null)
+    const command = onConfirmVerification({
+      acceptedTemplateKeys: acceptedGroups.map((group) => group.templateKey),
+      destination
+    })
+      .catch((error) => {
+        setConfirmationError(error?.message || 'Try again in a moment.')
+      })
+      .finally(() => {
+        confirmationRef.current = null
+        setConfirmationPending(false)
+      })
+    confirmationRef.current = command
+    return command
+  }
+
+  function saveOverlayAndRemine(nextOverlay) {
+    if (overlayMutationRef.current || !onSaveOverlay) {
+      return overlayMutationRef.current
+    }
+
+    setOverlayPending(true)
+    setOverlayError(null)
+    const mutation = onSaveOverlay(nextOverlay)
+      .then(() => {
+        auditRequestRef.current += 1
+        setResult(null)
+        setDecisions({})
+        setExamplesFor(null)
+        setConfirmedKeys(null)
+        setAudit(null)
+        setAuditLoading(false)
+        setAuditError(null)
+        setMineError(null)
+      })
+      .catch((error) => {
+        setOverlayError(error?.message || 'Try again in a moment.')
+        throw error
+      })
+      .finally(() => {
+        overlayMutationRef.current = null
+        setOverlayPending(false)
+      })
+    overlayMutationRef.current = mutation
+    return mutation
   }
 
   const cardProps = (group) => ({
@@ -389,6 +451,7 @@ export function TemplateMiningPage({
                   <Button
                     variant="secondary"
                     size="sm"
+                    disabled={overlayPending}
                     onClick={applyAllSuggestedAccepts}
                   >
                     Apply all {suggestedAcceptGroups.length}
@@ -407,12 +470,21 @@ export function TemplateMiningPage({
           <details className="vrs-tm-advanced">
             <summary>Advanced</summary>
             {onSaveOverlay && (
-              <OverlayManager overlay={overlay} onSave={onSaveOverlay} />
+              <OverlayManager
+                overlay={overlay}
+                onSave={saveOverlayAndRemine}
+                pending={overlayPending}
+                error={overlayError}
+              />
             )}
           </details>
 
           <div className="vrs-tm-footer">
-            <Button variant="ghost" onClick={() => setDecisions({})}>
+            <Button
+              variant="ghost"
+              disabled={overlayPending}
+              onClick={() => setDecisions({})}
+            >
               Clear decisions
             </Button>
             <div className="vrs-tm-footer__end">
@@ -423,7 +495,7 @@ export function TemplateMiningPage({
               )}
               <Button
                 variant="primary"
-                disabled={acceptedGroups.length === 0}
+                disabled={acceptedGroups.length === 0 || overlayPending}
                 onClick={goToVerify}
               >
                 Continue to verify
@@ -435,7 +507,12 @@ export function TemplateMiningPage({
 
       {step === 'verify' && (
         <>
-          <Button variant="ghost" size="sm" onClick={() => onBackToReview?.()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={confirmationPending}
+            onClick={() => onBackToReview?.()}
+          >
             Back to review
           </Button>
           <AuditReview
@@ -445,14 +522,12 @@ export function TemplateMiningPage({
             hasAccepted={acceptedGroups.length > 0}
             loading={auditLoading}
             error={auditError}
+            confirmationPending={confirmationPending}
+            confirmationError={confirmationError}
             plan={plan}
             onUpgrade={onUpgrade}
-            onFinish={() =>
-              onFinish?.(acceptedGroups.map((group) => group.templateKey))
-            }
-            onKeepVerified={() =>
-              onKeepVerified?.(acceptedGroups.map((group) => group.templateKey))
-            }
+            onFinish={() => confirmVerification('exchange')}
+            onKeepVerified={() => confirmVerification('feeds')}
           />
         </>
       )}
