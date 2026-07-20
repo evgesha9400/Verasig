@@ -92,6 +92,9 @@ class FeedRow(Base):
     captured_through_external_message_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True
     )
+    capture_generation: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
     meta: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -447,29 +450,39 @@ class ParserOverlayRow(Base):
     )
 
 
-class MineResultRow(Base):
-    """The last template-mining result for a feed — the mined families plus the
-    raw messages they were mined from ({groups, messages}, camelCase wire shape).
+class MiningReviewRow(Base):
+    """One immutable template-mining review over an exact capture + overlay.
 
-    One row per feed: a fresh mine upserts it, deleting the feed cascades it away.
-    Reopening a verified feed hydrates the Verify audit from this snapshot instead
-    of re-running the (CPU-bound) scan over the whole history."""
+    Reviews survive later capture generations so stale review ids can be rejected
+    explicitly instead of silently resolving to a different message corpus.
+    """
 
-    __tablename__ = "mine_result"
+    __tablename__ = "mining_review"
     __table_args__ = (
         ForeignKeyConstraint(
-            _FEED_FK, _FEED_REF, name="fk_mine_result_feed", ondelete="CASCADE"
+            _FEED_FK, _FEED_REF, name="fk_mining_review_feed", ondelete="CASCADE"
+        ),
+        Index(
+            "ix_mining_review_feed_created",
+            "user_id",
+            "external_id",
+            "created_at",
         ),
     )
 
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), primary_key=True
+        Uuid, ForeignKey("user_account.id", ondelete="CASCADE"), nullable=False
     )
-    external_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    external_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    input_revision: Mapped[str] = mapped_column(String(64), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+    overlay: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    accepted_template_keys: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    missed_message_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
-    updated_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

@@ -307,10 +307,15 @@ export function useWorkflowState(authToken, plan) {
     )
   }
 
-  async function confirmAuthenticatedVerification(acceptedTemplateKeys, destination) {
+  async function confirmAuthenticatedVerification(
+    reviewId,
+    acceptedTemplateKeys,
+    destination
+  ) {
     const confirmation = await confirmMining(
       authToken,
       activeFeedId,
+      reviewId,
       acceptedTemplateKeys
     )
     if (confirmation?.feedStatus !== 'verified') {
@@ -332,14 +337,23 @@ export function useWorkflowState(authToken, plan) {
     finishVerification(destination)
   }
 
-  function confirmVerification({ acceptedTemplateKeys = [], destination = 'feeds' }) {
+  function confirmVerification({
+    reviewId,
+    acceptedTemplateKeys = [],
+    destination = 'feeds'
+  }) {
     if (!activeFeedId) {
       return Promise.reject(new Error('Select a feed before confirming verification.'))
+    }
+    if (authToken && !reviewId) {
+      return Promise.reject(
+        new Error('Re-mine this feed before confirming verification.')
+      )
     }
     if (confirmationRef.current) return confirmationRef.current
 
     const command = authToken
-      ? confirmAuthenticatedVerification(acceptedTemplateKeys, destination)
+      ? confirmAuthenticatedVerification(reviewId, acceptedTemplateKeys, destination)
       : confirmDemoVerification(destination)
     confirmationRef.current = command.finally(() => {
       confirmationRef.current = null

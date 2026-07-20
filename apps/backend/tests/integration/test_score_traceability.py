@@ -142,7 +142,7 @@ def _score_from_repo(session_factory):
         message_count=message_count,
         events=signals,
         signals=signals,
-        missed_event_ids=[],
+        missed_message_ids=[],
         deletions=deletions,
         computed_at=_BASE,
     )[0]

@@ -124,7 +124,12 @@ function mineResultFixture() {
       date: candidate.message.date
     }))
   )
-  return { groups, messages }
+  return {
+    reviewId: '10000000-0000-0000-0000-000000000001',
+    inputRevision: 'a'.repeat(64),
+    groups,
+    messages
+  }
 }
 
 // Mirrors the shape getMineAudit resolves with (ADR 0015): the same buckets
@@ -258,7 +263,11 @@ describe('TemplateMiningPage', () => {
     // coverage metric needs it too, not just the Verify screen.
     await acceptFirstTemplate(user)
     await waitFor(() =>
-      expect(onLoadAudit).toHaveBeenCalledWith('apex', ['tpl_accept'])
+      expect(onLoadAudit).toHaveBeenCalledWith(
+        'apex',
+        '10000000-0000-0000-0000-000000000001',
+        ['tpl_accept']
+      )
     )
 
     await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
@@ -305,6 +314,7 @@ describe('TemplateMiningPage', () => {
       within(review).getByRole('button', { name: /Confirm & route to Exchange/i })
     )
     expect(onConfirmVerification).toHaveBeenCalledWith({
+      reviewId: '10000000-0000-0000-0000-000000000001',
       acceptedTemplateKeys: ['tpl_accept'],
       destination: 'exchange'
     })
@@ -350,6 +360,22 @@ describe('TemplateMiningPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Keep verified/i }))
     await waitFor(() => expect(onConfirmVerification).toHaveBeenCalledTimes(2))
+  })
+
+  it('requires a fresh mine when the server rejects a stale review', async () => {
+    const stale = Object.assign(new Error('Review is stale.'), {
+      status: 409,
+      code: 'MINING_REVIEW_STALE'
+    })
+    const onLoadAudit = vi.fn().mockRejectedValue(stale)
+    const { user, onStartMine } = await renderMinedPage({ onLoadAudit })
+    await acceptFirstTemplate(user)
+
+    expect(await screen.findByText(/Messages or parser settings changed/i)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /Re-mine messages/i }))
+
+    await waitFor(() => expect(onStartMine).toHaveBeenCalledTimes(2))
+    expect(screen.getByText(/Mining Apex Crypto Calls/i)).toBeTruthy()
   })
 
   it('clears stale mining state and starts exactly one mine after overlay save', async () => {
@@ -489,14 +515,15 @@ describe('TemplateMiningPage — mine failure', () => {
   })
 })
 
-// Reopening a verified feed should hydrate Verify from the backend's cached mine
-// result instead of re-running the scan. onLoadMineResult resolves with the cached
+// Reopening a verified feed should hydrate Verify from the latest current review
+// instead of re-running the scan. onLoadMineResult resolves with the stored
 // {groups, messages}; the live-mine job (onStartMine) must never be touched.
-describe('TemplateMiningPage — resume from cached mine result', () => {
+describe('TemplateMiningPage — resume from a current mining review', () => {
   it('hydrates the audit from the cache without re-running the scan', async () => {
     const { onStartMine, onStreamMine } = mineJobMocks()
-    const { groups, messages } = mineResultFixture()
-    const onLoadMineResult = vi.fn().mockResolvedValue({ groups, messages })
+    const mineResult = mineResultFixture()
+    const { groups } = mineResult
+    const onLoadMineResult = vi.fn().mockResolvedValue(mineResult)
     const onLoadConfirmed = vi
       .fn()
       .mockResolvedValue({ acceptedTemplateKeys: [groups[0].templateKey] })
@@ -518,7 +545,9 @@ describe('TemplateMiningPage — resume from cached mine result', () => {
     expect(onLoadMineResult).toHaveBeenCalledWith('7')
     expect(onStartMine).not.toHaveBeenCalled()
     await waitFor(() =>
-      expect(onLoadAudit).toHaveBeenCalledWith('7', [groups[0].templateKey])
+      expect(onLoadAudit).toHaveBeenCalledWith('7', mineResult.reviewId, [
+        groups[0].templateKey
+      ])
     )
   })
 
@@ -547,7 +576,8 @@ describe('TemplateMiningPage — resume from cached mine result', () => {
 describe('TemplateMiningPage — resume a verified feed', () => {
   it('reseeds the confirmed templates and shows the audit (no bounce)', async () => {
     const { onStartMine, onStreamMine, stream } = mineJobMocks()
-    const { groups, messages } = mineResultFixture()
+    const mineResult = mineResultFixture()
+    const { groups } = mineResult
     const confirmedKey = groups[0].templateKey
     const onLoadConfirmed = vi
       .fn()
@@ -568,7 +598,7 @@ describe('TemplateMiningPage — resume a verified feed', () => {
     )
 
     await waitFor(() => expect(stream.handlers).toBeTruthy())
-    act(() => stream.handlers.onDone({ groups, messages }))
+    act(() => stream.handlers.onDone(mineResult))
 
     expect(await screen.findByRole('tab', { name: /Parsed/i })).toBeTruthy()
     expect(onLoadConfirmed).toHaveBeenCalledWith('7')
@@ -577,7 +607,7 @@ describe('TemplateMiningPage — resume a verified feed', () => {
 
   it('falls back to Review when no confirmed templates come back', async () => {
     const { onStartMine, onStreamMine, stream } = mineJobMocks()
-    const { groups, messages } = mineResultFixture()
+    const mineResult = mineResultFixture()
     const onLoadConfirmed = vi.fn().mockResolvedValue({ acceptedTemplateKeys: [] })
     const onBackToReview = vi.fn()
 
@@ -593,7 +623,7 @@ describe('TemplateMiningPage — resume a verified feed', () => {
     )
 
     await waitFor(() => expect(stream.handlers).toBeTruthy())
-    act(() => stream.handlers.onDone({ groups, messages }))
+    act(() => stream.handlers.onDone(mineResult))
 
     await waitFor(() => expect(onBackToReview).toHaveBeenCalled())
     expect(onLoadConfirmed).toHaveBeenCalledWith('7')

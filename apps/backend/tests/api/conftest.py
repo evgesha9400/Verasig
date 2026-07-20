@@ -93,19 +93,14 @@ def _backfill_to_done(client, app, token: str, source) -> None:
         "".join(response.iter_text())
 
 
-def _mined_keys(client, app, token: str) -> list[str]:
-    """The template_keys the miner yields for the stored feed — what the client
-    reviews and accepts before POSTing confirm. Re-mining the SAME stored messages
-    (byte-identical port) yields the SAME keys the browser saw, so the match is
-    exact and the test never hardcodes a hash."""
-    from verasig.features.feeds import message_repository
-    from verasig.features.mining.mining_confirm import _to_chat_message
-    from verasig.features.mining.template_mining import mine_template_groups
-    from verasig.features.parser_overlay.repository import read_overlay
-
-    user_id = read_user_id(token, app.state.jwt_secret)
-    with app.state.session_factory() as session:
-        messages = message_repository.read_messages(session, user_id, 7)
-        overlay = read_overlay(session, user_id)
-    groups = mine_template_groups([_to_chat_message(m) for m in messages], overlay)
-    return [group.template_key for group in groups]
+def _mine_review(client, token: str) -> dict:
+    assert (
+        client.post("/feeds/7/mining/preview", headers=_auth(token)).status_code == 202
+    )
+    with client.stream(
+        "GET", "/feeds/7/mining/preview/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    result = client.get("/feeds/7/mining/result", headers=_auth(token))
+    assert result.status_code == 200
+    return result.json()

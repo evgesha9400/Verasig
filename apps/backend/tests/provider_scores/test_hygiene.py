@@ -208,8 +208,9 @@ def test_completeness_excludes_empty_signal_denominator():
 def test_parser_confidence_measures_recognized_share_of_all_candidates():
     # recognition rate = extracted signals / (extracted + missed events).
     measurement = measure_parser_confidence(
+        channel_id=7,
         signals=[_signal(20)],
-        missed_event_ids=[_uuid(21), _uuid(22)],
+        missed_message_ids=[21, 22],
     )
 
     assert isinstance(measurement, HygieneMeasurement)
@@ -218,8 +219,8 @@ def test_parser_confidence_measures_recognized_share_of_all_candidates():
     assert measurement.normalized == pytest.approx(1 / 3)
     assert measurement.evidence_refs == [
         "signal:00000000-0000-0000-0000-000000000020",
-        "event:00000000-0000-0000-0000-000000000021",
-        "event:00000000-0000-0000-0000-000000000022",
+        "message:7/21",
+        "message:7/22",
     ]
 
 
@@ -227,18 +228,21 @@ def test_parser_confidence_keeps_zero_recognized_as_real_measurement():
     # A feed whose every candidate is a miss scores 0 — a real measurement, not
     # an exclusion.
     measurement = measure_parser_confidence(
+        channel_id=7,
         signals=[],
-        missed_event_ids=[_uuid(23)],
+        missed_message_ids=[23],
     )
 
     assert isinstance(measurement, HygieneMeasurement)
     assert measurement.raw_value == 0.0
     assert measurement.normalized == 0.0
-    assert measurement.evidence_refs == ["event:00000000-0000-0000-0000-000000000023"]
+    assert measurement.evidence_refs == ["message:7/23"]
 
 
 def test_parser_confidence_excludes_empty_candidate_denominator():
-    measurement = measure_parser_confidence(signals=[], missed_event_ids=[])
+    measurement = measure_parser_confidence(
+        channel_id=7, signals=[], missed_message_ids=[]
+    )
 
     assert isinstance(measurement, ExcludedMeasurement)
     assert measurement.name == "parser_confidence"

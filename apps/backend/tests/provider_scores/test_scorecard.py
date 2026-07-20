@@ -228,7 +228,7 @@ def test_provider_score_builder_measures_all_present_components():
         message_count=2,
         events=[signal],
         signals=[signal],
-        missed_event_ids=[],
+        missed_message_ids=[],
         deletions=[_snapshot_rescan_proof(3)],
         computed_at=_computed_at(),
     )
@@ -255,7 +255,7 @@ def test_provider_score_builder_adds_simulation_components_when_outcomes_exist()
         message_count=2,
         events=[signal],
         signals=[signal],
-        missed_event_ids=[],
+        missed_message_ids=[],
         deletions=[_snapshot_rescan_proof(6)],
         sim_outcomes=[_sim_outcome(signal)],
         computed_at=_computed_at(),

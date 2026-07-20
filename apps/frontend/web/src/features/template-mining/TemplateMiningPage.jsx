@@ -17,9 +17,9 @@ import './template-mining.css'
    from the backend (onLoadAudit) whenever the accepted-template set changes.
    This component owns the shared mining state (result, decisions, fetched
    audit) and renders the view for the current step; advancing calls up to the
-   parent. Reopening a verified feed lands on Verify: the page re-mines, then
-   reseeds the accepted templates recovered from the backend (onLoadConfirmed)
-   so the audit repopulates instead of bouncing to Review. */
+   parent. Reopening a verified feed lands on Verify: the page loads the latest
+   current review and reseeds accepted templates from the backend
+   (onLoadConfirmed), so the audit repopulates without changing its input. */
 
 const EMPTY_AUDIT = {
   parsedSignals: [],
@@ -32,6 +32,12 @@ const EMPTY_AUDIT = {
 // A request per keystroke/toggle would hammer the backend; the audit is only
 // ever read a moment after the operator settles on a decision.
 const AUDIT_DEBOUNCE_MS = 300
+const STALE_REVIEW_MESSAGE =
+  'Messages or parser settings changed after this review. Re-mine before auditing or confirming.'
+
+function isStaleReview(error) {
+  return error?.status === 409 && error?.code === 'MINING_REVIEW_STALE'
+}
 
 function TemplateSection({ title, subtitle, groups, action, cardProps }) {
   if (groups.length === 0) return null
@@ -92,6 +98,7 @@ export function TemplateMiningPage({
   const [confirmationError, setConfirmationError] = useState(null)
   const [overlayPending, setOverlayPending] = useState(false)
   const [overlayError, setOverlayError] = useState(null)
+  const [reviewStaleMessage, setReviewStaleMessage] = useState(null)
   const seededFeedRef = useRef(null)
   const auditRequestRef = useRef(0)
   const confirmationRef = useRef(null)
@@ -159,6 +166,7 @@ export function TemplateMiningPage({
     const timer = setTimeout(() => {
       onLoadAudit(
         activeFeed.id,
+        result.reviewId,
         acceptedGroups.map((group) => group.templateKey)
       )
         .then((data) => {
@@ -167,6 +175,7 @@ export function TemplateMiningPage({
         })
         .catch((error) => {
           if (requestId !== auditRequestRef.current) return
+          if (isStaleReview(error)) setReviewStaleMessage(STALE_REVIEW_MESSAGE)
           setAuditError(error?.message || 'Try again in a moment.')
         })
         .finally(() => {
@@ -175,7 +184,7 @@ export function TemplateMiningPage({
     }, AUDIT_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auditNeeded, acceptedTemplateKeys, activeFeed?.id, onLoadAudit])
+  }, [auditNeeded, acceptedTemplateKeys, activeFeed?.id, onLoadAudit, result?.reviewId])
 
   const metrics = useMemo(() => {
     if (!result) return null
@@ -213,6 +222,7 @@ export function TemplateMiningPage({
     setConfirmationError(null)
     setOverlayPending(false)
     setOverlayError(null)
+    setReviewStaleMessage(null)
     seededFeedRef.current = null
   }, [activeFeed?.id])
 
@@ -221,10 +231,9 @@ export function TemplateMiningPage({
     if (step === 'mine' && result) navRef.current.onMined?.()
   }, [step, result])
 
-  // Reopening a verified feed lands on Verify: hydrate from the backend's cached
-  // mine snapshot instead of re-running the scan. On a hit we set `result` and skip
-  // MineView entirely; a miss (404 — feed verified before the cache existed) marks
-  // the check done and falls through to a live mine. Once per feed.
+  // Reopening a verified feed lands on Verify: hydrate its latest current review.
+  // On a hit we set `result` and skip MineView; a 404 means there is no current
+  // review, so the page falls through to a live mine. Once per feed.
   useEffect(() => {
     if (!onLoadMineResult) return
     if (step !== 'verify' || result || resumeChecked) return
@@ -233,7 +242,11 @@ export function TemplateMiningPage({
       .then((payload) => {
         if (!cancelled && payload) handleMineDone(payload)
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (!cancelled && isStaleReview(error)) {
+          setReviewStaleMessage(STALE_REVIEW_MESSAGE)
+        }
+      })
       .finally(() => {
         if (!cancelled) setResumeChecked(true)
       })
@@ -285,6 +298,8 @@ export function TemplateMiningPage({
   function handleMineDone(mineResult) {
     setMineError(null)
     setResult({
+      reviewId: mineResult?.reviewId,
+      inputRevision: mineResult?.inputRevision,
       groups: mineResult?.groups ?? [],
       messages: mineResult?.messages ?? []
     })
@@ -292,6 +307,7 @@ export function TemplateMiningPage({
     setExamplesFor(null)
     setAudit(null)
     setAuditError(null)
+    setReviewStaleMessage(null)
   }
 
   // A failed mine keeps the operator on the loader with an explicit error and a
@@ -334,10 +350,12 @@ export function TemplateMiningPage({
     setConfirmationPending(true)
     setConfirmationError(null)
     const command = onConfirmVerification({
+      reviewId: result.reviewId,
       acceptedTemplateKeys: acceptedGroups.map((group) => group.templateKey),
       destination
     })
       .catch((error) => {
+        if (isStaleReview(error)) setReviewStaleMessage(STALE_REVIEW_MESSAGE)
         setConfirmationError(error?.message || 'Try again in a moment.')
       })
       .finally(() => {
@@ -379,6 +397,18 @@ export function TemplateMiningPage({
     return mutation
   }
 
+  function remineStaleReview() {
+    auditRequestRef.current += 1
+    setResult(null)
+    setDecisions({})
+    setAudit(null)
+    setAuditLoading(false)
+    setAuditError(null)
+    setConfirmationError(null)
+    setResumeChecked(true)
+    setMineAttempt((attempt) => attempt + 1)
+  }
+
   const cardProps = (group) => ({
     status: decisions[group.templateKey] || 'unreviewed',
     onAccept: () => decide(group.templateKey, 'accepted'),
@@ -400,6 +430,11 @@ export function TemplateMiningPage({
       Boolean(onLoadMineResult) && step === 'verify' && !resumeChecked
     return (
       <div className="vrs-page vrs-tm">
+        {reviewStaleMessage && (
+          <div className="vrs-empty vrs-empty--sm" role="alert">
+            <div className="vrs-empty__note">{reviewStaleMessage}</div>
+          </div>
+        )}
         {mineError ? (
           <div className="vrs-empty vrs-empty--sm" role="alert">
             <div className="vrs-empty__note">Mining failed. {mineError}</div>
@@ -429,6 +464,14 @@ export function TemplateMiningPage({
 
   return (
     <div className="vrs-page vrs-tm">
+      {reviewStaleMessage && (
+        <div className="vrs-empty vrs-empty--sm" role="alert">
+          <div className="vrs-empty__note">{reviewStaleMessage}</div>
+          <Button variant="primary" size="sm" onClick={remineStaleReview}>
+            Re-mine messages
+          </Button>
+        </div>
+      )}
       {step === 'mine' && <Loader variant="dot" size="sm" title="Opening review…" />}
 
       {step === 'review' && (

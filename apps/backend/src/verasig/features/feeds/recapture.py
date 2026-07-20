@@ -64,5 +64,6 @@ def _wipe_capture(
     with session_factory() as session:
         deleted = message_repository.delete_feed_messages(session, user_id, external_id)
         feed_repository.reset_cursor(session, user_id, external_id)
+        feed_repository.advance_capture_generation(session, user_id, external_id)
         session.commit()
         return deleted

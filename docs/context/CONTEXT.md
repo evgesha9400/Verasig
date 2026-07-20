@@ -71,15 +71,19 @@ _Avoid_: merged signal, final signal.
 ### Mining
 
 **Template mining**:
-The parser-first extraction mechanism: the backend re-mines a `Feed`'s captured messages, groups them into `Template family`s by shared normalized format, and lets the operator accept or reject each family. Replaced the label→distill→verify screens ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)).
+The parser-first extraction mechanism: the backend groups a `Feed`'s captured messages into `Template family`s by shared normalized format, persists the exact input and output as a `MiningReview`, and lets the operator accept or reject each family. Replaced the label→distill→verify screens ([ADR 0013](../adr/0013-mining-wizard-replaces-label-distill-verify-frontend.md)).
 _Avoid_: distillation, labeling.
+
+**MiningReview**:
+The immutable, revisioned result of one Template mining run: the exact ordered messages, parser overlay, and `Template family`s the operator reviewed. Audit and Mining confirm address it by `reviewId`; if the live corpus, overlay, or full-history capture generation changed, the review is stale and cannot be applied ([ADR 0018](../adr/0018-revisioned-mining-review.md)).
+_Avoid_: current cache, latest messages (when referring to reviewed input).
 
 **Template family**:
 A group of a `Feed`'s messages sharing one normalized format (a signal template), surfaced by **Template mining**. Accepting a family validates every message in it at once; one decision, not per-message labels.
 _Avoid_: cluster, group (unqualified).
 
 **Mining confirm**:
-Committing the accepted `Template family`s (`POST /feeds/{external_id}/mining/confirm`). The backend re-mines the feed's stored messages (byte-identical to what the browser reviewed), keeps the accepted families, and persists each candidate as a `RawSignalEvent` + linked `ExtractedSignal`, then marks the `Feed` **verified** ([ADR 0016](../adr/0016-remove-legacy-loop-and-regex-rule-pipeline.md)). The miner **is** the extractor — its structured fields are the signal; no rules are written. This is when Mining decisions become authoritative for live scoring and deletion candidacy.
+Committing the accepted `Template family`s (`POST /feeds/{external_id}/mining/confirm`). Under a feed-row lock, the backend validates the addressed `MiningReview`, replaces the feed's `signal` projection with the accepted families, records the confirmed review's candidate misses, and marks the `Feed` **verified** in one transaction ([ADR 0018](../adr/0018-revisioned-mining-review.md)). The miner **is** the extractor — its structured fields are the signal; no rules are written. This is when Mining decisions become authoritative for live scoring and deletion candidacy.
 _Avoid_: verify, distill, save.
 
 ### Deletion

@@ -401,8 +401,8 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           }
           onLoadConfirmed={(chatId) => getConfirmedMining(authToken, chatId)}
           onLoadMineResult={(chatId) => getMineResult(authToken, chatId)}
-          onLoadAudit={(chatId, acceptedTemplateKeys) =>
-            getMineAudit(authToken, chatId, acceptedTemplateKeys)
+          onLoadAudit={(chatId, reviewId, acceptedTemplateKeys) =>
+            getMineAudit(authToken, chatId, reviewId, acceptedTemplateKeys)
           }
           fireToast={fireToast}
           overlay={overlay}

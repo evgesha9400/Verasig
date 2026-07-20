@@ -1,9 +1,9 @@
 """Wire schemas for Mining Preview, Confirm and Audit (ADR 0015).
 
-Confirm is miner-based: the browser reviews the mined template families and POSTs
-the ``template_key``s it accepted. The backend re-mines the feed's stored messages
-(byte-identical port) and persists the matching families' signals — so the confirm
-wire shape carries only the accepted keys, never compiled rules or extractor code.
+Confirm is miner-based: the browser reviews immutable mined template families and
+POSTs the review ID plus the ``template_key``s it accepted. The backend validates
+the review against the current feed input and persists signals from that exact
+snapshot, never from a silent re-mine.
 
 Preview and Audit carry the miner's full output (template families / audit
 buckets), so those models mirror the ``template_mining`` dataclasses field-for-
@@ -13,11 +13,13 @@ browser's camelCase JS shape.
 """
 
 from typing import Any
+from uuid import UUID
 
 from verasig.foundation.http.schemas import CamelModel
 
 
 class MiningConfirmIn(CamelModel):
+    review_id: UUID
     accepted_template_keys: list[str] = []
 
 
@@ -32,6 +34,7 @@ class MiningConfirmedOut(CamelModel):
 
 
 class MiningAuditIn(CamelModel):
+    review_id: UUID
     accepted_template_keys: list[str] = []
 
 
@@ -138,6 +141,8 @@ class TemplateGroupOut(CamelModel):
 
 
 class MineResultOut(CamelModel):
+    review_id: UUID
+    input_revision: str
     groups: list[TemplateGroupOut]
     messages: list[MineMessageOut]
 

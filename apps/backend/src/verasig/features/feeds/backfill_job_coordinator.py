@@ -272,7 +272,7 @@ class BackfillJobCoordinator:
         self, user_id: UUID, channel_id: int, mode: BackfillMode
     ) -> tuple[BackfillJobRun, str | None]:
         with self._session_factory() as session:
-            feed = feed_repository.read_feed(session, user_id, channel_id)
+            feed = feed_repository.lock_feed(session, user_id, channel_id)
             previous_status = feed.status if feed is not None else None
             run = backfill_job_repository.create_run(
                 session, user_id, channel_id, _now(), mode, previous_status

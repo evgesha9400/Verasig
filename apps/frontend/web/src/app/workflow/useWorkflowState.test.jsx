@@ -288,6 +288,7 @@ describe('useWorkflowState', () => {
     let command
     act(() => {
       command = getWorkflow().confirmVerification({
+        reviewId: 'review-1',
         acceptedTemplateKeys: ['tpl_accept'],
         destination: 'feeds'
       })
@@ -318,6 +319,7 @@ describe('useWorkflowState', () => {
 
     await expect(
       getWorkflow().confirmVerification({
+        reviewId: 'review-1',
         acceptedTemplateKeys: ['tpl_accept'],
         destination: 'feeds'
       })
@@ -327,6 +329,7 @@ describe('useWorkflowState', () => {
 
     await act(async () => {
       await getWorkflow().confirmVerification({
+        reviewId: 'review-1',
         acceptedTemplateKeys: ['tpl_accept'],
         destination: 'feeds'
       })
@@ -363,12 +366,16 @@ describe('useWorkflowState', () => {
 
     await act(async () => {
       await getWorkflow().confirmVerification({
+        reviewId: 'review-1',
         acceptedTemplateKeys: ['tpl_accept'],
         destination: 'exchange'
       })
     })
 
     expect(order).toEqual(['confirm', 'refresh'])
+    expect(confirmMining).toHaveBeenCalledWith('jwt-token', feed.id, 'review-1', [
+      'tpl_accept'
+    ])
     expect(getWorkflow().feeds).toEqual([verifiedServerFeed])
     expect(getWorkflow().feeds[0].hasRisk).toBe(false)
     expect(getWorkflow().screen).toBe('exchange')
@@ -392,6 +399,7 @@ describe('useWorkflowState', () => {
     await act(async () => {
       try {
         await getWorkflow().confirmVerification({
+          reviewId: 'review-1',
           acceptedTemplateKeys: ['tpl_accept'],
           destination: 'feeds'
         })

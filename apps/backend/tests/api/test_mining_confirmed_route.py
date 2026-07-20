@@ -9,7 +9,7 @@ the two endpoints share exactly one setup path.
 from conftest import (
     _auth,
     _backfill_to_done,
-    _mined_keys,
+    _mine_review,
 )
 from conftest import (
     _register_token as _register,
@@ -22,12 +22,13 @@ from fakes import messages as _messages
 def test_confirmed_lists_accepted_keys_after_confirm(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-    keys = _mined_keys(client, app, token)
+    review = _mine_review(client, token)
+    keys = [group["templateKey"] for group in review["groups"]]
 
     client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": keys},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": keys},
     )
     response = client.get("/feeds/7/mining/confirmed", headers=_auth(token))
 
@@ -40,7 +41,6 @@ def test_confirmed_lists_accepted_keys_after_confirm(client, app):
 def test_confirmed_is_empty_before_any_confirm(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
-
     response = client.get("/feeds/7/mining/confirmed", headers=_auth(token))
 
     assert response.status_code == 200
@@ -50,11 +50,12 @@ def test_confirmed_is_empty_before_any_confirm(client, app):
 def test_confirmed_is_empty_when_confirm_accepted_no_keys(client, app):
     token = _register(client)
     _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
+    review = _mine_review(client, token)
 
     client.post(
         "/feeds/7/mining/confirm",
         headers=_auth(token),
-        json={"acceptedTemplateKeys": []},
+        json={"reviewId": review["reviewId"], "acceptedTemplateKeys": []},
     )
     response = client.get("/feeds/7/mining/confirmed", headers=_auth(token))
 

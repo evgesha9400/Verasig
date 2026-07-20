@@ -1,7 +1,7 @@
 """Upsert one owner-keyed row that stamps ``created_at``/``updated_at``.
 
-The shared shape behind the per-owner config tables (parser_overlay, mine_result,
-…): insert the row on first write, replace its value columns on conflict, and
+The shared shape behind owner-keyed config such as `parser_overlay`: insert the
+row on first write, replace its value columns on conflict, and
 keep ``created_at`` from the first write while advancing ``updated_at``.
 """
 

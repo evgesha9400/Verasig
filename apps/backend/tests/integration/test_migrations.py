@@ -9,6 +9,39 @@ def test_migrations_apply(pg_url):
     command.upgrade(cfg, "head")  # no error == migrations apply
 
 
+def test_revisioned_mining_review_upgrades_from_0001_to_head(pg_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", pg_url)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0001_init")
+    before = inspect(create_engine(pg_url, future=True))
+    assert "mine_result" in before.get_table_names()
+
+    command.upgrade(cfg, "head")
+
+    inspector = inspect(create_engine(pg_url, future=True))
+    tables = set(inspector.get_table_names())
+    assert "mine_result" not in tables
+    assert "mining_review" in tables
+    feed_columns = {column["name"] for column in inspector.get_columns("feed")}
+    assert "capture_generation" in feed_columns
+    review_columns = {
+        column["name"] for column in inspector.get_columns("mining_review")
+    }
+    assert {
+        "id",
+        "user_id",
+        "external_id",
+        "input_revision",
+        "payload",
+        "overlay",
+        "accepted_template_keys",
+        "missed_message_ids",
+        "confirmed_at",
+        "created_at",
+    } <= review_columns
+
+
 def test_feed_capture_tables_exist_after_upgrade(pg_url):
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", pg_url)
@@ -33,6 +66,7 @@ def test_multi_tenant_api_tables_and_columns_exist_after_upgrade(pg_url):
         "feed_risk_config",
         "backtest_result",
         "lifecycle_link",
+        "mining_review",
     } <= tables
     assert "user_telegram_link" not in tables
 
@@ -82,6 +116,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
             "signal",
             "deleted_signal_evidence",
             "backfill_job_run",
+            "mining_review",
         )
         for index in inspector.get_indexes(table)
     }
@@ -91,6 +126,7 @@ def test_schema_hardening_constraints_exist_after_upgrade(pg_url):
         "ix_deleted_signal_evidence_channel",
         "ix_backfill_job_run_user_channel_started",
         "ix_backfill_job_run_status",
+        "ix_mining_review_feed_created",
     } <= index_names
 
     check_names = {
@@ -189,6 +225,7 @@ _USER_ACCOUNT_FK_TABLES = (
     "feed",
     "feed_risk_config",
     "lifecycle_link",
+    "mining_review",
     "user_exchange_connection",
 )
 
