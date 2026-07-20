@@ -48,5 +48,7 @@ new class prefixes.
 
 snake_case modules and feature folders; `CamelModel` wire schemas expose
 camelCase JSON (`alias_generator=to_camel`, `populate_by_name`). **Mining confirm**
-persists the miner's structured signals straight into `raw_signal_event` +
-`extracted_signal` via `features/signals/outcome_repository.py`; no rules are written.
+addresses an immutable `MiningReview`, validates its `inputRevision`, and replaces
+the feed's `signal` projection through `features/signals/outcome_repository.py`.
+The accepted templates, confirmed candidate misses, verified status, and signal
+projection commit in the same feed-row-locked transaction; no rules are written.

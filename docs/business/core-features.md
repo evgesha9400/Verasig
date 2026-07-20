@@ -2,18 +2,15 @@
 
 ## MVP Scope
 
-- Telegram app user-account session ingestion.
-- Public and private Telegram channel history capture.
-- RawSignalEvent append-only storage.
-- Text extractor.
-- Canonical Signal schema.
-- Provider-specific deterministic parser rules.
-- LLM fallback extraction for unsupported formats.
-- Parser drift warning log.
-- Signal Lake writer.
-- Deleted-signal evidence capture.
-- Channel performance scorecard.
-- Signed-up-user provider dashboard.
+- User-owned Telegram source sessions and public/private feed capture.
+- Immutable raw-message history with resumable and full-history capture modes.
+- Server-side template mining over the captured corpus and parser overlay.
+- Immutable, revisioned `MiningReview` snapshots for Mine, Review, and Verify.
+- Atomic confirmation of accepted templates into the feed's `signal` projection.
+- Durable confirmed and suspected deleted-signal evidence.
+- Historical signal simulation against public Bybit market data.
+- Recomputable, evidence-referenced provider scorecards.
+- Signed-up-user feed, signal, and provider dashboard views.
 
 ## MVP Exclusions
 
@@ -31,21 +28,20 @@
 
 ## Feature Contracts
 
-- Ingestion contract: Telegram channel message in, RawSignalEvent out.
-- Extractor contract: RawSignalEvent in, Signal out.
-- Parser-rule contract: provider history in, deterministic parser rule out.
-- LLM fallback contract: unsupported raw event in, extracted Signal or unrecognized Signal out.
-- Store contract: Signal in, append-only persisted record out.
-- Deleted-signal contract: historical message state in, deletion evidence out.
-- Scorecard contract: raw events, signals, PnL, active-user estimates, drawdown, and deletion evidence in, provider metrics out.
+- Capture contract: provider messages become immutable, user-owned `raw_message` rows.
+- Mining contract: captured messages plus the parser overlay produce an immutable `MiningReview` with `reviewId` and `inputRevision`.
+- Confirmation contract: the addressed current review plus accepted template keys atomically replaces `signal`, records confirmed review evidence, and marks the feed verified.
+- Signal contract: every persisted `Signal` is keyed directly to its source message; a miss is the absence of a signal row.
+- Deletion contract: a live snapshot compared with durable capture produces retained deletion evidence; only confirmed signal deletions affect quality.
+- Simulation contract: a signal or folded lifecycle plus historical klines produces an observe-only outcome under an explicit execution policy.
+- Scorecard contract: durable capture, confirmed review misses, signals, simulations, audience proxies, and deletion evidence produce a recomputable explanation with evidence references.
 
 ## MVP Metrics
 
-- Raw message capture completeness: 100 percent of Telegram messages available to the authorized user-account session.
-- Signal extraction precision: target 95 percent before demo execution support.
-- Signal extraction recall: target 70 percent before demo execution support.
-- Parser drift warning coverage: 100 percent of LLM fallback extractions.
-- Provider score explainability coverage: 100 percent of score changes trace to stored evidence.
+- Raw-message capture completeness: 100 percent of messages available to the authorized user session within the selected history depth.
+- Confirmed-review precision: target 95 percent before any execution expansion.
+- Confirmed-review recall: target 70 percent before any execution expansion.
+- Provider-score explainability: every measured component traces to durable evidence.
 - Pilot signal sources: at least 3.
 - Pilot users or channel owners: at least 3.
 - Paid-intent threshold: at least 2 buyers willing to pay for proof.
