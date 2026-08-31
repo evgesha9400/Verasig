@@ -10,7 +10,7 @@
     "format": "prettier --write \"web/**/*.{js,jsx,ts,tsx,json,css,html}\" \"design-system/**/*.{js,jsx,ts,tsx,json,css,html}\" \"package*.json\"",
     "format:check": "prettier --check \"web/**/*.{js,jsx,ts,tsx,json,css,html}\" \"design-system/**/*.{js,jsx,ts,tsx,json,css,html}\" \"package*.json\"",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspace @verasig/design-system && npm run test --workspace verasig-web -- --run",
+    "test": "npm run test --workspace @verasig/design-system && npm run test --workspace verasig-web",
     "build": "npm run build --workspace verasig-web"
   },
   "devDependencies": {
