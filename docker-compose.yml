@@ -1,3 +1,5 @@
+name: verasig
+
 x-backend-service: &backend-service
   build: ./apps/backend
   image: verasig-backend:local
