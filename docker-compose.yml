@@ -11,7 +11,7 @@ services:
   db:
     image: postgres:16
     ports:
-      - "${VERASIG_DB_PORT:-5432}:5432"     # exposed to host for local backend/CLI
+      - "127.0.0.1:${VERASIG_DB_PORT:-5434}:5432"     # exposed to host for local backend/CLI
     environment:
       POSTGRES_USER: ${VERASIG_DB_USER:-verasig}
       POSTGRES_PASSWORD: ${VERASIG_DB_PASSWORD:-verasig}
@@ -60,7 +60,7 @@ services:
     working_dir: /workspace
     environment:
       CHOKIDAR_USEPOLLING: "true"
-      VITE_API_BASE_URL: http://localhost:8000
+      VITE_VERASIG_API_URL: http://localhost:8000
     command:
       [
         "sh",
@@ -77,5 +77,6 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata: {}
+  pgdata:
+    name: verasig_pgdata
   frontend_node_modules: {}
