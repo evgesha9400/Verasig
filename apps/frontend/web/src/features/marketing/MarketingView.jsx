@@ -440,11 +440,20 @@ function CTA({ loginPath, signupPath }) {
   )
 }
 
+// Links with no page yet render as href-less <a> placeholders (not focusable,
+// never navigate) instead of href="#" jumps to the top of the page.
 function Footer() {
   const cols = [
-    { h: 'Product', links: ['How it works', 'Integrations', 'Principles'] },
-    { h: 'Resources', links: ['Docs', 'Changelog', 'Status'] },
-    { h: 'Company', links: ['About', 'Contact', 'Security'] }
+    {
+      h: 'Product',
+      links: [
+        ['How it works', '#how'],
+        ['Integrations', '#integrations'],
+        ['Principles', '#principles']
+      ]
+    },
+    { h: 'Resources', links: [['Docs'], ['Changelog'], ['Status']] },
+    { h: 'Company', links: [['About'], ['Contact'], ['Security']] }
   ]
   return (
     <footer className="mk-foot">
@@ -462,9 +471,9 @@ function Footer() {
           {cols.map((c) => (
             <div className="mk-foot__col" key={c.h}>
               <div className="mk-foot__h">{c.h}</div>
-              {c.links.map((l) => (
-                <a key={l} href="#">
-                  {l}
+              {c.links.map(([label, href]) => (
+                <a key={label} href={href}>
+                  {label}
                 </a>
               ))}
             </div>
@@ -474,9 +483,9 @@ function Footer() {
       <div className="mk-foot__bar">
         <span>© 2026 Verasig</span>
         <span className="mk-foot__legal">
-          <a href="#">Privacy</a>
-          <a href="#">Terms</a>
-          <a href="#">Security</a>
+          <a>Privacy</a>
+          <a>Terms</a>
+          <a>Security</a>
         </span>
       </div>
     </footer>

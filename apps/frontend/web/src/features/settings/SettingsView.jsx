@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, Input, Button, Badge, Banner, Dialog } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import {
+  cancelEmailChange as cancelEmailChangeRequest,
   cancelSubscription,
   changeEmail,
   changeSubscription,
@@ -83,15 +84,21 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         setEmail(updated.pendingEmail || updated.email)
         onToast(
           'info',
-          'Verification sent',
-          `Check ${updated.pendingEmail} and click the link to confirm the change.`
+          'Email change pending',
+          `${updated.pendingEmail} is waiting for confirmation. Email delivery is not available yet.`
         )
       }
     )
   }
   function cancelEmailChange() {
-    onUpdateUser({ pendingEmail: null })
-    setEmail(user.email)
+    void applyBackendUser(
+      'email',
+      () => cancelEmailChangeRequest(authToken),
+      (updated) => {
+        setEmail(updated.email)
+        onToast('info', 'Email change cancelled', `${updated.email} stays active.`)
+      }
+    )
   }
 
   /* ---- password ---- */
@@ -104,8 +111,8 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         setResetState('sent')
         onToast(
           'verified',
-          'Reset link sent',
-          `A password reset link is on its way to ${user.email}.`
+          'Reset requested',
+          'Your password reset request was recorded. Email delivery is not available yet.'
         )
       })
       .catch((caughtError) => {
@@ -241,7 +248,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         footer={
           <>
             <span className="vrs-help">
-              We&rsquo;ll send a verification link before the change takes effect.
+              A new address takes effect only after it is confirmed.
             </span>
             <Button
               variant="primary"
@@ -275,30 +282,19 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
               tone="pending"
               title="Verification pending"
               actions={
-                <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      onToast(
-                        'info',
-                        'Verification re-sent',
-                        `A fresh link is on its way to ${user.pendingEmail}.`
-                      )
-                    }
-                  >
-                    Resend link
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={cancelEmailChange}>
-                    Cancel change
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={busy === 'email'}
+                  onClick={cancelEmailChange}
+                >
+                  Cancel change
+                </Button>
               }
             >
-              We sent a confirmation link to{' '}
-              <span className="vrs-mono">{user.pendingEmail}</span>. Your current
-              address <span className="vrs-mono">{user.email}</span> stays active until
-              it&rsquo;s confirmed.
+              <span className="vrs-mono">{user.pendingEmail}</span> is waiting for
+              confirmation. Your current address{' '}
+              <span className="vrs-mono">{user.email}</span> stays active until then.
             </Banner>
           )}
         </div>
@@ -311,7 +307,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         footer={
           <>
             <span className="vrs-help">
-              The link expires after 60 minutes. Active sessions stay signed in.
+              Reset requests are recorded. Email delivery is not available yet.
             </span>
             <Button
               variant="secondary"
@@ -322,18 +318,18 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
               iconLeft={resetState === 'idle' ? <Icon name="lock" size={15} /> : null}
             >
               {resetState === 'sent'
-                ? 'Link sent'
+                ? 'Reset requested'
                 : resetState === 'sending'
-                  ? 'Sending…'
-                  : 'Send reset link'}
+                  ? 'Requesting…'
+                  : 'Request reset'}
             </Button>
           </>
         }
       >
         {resetState === 'sent' ? (
-          <Banner tone="verified" title="Reset link sent">
-            Check <span className="vrs-mono">{user.email}</span> and follow the link to
-            set a new password.
+          <Banner tone="verified" title="Reset requested">
+            The request for <span className="vrs-mono">{user.email}</span> was recorded.
+            No reset link was sent because email delivery is not available yet.
           </Banner>
         ) : (
           <div className="vrs-set-pass">

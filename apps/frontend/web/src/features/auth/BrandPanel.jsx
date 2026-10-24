@@ -24,7 +24,7 @@ export function BrandPanel() {
     <aside className="auth-brand v-lattice">
       <div className="auth-brand__glow" />
       <div className="auth-brand__top">
-        <a className="auth-brand__logo" href="#">
+        <a className="auth-brand__logo" href="/">
           <AuthMark size={26} />
           Verasig<span style={{ color: 'var(--signal-500)' }}>.</span>
         </a>

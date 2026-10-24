@@ -48,6 +48,10 @@
 .vrs-tm-step.is-done {
   color: var(--text-body);
 }
+.vrs-tm-step.is-done:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+}
 .vrs-tm-step.is-active {
   color: var(--accent-text);
   border-color: var(--accent);
@@ -141,7 +145,12 @@
   border-color: color-mix(in srgb, var(--verified-500) 55%, var(--border-default));
 }
 .vrs-tm-card.is-rejected {
-  opacity: 0.72;
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
+}
+/* Dim only the template text: labels and action buttons stay at full contrast. */
+.vrs-tm-card.is-rejected .vrs-tm-tmpl {
+  opacity: 0.75;
 }
 .vrs-tm-tmpl {
   margin: 0;

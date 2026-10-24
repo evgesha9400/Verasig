@@ -3,11 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { listFeeds } from '../../shared/api/feedsApi.js'
 import { getTelegramStatus } from '../../shared/api/telegramApi.js'
 import { confirmMining } from '../../shared/api/mineApi.js'
+import { connectExchange, listExchanges } from '../../shared/api/exchangesApi.js'
 import { useWorkflowState } from './useWorkflowState.js'
 
 vi.mock('../../shared/api/feedsApi.js', () => ({ listFeeds: vi.fn() }))
 vi.mock('../../shared/api/telegramApi.js', () => ({ getTelegramStatus: vi.fn() }))
 vi.mock('../../shared/api/mineApi.js', () => ({ confirmMining: vi.fn() }))
+vi.mock('../../shared/api/exchangesApi.js', () => ({
+  connectExchange: vi.fn(),
+  disconnectExchange: vi.fn(),
+  listExchanges: vi.fn()
+}))
 
 const reviewedFeed = {
   id: 'reviewed-feed',
@@ -89,6 +95,7 @@ describe('useWorkflowState', () => {
     vi.clearAllMocks()
     getTelegramStatus.mockResolvedValue({ connected: true })
     listFeeds.mockResolvedValue({ feeds: [] })
+    listExchanges.mockResolvedValue({ exchanges: [] })
   })
 
   it('clears the previous toast timer so a rapid second toast is not cut short', () => {
@@ -236,6 +243,41 @@ describe('useWorkflowState', () => {
     await waitFor(() => expect(getWorkflow().feeds).toEqual([serverFeed]))
     expect(getWorkflow().feeds[0].status).toBe('backfilled')
     expect(getWorkflow().feeds[0].hasRisk).toBe(false)
+  })
+
+  it('drops a full re-fetch back to resume once its start is consumed', () => {
+    const getWorkflow = renderWorkflow()
+    const feed = { ...reviewedFeed, status: 'backfilled' }
+
+    act(() => getWorkflow().upsertFeed(feed))
+    act(() => getWorkflow().refetchFullHistory(feed))
+    expect(getWorkflow().backfillMode).toBe('full')
+
+    act(() => getWorkflow().consumeBackfillMode())
+    expect(getWorkflow().backfillMode).toBe('resume')
+  })
+
+  it('hydrates and connects Bybit through the exchanges API when authenticated', async () => {
+    listExchanges.mockResolvedValueOnce({
+      exchanges: [{ id: 'bybit', connected: true, account: 'AAAA…ZZ' }]
+    })
+    connectExchange.mockResolvedValueOnce({
+      id: 'bybit',
+      connected: true,
+      account: 'BBBB…YY'
+    })
+    const getWorkflow = renderWorkflow('jwt-token')
+
+    await waitFor(() => expect(getWorkflow().bybitAccount).toBe('AAAA…ZZ'))
+    expect(getWorkflow().bybitConnected).toBe(true)
+
+    await act(() => getWorkflow().connectBybit({ apiKey: 'key', secret: 'secret' }))
+
+    expect(connectExchange).toHaveBeenCalledWith('jwt-token', 'bybit', {
+      apiKey: 'key',
+      apiSecret: 'secret'
+    })
+    expect(getWorkflow().bybitAccount).toBe('BBBB…YY')
   })
 
   it('opens backfilled feeds at Mine regardless of prior rules', () => {

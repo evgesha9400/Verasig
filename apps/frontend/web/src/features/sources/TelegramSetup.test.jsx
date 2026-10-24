@@ -80,6 +80,28 @@ describe('TelegramSetup', () => {
     await waitFor(() => expect(onConnect).toHaveBeenCalledTimes(1))
   })
 
+  it('shows a verification failure in the code phase', async () => {
+    const onVerify = vi.fn().mockRejectedValueOnce(new Error('Invalid login code'))
+    render(
+      <TelegramSetup onConnected={() => {}} onCancel={() => {}} onVerify={onVerify} />
+    )
+    fillCredentials()
+    fireEvent.click(screen.getByRole('button', { name: /send login code/i }))
+    await waitFor(() => expect(screen.getByLabelText('Digit 1')).toBeTruthy(), {
+      timeout: 1800
+    })
+    for (let i = 1; i <= 5; i += 1) {
+      fireEvent.change(screen.getByLabelText(`Digit ${i}`), {
+        target: { value: String(i) }
+      })
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: /verify & connect/i }))
+
+    expect(await screen.findByText('Invalid login code')).toBeTruthy()
+    expect(screen.getByLabelText('Digit 1')).toBeTruthy()
+  })
+
   it('requests Telegram two-factor password when the server asks for it', async () => {
     const onVerify = vi
       .fn()

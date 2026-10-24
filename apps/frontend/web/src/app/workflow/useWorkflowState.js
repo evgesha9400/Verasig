@@ -4,6 +4,11 @@ import { getTelegramStatus } from '../../shared/api/telegramApi.js'
 import { PIPELINE_STEPS } from '../../domain/workflow/pipelineSteps.js'
 import { landingStepForFeed } from '../../domain/workflow/stepAccess.js'
 import { confirmMining } from '../../shared/api/mineApi.js'
+import {
+  connectExchange,
+  disconnectExchange,
+  listExchanges
+} from '../../shared/api/exchangesApi.js'
 import { FEEDS } from '../../domain/demo-data/seed.js'
 
 const LS_KEY = 'vrs-proto-state-2'
@@ -83,6 +88,7 @@ export function useWorkflowState(authToken, plan) {
   const [bybitConnected, setBybitConnected] = useState(
     saved ? saved.bybitConnected : false
   )
+  const [bybitAccount, setBybitAccount] = useState(null)
   const [toast, setToast] = useState(null)
   const [backTarget, setBackTarget] = useState(null)
   const [signalsPreset, setSignalsPreset] = useState(null)
@@ -151,6 +157,19 @@ export function useWorkflowState(authToken, plan) {
         )
       })
 
+    // Exchange state is secondary to sources: a failed read leaves Bybit shown as
+    // not connected, and reconnecting is an idempotent upsert on the server.
+    listExchanges(authToken)
+      .then((body) => {
+        if (!active) return
+        const bybit = (body?.exchanges || []).find(
+          (exchange) => exchange.id === 'bybit'
+        )
+        setBybitConnected(Boolean(bybit?.connected))
+        setBybitAccount(bybit?.account ?? null)
+      })
+      .catch(() => {})
+
     return () => {
       active = false
     }
@@ -208,6 +227,13 @@ export function useWorkflowState(authToken, plan) {
 
   function startBackfill(feed, depth = '1y') {
     beginBackfill({ feed, mode: 'resume', depth })
+  }
+
+  // A refresh/full mode is a one-shot command: once its start request lands, a
+  // remounted BackfillView must attach to (resume) the job, never restart it. A
+  // repeated FULL start after the job finished would wipe the capture again.
+  function consumeBackfillMode() {
+    setBackfillMode('resume')
   }
 
   function retryBackfill(feed) {
@@ -514,13 +540,39 @@ export function useWorkflowState(authToken, plan) {
     setScreen('sources')
   }
 
-  function connectBybit() {
-    setBybitConnected(true)
+  function applyBybit(exchange) {
+    setBybitConnected(Boolean(exchange?.connected))
+    setBybitAccount(exchange?.account ?? null)
+  }
+
+  // Authenticated: the server verifies the keys and the error reaches the caller,
+  // which shows it on the form. Demo mode flips the local flag only.
+  async function connectBybit({ apiKey, secret } = {}) {
+    if (authToken) {
+      applyBybit(
+        await connectExchange(authToken, 'bybit', { apiKey, apiSecret: secret })
+      )
+    } else {
+      setBybitConnected(true)
+    }
     fireToast('verified', 'Bybit connected', 'Verified signals will route to Bybit.')
   }
 
-  function disconnectBybit() {
-    setBybitConnected(false)
+  async function disconnectBybit() {
+    if (authToken) {
+      try {
+        applyBybit(await disconnectExchange(authToken, 'bybit'))
+      } catch (error) {
+        fireToast(
+          'rejected',
+          'Could not disconnect Bybit',
+          error?.message || 'Try again in a moment.'
+        )
+        return
+      }
+    } else {
+      setBybitConnected(false)
+    }
     fireToast(
       'rejected',
       'Bybit disconnected',
@@ -550,6 +602,7 @@ export function useWorkflowState(authToken, plan) {
     feeds,
     activeFeedId,
     bybitConnected,
+    bybitAccount,
     toast,
     backTarget,
     signalsPreset,
@@ -561,6 +614,7 @@ export function useWorkflowState(authToken, plan) {
 
     goToDeletedSignals,
     startBackfill,
+    consumeBackfillMode,
     retryBackfill,
     resumeFeed,
     openFeed,

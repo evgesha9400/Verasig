@@ -40,7 +40,7 @@ export function LoginView({ onLogin, onRegister }) {
       <BrandPanel />
       <main className="auth-main">
         <div className="auth-form-wrap">
-          <a className="auth-form-wrap__logo" href="#">
+          <a className="auth-form-wrap__logo" href="/">
             <Icon name="sources" size={24} />
             Verasig<span style={{ color: 'var(--signal-500)' }}>.</span>
           </a>
@@ -72,7 +72,8 @@ export function LoginView({ onLogin, onRegister }) {
             />
             <div className="auth-row">
               <Checkbox label="Remember me" />
-              <TextLink href="#" className="auth-forgot">
+              {/* Placeholder until password recovery exists: never navigates. */}
+              <TextLink as="a" className="auth-forgot">
                 Forgot password?
               </TextLink>
             </div>

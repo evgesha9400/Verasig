@@ -428,6 +428,29 @@ describe('AppRoutes', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull()
   })
 
+  it('keeps the stored token when the session check hits a server error', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
+    let meCalls = 0
+    installFetch({
+      'GET /auth/me': () => {
+        meCalls += 1
+        return meCalls === 1
+          ? jsonResponse({ error: { message: 'Service unavailable' } }, 503)
+          : jsonResponse(backendUser)
+      },
+      ...sourceRoutes()
+    })
+
+    renderRoute('/app')
+
+    expect(await screen.findByText("Can't reach Verasig")).toBeTruthy()
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('stored-token')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByText('Ada Lovelace')).toBeTruthy()
+  })
+
   it('supports signup to product to backend logout to landing', async () => {
     const user = userEvent.setup()
     installFetch({

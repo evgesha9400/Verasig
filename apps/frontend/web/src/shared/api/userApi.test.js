@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  cancelEmailChange,
   cancelSubscription,
   changeEmail,
   changeSubscription,
@@ -69,6 +70,18 @@ describe('userApi', () => {
         Authorization: 'Bearer jwt-token'
       },
       body: JSON.stringify({ email: 'next@example.com' })
+    })
+  })
+
+  it('cancels a pending email change without a body', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse(user))
+
+    const body = await cancelEmailChange('jwt-token')
+
+    expect(body.pendingEmail).toBeNull()
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/user/email/cancel', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer jwt-token' }
     })
   })
 

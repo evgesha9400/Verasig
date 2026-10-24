@@ -288,6 +288,8 @@ export function AuditReview({
   const [templateId, setTemplateId] = useState('all')
   const [page, setPage] = useState(0)
   const [openKeys, setOpenKeys] = useState(() => new Set())
+  // Confirming commits what the audit shows, so it waits for a settled audit.
+  const confirmBlocked = confirmationPending || loading || Boolean(error)
 
   function toggleRow(key) {
     setOpenKeys((current) => toggleInSet(current, key))
@@ -435,7 +437,7 @@ export function AuditReview({
               <Button
                 variant="primary"
                 size="sm"
-                disabled={confirmationPending}
+                disabled={confirmBlocked}
                 onClick={onKeepVerified}
               >
                 Keep verified
@@ -444,7 +446,7 @@ export function AuditReview({
             <Button
               variant="secondary"
               size="sm"
-              disabled={confirmationPending}
+              disabled={confirmBlocked}
               onClick={onFinish}
             >
               {confirmationPending

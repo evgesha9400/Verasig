@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { Loader, ThemeProvider } from '@verasig/design-system'
+import { Banner, Button, Loader, ThemeProvider } from '@verasig/design-system'
 import { LoginView } from '../features/auth/LoginView.jsx'
 import { RegisterView } from '../features/auth/RegisterView.jsx'
 import { getCurrentUser, login, logout, register } from '../shared/api/authApi.js'
@@ -19,6 +19,12 @@ function createInitialSession() {
   return { status: 'checking', token, user: null }
 }
 
+// Only an explicit auth rejection proves the stored token is bad. A network
+// failure or server error keeps it so the session survives the outage.
+function isRejectedToken(error) {
+  return error?.status === 401 || error?.status === 403
+}
+
 function SessionBoot() {
   return (
     <div className="auth-wrap">
@@ -34,11 +40,32 @@ function SessionBoot() {
   )
 }
 
+function SessionUnavailable({ onRetry }) {
+  return (
+    <div className="auth-wrap">
+      <main className="auth-main">
+        <Banner
+          tone="rejected"
+          title="Can't reach Verasig"
+          actions={
+            <Button variant="primary" size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          }
+        >
+          Your session is kept. Try again in a moment.
+        </Banner>
+      </main>
+    </div>
+  )
+}
+
 export function AppRoutes() {
   const [session, setSession] = useState(createInitialSession)
   const navigate = useNavigate()
   const authenticated = session.status === 'authenticated'
   const checkingSession = session.status === 'checking'
+  const sessionUnavailable = session.status === 'unavailable'
 
   useEffect(() => {
     if (session.status !== 'checking' || !session.token) return undefined
@@ -50,8 +77,12 @@ export function AppRoutes() {
         if (!active) return
         setSession({ status: 'authenticated', token: session.token, user })
       })
-      .catch(() => {
+      .catch((error) => {
         if (!active) return
+        if (!isRejectedToken(error)) {
+          setSession({ status: 'unavailable', token: session.token, user: null })
+          return
+        }
         forgetAuthToken()
         setSession({ status: 'anonymous', token: null, user: null })
       })
@@ -138,6 +169,10 @@ export function AppRoutes() {
         element={
           checkingSession ? (
             <SessionBoot />
+          ) : sessionUnavailable ? (
+            <SessionUnavailable
+              onRetry={() => setSession({ ...session, status: 'checking' })}
+            />
           ) : authenticated ? (
             <ProductApp
               authToken={session.token}

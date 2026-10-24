@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { BackfillView } from './BackfillView.jsx'
 
@@ -68,6 +68,38 @@ describe('BackfillView', () => {
       lastDate: 'May 30, 2026',
       status: 'succeeded'
     })
+  })
+
+  it('sends cancel only after a pending start resolves', async () => {
+    let resolveStart
+    const onStart = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveStart = resolve
+        })
+    )
+    const onCancelBackfill = vi.fn().mockResolvedValue()
+    const onCancel = vi.fn()
+
+    render(
+      <BackfillView
+        feed={feed}
+        onStart={onStart}
+        onStream={vi.fn(() => ({ close: vi.fn() }))}
+        onCancelBackfill={onCancelBackfill}
+        onCancel={onCancel}
+      />
+    )
+    await waitFor(() => expect(onStart).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancel backfill/i }))
+    await Promise.resolve()
+    expect(onCancelBackfill).not.toHaveBeenCalled()
+
+    await act(async () => resolveStart())
+
+    await waitFor(() => expect(onCancelBackfill).toHaveBeenCalledWith('7'))
+    expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the stream open when fetched/lastDate update mid-backfill', async () => {

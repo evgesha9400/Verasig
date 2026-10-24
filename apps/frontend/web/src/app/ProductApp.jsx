@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Button,
   IconButton,
@@ -86,30 +86,29 @@ export function deletionRescanToast(feed, result = {}) {
   }
 }
 
-export function ProductApp({ authToken, user: sessionUser, onLogout }) {
-  const [theme, setTheme] = useTheme()
-
-  const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
-  const [checkingGapFeedId, setCheckingGapFeedId] = useState(null)
-  const [rescanScanned, setRescanScanned] = useState(null)
-
-  useEffect(() => {
-    setUser(mergeUserDefaults(sessionUser))
-  }, [sessionUser])
-
-  function updateUser(patch) {
-    setUser((current) => {
-      return { ...current, ...patch }
-    })
-  }
-
+// Parser overlay state. The boot read and saves race: every save (and every
+// token change/unmount) bumps a sequence number, so a slow boot read that
+// resolves after a save is discarded instead of clobbering the saved overlay.
+export function useParserOverlay(authToken, fireToast) {
   const [overlay, setOverlay] = useState({})
+  // False until the server overlay is read. An edit built on the unread `{}` would
+  // replace every saved rule, so saveOverlay re-reads before writing.
+  const [overlayLoaded, setOverlayLoaded] = useState(false)
+  const overlaySeqRef = useRef(0)
 
   useEffect(() => {
     if (!authToken) return
+    const seq = ++overlaySeqRef.current
     getParserOverlay(authToken)
-      .then((body) => setOverlay(body.overlay || {}))
+      .then((body) => {
+        if (overlaySeqRef.current !== seq) return
+        setOverlay(body.overlay || {})
+        setOverlayLoaded(true)
+      })
       .catch(() => {})
+    return () => {
+      overlaySeqRef.current += 1
+    }
   }, [authToken])
 
   async function saveOverlay(next) {
@@ -118,7 +117,19 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
       return next
     }
 
+    overlaySeqRef.current += 1
     try {
+      if (!overlayLoaded) {
+        const current = await getParserOverlay(authToken)
+        const serverOverlay = current.overlay || {}
+        setOverlay(serverOverlay)
+        setOverlayLoaded(true)
+        if (JSON.stringify(serverOverlay) !== JSON.stringify(overlay)) {
+          throw new Error(
+            'Your saved parser rules just loaded. Review them and apply the change again.'
+          )
+        }
+      }
       const body = await putParserOverlay(authToken, next)
       const savedOverlay = body.overlay || next
       setOverlay(savedOverlay)
@@ -133,6 +144,37 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     }
   }
 
+  return { overlay, saveOverlay }
+}
+
+export function ProductApp({ authToken, user: sessionUser, onLogout }) {
+  const [theme, setTheme] = useTheme()
+
+  const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
+  const [gapChecks, setGapChecks] = useState({}) // { [feedId]: { scanned } }
+  const gapStreamsRef = useRef(new Map()) // feedId -> open rescan SSE subscription
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    const gapStreams = gapStreamsRef.current
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      for (const stream of gapStreams.values()) stream.close()
+      gapStreams.clear()
+    }
+  }, [])
+
+  useEffect(() => {
+    setUser(mergeUserDefaults(sessionUser))
+  }, [sessionUser])
+
+  function updateUser(patch) {
+    setUser((current) => {
+      return { ...current, ...patch }
+    })
+  }
+
   const {
     nav,
     setNav,
@@ -142,6 +184,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     activeFeed,
     setScreen,
     bybitConnected,
+    bybitAccount,
     toast,
     clearToast,
     fireToast,
@@ -149,6 +192,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     signalsPreset,
     backfillMode,
     backfillDepth,
+    consumeBackfillMode,
     isWorkflow,
     pipelineStep,
     goToDeletedSignals,
@@ -176,6 +220,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     upsertFeed,
     setBackTarget
   } = useWorkflowState(authToken, user.plan)
+  const { overlay, saveOverlay } = useParserOverlay(authToken, fireToast)
 
   useEffect(() => {
     const root = document.documentElement
@@ -216,44 +261,58 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     fireToast(notice.tone, notice.title, notice.msg)
   }
 
+  function setGapCheck(feedId, check) {
+    setGapChecks((current) => {
+      const next = { ...current }
+      delete next[feedId]
+      if (check) next[feedId] = check
+      return next
+    })
+  }
+
+  function endGapCheck(feedId) {
+    gapStreamsRef.current.get(feedId)?.close()
+    gapStreamsRef.current.delete(feedId)
+    setGapCheck(feedId, null)
+  }
+
   async function handleCheckGaps(feed) {
     if (!authToken) {
       previewCheckGaps(feed)
       return
     }
 
-    setCheckingGapFeedId(feed.id)
-    setRescanScanned(null)
-
-    try {
-      await startDeletionRescan(authToken, feed.id)
-      streamDeletionRescanProgress(authToken, feed.id, {
-        onProgress: (progress) => {
-          if (progress.scanned != null) setRescanScanned(progress.scanned)
-        },
-        onDone: (result) => {
-          setCheckingGapFeedId(null)
-          setRescanScanned(null)
-          void refreshSources().catch(() => {})
-          showDeletionRescanToast(feed, result)
-        },
-        onError: (error) => {
-          setCheckingGapFeedId(null)
-          setRescanScanned(null)
-          fireToast(
-            'rejected',
-            'Check gaps failed',
-            error?.message || 'Could not check this feed right now.'
-          )
-        }
-      })
-    } catch (error) {
-      setCheckingGapFeedId(null)
+    function failGapCheck(error) {
+      endGapCheck(feed.id)
       fireToast(
         'rejected',
         'Check gaps failed',
         error?.message || 'Could not check this feed right now.'
       )
+    }
+
+    endGapCheck(feed.id)
+    setGapCheck(feed.id, { scanned: null })
+
+    try {
+      await startDeletionRescan(authToken, feed.id)
+      if (!mountedRef.current) return
+      const stream = streamDeletionRescanProgress(authToken, feed.id, {
+        onProgress: (progress) => {
+          if (progress.scanned != null) {
+            setGapCheck(feed.id, { scanned: progress.scanned })
+          }
+        },
+        onDone: (result) => {
+          endGapCheck(feed.id)
+          void refreshSources().catch(() => {})
+          showDeletionRescanToast(feed, result)
+        },
+        onError: failGapCheck
+      })
+      gapStreamsRef.current.set(feed.id, stream)
+    } catch (error) {
+      failGapCheck(error)
     }
   }
 
@@ -290,8 +349,9 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     body = (
       <ExchangesView
         bybitConnected={bybitConnected}
-        onConnect={() => connectBybit()}
-        onDisconnect={() => disconnectBybit()}
+        bybitAccount={bybitAccount}
+        onConnect={connectBybit}
+        onDisconnect={disconnectBybit}
       />
     )
   } else if (nav === 'settings') {
@@ -346,8 +406,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onRemove={handleRemoveFeed}
         onViewDeleted={goToDeletedSignals}
         onCheckGaps={handleCheckGaps}
-        checkingGapFeedId={checkingGapFeedId}
-        rescanScanned={rescanScanned}
+        gapChecks={gapChecks}
         onAddFeed={addTelegramFeed}
       />
     )
@@ -378,7 +437,12 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
           feed={activeFeed}
           mode={backfillMode}
           onStart={(chatId) =>
-            startBackfillJob(authToken, chatId, backfillMode, backfillDepth)
+            startBackfillJob(authToken, chatId, backfillMode, backfillDepth).then(
+              (job) => {
+                consumeBackfillMode()
+                return job
+              }
+            )
           }
           onStream={(chatId, handlers) =>
             streamBackfillProgress(authToken, chatId, handlers)

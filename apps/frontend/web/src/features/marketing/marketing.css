@@ -59,6 +59,9 @@
   color: var(--text-strong);
   letter-spacing: -0.02em;
 }
+.mk-nav__brand:hover {
+  color: var(--text-strong);
+}
 .mk-nav__links {
   display: flex;
   gap: 26px;
@@ -530,7 +533,7 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
-.mk-foot__col a:hover {
+.mk-foot__col a[href]:hover {
   color: var(--text-strong);
 }
 .mk-foot__bar {
@@ -552,7 +555,7 @@
 .mk-foot__legal a {
   color: var(--text-faint);
 }
-.mk-foot__legal a:hover {
+.mk-foot__legal a[href]:hover {
   color: var(--text-body);
 }
 
@@ -565,8 +568,8 @@
 .mk-nav__brand,
 .mk-nav__links a,
 .mk-nav__signin,
-.mk-foot__col a,
-.mk-foot__legal a {
+.mk-foot__col a[href],
+.mk-foot__legal a[href] {
   cursor: pointer;
   text-decoration: none;
 }
@@ -812,7 +815,12 @@
   border-radius: var(--radius-lg);
 }
 .mk-int.is-soon {
-  opacity: 0.6;
+  background: var(--surface-sunken);
+  border-style: dashed;
+}
+/* Dim only the logo: name and kind text keep full AA contrast. */
+.mk-int.is-soon .mk-int__logo {
+  opacity: 0.55;
 }
 .mk-int__logo {
   width: 44px;

@@ -110,6 +110,31 @@ describe('SettingsView', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
+  it('cancels a pending email change through the backend', async () => {
+    const pending = { ...user, pendingEmail: 'next@example.com' }
+    const onUpdateUser = vi.fn()
+
+    fetch.mockResolvedValueOnce(jsonResponse(user))
+
+    render(
+      <SettingsView
+        authToken="jwt-token"
+        user={pending}
+        onUpdateUser={onUpdateUser}
+        onToast={() => {}}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel change' }))
+
+    await waitFor(() => {
+      expect(onUpdateUser).toHaveBeenCalledWith(user)
+    })
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/user/email/cancel', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
   it('surfaces backend validation errors in the toast path', async () => {
     const onUpdateUser = vi.fn()
     const onToast = vi.fn()

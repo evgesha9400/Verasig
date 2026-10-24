@@ -70,6 +70,7 @@ export function TelegramSetup({
   const codeComplete = code.length === 5
   async function verify() {
     if (!codeComplete) return
+    setErr(null)
     setPhase('verifying')
 
     try {
@@ -191,6 +192,11 @@ export function TelegramSetup({
               </span>{' '}
               on Telegram. Enter it below.
             </Banner>
+            {err && (
+              <Banner tone="rejected" title="Couldn’t verify code">
+                {err}
+              </Banner>
+            )}
             <div className="vrs-form">
               <OTPInput
                 length={5}

@@ -62,6 +62,9 @@ export function BackfillView({
   const [stage, setStage] = useState('capture')
   const countRef = useRef(seedCount)
   const dateRef = useRef(seedDate)
+  // Settles once the start request does. Cancel waits on it: a cancel sent before
+  // the server creates the job is a no-op and the job would then run anyway.
+  const startRef = useRef(Promise.resolve())
   const handlersRef = useRef({
     onCancel,
     onCancelBackfill,
@@ -98,7 +101,9 @@ export function BackfillView({
 
       async function startBackendBackfill() {
         try {
-          await handlersRef.current.onStart(feed.id)
+          const started = Promise.resolve(handlersRef.current.onStart(feed.id))
+          startRef.current = started.catch(() => {})
+          await started
           if (closed) return
           subscription = handlersRef.current.onStream(feed.id, {
             onProgress: (progress) => {
@@ -221,6 +226,7 @@ export function BackfillView({
   async function cancelBackfill() {
     try {
       if (handlersRef.current.onCancelBackfill) {
+        await startRef.current
         await handlersRef.current.onCancelBackfill(feed.id)
       }
       handlersRef.current.onCancel(countRef.current, storedDate(dateRef.current))

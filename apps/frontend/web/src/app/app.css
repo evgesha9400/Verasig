@@ -163,6 +163,7 @@
   border-top: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: transparent;
+  color: inherit;
   cursor: pointer;
   text-align: left;
   transition:
@@ -793,8 +794,8 @@ button.vrs-pipe__step:hover .vrs-pipe__lbl {
   color: var(--accent-text);
 }
 button.vrs-pipe__step:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 button.vrs-pipe__step:active {
   transform: scale(0.992);

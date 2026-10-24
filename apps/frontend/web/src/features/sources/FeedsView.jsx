@@ -74,8 +74,7 @@ export function FeedsView({
   onRemove,
   onViewDeleted,
   onCheckGaps,
-  checkingGapFeedId,
-  rescanScanned,
+  gapChecks = {}, // { [feedId]: { scanned } } for every feed with a running check
   onAddFeed
 }) {
   const [tag, setTag] = useState('')
@@ -114,6 +113,8 @@ export function FeedsView({
     return (
       <Popover
         className="vrs-feed-pop"
+        role="dialog"
+        label="Confirmed signal deletion"
         trigger={
           <Badge tone="rejected" dot>
             Scam
@@ -180,7 +181,7 @@ export function FeedsView({
     const started = c.status !== 'new' && c.status !== 'backfilling'
     // Gaps only become meaningful once rules classify signals.
     const reviewed = isReviewedFeed(c)
-    const checkingGaps = checkingGapFeedId === c.id
+    const checkingGaps = Boolean(gapChecks[c.id])
     return (
       <Menu
         trigger={
@@ -234,7 +235,8 @@ export function FeedsView({
   }
 
   // The row itself navigates (onOpenFeed); the right side shows status info and
-  // the gear only. The gear stops propagation so it never triggers row nav.
+  // the gear only. The gear stops click and key propagation so it never triggers
+  // row nav.
   function rightSide(c) {
     return (
       <div className="vrs-feed-right">
@@ -253,7 +255,12 @@ export function FeedsView({
         {c.status === 'backfilled' && (
           <div className="vrs-feed-progress">{fmtNum(c.fetched)} messages</div>
         )}
-        <span onClick={(e) => e.stopPropagation()}>{optionsMenu(c)}</span>
+        <span
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {optionsMenu(c)}
+        </span>
       </div>
     )
   }
@@ -300,6 +307,8 @@ export function FeedsView({
             style={{ cursor: 'pointer' }}
             onClick={() => onOpenFeed && onOpenFeed(c)}
             onKeyDown={(event) => {
+              // Keys pressed on a nested control (menu, flag link) belong to it.
+              if (event.target !== event.currentTarget) return
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
                 onOpenFeed && onOpenFeed(c)
@@ -327,10 +336,10 @@ export function FeedsView({
                   />
                   {fmtNum(c.subscribers)} subscribers
                 </span>
-                {checkingGapFeedId === c.id && rescanScanned != null && (
+                {gapChecks[c.id]?.scanned != null && (
                   <>
                     <span className="dot" />
-                    <span>checking · {fmtNum(rescanScanned)} scanned</span>
+                    <span>checking · {fmtNum(gapChecks[c.id].scanned)} scanned</span>
                   </>
                 )}
                 {c.deletedCount > 0 && (

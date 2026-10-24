@@ -33,7 +33,8 @@ describe('FeedsView', () => {
       />
     )
 
-    expect(screen.getByRole('tooltip').textContent).toContain(
+    // Interactive content (a button) → dialog semantics, not tooltip.
+    expect(screen.getByRole('dialog').textContent).toContain(
       'Confirmed signal deletion'
     )
   })
@@ -239,7 +240,7 @@ describe('FeedsView', () => {
         onRemove={() => {}}
         onViewDeleted={() => {}}
         onCheckGaps={() => {}}
-        checkingGapFeedId={reviewedFeed.id}
+        gapChecks={{ [reviewedFeed.id]: { scanned: null } }}
         onBacktest={() => {}}
       />
     )
@@ -453,6 +454,29 @@ describe('FeedsView', () => {
 
     expect(onOpenFeed).not.toHaveBeenCalled()
   })
+
+  it('opens the feed on Enter only when the row itself has focus', () => {
+    const onOpenFeed = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'backfilled', signalDeletion: false }]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Options' }), { key: 'Enter' })
+    expect(onOpenFeed).not.toHaveBeenCalled()
+
+    const row = screen.getByRole('button', { name: 'Options' }).closest('.vrs-feed-row')
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onOpenFeed).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('FeedsView deletion visibility', () => {
@@ -512,8 +536,7 @@ describe('FeedsView deletion visibility', () => {
       feeds: [
         { id: 'x', name: 'X', initials: 'X', status: 'verified', deletedCount: 0 }
       ],
-      checkingGapFeedId: 'x',
-      rescanScanned: 1200
+      gapChecks: { x: { scanned: 1200 } }
     })
     expect(screen.getByText(/checking · 1\.2K scanned/i)).toBeTruthy()
   })

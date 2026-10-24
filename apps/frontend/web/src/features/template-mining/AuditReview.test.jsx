@@ -649,6 +649,18 @@ describe('AuditReview', () => {
     expect(screen.getByRole('button', { name: /Keep verified/i }).disabled).toBe(true)
   })
 
+  it.each([
+    ['loading', { loading: true }],
+    ['failed', { error: 'Audit unavailable.' }]
+  ])('disables both confirmation actions while the audit is %s', (_, props) => {
+    renderReview({ onFinish: vi.fn(), onKeepVerified: vi.fn(), ...props })
+
+    expect(
+      screen.getByRole('button', { name: /Confirm & route to Exchange/i }).disabled
+    ).toBe(true)
+    expect(screen.getByRole('button', { name: /Keep verified/i }).disabled).toBe(true)
+  })
+
   it('renders a retryable confirmation failure inline', () => {
     renderReview({
       onFinish: vi.fn(),

@@ -4,16 +4,24 @@ import { Icon } from '@verasig/design-system'
 import { SourceCard } from '../../shared/components/SourceCard.jsx'
 import { EXCHANGES } from '../../domain/demo-data/seed.js'
 
-export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
+export function ExchangesView({
+  bybitConnected,
+  bybitAccount,
+  onConnect,
+  onDisconnect
+}) {
   const bybit = EXCHANGES.find((d) => d.id === 'bybit')
+  const account = bybitAccount || bybit.account
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [configuring, setConfiguring] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [key, setKey] = useState('')
   const [secret, setSecret] = useState('')
+  const [connectError, setConnectError] = useState(null)
   const valid = key.trim().length >= 12 && secret.trim().length >= 12
   function startConfigure() {
     setConfiguring(true)
+    setConnectError(null)
     setKey('')
     setSecret('')
   }
@@ -23,16 +31,20 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
     setKey('')
     setSecret('')
   }
-  function verifyAndConnect() {
+  async function verifyAndConnect() {
     if (!valid || verifying) return
     setVerifying(true)
-    setTimeout(() => {
-      setVerifying(false)
+    setConnectError(null)
+    try {
+      await onConnect?.({ apiKey: key.trim(), secret: secret.trim() })
       setConfiguring(false)
       setKey('')
       setSecret('')
-      onConnect && onConnect()
-    }, 1700)
+    } catch (error) {
+      setConnectError(error?.message || 'Could not verify these API keys.')
+    } finally {
+      setVerifying(false)
+    }
   }
   const byLogo = (
     <span
@@ -66,7 +78,7 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
               desc="Trade-only API key linked. Verified signals route here in real time."
               meta={
                 <>
-                  <Icon name="key" size={13} /> {bybit.account}
+                  <Icon name="key" size={13} /> {account}
                 </>
               }
               action={
@@ -128,7 +140,11 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
                 >
                   {verifying ? (
                     <Banner tone="info" title="Verifying API credentials…">
-                      Checking permissions and placing a zero-value test order.
+                      Checking the key with Bybit.
+                    </Banner>
+                  ) : connectError ? (
+                    <Banner tone="rejected" title="Couldn’t connect Bybit">
+                      {connectError}
                     </Banner>
                   ) : (
                     <Banner tone="pending" title="Use a trade-only key">
@@ -208,9 +224,8 @@ export function ExchangesView({ bybitConnected, onConnect, onDisconnect }) {
           </>
         }
       >
-        Your trade-only API key ({bybit.account}) will be removed from Verasig. Open
-        positions are unaffected — only new signal routing stops. You can reconnect any
-        time.
+        Your trade-only API key ({account}) will be removed from Verasig. Open positions
+        are unaffected — only new signal routing stops. You can reconnect any time.
       </Dialog>
     </div>
   )

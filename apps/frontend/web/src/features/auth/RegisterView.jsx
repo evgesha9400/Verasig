@@ -55,7 +55,7 @@ export function RegisterView({ onRegister, onLogin }) {
       <BrandPanel />
       <main className="auth-main">
         <div className="auth-form-wrap">
-          <a className="auth-form-wrap__logo" href="#">
+          <a className="auth-form-wrap__logo" href="/">
             <Icon name="sources" size={24} />
             Verasig<span style={{ color: 'var(--signal-500)' }}>.</span>
           </a>
@@ -119,8 +119,8 @@ export function RegisterView({ onRegister, onLogin }) {
             </Button>
           </form>
           <p className="auth-legal">
-            By creating an account you agree to our <a href="#">Terms</a> and{' '}
-            <a href="#">Privacy Policy</a>.
+            By creating an account you agree to our <a>Terms</a> and{' '}
+            <a>Privacy Policy</a>.
           </p>
           <div className="auth-switch">
             Already have an account?{' '}

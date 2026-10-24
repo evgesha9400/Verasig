@@ -29,7 +29,7 @@ export function SignalsView({
   onLinkSignalModifier = linkSignalModifier
 }) {
   const useBackend = Boolean(authToken)
-  const signalFeeds = feeds.filter(isSignalFeed)
+  const signalFeeds = useMemo(() => feeds.filter(isSignalFeed), [feeds])
   const feedById = useMemo(
     () => Object.fromEntries(feeds.map((f) => [f.id, f])),
     [feeds]
@@ -452,9 +452,12 @@ export function SignalsView({
           pageRows.map((s) => {
             const f = displayFeed(s, feedById[s.feedId])
             const open = openId === s.id
-            const skipped = s.status === 'skipped' && !s.cancelled
             const untested = s.status === 'untested'
             const tested = s.status === 'tested'
+            // A tested signal was entered, so a close reply is an author exit, not a
+            // pre-entry cancellation.
+            const cancelled = Boolean(s.cancelled) && !tested
+            const skipped = s.status === 'skipped' && !cancelled
             const deleted = s.deleted
             const mods = s.mods || []
             const authorExit = s.effective && s.effective.closedBy === 'author'
@@ -464,7 +467,7 @@ export function SignalsView({
             return (
               <div key={s.id} className={`vrs-sig-item ${open ? 'is-open' : ''}`}>
                 <button
-                  className={`vrs-sigrow s-${s.status} ${deleted ? 'is-deleted' : ''} ${s.cancelled ? 'is-cancelled' : ''}`}
+                  className={`vrs-sigrow s-${s.status} ${deleted ? 'is-deleted' : ''} ${cancelled ? 'is-cancelled' : ''}`}
                   onClick={() => setOpenId(open ? null : s.id)}
                 >
                   <span className="vrs-sigrow__rail" aria-hidden="true" />
@@ -499,7 +502,7 @@ export function SignalsView({
                       <Badge tone="rejected" dot>
                         Deleted
                       </Badge>
-                    ) : s.cancelled ? (
+                    ) : cancelled ? (
                       <Badge tone="neutral" dot>
                         Cancelled
                       </Badge>
@@ -674,7 +677,7 @@ export function SignalsView({
                       </div>
 
                       {/* position timeline — how the updates played the position */}
-                      {mods.length > 0 && !s.cancelled && (
+                      {mods.length > 0 && (
                         <div className="vrs-tl">
                           <div
                             className="vrs-sig-pane__eyebrow"
@@ -794,7 +797,7 @@ export function SignalsView({
                           this signal was deleted from the feed&rsquo;s history after
                           extraction.
                         </div>
-                      ) : s.cancelled ? (
+                      ) : cancelled ? (
                         <div className="vrs-sig-skipnote">
                           <Icon name="x" size={13} /> Cancelled by the author before
                           entry — excluded from the backtest.
@@ -972,9 +975,28 @@ function rawMessage(s) {
   return `${side} ${s.symbol} @ ${s.entry}\nstop ${s.stop}\ntargets ${s.tp}\nclose half at first TP, then move SL to break-even`
 }
 
-// 'Jun 7' + '14:32' → sortable recency key (descending newest)
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+]
+
+// Sortable recency key (descending newest). Backend rows carry an ISO `at`; demo
+// rows only have 'Jun 7' + '14:32', which sorts by month, day and time.
 function sortKey(s) {
+  const ts = s.at ? Date.parse(s.at) : NaN
+  if (!Number.isNaN(ts)) return ts
+  const month = Math.max(0, MONTHS.indexOf((s.date.match(/[A-Za-z]{3}/) || [''])[0]))
   const day = parseInt((s.date.match(/\d+/) || [0])[0], 10)
   const [h, m] = s.time.split(':').map((n) => parseInt(n, 10))
-  return day * 10000 + h * 100 + m
+  return month * 1000000 + day * 10000 + h * 100 + m
 }

@@ -223,6 +223,16 @@ function acceptFirstTemplate(user) {
   return user.click(acceptButtons[0])
 }
 
+// Confirmation stays disabled until the debounced audit settles.
+async function openSettledVerify(user) {
+  await acceptFirstTemplate(user)
+  await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
+  await screen.findByRole('tab', { name: /Parsed/i })
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /Keep verified/i }).disabled).toBe(false)
+  )
+}
+
 describe('TemplateMiningPage', () => {
   it('auto-runs the server mine and lands on Review with no manual button click', async () => {
     await renderMinedPage()
@@ -279,6 +289,36 @@ describe('TemplateMiningPage', () => {
     expect(screen.getByRole('button', { name: /Continue to verify/i })).toBeTruthy()
   })
 
+  it('does not refetch the audit when the parent re-renders with a new onLoadAudit closure', async () => {
+    const { onStartMine, onStreamMine, stream } = mineJobMocks()
+    const loadAudit = vi.fn().mockResolvedValue(auditFixture())
+    function Parent() {
+      const [, setTick] = useState(0)
+      return (
+        <>
+          <button onClick={() => setTick((tick) => tick + 1)}>Re-render parent</button>
+          <Harness
+            onStartMine={onStartMine}
+            onStreamMine={onStreamMine}
+            onLoadAudit={(...args) => loadAudit(...args)}
+          />
+        </>
+      )
+    }
+    const user = userEvent.setup()
+    render(<Parent />)
+    await waitFor(() => expect(stream.handlers).toBeTruthy())
+    act(() => stream.handlers.onDone(mineResultFixture()))
+    await screen.findByText('Suggested accept')
+
+    await acceptFirstTemplate(user)
+    await waitFor(() => expect(loadAudit).toHaveBeenCalledTimes(1))
+    await user.click(screen.getByRole('button', { name: /Re-render parent/i }))
+    await user.click(screen.getByRole('button', { name: /Re-render parent/i }))
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(loadAudit).toHaveBeenCalledTimes(1)
+  })
+
   it('debounces the audit fetch instead of firing once per toggle', async () => {
     const { user, onLoadAudit } = await renderMinedPage()
     await acceptFirstTemplate(user)
@@ -305,9 +345,7 @@ describe('TemplateMiningPage', () => {
   it('sends one awaited confirmation command with the selected destination', async () => {
     const onConfirmVerification = vi.fn().mockResolvedValue()
     const { user } = await renderMinedPage({ onConfirmVerification })
-    await acceptFirstTemplate(user)
-    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
-    await screen.findByRole('tab', { name: /Parsed/i })
+    await openSettledVerify(user)
 
     const review = screen.getByText('Review results').closest('.vrs-tm-review')
     await user.click(
@@ -324,9 +362,7 @@ describe('TemplateMiningPage', () => {
     const confirmation = deferred()
     const onConfirmVerification = vi.fn().mockReturnValue(confirmation.promise)
     const { user } = await renderMinedPage({ onConfirmVerification })
-    await acceptFirstTemplate(user)
-    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
-    await screen.findByRole('tab', { name: /Parsed/i })
+    await openSettledVerify(user)
 
     await user.click(screen.getByRole('button', { name: /Keep verified/i }))
 
@@ -346,9 +382,7 @@ describe('TemplateMiningPage', () => {
       .mockRejectedValueOnce(new Error('Confirmation unavailable.'))
       .mockResolvedValueOnce()
     const { user } = await renderMinedPage({ onConfirmVerification })
-    await acceptFirstTemplate(user)
-    await user.click(screen.getByRole('button', { name: /Continue to verify/i }))
-    await screen.findByRole('tab', { name: /Parsed/i })
+    await openSettledVerify(user)
 
     await user.click(screen.getByRole('button', { name: /Keep verified/i }))
 

@@ -83,7 +83,7 @@ export function TemplateMiningPage({
   decisions: controlledDecisions,
   onDecisionsChange
 }) {
-  const [result, setResult] = useState(null) // { groups, messages }
+  const [result, setResult] = useState(null) // { groups, messages, totalMessages }
   const [internalDecisions, setInternalDecisions] = useState({})
   const [examplesFor, setExamplesFor] = useState(null) // open template's key
   const [confirmedKeys, setConfirmedKeys] = useState(null) // null = not fetched / N/A
@@ -151,6 +151,11 @@ export function TemplateMiningPage({
   // changes while it's needed (Review's coverage metric, and the Verify
   // screen), debounced so a run of toggles doesn't fire a request each.
   const auditNeeded = (step === 'review' || step === 'verify') && Boolean(result)
+  // Read through a ref: the parent passes a fresh closure each render, and an
+  // unrelated parent re-render must not refire the audit request.
+  const onLoadAuditRef = useRef(onLoadAudit)
+  onLoadAuditRef.current = onLoadAudit
+  const hasLoadAudit = Boolean(onLoadAudit)
   useEffect(() => {
     if (!auditNeeded) return
     if (!acceptedTemplateKeys) {
@@ -159,16 +164,17 @@ export function TemplateMiningPage({
       setAuditError(null)
       return
     }
-    if (!onLoadAudit || !activeFeed?.id) return
+    if (!hasLoadAudit || !activeFeed?.id) return
     setAuditLoading(true)
     setAuditError(null)
     const requestId = ++auditRequestRef.current
     const timer = setTimeout(() => {
-      onLoadAudit(
-        activeFeed.id,
-        result.reviewId,
-        acceptedGroups.map((group) => group.templateKey)
-      )
+      onLoadAuditRef
+        .current(
+          activeFeed.id,
+          result.reviewId,
+          acceptedGroups.map((group) => group.templateKey)
+        )
         .then((data) => {
           if (requestId !== auditRequestRef.current) return
           setAudit(data ?? EMPTY_AUDIT)
@@ -184,14 +190,20 @@ export function TemplateMiningPage({
     }, AUDIT_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auditNeeded, acceptedTemplateKeys, activeFeed?.id, onLoadAudit, result?.reviewId])
+  }, [
+    auditNeeded,
+    acceptedTemplateKeys,
+    activeFeed?.id,
+    hasLoadAudit,
+    result?.reviewId
+  ])
 
   const metrics = useMemo(() => {
     if (!result) return null
     const candidates = groups.reduce((sum, group) => sum + group.count, 0)
     const parsedSignals = audit ? audit.parsedSignals.length : 0
     return {
-      totalMessages: result.messages.length,
+      totalMessages: result.totalMessages,
       candidates,
       groups: groups.length,
       accepted: acceptedGroups.length,
@@ -301,7 +313,8 @@ export function TemplateMiningPage({
       reviewId: mineResult?.reviewId,
       inputRevision: mineResult?.inputRevision,
       groups: mineResult?.groups ?? [],
-      messages: mineResult?.messages ?? []
+      messages: mineResult?.messages ?? [],
+      totalMessages: mineResult?.totalMessages ?? mineResult?.messages?.length ?? 0
     })
     setDecisions({})
     setExamplesFor(null)

@@ -184,6 +184,74 @@ describe('SignalsView', () => {
     expect(screen.getByText('Queued for backtest', { exact: false })).toBeTruthy()
   })
 
+  it('shows an author-closed tested trade as tested with its position timeline', async () => {
+    const authorClosed = {
+      ...ethSignal,
+      cancelled: true,
+      mods: [
+        { id: 'mod-1', kind: 'close', price: '2400', effect: 'Closed', time: '13:00' }
+      ],
+      effective: { ...ethSignal.effective, closedBy: 'author' }
+    }
+    renderView({
+      onListSignals: vi.fn().mockResolvedValue(backendBody({ signals: [authorClosed] }))
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: /ETH\/USDT/i }))
+
+    expect(screen.getByText('Position timeline')).toBeTruthy()
+    expect(screen.getByText('Closed by author')).toBeTruthy()
+    expect(screen.queryByText('Cancelled')).toBeNull()
+    expect(screen.queryByText(/Cancelled by the author before/)).toBeNull()
+  })
+
+  it('keeps the cancelled badge and timeline for a pre-entry cancellation', async () => {
+    const cancelledBeforeEntry = {
+      ...btcSignal,
+      status: 'skipped',
+      cancelled: true,
+      mods: [{ id: 'mod-2', kind: 'cancel', effect: 'Cancelled', time: '12:10' }]
+    }
+    renderView({
+      onListSignals: vi
+        .fn()
+        .mockResolvedValue(backendBody({ signals: [cancelledBeforeEntry] }))
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: /BTC\/USDT/i }))
+
+    expect(screen.getByText('Position timeline')).toBeTruthy()
+    expect(screen.getByText(/Cancelled by the author before/)).toBeTruthy()
+  })
+
+  it('orders signals by full timestamp across month boundaries', async () => {
+    const september = {
+      ...btcSignal,
+      id: 'sig-sep',
+      date: 'Sep 30',
+      at: '2026-09-30T12:00:00+00:00'
+    }
+    const october = {
+      ...ethSignal,
+      id: 'sig-oct',
+      date: 'Oct 1',
+      at: '2026-10-01T12:00:00+00:00'
+    }
+    renderView({
+      onListSignals: vi
+        .fn()
+        .mockResolvedValue(
+          backendBody({ signals: [september, october], orphanMods: [] })
+        )
+    })
+
+    const rows = await screen.findAllByRole('button', { name: /USDT/ })
+    const labels = rows.map((row) => row.textContent)
+    expect(labels.findIndex((t) => t.includes('ETH/USDT'))).toBeLessThan(
+      labels.findIndex((t) => t.includes('BTC/USDT'))
+    )
+  })
+
   it('dismisses an orphan update locally', async () => {
     renderView()
 

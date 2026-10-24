@@ -253,7 +253,7 @@
   color: var(--text-muted);
   text-decoration: none;
 }
-.auth-legal a:hover {
+.auth-legal a[href]:hover {
   text-decoration: underline;
 }
 
