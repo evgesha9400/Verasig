@@ -25,6 +25,15 @@ def test_trade_intent_normalizes_symbol_to_upper_and_appends_usdt():
     assert TradeIntent(symbol="ETHUSDT", side=Side.SHORT).symbol == "ETHUSDT"
 
 
+@pytest.mark.parametrize("symbol", ["EURUSD", "XAUUSD", "NAS100", "ETHUSDC", "AAPL"])
+def test_trade_intent_preserves_a_symbol_that_is_already_complete(symbol):
+    assert TradeIntent(symbol=symbol, side=Side.LONG).symbol == symbol
+
+
+def test_trade_intent_preserves_a_complete_symbol_written_in_lowercase():
+    assert TradeIntent(symbol=" eurusd ", side=Side.LONG).symbol == "EURUSD"
+
+
 def test_trade_intent_rejects_empty_symbol():
     with pytest.raises(ValidationError):
         TradeIntent(symbol="", side=Side.LONG)

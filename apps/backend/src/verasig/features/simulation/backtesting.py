@@ -18,6 +18,7 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.mining.mining_review import read_confirmed_missed_message_ids
+from verasig.features.parser_overlay.repository import read_overlay
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.risk.policy import RiskConfigPolicy
 from verasig.features.signals import (
@@ -85,6 +86,7 @@ def load_folded_signals(
                 session, user_id, channel_id
             )
         }
+        overlay = read_overlay(session, user_id)
     return BacktestInputs(
         channel=channel,
         messages=messages,
@@ -92,7 +94,9 @@ def load_folded_signals(
         signals=signals,
         missed_message_ids=missed_message_ids,
         deletions=deletions,
-        folded_signals=fold(signals, messages, manual_links=manual_links),
+        folded_signals=fold(
+            signals, messages, manual_links=manual_links, overlay=overlay
+        ),
     )
 
 

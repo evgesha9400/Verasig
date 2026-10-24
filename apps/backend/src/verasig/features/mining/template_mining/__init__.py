@@ -1,7 +1,7 @@
 """Verasig - Template Mining: public surface of the parser-first miner.
 
-Pure, deterministic, local. A faithful Python port of the frontend
-``template-mining`` module. No LLM.
+Pure, deterministic, local. Originally ported from the frontend
+``template-mining`` module; the backend is now its only implementation. No LLM.
 
 The client-only ``rules.js`` (accepted-rule audit/compile) and ``weakMemo.js``
 (a perf-only cache) are intentionally not ported - mining does not need them.

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from verasig.features.feeds import feed_repository, message_repository
 from verasig.features.mining import mining_review_repository
+from verasig.features.mining.template_mining.mining import MINER_VERSION
 from verasig.features.mining.template_mining.types import ChatMessage, TemplateGroup
 from verasig.features.parser_overlay.repository import read_overlay
 
@@ -80,6 +81,7 @@ def input_revision(
     return _digest(
         {
             "captureGeneration": capture_generation,
+            "minerVersion": MINER_VERSION,
             "messages": [
                 {"id": message.id, "text": message.text, "date": message.date}
                 for message in messages
@@ -163,14 +165,13 @@ def require_latest_current_review(
 def read_confirmed_missed_message_ids(
     session: Session, user_id: UUID, external_id: int
 ) -> list[int]:
+    """The misses of the latest confirmed review. The same confirm wrote them and
+    the stored signal set, so they stay paired even after new messages make the
+    review stale; dropping them would score parser confidence as a perfect 1.0."""
     row = mining_review_repository.read_latest_confirmed_review_row(
         session, user_id, external_id
     )
     if row is None:
-        return []
-    try:
-        _require_revision(session, user_id, external_id, row.input_revision)
-    except MiningReviewStaleError:
         return []
     return [int(message_id) for message_id in row.missed_message_ids or []]
 

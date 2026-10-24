@@ -130,3 +130,70 @@ def test_accepts_a_chat_message_object_as_input():
     fields = extract_signal_fields({"id": "x", "text": "BUY XAUUSD NOW\nSL 2312"})
     assert fields.instrument == "XAUUSD"
     assert fields.stop_loss == 2312
+
+
+# --- inline clauses ---
+def test_routes_each_inline_clause_to_its_own_field():
+    fields = extract_signal_fields("BTC LONG entry 100 sl 95 tp 110")
+    assert fields.entry.price == 100
+    assert fields.stop_loss == 95
+    assert fields.take_profits == [110]
+
+
+def test_reads_a_header_price_ahead_of_inline_stop_and_targets():
+    fields = extract_signal_fields("BTC LONG 64000 SL 62000 TP 66000 68000")
+    assert fields.entry.price == 64000
+    assert fields.stop_loss == 62000
+    assert fields.take_profits == [66000, 68000]
+
+
+def test_collects_numbered_target_lines_without_their_ordinals():
+    fields = extract_signal_fields("BTC LONG\nSL 95\nTargets:\n1. 110\n2) 120")
+    assert fields.take_profits == [110, 120]
+
+
+def test_does_not_read_a_mention_as_an_entry():
+    fields = extract_signal_fields("BTC LONG\n@admin 2 spots left")
+    assert fields.entry is None
+
+
+def test_prefers_the_instrument_on_the_direction_line():
+    fields = extract_signal_fields("ETH looks heavy\nBTC LONG 64000")
+    assert fields.instrument == "BTCUSDT"
+
+
+# --- leverage ---
+def test_reads_a_single_leverage():
+    assert extract_signal_fields("BTC LONG\nLeverage 20x").leverage == 20
+
+
+def test_reads_the_top_of_a_leverage_range():
+    assert extract_signal_fields("BTC LONG\nLeverage 5-10x").leverage == 10
+
+
+def test_leaves_leverage_unset_when_none_is_stated():
+    assert extract_signal_fields("BTC LONG 64000").leverage is None
+
+
+def test_a_market_word_inside_an_entry_clause_keeps_its_price():
+    fields = extract_signal_fields("BTC LONG\nEntry now 64000\nSL 62000\nTP 66000")
+    assert fields.entry.price == 64000
+
+
+def test_a_unit_word_on_the_next_line_does_not_drop_a_price():
+    fields = extract_signal_fields("EURUSD BUY\nTP 1.0950\nPips: 100")
+    assert fields.take_profits == [1.095]
+
+
+def test_digit_led_ticker_header_has_no_entry_price():
+    fields = extract_signal_fields("1000PEPEUSDT LONG\nSL 0.007\nTP 0.01")
+    assert fields.instrument == "1000PEPEUSDT"
+    assert fields.entry is None
+    assert fields.stop_loss == 0.007
+
+
+def test_instrument_repeated_on_the_direction_line_wins_over_an_earlier_mention():
+    fields = extract_signal_fields(
+        "ETH and BTC watchlist\nBTC LONG entry 100 sl 95 tp 110"
+    )
+    assert fields.instrument == "BTCUSDT"

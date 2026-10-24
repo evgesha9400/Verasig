@@ -92,6 +92,27 @@ def test_login_rejects_password_longer_than_bcrypt_limit(client):
     assert response.status_code == 422
 
 
+def test_register_rejects_multibyte_password_over_bcrypt_byte_limit(client):
+    # 40 characters but 80 UTF-8 bytes: within max_length, over bcrypt's limit.
+    payload = _register_payload()
+    payload["password"] = "ж" * 40
+
+    response = client.post("/auth/register", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_login_rejects_multibyte_password_over_bcrypt_byte_limit(client):
+    _register(client)
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "ada@example.com", "password": "ж" * 40},
+    )
+
+    assert response.status_code == 422
+
+
 def test_register_rejects_blank_first_name(client):
     payload = _register_payload()
     payload["firstName"] = "   "

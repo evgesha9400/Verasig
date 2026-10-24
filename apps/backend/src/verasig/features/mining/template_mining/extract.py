@@ -3,10 +3,9 @@
 Assembles the detectors, extractor, intent classifier, scorer, geometry check
 and template normalizer into one Candidate. The minimum bar is instrument +
 direction; below it the message is not a signal candidate and we return None -
-the parser itself is the classifier.
-
-Faithful port of ``extract.js`` (the perf-only weakMemo caches are omitted;
-they are an optimization, not behavior).
+the parser itself is the classifier. ``analyze_message`` is the single pass:
+the text is normalized and its prices detected once, and every downstream step
+reuses them.
 """
 
 from __future__ import annotations
@@ -18,25 +17,36 @@ from .fields import StructuredFields, extract_signal_fields
 from .geometry import validate_price_geometry
 from .instruments import detect_instruments
 from .intent import classify_intent
-from .prices import detect_prices
+from .prices import DetectedPrice, detect_prices
 from .scoring import score_candidate
 from .template import hash_string, normalize_template
-from .text import normalize_message_text
+from .text import NormalizedText, normalize_message_text
 from .types import Candidate, ChatMessage
 
 
 @dataclass
 class _Analysis:
-    clean: str
-    lower: str
-    lines: list[str]
+    normalized: NormalizedText
     instruments: list
     directions: list
+    prices: list[DetectedPrice]
     fields: StructuredFields
     intent: str
 
+    @property
+    def clean(self) -> str:
+        return self.normalized.clean
 
-def _as_message(message) -> ChatMessage:
+    @property
+    def lower(self) -> str:
+        return self.normalized.lower
+
+    @property
+    def lines(self) -> list[str]:
+        return self.normalized.lines
+
+
+def as_message(message) -> ChatMessage:
     # Hash the content so two distinct same-length strings get distinct ids.
     if isinstance(message, str):
         return ChatMessage(id=f"msg_{hash_string(message)}", text=message)
@@ -62,21 +72,8 @@ def _message_text(message) -> str:
     return getattr(message, "text", "") or ""
 
 
-def _intent_rejection_reason(intent: str) -> str | None:
-    if intent == "update":
-        return "Reads as an update to an open trade, not a new signal."
-    if intent == "result":
-        return "Reads as a trade result, not a new signal."
-    if intent == "commentary":
-        return "Reads as commentary, not a tradeable signal."
-    return None
-
-
-def _collect_rejection_reasons(intent, fields, directions, geometry) -> list[str]:
+def _collect_rejection_reasons(directions, geometry) -> list[str]:
     reasons = [*geometry.warnings]
-    intent_reason = _intent_rejection_reason(intent)
-    if intent_reason:
-        reasons.append(intent_reason)
     if is_emoji_only_direction(directions):
         reasons.append("Direction is inferred from an emoji only.")
     return reasons
@@ -85,25 +82,32 @@ def _collect_rejection_reasons(intent, fields, directions, geometry) -> list[str
 def analyze_message(message, overlay: dict | None = None) -> _Analysis:
     """Detectors, extracted fields and intent for any message."""
     normalized = normalize_message_text(_message_text(message))
-    clean, lower, lines = normalized.clean, normalized.lower, normalized.lines
-    instruments = detect_instruments(clean, overlay)
-    directions = detect_directions(clean, overlay)
+    instruments = detect_instruments(normalized.clean, overlay)
+    directions = detect_directions(normalized.clean, overlay)
+    prices = detect_prices(normalized.clean)
     fields = extract_signal_fields(
         message,
         overlay,
         {
             "instruments": instruments,
             "directions": directions,
+            "prices": prices,
             "normalized": normalized,
         },
     )
-    intent = classify_intent(_message_text(message), fields)
-    return _Analysis(clean, lower, lines, instruments, directions, fields, intent)
+    intent = classify_intent(normalized.original, fields, normalized)
+    return _Analysis(normalized, instruments, directions, prices, fields, intent)
 
 
 def attempt_extract_signal(input_, overlay: dict | None = None) -> Candidate | None:
-    message = _as_message(input_)
-    analysis = analyze_message(message, overlay)
+    message = as_message(input_)
+    return candidate_of(message, analyze_message(message, overlay), overlay)
+
+
+def candidate_of(
+    message: ChatMessage, analysis: _Analysis, overlay: dict | None = None
+) -> Candidate | None:
+    """The candidate an already-analyzed message yields, or None below the bar."""
     if not analysis.instruments or not analysis.directions:
         return None
     # The parser is the classifier: only a message that reads as a NEW signal is
@@ -111,14 +115,14 @@ def attempt_extract_signal(input_, overlay: dict | None = None) -> Candidate | N
     if analysis.intent != "new_signal":
         return None
 
-    prices = detect_prices(analysis.clean)
     template = normalize_template(
         {"message": message},
         overlay,
         {
             "instruments": analysis.instruments,
             "directions": analysis.directions,
-            "prices": prices,
+            "prices": analysis.prices,
+            "normalized": analysis.normalized,
         },
     )
     # No structural skeleton survived - it is not a parseable signal format.
@@ -136,15 +140,13 @@ def attempt_extract_signal(input_, overlay: dict | None = None) -> Candidate | N
             "lines": analysis.lines,
         }
     )
-    rejection_reasons = _collect_rejection_reasons(
-        analysis.intent, analysis.fields, analysis.directions, geometry
-    )
+    rejection_reasons = _collect_rejection_reasons(analysis.directions, geometry)
 
     return Candidate(
         message=message,
         instruments=analysis.instruments,
         directions=analysis.directions,
-        prices=prices,
+        prices=analysis.prices,
         fields=analysis.fields,
         intent=analysis.intent,
         confidence=confidence,

@@ -200,3 +200,117 @@ def test_different_symbol_reply_that_is_a_signal_starts_its_own_root():
     assert set(by_symbol) == {"BTCUSDT", "ETHUSDT"}
     assert len(by_symbol["BTCUSDT"].timeline) == 1  # ETH is not a member of BTC
     assert len(by_symbol["ETHUSDT"].timeline) == 1
+
+
+def test_reply_to_a_manually_linked_modifier_joins_the_same_root():
+    signal, entry_msg = _entry(1, 0, entry_low="65000", stop_loss="64000")
+    linked = _message(2, 30, "SL 64500")  # unthreaded, linked by hand
+    reply = _message(3, 60, "SL 64800", reply_to=2)  # replies to the linked one
+    deeper = _message(4, 90, "SL 64900", reply_to=3)  # transitively
+    folded = fold(
+        [signal], [entry_msg, linked, reply, deeper], manual_links={2: signal.id}
+    )
+    timeline = folded[0].timeline
+    assert [step.source_message_id for step in timeline] == [1, 2, 3, 4]
+    assert timeline[-1].effective_stop_loss == Decimal("64900")
+
+
+def test_reply_naming_another_instrument_does_not_patch_the_signal():
+    signal, entry_msg = _entry(1, 0, symbol="BTC", entry_low="65000", stop_loss="64000")
+    reply = _message(2, 30, "ETH move SL to 3000", reply_to=1)
+    folded = fold([signal], [entry_msg, reply])
+    timeline = folded[0].timeline
+    assert len(timeline) == 1  # the ETH reply is skipped for the BTCUSDT signal
+    assert timeline[0].effective_stop_loss == Decimal("64000")
+
+
+def test_reply_naming_the_same_instrument_patches_the_signal():
+    signal, entry_msg = _entry(1, 0, symbol="BTC", entry_low="65000", stop_loss="64000")
+    reply = _message(2, 30, "BTC move SL to 64500", reply_to=1)
+    folded = fold([signal], [entry_msg, reply])
+    timeline = folded[0].timeline
+    assert len(timeline) == 2
+    assert timeline[1].effective_stop_loss == Decimal("64500")
+
+
+def test_reduce_beyond_the_whole_position_closes_without_going_negative():
+    signal, entry_msg = _entry(1, 0, entry_low="65000")
+    reply = _message(2, 30, "reduce 150%", reply_to=1)
+    folded = fold([signal], [entry_msg, reply])
+    step = folded[0].timeline[1]
+    assert step.event_type is SignalEventType.CLOSE
+    assert step.effective_size == Decimal(0)
+    assert step.leg_size == Decimal(-1)
+    assert folded[0].closed_at == _at(30)
+
+
+def test_size_reduction_after_close_is_ignored():
+    signal, entry_msg = _entry(1, 0, entry_low="65000")
+    close = _message(2, 30, "closed", reply_to=1)
+    again = _message(3, 60, "reduce half", reply_to=1)
+    folded = fold([signal], [entry_msg, close, again])
+    timeline = folded[0].timeline
+    assert len(timeline) == 2  # a size-only reply after close adds no step
+    assert timeline[-1].effective_size == Decimal(0)
+    assert folded[0].closed_at == _at(30)
+
+
+def test_stop_update_after_close_still_applies_without_a_size_leg():
+    signal, entry_msg = _entry(1, 0, entry_low="65000", stop_loss="64000")
+    close = _message(2, 30, "closed", reply_to=1)
+    late = _message(3, 60, "close half, SL 64500", reply_to=1)
+    folded = fold([signal], [entry_msg, close, late])
+    step = folded[0].timeline[-1]
+    assert step.source_message_id == 3
+    assert step.event_type is SignalEventType.MODIFY
+    assert step.effective_stop_loss == Decimal("64500")
+    assert step.effective_size == Decimal(0)
+    assert step.leg_size is None
+    assert folded[0].closed_at == _at(30)
+
+
+def test_an_add_after_close_does_not_reopen_the_position():
+    signal, entry_msg = _entry(1, 0, entry_low="65000")
+    close = _message(2, 30, "closed", reply_to=1)
+    add = _message(3, 60, "add 1x at 64000", reply_to=1)
+    folded = fold([signal], [entry_msg, close, add])
+    assert len(folded[0].timeline) == 2
+    assert folded[0].timeline[-1].effective_size == Decimal(0)
+
+
+def test_reply_naming_an_overlay_instrument_does_not_patch_the_signal():
+    # "WIFFY" is an instrument only through the user's parser overlay; the symbol
+    # guard must honour it exactly as the miner does.
+    signal, entry_msg = _entry(1, 0, symbol="BTC", entry_low="65000", stop_loss="64000")
+    reply = _message(2, 30, "WIFFY move SL to 3000", reply_to=1)
+    overlay = {"instrumentAliases": {"WIFFY": "WIFUSDT"}}
+
+    without_overlay = fold([signal], [entry_msg, reply])
+    with_overlay = fold([signal], [entry_msg, reply], overlay=overlay)
+
+    assert len(without_overlay[0].timeline) == 2
+    assert len(with_overlay[0].timeline) == 1
+
+
+def test_deep_reply_chain_folds_every_member_once():
+    signal, entry_msg = _entry(1, 0, entry_low="65000", stop_loss="60000")
+    chain = [
+        _message(index, index, f"SL {60000 + index}", reply_to=index - 1)
+        for index in range(2, 202)
+    ]
+
+    folded = fold([signal], [entry_msg, *reversed(chain)])
+
+    timeline = folded[0].timeline
+    assert [step.source_message_id for step in timeline] == list(range(1, 202))
+    assert timeline[-1].effective_stop_loss == Decimal("60201")
+
+
+def test_reply_cycle_without_a_root_is_not_a_member():
+    signal, entry_msg = _entry(1, 0, entry_low="65000", stop_loss="64000")
+    first = _message(2, 30, "SL 64500", reply_to=3)
+    second = _message(3, 60, "SL 64800", reply_to=2)
+
+    folded = fold([signal], [entry_msg, first, second])
+
+    assert len(folded[0].timeline) == 1

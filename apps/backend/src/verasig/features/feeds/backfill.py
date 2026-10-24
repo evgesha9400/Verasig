@@ -5,8 +5,9 @@ and advances the top cursor in one committed transaction, so a crash mid-stream
 loses at most the in-flight batch and a restart resumes from the oldest captured
 id — paging further into the past without refetching, because the capture insert
 is ON CONFLICT DO NOTHING. `extend_newer` (REFRESH) instead pulls only messages
-posted since the top cursor. Only one batch is ever held. Capture is user-owned,
-so every step is scoped by `user_id`.
+posted since the top cursor, OLDEST->NEWEST, so the committed top cursor only
+ever advances over a contiguous range. Only one batch is ever held. Capture is
+user-owned, so every step is scoped by `user_id`.
 """
 
 import logging
@@ -22,6 +23,10 @@ from verasig.domain.telegram_ports import TelegramSource
 from verasig.features.feeds import feed_repository, message_repository
 
 logger = logging.getLogger(__name__)
+
+
+class FeedDeletedError(RuntimeError):
+    """The feed was deleted while its backfill job was in flight."""
 
 
 @dataclass(frozen=True)
@@ -40,8 +45,13 @@ async def backfill(
     on_batch: Callable[[int, datetime], None] | None = None,
     since: datetime | None = None,
     extend_newer: bool = False,
+    require_feed: bool = False,
 ) -> BackfillResult:
-    external_id = await _register_feed(source, user_id, reference, session_factory)
+    """`require_feed` refuses to create a missing feed: a job started for an
+    existing feed raises `FeedDeletedError` instead of re-creating a deleted one."""
+    external_id = await _register_feed(
+        source, user_id, reference, session_factory, require_feed
+    )
     logger.info(
         "backfill stream: user=%s external_id=%s extend_newer=%s since=%s",
         user_id,
@@ -90,12 +100,16 @@ async def _register_feed(
     user_id: UUID,
     reference: str | int,
     session_factory: sessionmaker,
+    require_feed: bool,
 ) -> int:
     channel = await source.resolve_channel(reference)
     with session_factory() as session:
-        feed_repository.upsert_feed_metadata(
-            session, user_id, channel, datetime.now(tz=UTC)
-        )
+        if not require_feed:
+            feed_repository.upsert_feed_metadata(
+                session, user_id, channel, datetime.now(tz=UTC)
+            )
+        elif feed_repository.refresh_feed_metadata(session, user_id, channel) is None:
+            raise FeedDeletedError(f"feed {channel.channel_id} was deleted")
         session.commit()
         return channel.channel_id
 

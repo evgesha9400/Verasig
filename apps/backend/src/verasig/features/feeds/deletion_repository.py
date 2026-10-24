@@ -7,12 +7,16 @@ speaks `external_id`/`external_message_id` and is user-owned.
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from verasig.domain.deletion import DeletedSignalEvidence
 from verasig.storage.models import DeletedSignalEvidenceRow
+
+# Rows per INSERT: 10 bound columns per row keeps each statement far below
+# PostgreSQL's 65,535 bind-parameter limit, however large the evidence set.
+_UPSERT_CHUNK = 2000
 
 
 @dataclass(frozen=True)
@@ -43,8 +47,16 @@ def upsert_deletion_evidence(
     session: Session, user_id: UUID, evidence: list[DeletedSignalEvidence]
 ) -> int:
     """Persist evidence; upgrade SUSPECTED->CONFIRMED only, preserving detected_at."""
-    if not evidence:
-        return 0
+    written = 0
+    for start in range(0, len(evidence), _UPSERT_CHUNK):
+        chunk = evidence[start : start + _UPSERT_CHUNK]
+        written += _upsert_evidence_chunk(session, user_id, chunk)
+    return written
+
+
+def _upsert_evidence_chunk(
+    session: Session, user_id: UUID, evidence: list[DeletedSignalEvidence]
+) -> int:
     statement = pg_insert(DeletedSignalEvidenceRow).values(
         [_deletion_values(user_id, item) for item in evidence]
     )
@@ -96,42 +108,37 @@ def read_deletion_evidence(
     return [_row_to_deletion(row) for row in rows]
 
 
-def _is_signal_deletion(confidence: str, was_candidate: bool) -> bool:
-    """A CONFIRMED deletion of a signal candidate is a signal deletion (ADR 0016).
-
-    `was_signal_candidate` is authoritative: it is set at detection time iff the
-    deleted message had a persisted `signal`, which only the miner writes on
-    Confirm — so no unconfirmed candidacy can reach here.
-    """
-    return confidence == "CONFIRMED" and bool(was_candidate)
-
-
 def summarize_deletions(
     session: Session,
     user_id: UUID,
     external_ids: list[int],
 ) -> dict[int, DeletionSummary]:
+    """Confirmed-deletion counts per feed, aggregated in PostgreSQL.
+
+    Suspected id-gaps are internal-only (hygiene), never surfaced. A CONFIRMED
+    deletion of a signal candidate is a signal deletion (ADR 0016):
+    `was_signal_candidate` is authoritative, set at detection time iff the deleted
+    message had a persisted `signal`, which only the miner writes on Confirm.
+    """
     if not external_ids:
         return {}
+    signal_count = func.count().filter(
+        DeletedSignalEvidenceRow.was_signal_candidate.is_(True)
+    )
     rows = session.execute(
-        select(
-            DeletedSignalEvidenceRow.external_id,
-            DeletedSignalEvidenceRow.confidence,
-            DeletedSignalEvidenceRow.was_signal_candidate,
-        ).where(
+        select(DeletedSignalEvidenceRow.external_id, func.count(), signal_count)
+        .where(
             DeletedSignalEvidenceRow.user_id == user_id,
             DeletedSignalEvidenceRow.external_id.in_(external_ids),
+            DeletedSignalEvidenceRow.confidence == "CONFIRMED",
         )
+        .group_by(DeletedSignalEvidenceRow.external_id)
     ).all()
     summaries = {external_id: DeletionSummary() for external_id in external_ids}
-    for external_id, confidence, was_candidate in rows:
-        if confidence != "CONFIRMED":
-            continue  # suspected id-gaps are internal-only (hygiene), never surfaced
-        current = summaries[external_id]
-        is_signal = _is_signal_deletion(confidence, was_candidate)
+    for external_id, deleted_count, deleted_signal_count in rows:
         summaries[external_id] = DeletionSummary(
-            signal_deletion=current.signal_deletion or is_signal,
-            deleted_count=current.deleted_count + 1,
-            deleted_signal_count=current.deleted_signal_count + int(is_signal),
+            signal_deletion=deleted_signal_count > 0,
+            deleted_count=deleted_count,
+            deleted_signal_count=deleted_signal_count,
         )
     return summaries

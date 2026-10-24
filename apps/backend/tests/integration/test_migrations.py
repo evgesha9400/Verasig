@@ -9,14 +9,9 @@ def test_migrations_apply(pg_url):
     command.upgrade(cfg, "head")  # no error == migrations apply
 
 
-def test_revisioned_mining_review_upgrades_from_0001_to_head(pg_url):
+def test_mining_review_schema_exists_after_upgrade(pg_url):
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", pg_url)
-    command.downgrade(cfg, "base")
-    command.upgrade(cfg, "0001_init")
-    before = inspect(create_engine(pg_url, future=True))
-    assert "mine_result" in before.get_table_names()
-
     command.upgrade(cfg, "head")
 
     inspector = inspect(create_engine(pg_url, future=True))

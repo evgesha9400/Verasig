@@ -1,13 +1,14 @@
 """Mining Confirm persists accepted families' signals (ADR 0015, miner-based).
 
 `confirm_review` consumes a revisioned review, keeps the accepted
-template families, persists each candidate as one ``Signal`` — the SAME rows the
-Signals view reads — by replacing the feed's whole signal projection (delete +
-insert), and marks the feed verified.
+template families, persists each audit-parsed candidate as one ``Signal`` — the
+SAME rows the Signals view reads — by reconciling the feed's whole signal
+projection (a retained message keeps its signal id), and marks the feed verified.
 """
 
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime, timezone
+from decimal import Decimal
 from threading import Event
 from uuid import uuid4
 
@@ -27,8 +28,9 @@ from verasig.features.mining.mining_confirm import (
 )
 from verasig.features.mining.mining_review import create_review, read_input
 from verasig.features.mining.template_mining import mine_template_groups
-from verasig.features.signals import outcome_repository
+from verasig.features.signals import lifecycle_link_repository, outcome_repository
 from verasig.features.signals.views import present_signals
+from verasig.features.simulation import repository as backtest_repository
 from verasig.foundation.jobs.registry import JobRegistry
 
 
@@ -158,6 +160,9 @@ def test_confirm_maps_structured_fields_onto_the_signal(session_factory):
         extracted = outcome_repository.read_signals(session, 1, user_id)
     btc = next(signal for signal in extracted if signal.symbol == "BTCUSDT")
     assert btc.side.value == "LONG"
+    assert btc.entry_low == Decimal("100")
+    assert btc.stop_loss == Decimal("95")
+    assert btc.take_profits == [Decimal("110")]
     assert btc.confidence is not None  # miner confidence carried onto the signal
     assert btc.rule_id in keys  # provenance: which template family produced it
 
@@ -192,11 +197,9 @@ def test_reconfirm_is_idempotent(session_factory):
 def test_reconfirm_with_a_smaller_accepted_set_removes_deselected_signals(
     session_factory,
 ):
-    """Confirm replaces the feed's whole signal projection. Before the fix,
-    persistence only ever upserted, so confirming a SMALLER accepted set left
-    the de-selected family's signal orphaned in storage — it resurrected the
-    next time the feed was reopened. A replace (delete + insert) makes the
-    stored set always exactly the accepted set."""
+    """Confirm reconciles the feed's whole signal projection: confirming a
+    SMALLER accepted set must not leave the de-selected family's signal
+    orphaned in storage (it would resurrect when the feed is reopened)."""
     user_id = _seed_backfilled_feed_with_two_families(session_factory)
     review = _create_review(session_factory, user_id)
     keys = [group.template_key for group in review.groups]
@@ -205,7 +208,7 @@ def test_reconfirm_with_a_smaller_accepted_set_removes_deselected_signals(
     confirm_review(session_factory, user_id, 1, review.review_id, keys)
     with session_factory() as session:
         before = outcome_repository.read_signals(session, 1, user_id)
-    assert {signal.symbol for signal in before} == {"BTCUSDT", "EURUSDUSDT"}
+    assert {signal.symbol for signal in before} == {"BTCUSDT", "EURUSD"}
 
     smaller = keys[:1]
     result = confirm_review(session_factory, user_id, 1, review.review_id, smaller)
@@ -215,6 +218,52 @@ def test_reconfirm_with_a_smaller_accepted_set_removes_deselected_signals(
     assert result.signals_extracted == 1
     assert len(after) == 1  # the de-selected family's signal is actually gone
     assert {signal.rule_id for signal in after} == set(smaller)
+
+
+def test_reconfirm_drops_backtests_of_the_previous_signal_set(session_factory):
+    user_id = _seed_backfilled_feed(session_factory)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
+    with session_factory() as session:
+        backtest_repository.insert_result(
+            session, user_id, 1, 70, Decimal("50"), Decimal("1"), [], _instant()
+        )
+        feed_repository.set_status(session, user_id, 1, "analyzed")
+        session.commit()
+
+    result = confirm_review(session_factory, user_id, 1, review.review_id, keys[:1])
+
+    with session_factory() as session:
+        results = backtest_repository.read_latest_results(session, user_id)
+        feed = feed_repository.read_feed(session, user_id, 1)
+    assert result.feed_status == "verified"
+    assert 1 not in results
+    assert feed.status == "verified"
+
+
+def test_reconfirm_keeps_retained_signal_ids_and_their_lifecycle_links(
+    session_factory,
+):
+    user_id = _seed_backfilled_feed_with_two_families(session_factory)
+    review = _create_review(session_factory, user_id)
+    keys = [group.template_key for group in review.groups]
+    confirm_review(session_factory, user_id, 1, review.review_id, keys)
+    with session_factory() as session:
+        before = outcome_repository.read_signals(session, 1, user_id)
+        btc = next(signal for signal in before if signal.symbol == "BTCUSDT")
+        lifecycle_link_repository.insert_link(
+            session, user_id, 1, 2, btc.id, _instant()
+        )
+        session.commit()
+
+    confirm_review(session_factory, user_id, 1, review.review_id, [btc.rule_id])
+
+    with session_factory() as session:
+        after = outcome_repository.read_signals(session, 1, user_id)
+        links = lifecycle_link_repository.read_links(session, user_id, 1)
+    assert [signal.id for signal in after] == [btc.id]  # EURUSD gone, BTC id kept
+    assert [link.root_signal_id for link in links] == [btc.id]
 
 
 def test_confirm_failure_rolls_back_projection_status_and_review_evidence(
@@ -256,15 +305,16 @@ def test_confirm_and_backfill_serialize_on_the_feed_row(session_factory, monkeyp
     keys = [group.template_key for group in review.groups]
     projection_started = Event()
     release_confirm = Event()
-    original_delete = outcome_repository.delete_signals_for_channel
+    original_replace = outcome_repository.replace_signals_for_channel
 
-    def block_after_lock(session, owner_id, external_id):
-        original_delete(session, owner_id, external_id)
+    def block_after_lock(session, owner_id, external_id, signals):
+        stored = original_replace(session, owner_id, external_id, signals)
         projection_started.set()
         assert release_confirm.wait(timeout=5)
+        return stored
 
     monkeypatch.setattr(
-        outcome_repository, "delete_signals_for_channel", block_after_lock
+        outcome_repository, "replace_signals_for_channel", block_after_lock
     )
     coordinator = BackfillJobCoordinator(session_factory, JobRegistry(), batch_size=200)
 

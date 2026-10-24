@@ -16,6 +16,8 @@ from fakes import FakeSource
 from fakes import channel as _channel
 from fakes import messages as _messages
 
+from verasig.features.mining import mining_review
+
 
 def _mine_to_done(client, token: str) -> None:
     assert (
@@ -47,6 +49,7 @@ def test_result_returns_cached_snapshot_after_mine(client, app):
     assert body["inputRevision"]
     assert isinstance(body["groups"], list) and len(body["groups"]) >= 1
     assert isinstance(body["messages"], list) and len(body["messages"]) >= 1
+    assert body["totalMessages"] == len(body["messages"])
     # Cached in the browser's camelCase wire shape, ready to hydrate directly.
     assert {"templateKey", "count", "suggestedAction"} <= set(body["groups"][0])
 
@@ -127,3 +130,13 @@ def test_result_on_foreign_feed_is_404(client, app):
     assert (
         client.get("/feeds/999/mining/result", headers=_auth(token)).status_code == 404
     )
+
+
+def test_a_miner_upgrade_stales_the_cached_review(client, app, monkeypatch):
+    token = _register(client)
+    _backfill_to_done(client, app, token, FakeSource(_channel(), _messages()))
+    _mine_to_done(client, token)
+
+    monkeypatch.setattr(mining_review, "MINER_VERSION", mining_review.MINER_VERSION + 1)
+
+    _assert_stale(client.get("/feeds/7/mining/result", headers=_auth(token)))

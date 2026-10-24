@@ -11,7 +11,10 @@ from verasig.features.exchanges.workflow import (
 )
 from verasig.foundation.http.auth_dependencies import get_current_user
 from verasig.foundation.http.errors import ApiError
-from verasig.foundation.market_data.bybit_account import KeyVerificationError
+from verasig.foundation.market_data.bybit_account import (
+    KeyVerificationError,
+    WithdrawPermissionError,
+)
 
 router = APIRouter(prefix="/exchanges")
 
@@ -48,6 +51,12 @@ async def connect(
         raise ApiError(403, "PLAN_LIMIT_EXCHANGES", "Exchange limit reached") from error
     except ExchangeUnavailableError as error:
         raise ApiError(404, "EXCHANGE_NOT_FOUND", "Exchange not found") from error
+    except WithdrawPermissionError as error:
+        raise ApiError(
+            400,
+            "EXCHANGE_KEYS_WITHDRAW_ENABLED",
+            "Exchange keys must not have withdrawal permission",
+        ) from error
     except KeyVerificationError as error:
         raise ApiError(
             400, "EXCHANGE_KEYS_INVALID", "Exchange keys are invalid"

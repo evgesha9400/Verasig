@@ -1,8 +1,11 @@
 """Atomic MiningReview confirmation.
 
 Confirm locks the feed row, validates the addressed immutable review against the
-live capture + overlay, replaces the signal projection, records review evidence,
-and marks the feed verified in one transaction.
+live capture + overlay, runs the accepted families over the review once
+(``compute_audit``), reconciles the signal projection to exactly the audit's
+parsed signals, drops backtests computed from the previous signal set, records
+review evidence, and marks the feed verified (awaiting a fresh backtest) in one
+transaction.
 """
 
 import logging
@@ -20,8 +23,8 @@ from verasig.features.mining import mining_review_repository
 from verasig.features.mining.mining_audit import AuditResult, compute_audit
 from verasig.features.mining.mining_review import require_current_review
 from verasig.features.mining.mining_signals import candidate_to_signal
-from verasig.features.mining.template_mining.types import TemplateGroup
 from verasig.features.signals import outcome_repository
+from verasig.features.simulation import repository as backtest_repository
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +59,18 @@ def confirm_review(
 
         review = require_current_review(session, user_id, external_id, review_id)
         kept = [group for group in review.groups if group.template_key in accepted]
-        signals = _signals_of(kept, external_id)
         audit = compute_audit(
             review.messages,
             review.groups,
             accepted_template_keys,
             review.overlay,
         )
+        signals = _signals_of(audit, external_id)
 
-        outcome_repository.delete_signals_for_channel(session, user_id, external_id)
-        extracted = outcome_repository.insert_signals(session, signals, user_id)
+        extracted = outcome_repository.replace_signals_for_channel(
+            session, user_id, external_id, signals
+        )
+        backtest_repository.delete_results_for_channel(session, user_id, external_id)
         feed.status = FeedStatus.VERIFIED
         review_row = mining_review_repository.read_review_row(
             session, user_id, external_id, review_id
@@ -103,12 +108,19 @@ def read_confirmed_template_keys(
         )
 
 
-def _signals_of(groups: Sequence[TemplateGroup], external_id: int) -> list[Signal]:
+def _signals_of(audit: AuditResult, external_id: int) -> list[Signal]:
+    """Persist exactly what the audit parsed - the same selection the operator
+    previewed (reject phrases and the confidence bar applied, fallback matches
+    included)."""
     return [
         signal
-        for group in groups
-        for candidate in group.candidates
-        if (signal := candidate_to_signal(candidate, external_id)) is not None
+        for parsed in audit.parsed_signals
+        if (
+            signal := candidate_to_signal(
+                parsed.candidate, external_id, parsed.template_key
+            )
+        )
+        is not None
     ]
 
 

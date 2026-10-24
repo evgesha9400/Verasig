@@ -4,15 +4,21 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
+import httpx
 import pytest
 
 from verasig.domain.channel import TelegramChannel
 from verasig.domain.lifecycle import FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, Side, Signal, SignalEventType
-from verasig.domain.simulation import Kline
+from verasig.domain.simulation import Kline, SimOutcomeKind
 from verasig.features.provider_scores.scorecard import build_provider_score
 from verasig.features.simulation.simulator import simulate_outcomes_from_market_data
+from verasig.foundation.market_data.bybit_market_data import (
+    BYBIT_KLINE_LIMIT,
+    BybitApiError,
+    BybitKlineClient,
+)
 
 _BASE = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 _END = _BASE + timedelta(minutes=2)
@@ -40,14 +46,14 @@ def _load_klines() -> list[Kline]:
     return [Kline.model_validate(item) for item in json.loads(_FIXTURE.read_text())]
 
 
-def _folded(signal_id: UUID) -> FoldedSignal:
+def _folded(signal_id: UUID, at: datetime = _BASE) -> FoldedSignal:
     return FoldedSignal(
         root_signal_id=signal_id,
         symbol="BTCUSDT",
         side=Side.LONG,
         timeline=[
             FoldStep(
-                at=_BASE,
+                at=at,
                 source_signal_id=signal_id,
                 source_message_id=1,
                 event_type=SignalEventType.NEW_ENTRY,
@@ -136,3 +142,74 @@ def test_market_data_backed_simulation_feeds_scorecard_components():
     assert score.components[1].raw_value == pytest.approx(0.2)
     assert "sim_expectancy: simulation not supplied" not in explanation.notes
     assert "drawdown: simulation not supplied" not in explanation.notes
+
+
+def test_signals_on_one_symbol_share_one_kline_fetch():
+    market_data = FakeMarketData(_load_klines())
+    later = _BASE + timedelta(minutes=1)
+
+    outcomes = simulate_outcomes_from_market_data(
+        folded_signals=[_folded(_uuid(1), at=later), _folded(_uuid(2))],
+        market_data=market_data,
+        end=_END,
+    )
+
+    # one fetch from the earliest entry; each signal replays from its own entry
+    assert market_data.calls == [("BTCUSDT", _BASE, _END, "1")]
+    assert outcomes[1].r_multiple == pytest.approx(2.0)
+    # the later signal never sees the 12:00 bar whose 99 low reached its entry
+    assert outcomes[0].kind is SimOutcomeKind.UNFILLED
+
+
+def _bybit_page(open_times_ms: list[int]) -> dict:
+    rows = [[str(ms), "100", "101", "99", "100", "1", "1"] for ms in open_times_ms]
+    return {
+        "retCode": 0,
+        "retMsg": "OK",
+        "result": {"symbol": "BTCUSDT", "list": list(reversed(rows))},
+    }
+
+
+def _bybit_client(handler) -> BybitKlineClient:
+    return BybitKlineClient(
+        http_client=httpx.Client(
+            base_url="https://api.bybit.test", transport=httpx.MockTransport(handler)
+        )
+    )
+
+
+def test_bybit_client_pages_back_until_the_window_start():
+    minute = 60_000
+    start_ms = 1_700_000_000_000
+    total = BYBIT_KLINE_LIMIT + 5
+    all_bars = [start_ms + index * minute for index in range(total)]
+    ends: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        end_ms = int(request.url.params["end"])
+        ends.append(end_ms)
+        window = [ms for ms in all_bars if ms <= end_ms][-BYBIT_KLINE_LIMIT:]
+        return httpx.Response(200, json=_bybit_page(window))
+
+    klines = _bybit_client(handler).klines(
+        "BTCUSDT",
+        datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc),
+        datetime.fromtimestamp(all_bars[-1] / 1000, tz=timezone.utc),
+    )
+
+    assert len(ends) == 2
+    assert ends[1] == all_bars[5] - 1
+    assert len(klines) == total
+    assert [kline.open_time for kline in klines] == sorted(
+        kline.open_time for kline in klines
+    )
+
+
+def test_bybit_client_raises_on_a_non_zero_ret_code():
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"retCode": 10001, "retMsg": "params error", "result": {}}
+        )
+
+    with pytest.raises(BybitApiError, match="10001"):
+        _bybit_client(handler).klines("BTCUSDT", _BASE, _END)

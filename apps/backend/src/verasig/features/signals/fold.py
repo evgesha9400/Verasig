@@ -1,22 +1,24 @@
 """Signal-lifecycle fold (data-contracts.md §5; ADR 0007).
 
-`fold` threads each entry `Signal`'s `reply_to` chain (transitive,
-symbol-guarded by construction) into a time-ordered `FoldedSignal`: it seeds the
+`fold` threads each entry `Signal`'s `reply_to` chain (transitive, through
+manually linked modifiers too) into a time-ordered `FoldedSignal`: it seeds the
 effective position from the entry, then applies each in-thread patch in
 `posted_at` order, snapshotting the effective stop / take-profits / size / average
-entry after every step. Pure + offline; the fold is never stored, only stamped
+entry after every step. A reply that names a different instrument is skipped
+(symbol guard). Pure + offline; the fold is never stored, only stamped
 with `fold_version` so a past fold is reproducible.
 
 Join chain: `Signal.message_id → RawTelegramMessage` (for `reply_to` + `posted_at`).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from uuid import UUID
 
 from verasig.domain.lifecycle import FOLD_VERSION, FoldedSignal, FoldStep
 from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import EntryType, Signal, SignalEventType
+from verasig.features.mining.template_mining.instruments import detect_instruments
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 
 
@@ -33,20 +35,36 @@ def _entry_message_ids(signals: list[Signal]) -> dict[int, Signal]:
 
 
 def _nearest_root_message_id(
-    message: RawTelegramMessage,
+    message_id: int,
     messages_by_id: dict[int, RawTelegramMessage],
     entry_message_ids: dict[int, Signal],
+    manual_roots: dict[int, int],
+    root_cache: dict[int, int | None],
 ) -> int | None:
-    """Walk up the reply chain to the first entry root (transitive, cycle-guarded)."""
-    seen: set[int] = set()
-    current = message.reply_to_message_id
-    while current is not None and current not in seen:
-        seen.add(current)
+    """Walk up the reply chain to the first entry root or manually linked
+    message (transitive, cycle-guarded). Every visited node's root is cached,
+    so folding a whole feed walks each reply edge once."""
+    path: dict[int, None] = {}  # insertion-ordered set of visited nodes
+    root = None
+    current: int | None = message_id
+    while current is not None:
+        if current in root_cache:
+            root = root_cache[current]
+            break
+        if current in path:
+            break  # a reply cycle reaches no root
+        path[current] = None
         if current in entry_message_ids:
-            return current
+            root = current
+            break
+        if current in manual_roots:
+            root = manual_roots[current]  # a linked modifier, or a reply to one
+            break
         parent = messages_by_id.get(current)
         current = parent.reply_to_message_id if parent else None
-    return None
+    for node in path:
+        root_cache[node] = root
+    return root
 
 
 def _members_by_root(
@@ -61,12 +79,22 @@ def _members_by_root(
     root_by_signal_id = {
         signal.id: message_id for message_id, signal in entry_message_ids.items()
     }
+    manual_roots = {
+        message_id: root_by_signal_id[signal_id]
+        for message_id, signal_id in manual_links.items()
+        if signal_id in root_by_signal_id
+    }
+    root_cache: dict[int, int | None] = {}
     for message in messages:
         if message.message_id in entry_message_ids:
             continue  # an entry is its own root, never a member
-        root = root_by_signal_id.get(manual_links.get(message.message_id))
-        if root is None:
-            root = _nearest_root_message_id(message, messages_by_id, entry_message_ids)
+        root = _nearest_root_message_id(
+            message.message_id,
+            messages_by_id,
+            entry_message_ids,
+            manual_roots,
+            root_cache,
+        )
         if root is not None:
             members[root].append(message)
     for member_list in members.values():
@@ -191,17 +219,37 @@ def _apply_patch(
     )
 
 
+def _names_other_instrument(text: str, symbol: str, overlay: dict | None) -> bool:
+    named = {entity.normalized for entity in detect_instruments(text, overlay)}
+    return bool(named) and symbol not in named
+
+
+def applicable_patch(patch: LifecyclePatch, size_before: Decimal) -> LifecyclePatch:
+    """The part of ``patch`` that applies to a position of ``size_before``: a
+    closed position takes no further size op (add/reduce/close); its stop/TP
+    may still move."""
+    if size_before > 0:
+        return patch
+    return replace(
+        patch, add_multiplier=None, add_price=None, reduce_fraction=None, close=False
+    )
+
+
 def _fold_one(
     signal: Signal,
     root_message: RawTelegramMessage,
     members: list[RawTelegramMessage],
     version: int,
+    overlay: dict | None,
 ) -> FoldedSignal:
     position = _seed_position(signal)
     timeline = [_entry_step(signal, root_message, position)]
     closed_at = None
     for message in members:
-        patch = classify_patch(message.text or "")
+        text = message.text or ""
+        if _names_other_instrument(text, signal.symbol, overlay):
+            continue  # "ETH move SL" never patches a BTCUSDT signal
+        patch = applicable_patch(classify_patch(text), position.size)
         if not patch.is_actionable:
             continue  # inert reply: no phantom lifecycle step
         step = _apply_patch(signal, message, patch, position)
@@ -223,15 +271,20 @@ def fold(
     messages: list[RawTelegramMessage],
     version: int = FOLD_VERSION,
     manual_links: dict[int, UUID] | None = None,
+    overlay: dict | None = None,
 ) -> list[FoldedSignal]:
-    """Fold each entry signal + its reply-chain patches into a FoldedSignal."""
+    """Fold each entry signal + its reply-chain patches into a FoldedSignal.
+    ``overlay`` is the user's parser overlay, so the symbol guard recognizes
+    the same custom instruments the miner does."""
     entry_message_ids = _entry_message_ids(signals)
     messages_by_id = {message.message_id: message for message in messages}
     members = _members_by_root(
         entry_message_ids, messages_by_id, messages, manual_links or {}
     )
     return [
-        _fold_one(signal, messages_by_id[message_id], members[message_id], version)
+        _fold_one(
+            signal, messages_by_id[message_id], members[message_id], version, overlay
+        )
         for message_id, signal in entry_message_ids.items()
         if message_id in messages_by_id
     ]

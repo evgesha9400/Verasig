@@ -20,6 +20,7 @@ from verasig.features.accounts.user_schemas import UserOut, user_out
 from verasig.features.accounts.workflow import (
     EmailTakenError,
     PendingEmailMismatchError,
+    cancel_email_change,
     cancel_subscription,
     change_plan,
     confirm_email_change,
@@ -70,6 +71,17 @@ def request_email(
             access_token_ttl(request),
         )
         send_email_confirm(updated.pending_email, token)
+        session.commit()
+    return user_out(updated)
+
+
+@router.delete("/email")
+@router.post("/email/cancel")
+def cancel_email(
+    request: Request, user: UserAccount = Depends(get_current_user)
+) -> UserOut:
+    with request.app.state.session_factory() as session:
+        updated = cancel_email_change(session, user)
         session.commit()
     return user_out(updated)
 

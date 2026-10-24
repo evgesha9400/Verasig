@@ -3,9 +3,8 @@
 Turns a message into a structural skeleton by replacing the parts that vary
 (instruments, directions, prices, market markers) with placeholders, then
 uppercasing the label words the author actually wrote. Two messages with the
-same shape but different symbols and numbers collapse to one templateKey.
-
-Faithful port of ``template.js``.
+same shape but different symbols and numbers collapse to one templateKey, and
+so do messages of one format that differ only in how many targets they list.
 """
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ from dataclasses import dataclass
 import regex as re
 
 from .directions import detect_directions, is_emoji_direction
+from .fields import LEVERAGE
 from .instruments import detect_instruments
 from .intervals import by_start_then_longest_key
 from .prices import detect_prices
@@ -130,8 +130,7 @@ def _tidy_lines(text: str) -> str:
     return "\n".join(to_clean_lines(text))
 
 
-# [0-9] not \d: JS `\d` is ASCII-only; \d would also match unicode digits and
-# diverge from the JS parser (JS is the parity source of truth).
+# [0-9] not \d: \d would also match non-ASCII digits.
 _BARE_ORDINAL = re.compile(r"\bTP[0-9]+\b")
 _ORDINAL_KEEP = re.compile(r"^:?\s*<PRICE")
 
@@ -146,13 +145,10 @@ def _collapse_bare_ordinals(template: str) -> str:
     return _BARE_ORDINAL.sub(repl, template)
 
 
-# Leverage tokens ("20X", "17X", Cyrillic "20Х") vary per signal but are not
-# structural.
-LEVERAGE_TOKEN = re.compile(r"[0-9]+\s*[XХ](?![A-Za-zЀ-ӿ0-9])")
-
-
 def _collapse_leverage(template: str) -> str:
-    return LEVERAGE_TOKEN.sub("<LEVERAGE>", template)
+    # Leverage ("20X", Cyrillic "20Х", ranges "5-10X") varies per signal but is
+    # not structural; collapse it before decoration stripping splits "5-10X".
+    return LEVERAGE.sub("<LEVERAGE>", template)
 
 
 # Decoration that varies per message and must not split a format family.
@@ -244,26 +240,40 @@ def _collapse_price_runs(template: str) -> str:
 
 
 BARE_PRICE_LINE = re.compile(r"^(?:[0-9]+\s+)?<PRICE>$")
+# One target per line ("TP <PRICE>", "TP2 <PRICE>", "TARGET <PRICE>").
+TARGET_PRICE_LINE = re.compile(r"^(?:TP[0-9]*|TARGET)\s*<PRICE>$")
 
 
-def _collapse_target_lines(template: str) -> str:
+def _collapse_runs(
+    template: str, pattern: re.Pattern, single: str | None, many: str
+) -> str:
+    """Replace each run of consecutive ``pattern`` lines: a lone line becomes
+    ``single`` (kept verbatim when None), two or more become one ``many`` line."""
     out: list[str] = []
-    run = 0
+    run: list[str] = []
 
     def flush() -> None:
-        nonlocal run
-        if run > 0:
-            out.append("<PRICE_LIST>" if run >= 2 else "<PRICE>")
-        run = 0
+        if len(run) == 1:
+            out.append(run[0] if single is None else single)
+        elif run:
+            out.append(many)
+        run.clear()
 
     for line in template.split("\n"):
-        if BARE_PRICE_LINE.match(line):
-            run += 1
+        if pattern.match(line):
+            run.append(line)
             continue
         flush()
         out.append(line)
     flush()
     return "\n".join(out)
+
+
+def _collapse_target_lines(template: str) -> str:
+    # A run of bare price lines is one target list; so is a run of 2+ one-target
+    # lines, so a 2-TP and a 3-TP message of one format share a template.
+    template = _collapse_runs(template, BARE_PRICE_LINE, "<PRICE>", "<PRICE_LIST>")
+    return _collapse_runs(template, TARGET_PRICE_LINE, None, "TP <PRICE_LIST>")
 
 
 PRICE_OR_RANGE = re.compile(r"<(?:PRICE|RANGE)>")
@@ -389,13 +399,16 @@ def normalize_template(
     detections: dict | None = None,
 ) -> TemplateResult:
     detections = detections or {}
-    clean = normalize_message_text(candidate_text(candidate)).clean
+    normalized = detections.get("normalized") or normalize_message_text(
+        candidate_text(candidate)
+    )
+    clean = normalized.clean
     spans = _collect_spans(clean, overlay, detections)
     replaced = SIDE_EMOJI_RUN.sub(
-        "<SIDE_EMOJI> ", _strip_decoration(_apply_spans(clean, spans).upper())
+        "<SIDE_EMOJI> ",
+        _strip_decoration(_collapse_leverage(_apply_spans(clean, spans).upper())),
     )
-    skeleton = _collapse_price_runs(_tidy_lines(replaced))
-    skeleton = _collapse_leverage(_collapse_bare_ordinals(skeleton))
+    skeleton = _collapse_bare_ordinals(_collapse_price_runs(_tidy_lines(replaced)))
     skeleton = _keep_structural_lines(_collapse_target_lines(skeleton))
     skeleton = _canonicalize_template_family(skeleton)
     return TemplateResult(

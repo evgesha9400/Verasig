@@ -240,6 +240,45 @@ def test_backtest_uses_confirmed_review_misses_for_parser_confidence(session_fac
     assert score.score < 1.0
 
 
+def test_confirmed_misses_survive_a_stale_review(session_factory):
+    # New messages make the confirmed review stale; its misses still pair with
+    # the stored signals, so parser confidence must not jump to a perfect 1.0.
+    account = _seed(session_factory)
+    near_miss = RawTelegramMessage(
+        channel_id=7,
+        message_id=2,
+        text="LONG entry 101",
+        posted_at=_BASE + timedelta(seconds=30),
+        captured_at=_BASE + timedelta(seconds=30),
+        has_media=False,
+        raw_payload={},
+    )
+    later = RawTelegramMessage(
+        channel_id=7,
+        message_id=3,
+        text="gm",
+        posted_at=_BASE + timedelta(minutes=5),
+        captured_at=_BASE + timedelta(minutes=5),
+        has_media=False,
+        raw_payload={},
+    )
+    with session_factory() as session:
+        message_repository.insert_messages(session, account.id, [near_miss])
+        review_input = read_input(session, account.id, 7)
+        groups = mine_template_groups(review_input.messages, review_input.overlay)
+        review = create_review(session, account.id, 7, review_input, groups)
+        session.commit()
+    keys = [group.template_key for group in review.groups]
+    confirm_review(session_factory, account.id, 7, review.review_id, keys)
+    with session_factory() as session:
+        message_repository.insert_messages(session, account.id, [later])
+        session.commit()
+
+    inputs = load_folded_signals(session_factory, account.id, 7)
+
+    assert inputs.missed_message_ids == [2]
+
+
 def _seed(session_factory) -> UserAccount:
     with session_factory() as session:
         account = account_repository.insert_account(session, _account())

@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends, Request, status
 
 from verasig.features.feeds.feed_job_progress import publish_logged_progress
 from verasig.features.mining.mining_review import (
+    MiningReview,
+    MiningReviewInput,
     MiningReviewNotFoundError,
     MiningReviewStaleError,
     create_review,
@@ -83,34 +85,57 @@ def _publish(publisher: JobPublisher, channel_id: int, stage: str, count: int) -
     )
 
 
+def _load_input(session_factory, user_id: UUID, channel_id: int) -> MiningReviewInput:
+    with session_factory() as session:
+        return read_input(session, user_id, channel_id)
+
+
+def _persist_review(
+    session_factory,
+    user_id: UUID,
+    channel_id: int,
+    review_input: MiningReviewInput,
+    groups: list,
+) -> dict:
+    with session_factory() as session:
+        review = create_review(session, user_id, channel_id, review_input, groups)
+        session.commit()
+    return _mine_result_payload(review)
+
+
+def _mine_result_payload(review: MiningReview) -> dict:
+    return MineResultOut.model_validate(
+        {
+            "review_id": review.review_id,
+            "input_revision": review.input_revision,
+            "groups": review.groups,
+            "messages": review.messages,
+            "total_messages": len(review.messages),
+        },
+        from_attributes=True,
+    ).model_dump(by_alias=True, mode="json")
+
+
 async def _run_mine(
     publisher: JobPublisher,
     user_id: UUID,
     channel_id: int,
     session_factory,
 ) -> dict:
+    # DB reads/writes and the CPU-bound pure miner all run off the event loop,
+    # so other requests and the SSE progress keep flowing.
     _publish(publisher, channel_id, "loading", 0)
-    with session_factory() as session:
-        review_input = read_input(session, user_id, channel_id)
+    review_input = await asyncio.to_thread(
+        _load_input, session_factory, user_id, channel_id
+    )
     _publish(publisher, channel_id, "extracting", len(review_input.messages))
-    # CPU-bound pure port — run off the event loop so progress can flush.
     groups = await asyncio.to_thread(
         mine_template_groups, review_input.messages, review_input.overlay
     )
     _publish(publisher, channel_id, "grouping", len(groups))
-    with session_factory() as session:
-        review = create_review(session, user_id, channel_id, review_input, groups)
-        session.commit()
-    out = MineResultOut.model_validate(
-        {
-            "review_id": review.review_id,
-            "input_revision": review.input_revision,
-            "groups": review.groups,
-            "messages": review.messages,
-        },
-        from_attributes=True,
+    payload = await asyncio.to_thread(
+        _persist_review, session_factory, user_id, channel_id, review_input, groups
     )
-    payload = out.model_dump(by_alias=True, mode="json")
     _publish(publisher, channel_id, "complete", len(groups))
     return payload
 
@@ -164,12 +189,4 @@ def mine_result(
             raise ApiError(409, "MINING_REVIEW_STALE", str(error)) from error
     if review is None:
         raise ApiError(404, "MINE_RESULT_NOT_FOUND", "No current mining review")
-    return MineResultOut.model_validate(
-        {
-            "review_id": review.review_id,
-            "input_revision": review.input_revision,
-            "groups": review.groups,
-            "messages": review.messages,
-        },
-        from_attributes=True,
-    ).model_dump(by_alias=True, mode="json")
+    return _mine_result_payload(review)

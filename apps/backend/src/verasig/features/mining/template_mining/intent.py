@@ -5,15 +5,19 @@ when it parses into instrument + direction + some structure AND does not read
 as an outcome report (result), a position adjustment (update), or chatter
 (commentary). Markers are scored deterministically - no LLM.
 
-Faithful port of ``intent.js``.
+A negated instruction ("do not buy BTC") is never admitted as a new signal, but
+only a negation of the setup's own side counts: "Do not sell" under a LONG setup
+is a reminder, not a veto. An explicit cancellation ("Cancelled") is an update
+even when the message restates a complete setup.
 """
 
 from __future__ import annotations
 
 import regex as re
 
+from .directions import HORIZON
 from .fields import StructuredFields
-from .text import normalize_message_text
+from .text import NormalizedText, normalize_message_text
 
 # JS `\b` is ASCII-only; re.ASCII mirrors that boundary semantics.
 _A = re.ASCII
@@ -72,6 +76,28 @@ COMMENTARY_MARKERS = [
     re.compile(r"\bmay\b", _A),
 ]
 
+# "Do not buy" / "don't short" / "avoid entering" negate a direction; "enter"
+# negates either side.
+_NEGATION_EN = r"\b(?:do\s+not|don'?t|never|avoid|no)\s+"
+_NEGATION_RU = r"(?<![а-яё])не\s+"
+NEGATED_LONG_DIRECTION = [
+    re.compile(_NEGATION_EN + r"(?:buy|long|enter)\b" + HORIZON, _A),
+    re.compile(_NEGATION_RU + r"(?:покупа|лонгу|входи)", re.IGNORECASE),
+]
+NEGATED_SHORT_DIRECTION = [
+    re.compile(_NEGATION_EN + r"(?:sell|short|enter)\b" + HORIZON, _A),
+    re.compile(_NEGATION_RU + r"(?:прода|шорти|входи)", re.IGNORECASE),
+]
+_NEGATED_BY_SIDE = {"BUY": NEGATED_LONG_DIRECTION, "SELL": NEGATED_SHORT_DIRECTION}
+
+# "Cancelled" / "отмена" withdraws the setup; "cancel if 4H closes below" is an
+# invalidation rule inside a fresh setup, not a cancellation.
+EXPLICIT_CANCEL = re.compile(
+    r"(?:\bcancel(?:l?ed)?\b|(?<![а-яё])отмен(?:а|ен|ена|ено|или|яем|яю)?(?![а-яё]))"
+    r"(?![^\n.]*(?:\b(?:if|when|unless)\b|если|когда))",
+    re.IGNORECASE,
+)
+
 LEVEL_NEARBY = re.compile(r"\b(tp\d*|sl|target)\b", _A)
 _MARKET_MARKER = re.compile(r"\b(now|cmp|market)\b", _A)
 _MARKET_RU = re.compile(r"по\s*рынк", re.IGNORECASE)
@@ -117,14 +143,34 @@ def _is_complete_setup(fields: StructuredFields, market_marker: bool) -> bool:
     )
 
 
-def classify_intent(text: str, fields: StructuredFields | None = None) -> str:
-    if fields is None:
-        fields = StructuredFields()
-    lower = normalize_message_text(text).lower
+def classify_intent(
+    text: str,
+    fields: StructuredFields | None = None,
+    normalized: NormalizedText | None = None,
+) -> str:
+    """Classify a message; pass ``normalized`` when the caller already has it."""
+    lower = (normalized or normalize_message_text(text)).lower
+    fields = fields or StructuredFields()
+    intent = _classify(lower, fields)
+    if intent == "new_signal" and _negates_own_direction(lower, fields.direction):
+        return "commentary"
+    return intent
+
+
+def _negates_own_direction(lower: str, direction: str | None) -> bool:
+    markers = _NEGATED_BY_SIDE.get(direction or "")
+    if markers is None:  # no side to protect: any negated direction vetoes
+        markers = [*NEGATED_LONG_DIRECTION, *NEGATED_SHORT_DIRECTION]
+    return _any_match(markers, lower)
+
+
+def _classify(lower: str, fields: StructuredFields) -> str:
     has_instrument = bool(fields.instrument)
     has_direction = bool(fields.direction)
     market_marker = bool(_MARKET_MARKER.search(lower)) or bool(_MARKET_RU.search(lower))
 
+    if EXPLICIT_CANCEL.search(lower):
+        return "update"
     # A fully-structured setup (instrument+direction+entry+SL+TP) is a new signal
     # even when it contains result-ish words like "target"; decide completeness
     # before the result heuristic can mislabel it.

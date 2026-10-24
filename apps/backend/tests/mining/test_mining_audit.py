@@ -132,6 +132,17 @@ def test_overlay_reject_phrase_reroutes_an_otherwise_parsed_family():
     assert rejected_ids >= {m.id for m in SIGNAL_FAMILY}
 
 
+def test_reject_phrase_matches_across_a_non_breaking_space():
+    groups = _mine()
+    signal_group = _signal_group(groups)
+    overlay = {"rejectPhrases": ["xauusd buy"]}
+    spaced = ChatMessage(id="s4", text="XAUUSD\u00a0BUY NOW\nSL 2300\nTP 2325\nTP 2345")
+
+    audit = compute_audit([spaced], groups, [signal_group.template_key], overlay)
+
+    assert [entry.message.id for entry in audit.rejected_candidates] == ["s4"]
+
+
 def test_no_accepted_keys_yields_an_empty_audit_with_everything_rare_or_rejected():
     groups = _mine()
 

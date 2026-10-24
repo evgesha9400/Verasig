@@ -58,3 +58,16 @@ def test_treats_empty_input_as_empty_output():
     result = normalize_message_text("")
     assert result.clean == ""
     assert result.lines == []
+
+
+def test_reads_decimal_commas_as_decimal_points():
+    assert normalize_message_text("0,125").clean == "0.125"
+    assert normalize_message_text("2,5445").clean == "2.5445"
+    assert normalize_message_text("12,5").clean == "12.5"
+
+
+def test_still_strips_thousands_separators_and_keeps_comma_lists():
+    assert normalize_message_text("64,000").clean == "64000"
+    assert normalize_message_text("1,234,567").clean == "1234567"
+    assert normalize_message_text("1,2,3").clean == "1,2,3"
+    assert normalize_message_text("64000,65000").clean == "64000,65000"

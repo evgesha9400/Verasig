@@ -3,8 +3,6 @@
 Words carry strong confidence; direction emojis are deliberately weak because
 a coloured circle is ambiguous out of context. Both are returned in source
 order so the scorer can tell "emoji-only" signals apart from worded ones.
-
-Faithful port of ``directions.js``.
 """
 
 from __future__ import annotations
@@ -16,13 +14,18 @@ import regex as re
 from .text import escape_reg_exp
 
 WORD_CONFIDENCE = 0.9
+# "bullish"/"bearish" lean rather than instruct: still worded (above the emoji
+# ceiling) but an explicit buy/sell/long/short wins.
+LEANING_CONFIDENCE = 0.75
 EMOJI_CONFIDENCE = 0.4
 # Below word strength - the boundary the scorer/normalizer use to tell an
 # emoji-inferred direction apart from one the author actually wrote out.
 EMOJI_CONFIDENCE_CEILING = 0.7
 
-BUY_WORDS = ["buy", "long", "bullish"]
-SELL_WORDS = ["sell", "short", "bearish"]
+BUY_WORDS = ["buy", "long"]
+SELL_WORDS = ["sell", "short"]
+BUY_LEANING = ["bullish"]
+SELL_LEANING = ["bearish"]
 # Russian: лонг = long/buy, шорт = short/sell.
 BUY_WORDS_RU = ["лонг"]
 SELL_WORDS_RU = ["шорт"]
@@ -52,10 +55,14 @@ def is_emoji_only_direction(directions: list[DetectedEntity]) -> bool:
     return len(directions) > 0 and all(is_emoji_direction(d) for d in directions)
 
 
+# "short term" / "long-term" / "long time" are horizons, not directions.
+HORIZON = rf"(?![ \t]*-?[ \t]*(?:term|time)(?![{_ASCII_WORD}]))"
+
+
 def _word_matcher(words: list[str]) -> re.Pattern:
     body = "|".join(words)
     return re.compile(
-        rf"(?<![{_ASCII_WORD}])({body})(?![{_ASCII_WORD}])", re.IGNORECASE
+        rf"(?<![{_ASCII_WORD}])({body})(?![{_ASCII_WORD}]){HORIZON}", re.IGNORECASE
     )
 
 
@@ -115,6 +122,8 @@ _OPTIONS_PUT = re.compile(
 RULES = [
     _Rule(_word_matcher(BUY_WORDS), "BUY", WORD_CONFIDENCE),
     _Rule(_word_matcher(SELL_WORDS), "SELL", WORD_CONFIDENCE),
+    _Rule(_word_matcher(BUY_LEANING), "BUY", LEANING_CONFIDENCE),
+    _Rule(_word_matcher(SELL_LEANING), "SELL", LEANING_CONFIDENCE),
     _Rule(_OPTIONS_CALL, "BUY", WORD_CONFIDENCE),
     _Rule(_OPTIONS_PUT, "SELL", WORD_CONFIDENCE),
     _Rule(_cyrillic_matcher(BUY_WORDS_RU), "BUY", WORD_CONFIDENCE),

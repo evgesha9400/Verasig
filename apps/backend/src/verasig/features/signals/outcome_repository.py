@@ -1,10 +1,11 @@
 """Signal repository functions.
 
 Every persisted `signal` IS an extraction — the miner is the only source, and
-Confirm replaces a feed's whole signal set as one atomic projection (delete +
-insert; see `mining_confirm.confirm_review`), so there is no
-upsert-by-message dance and no de-selected family can survive a smaller
-reconfirm.
+Confirm reconciles a feed's whole signal set as one atomic projection (see
+`replace_signals_for_channel` and `mining_confirm.confirm_review`): a
+de-selected family cannot survive a smaller reconfirm, and a retained
+message's signal keeps its `id`, so lifecycle links and outcomes keyed on it
+survive.
 """
 
 from uuid import UUID
@@ -61,17 +62,69 @@ def insert_signals(session: Session, signals: list[Signal], user_id: UUID) -> in
     return len(session.execute(statement).fetchall())
 
 
-def delete_signals_for_channel(
-    session: Session, user_id: UUID, external_id: int
-) -> None:
-    """Clear a feed's whole signal projection before Confirm rewrites it — a
-    de-selected family must not survive a smaller reconfirm (orphan bug)."""
-    session.execute(
-        delete(SignalRow).where(
+# Extraction columns a reconfirm may rewrite; `id` and `created_at` are kept so
+# rows referencing the signal (lifecycle_link.root_signal_id cascades) survive.
+# Postgres caps one statement at 65535 bind parameters (~18 per signal row).
+_UPSERT_CHUNK = 2000
+_RECONFIRM_COLUMNS = (
+    "candidate_text",
+    "symbol",
+    "side",
+    "event_type",
+    "entry_type",
+    "entry_low",
+    "entry_high",
+    "stop_loss",
+    "take_profits",
+    "leverage",
+    "confidence",
+    "rule_id",
+    "extracted_at",
+)
+
+
+def replace_signals_for_channel(
+    session: Session, user_id: UUID, external_id: int, signals: list[Signal]
+) -> int:
+    """Make a feed's stored signal set exactly `signals`: delete the rows whose
+    message is no longer extracted, upsert the rest keyed on the message. Returns
+    the number of signals now stored."""
+    kept_message_ids = {signal.message_id for signal in signals}
+    stored_message_ids = session.scalars(
+        select(SignalRow.external_message_id).where(
             SignalRow.user_id == user_id,
             SignalRow.external_id == external_id,
         )
-    )
+    ).all()
+    removed = [
+        message_id
+        for message_id in stored_message_ids
+        if message_id not in kept_message_ids
+    ]
+    # Chunked IN lists keep each delete under the bind-parameter cap; a NOT IN
+    # over the kept set would bind one parameter per retained signal.
+    for start in range(0, len(removed), _UPSERT_CHUNK):
+        session.execute(
+            delete(SignalRow).where(
+                SignalRow.user_id == user_id,
+                SignalRow.external_id == external_id,
+                SignalRow.external_message_id.in_(
+                    removed[start : start + _UPSERT_CHUNK]
+                ),
+            )
+        )
+    stored = 0
+    for start in range(0, len(signals), _UPSERT_CHUNK):
+        chunk = signals[start : start + _UPSERT_CHUNK]
+        statement = pg_insert(SignalRow).values(
+            [_with_user_id(_signal_values(signal), user_id) for signal in chunk]
+        )
+        statement = statement.on_conflict_do_update(
+            index_elements=["user_id", "external_id", "external_message_id"],
+            set_={column: statement.excluded[column] for column in _RECONFIRM_COLUMNS},
+        ).returning(SignalRow.id)
+        stored += len(session.execute(statement).fetchall())
+    return stored
 
 
 def read_signal_channel(session: Session, user_id: UUID, signal_id: UUID) -> int | None:

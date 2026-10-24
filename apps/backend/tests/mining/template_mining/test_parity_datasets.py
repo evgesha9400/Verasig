@@ -1,12 +1,11 @@
-"""End-to-end parity anchor: the ported miner over the bundled datasets.
+"""End-to-end golden anchor: the miner over the bundled datasets.
 
-The strongest parity guarantee - runs ``mine_template_groups`` over the same
-SAMPLE_MESSAGES and FEED_MESSAGES the JS suite uses and asserts the identical
-template families (keys, counts, normalized templates, suggested actions,
-confidence ordering, instruments) the JS ``mineTemplateGroups`` produces.
-
-The expected values are captured from the JS implementation running over the
-same fixtures (see the frontend template-mining suite).
+Runs ``mine_template_groups`` over SAMPLE_MESSAGES and FEED_MESSAGES and asserts
+the exact template families (keys, counts, normalized templates, suggested
+actions, confidence ordering). The values were first captured from the retired
+JS miner; the backend now owns the miner, so they pin its canonical skeletons
+(one-target-per-line runs collapse to ``TP <PRICE_LIST>``, leverage ranges to
+``<LEVERAGE>``).
 
 The expected normalized-template strings are verbatim skeletons, so E501 is
 waived file-wide rather than wrapping (and risking altering) them.
@@ -21,19 +20,19 @@ from fixtures_sample_messages import SAMPLE_MESSAGES
 from verasig.features.mining.template_mining.mining import mine_template_groups
 
 # (template_key, normalized_template, count, confidence_avg, suggested_action,
-#  geometry_warnings) - ordered exactly as the JS miner returns them.
+#  geometry_warnings) - ordered exactly as the miner returns them.
 EXPECTED_SAMPLE = [
     (
-        "tpl_3rxtmw",
-        "<INSTRUMENT> <SIDE> MARKET\nSL <PRICE>\nTP <PRICE>\nTP <PRICE>",
+        "tpl_1tqqwsw",
+        "<INSTRUMENT> <SIDE> MARKET\nSL <PRICE>\nTP <PRICE_LIST>",
         4,
         0.875,
         "accept",
         0,
     ),
     (
-        "tpl_1lhcs8h",
-        "<SIDE_EMOJI> <INSTRUMENT>\nENTRY <RANGE>\nSL <PRICE>\nTP1 <PRICE>\nTP2 <PRICE>",
+        "tpl_1wwtun4",
+        "<SIDE_EMOJI> <INSTRUMENT>\nENTRY <RANGE>\nSL <PRICE>\nTP <PRICE_LIST>",
         4,
         0.875,
         "accept",
@@ -56,8 +55,8 @@ EXPECTED_SAMPLE = [
         0,
     ),
     (
-        "tpl_tryiys",
-        "<INSTRUMENT> <SIDE>\nSL <PRICE>\nTP <PRICE>\nTP <PRICE>",
+        "tpl_repdqk",
+        "<INSTRUMENT> <SIDE>\nSL <PRICE>\nTP <PRICE_LIST>",
         3,
         0.8125,
         "accept",
@@ -115,9 +114,9 @@ EXPECTED_FEED = [
         0,
     ),
     (
-        "tpl_r495yf",
+        "tpl_16p7q70",
         "<SIDE> <INSTRUMENT>\nENTRY <RANGE>\nSTOP <PRICE>\n"
-        "TARGETS <PRICE_LIST>\nLEVERAGE 5 <LEVERAGE>",
+        "TARGETS <PRICE_LIST>\nLEVERAGE <LEVERAGE>",
         1,
         0.9375,
         "accept",
@@ -169,12 +168,12 @@ def test_feed_dataset_size_matches_js():
     assert len(FEED_MESSAGES) == 18
 
 
-def test_sample_groups_match_js_exactly():
+def test_sample_groups_match_golden():
     groups = mine_template_groups(SAMPLE_MESSAGES)
     assert [_summary(g) for g in groups] == EXPECTED_SAMPLE
 
 
-def test_feed_groups_match_js_exactly():
+def test_feed_groups_match_golden():
     groups = mine_template_groups(FEED_MESSAGES)
     assert [_summary(g) for g in groups] == EXPECTED_FEED
 

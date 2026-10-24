@@ -289,3 +289,47 @@ async def test_rescan_empty_live_snapshot_aborts_without_writing(session_factory
     with pytest.raises(RescanAborted):
         await rescan(_source(set()), _USER_ID, "@pilot", session_factory)
     assert _read(session_factory) == []  # inaccessible channel is not a mass deletion
+
+
+def test_upsert_chunks_evidence_past_the_bind_parameter_limit(session_factory):
+    _seed_channel(session_factory)
+    # 7,000 rows x 10 columns = 70,000 binds: one INSERT would exceed PostgreSQL's
+    # 65,535 limit, so this only succeeds when the upsert is chunked.
+    evidence = [_suspected(message_id, _LATER) for message_id in range(1, 7001)]
+
+    assert _upsert(session_factory, evidence) == 7000
+    assert len(_read(session_factory)) == 7000
+
+
+class _CapturesDuringWalk(FakeSource):
+    """Captures a brand-new message while the live walk is in flight."""
+
+    def __init__(self, session_factory, live_ids: set[int]) -> None:
+        super().__init__(_channel(), [], live_ids=live_ids)
+        self._session_factory = session_factory
+
+    async def live_message_ids(self, channel_id, on_progress=None) -> set[int]:
+        live = await super().live_message_ids(channel_id, on_progress)
+        with self._session_factory() as session:
+            message_repository.insert_messages(
+                session, _USER_ID, [_message(6, "posted mid-walk")]
+            )
+            session.commit()
+        return live
+
+
+async def test_rescan_never_confirms_a_message_captured_during_the_live_walk(
+    session_factory,
+):
+    _seed_corpus(session_factory)
+
+    result = await rescan(
+        _CapturesDuringWalk(session_factory, {1, 2, 3, 5}),
+        _USER_ID,
+        "@pilot",
+        session_factory,
+    )
+
+    stored = {item.message_id: item for item in _read(session_factory)}
+    assert 6 not in stored  # absent from the walk only because it was too new
+    assert result.confirmed == 0

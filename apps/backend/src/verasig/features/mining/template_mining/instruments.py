@@ -6,8 +6,6 @@ Aliases normalize to one canonical symbol so "GOLD" and "XAU" group together.
 
 Dictionaries are intentionally data, not code - channel- or broker-specific
 symbols extend the maps below without touching the matching logic.
-
-Faithful port of ``instruments.js``.
 """
 
 from __future__ import annotations
@@ -58,7 +56,6 @@ CRYPTO_TICKERS = {
     "BNB",
     "ADA",
     "AVAX",
-    "LINK",
     "DOT",
     "MATIC",
     "POL",
@@ -74,9 +71,7 @@ CRYPTO_TICKERS = {
     "ORDI",
     "SEI",
     "ARB",
-    "OP",
     "INJ",
-    "NEAR",
     "PEPE",
     "SHIB",
     "BONK",
@@ -97,7 +92,6 @@ CRYPTO_TICKERS = {
     "AXS",
     "GALA",
     "FARTCOIN",
-    "NOT",
     "JUP",
     "PYTH",
     "WLD",
@@ -105,18 +99,24 @@ CRYPTO_TICKERS = {
     "ONDO",
 }
 
+# Tickers that double as English words ("do NOT buy", "Link pinned above") count
+# only with a $/# prefix, an explicit quote ("OPUSDT") or a coin label.
+AMBIGUOUS_TICKERS = {"NOT", "OP", "NEAR", "LINK"}
+TICKER_PREFIXES = "$#"
+
 DICTIONARY_CONFIDENCE = 0.95
 PAIR_CONFIDENCE = 0.85
 
 # Russian "Монета:/Монету:" coin label -> the ticker that follows.
 # Allow a #/$ prefix and digits in the ticker so "#1INCH" / "1000PEPE" are caught.
 COIN_LABEL = re.compile(r"Монет[а-яё]*\s*:?\s*[#$]?([A-Za-z0-9]{2,10})", re.IGNORECASE)
-# A bare ticker, optionally carrying a concatenated crypto quote ("LINKUSDT"), so
-# a slash-less pair still splits into base + quote instead of being swallowed
-# whole. Non-greedy base + longest-first quote alternation keeps the split at the
-# quote boundary (LINK|USDT, not LINKUSD|T).
-BARE_TICKER = re.compile(
-    r"(?<![A-Za-z0-9])([A-Z]{2,8}?)(USDT|USDC|USD|PERP|BTC|ETH)?(?![A-Za-z0-9])"
+# A bare uppercase ticker ("XRP", "$LINK").
+BARE_TICKER = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,8})(?![A-Za-z0-9])")
+# A slash-less pair with a concatenated quote ("LDOUSDT", "1000PEPEUSDT",
+# "ETHBTC"). Non-greedy base + longest-first quote alternation keeps the split
+# at the quote boundary (LINK|USDT, not LINKUSD|T).
+QUOTED_TICKER = re.compile(
+    r"(?<![A-Za-z0-9])([A-Z0-9]{2,10}?)(USDT|USDC|USD|PERP|BTC|ETH)(?![A-Za-z0-9])"
 )
 HAS_LETTER = re.compile(r"[A-Za-z]")
 
@@ -263,23 +263,58 @@ def _collect_coin_label_hits(text: str, hits: list[_Hit]) -> None:
         )
 
 
+def _ticker_hit(match: re.Match, normalized: str) -> _Hit:
+    return _Hit(
+        start=match.start(),
+        end=match.start() + len(match.group(0)),
+        normalized=normalized,
+        raw=match.group(0),
+        confidence=PAIR_CONFIDENCE,
+    )
+
+
+def _is_known_base(base: str, text: str, start: int) -> bool:
+    if base in CRYPTO_TICKERS:
+        return True
+    prefixed = start > 0 and text[start - 1] in TICKER_PREFIXES
+    return base in AMBIGUOUS_TICKERS and prefixed
+
+
 def _collect_bare_ticker_hits(text: str, hits: list[_Hit]) -> None:
     for match in BARE_TICKER.finditer(text):
         base = match.group(1)
-        if base not in CRYPTO_TICKERS:
-            continue
-        quote = match.group(2)
-        hits.append(
-            _Hit(
-                start=match.start(),
-                end=match.start() + len(match.group(0)),
-                # an explicit concatenated quote is kept verbatim (LINKUSDT,
-                # ETHBTC); a bare base defaults to the USDT quote, as before.
-                normalized=f"{base}{quote}" if quote else _to_usdt(base),
-                raw=match.group(0),
-                confidence=PAIR_CONFIDENCE,
-            )
-        )
+        if _is_known_base(base, text, match.start()):
+            # a bare base defaults to the USDT quote
+            hits.append(_ticker_hit(match, _to_usdt(base)))
+
+
+# Crypto bases the alias table owns ("BTC", "ETH", "SOL").
+_ALIAS_CRYPTO_BASES = {
+    symbol.removesuffix("USDT") for symbol in ALIASES if symbol.endswith("USDT")
+}
+# Quotes no English word ends in; "TEETH"/"TWENTIETH" end in ETH.
+_UNAMBIGUOUS_QUOTES = {"USDT", "USDC", "PERP"}
+HAS_DIGIT = re.compile(r"[0-9]")
+
+
+def _is_quoted_pair(base: str, quote: str) -> bool:
+    # A known base takes any quote. An unlisted one ("LDO", "1000PEPE") needs a
+    # quote no word ends in, or a digit ("1000PEPEETH") - never bare USD, which
+    # is forex/alias territory.
+    known = {*CRYPTO_TICKERS, *AMBIGUOUS_TICKERS, *_ALIAS_CRYPTO_BASES}
+    if base in known:
+        return base != quote
+    if quote not in _UNAMBIGUOUS_QUOTES and not HAS_DIGIT.search(base):
+        return False
+    return quote != "USD" and _is_valid_crypto_pair(base, quote)
+
+
+def _collect_quoted_ticker_hits(text: str, hits: list[_Hit]) -> None:
+    for match in QUOTED_TICKER.finditer(text):
+        base, quote = match.group(1), match.group(2)
+        if _is_quoted_pair(base, quote):
+            # an explicit concatenated quote is kept verbatim (LINKUSDT, ETHBTC)
+            hits.append(_ticker_hit(match, f"{base}{quote}"))
 
 
 def _dedupe_hits(hits: list[_Hit]) -> list[_Hit]:
@@ -304,6 +339,7 @@ def detect_instruments(text: str, overlay: dict | None = None) -> list[DetectedE
     _collect_coin_label_hits(text, hits)
     _collect_pair_hits(CRYPTO_PAIR, text, hits, _is_valid_crypto_pair)
     _collect_pair_hits(FOREX_PAIR, text, hits, _is_valid_forex_pair)
+    _collect_quoted_ticker_hits(text, hits)
     _collect_bare_ticker_hits(text, hits)
     return [
         DetectedEntity(

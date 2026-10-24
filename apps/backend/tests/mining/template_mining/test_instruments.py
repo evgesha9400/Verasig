@@ -109,3 +109,36 @@ def test_recognises_a_custom_alias_from_the_overlay():
     overlay = {"instrumentAliases": {"АПТ": "APTUSDT"}}
     hits = detect_instruments("АПТ long here", overlay)
     assert any(h.normalized == "APTUSDT" for h in hits)
+
+
+# --- concatenated pairs and word-like tickers ---
+def test_accepts_a_concatenated_pair_with_an_unlisted_base():
+    assert _normals("LDOUSDT long") == ["LDOUSDT"]
+
+
+def test_accepts_digits_in_a_concatenated_base():
+    assert _normals("1000PEPEUSDT short") == ["1000PEPEUSDT"]
+    assert _normals("1INCHUSDT long") == ["1INCHUSDT"]
+
+
+def test_keeps_a_concatenated_crypto_quote_verbatim():
+    assert _normals("ETHBTC long") == ["ETHBTC"]
+    assert _normals("ETHUSDC long") == ["ETHUSDC"]
+
+
+def test_does_not_read_english_words_as_tickers():
+    assert _normals("DO NOT BUY NOW") == []
+    assert _normals("Link pinned above") == []
+    assert _normals("OP NEAR LINK") == []
+
+
+def test_reads_a_word_like_ticker_with_a_prefix_quote_or_coin_label():
+    assert _normals("$NOT long") == ["NOTUSDT"]
+    assert _normals("#OP short") == ["OPUSDT"]
+    assert _normals("NEARUSDT long") == ["NEARUSDT"]
+    assert _normals("Монета: LINK") == ["LINKUSDT"]
+
+
+def test_does_not_read_an_english_word_ending_in_eth_as_a_pair():
+    assert _normals("TEETH LONG") == []
+    assert _normals("SEE YOU ON THE TWENTIETH") == []

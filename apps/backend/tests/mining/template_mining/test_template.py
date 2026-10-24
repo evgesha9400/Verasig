@@ -16,8 +16,7 @@ def _template_of(text: str) -> str:
 def test_normalizes_an_emoji_range_numbered_tp_signal():
     text = "\U0001f7e2 XAUUSD BUY\nEntry: 2320-2325\nSL: 2312\nTP1: 2340\nTP2: 2355"
     assert _template_of(text) == (
-        "<SIDE_EMOJI> <INSTRUMENT> <SIDE>\nENTRY <RANGE>\n"
-        "SL <PRICE>\nTP1 <PRICE>\nTP2 <PRICE>"
+        "<SIDE_EMOJI> <INSTRUMENT> <SIDE>\nENTRY <RANGE>\nSL <PRICE>\nTP <PRICE_LIST>"
     )
 
 
@@ -136,3 +135,16 @@ def test_hash_string_matches_js_charcodeat_for_astral_chars():
             n //= 36
     assert hash_string(text) == expected
     assert hash_string(text) != hash_string("BTC")  # the astral char contributes
+
+
+# --- arity and leverage do not split a format family ---
+def test_two_and_three_target_lines_share_one_template():
+    two = _template_of("BTC LONG\nSL 95\nTP1 110\nTP2 120")
+    three = _template_of("ETH LONG\nSL 190\nTP1 210\nTP2 220\nTP3 230")
+    assert two == three == "<INSTRUMENT> <SIDE>\nSL <PRICE>\nTP <PRICE_LIST>"
+
+
+def test_leverage_ranges_collapse_to_one_placeholder():
+    a = _template_of("BTC LONG\nLeverage 5-10x\nSL 95")
+    b = _template_of("ETH LONG\nLeverage 3-10x\nSL 190")
+    assert a == b == "<INSTRUMENT> <SIDE>\nLEVERAGE <LEVERAGE>\nSL <PRICE>"

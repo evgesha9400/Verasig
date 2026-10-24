@@ -3,32 +3,29 @@
 Every message is parsed; the ones that clear the bar are bucketed by
 template_key. Each family carries the stats a reviewer needs - count, average
 confidence, intent mix, date range, examples - plus a suggested action so the
-obviously good and obviously bad families need no thought.
-
-Faithful port of ``mining.js``.
+obviously good families need no thought. Every candidate already reads as a
+new signal (the parser is the classifier), so a family is either accepted
+outright or left for review.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
-import regex as re
-
 from .extract import attempt_extract_signal
 from .types import Candidate, TemplateGroup
 
+# Bump whenever extraction or template keys change: it is part of a review's
+# input revision, so a review mined by an older miner goes stale instead of
+# being confirmed against keys the current miner no longer produces.
+MINER_VERSION = 2
+
 ACCEPT_CONFIDENCE = 0.6
 ACCEPT_SIGNAL_SHARE = 0.6
-REJECT_NONSIGNAL_SHARE = 0.5
 GEOMETRY_REVIEW_SHARE = 0.3
 MAX_EXAMPLES = 5
 
-# Geometry warnings must never let a family auto-accept.
-GEOMETRY_WARNING = re.compile(
-    r"wrong side of entry|not (below|above) the targets", re.IGNORECASE
-)
-
-ACTION_RANK = {"review": 0, "accept": 1, "reject": 2}
+ACTION_RANK = {"review": 0, "accept": 1}
 
 
 def _empty_intent_distribution() -> dict[str, int]:
@@ -66,13 +63,8 @@ def _top_examples(candidates: list[Candidate]) -> list[Candidate]:
 
 
 def _geometry_warning_count(candidates: list[Candidate]) -> int:
-    count = 0
-    for candidate in candidates:
-        if len(candidate.parser_issues or []) > 0 or any(
-            GEOMETRY_WARNING.search(reason) for reason in candidate.rejection_reasons
-        ):
-            count += 1
-    return count
+    # Geometry warnings must never let a family auto-accept.
+    return sum(1 for candidate in candidates if candidate.parser_issues)
 
 
 def _suggest_action(
@@ -82,16 +74,11 @@ def _suggest_action(
     geometry_warnings: int,
 ) -> str:
     signal_share = distribution["new_signal"] / count
-    non_signal_share = (
-        distribution["update"] + distribution["result"] + distribution["commentary"]
-    ) / count
     # A materially geometry-broken family is downgraded to review, never accept.
     if geometry_warnings / count > GEOMETRY_REVIEW_SHARE:
         return "review"
     if signal_share >= ACCEPT_SIGNAL_SHARE and confidence_avg >= ACCEPT_CONFIDENCE:
         return "accept"
-    if non_signal_share > REJECT_NONSIGNAL_SHARE:
-        return "reject"
     return "review"
 
 
@@ -147,16 +134,22 @@ def _sort_groups(groups: list[TemplateGroup]) -> list[TemplateGroup]:
     )
 
 
-def mine_template_groups(
-    messages: list, overlay: dict | None = None
-) -> list[TemplateGroup]:
-    candidates = [
-        candidate
-        for candidate in (
-            attempt_extract_signal(message, overlay) for message in (messages or [])
-        )
-        if candidate is not None
-    ]
+def group_candidates(candidates: list[Candidate]) -> list[TemplateGroup]:
+    """Bucket already-extracted candidates into sorted template families."""
     buckets = _bucket_by_template(candidates)
     groups = [_to_group(key, group) for key, group in buckets.items()]
     return _sort_groups(groups)
+
+
+def mine_template_groups(
+    messages: list, overlay: dict | None = None
+) -> list[TemplateGroup]:
+    return group_candidates(
+        [
+            candidate
+            for candidate in (
+                attempt_extract_signal(message, overlay) for message in (messages or [])
+            )
+            if candidate is not None
+        ]
+    )

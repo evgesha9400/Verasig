@@ -145,6 +145,8 @@ class MineResultOut(CamelModel):
     input_revision: str
     groups: list[TemplateGroupOut]
     messages: list[MineMessageOut]
+    # lets the client keep the count without retaining the whole message list
+    total_messages: int = 0
 
 
 # --- Mining Audit -------------------------------------------------------------

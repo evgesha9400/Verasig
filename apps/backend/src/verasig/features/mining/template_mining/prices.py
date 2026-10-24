@@ -2,10 +2,11 @@
 
 Pulls numeric levels and min/max ranges out of a message while stepping around
 the things that look numeric but are not prices: numbered TP labels ("TP1"),
-clock times ("08:42") and leverage ("5-10x"). Ranges are scanned first and
-their spans reserved so the two levels of a range are never re-read as singles.
-
-Faithful port of ``prices.js``.
+clock times ("08:42"), ISO dates ("2026-05-04"), list ordinals ("1. 110"),
+leverage ("5-10x") and digit-led tickers ("1000PEPEUSDT"). Ranges are scanned
+first and their spans reserved so the two levels of a range are never re-read
+as singles. Separators never cross a line break, so detecting over a whole
+message equals detecting line by line.
 """
 
 from __future__ import annotations
@@ -22,17 +23,24 @@ _NUMBER = r"(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?[kKmM]?"
 TIME = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b")
 # A numbered target ordinal written apart from its value ("TP 1 2340").
 TARGET_ORDINAL = re.compile(
-    r"\b(?:tp|tgt|targets?)\s+\d{1,2}\b(?=[\s:]*\d)", re.IGNORECASE
+    r"\b(?:tp|tgt|targets?)[ \t]+\d{1,2}\b(?=[ \t:]*\d)", re.IGNORECASE
 )
+ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+# A numbered list item ordinal ahead of its value ("1. 110", "2) 120").
+LIST_ORDINAL = re.compile(r"^[ \t]*\d{1,2}[.)](?=[ \t]+\d)", re.MULTILINE)
 # Keycap-emoji ordinals (1️⃣ 2️⃣ …) prefix numbered target lines.
 KEYCAP = re.compile("[0-9]\ufe0f?\u20e3")
-SINGLE = re.compile(rf"(?<![A-Za-z\d.,])({_NUMBER})")
+# A level never runs into letters or more digits: "1000PEPEUSDT" / "1INCH" are
+# tickers, not a "1000" / "1" level. A sentence-ending "." is still allowed.
+SINGLE = re.compile(rf"(?<![A-Za-z\d.,])({_NUMBER})(?![A-Za-z\d]|\.\d)")
 RANGE = re.compile(
-    rf"(?<![A-Za-z\d.,])({_NUMBER})\s*(?:-|to)\s*({_NUMBER})", re.IGNORECASE
+    rf"(?<![A-Za-z\d.,])({_NUMBER})[ \t]*(?:-|to)[ \t]*({_NUMBER})", re.IGNORECASE
 )
 
 # Leverage ("10x") and percentages ("2%") only count when glued to the number.
-TRAILING_UNIT_WORD = re.compile(r"^\s*(pips?|points?|pts|pct|percent)\b", re.IGNORECASE)
+TRAILING_UNIT_WORD = re.compile(
+    r"^[ \t]*(pips?|points?|pts|pct|percent)\b", re.IGNORECASE
+)
 # x / Latin X / Cyrillic kha (leverage "20X"/"20kha") and % are never price levels.
 _UNIT_CHAR = re.compile("[xX\u0445\u0425%]")
 
@@ -75,6 +83,8 @@ def _blocked_spans(text: str) -> list[tuple[int, int]]:
     _spans_of(TIME, text, spans)
     _spans_of(TARGET_ORDINAL, text, spans)
     _spans_of(KEYCAP, text, spans)
+    _spans_of(ISO_DATE, text, spans)
+    _spans_of(LIST_ORDINAL, text, spans)
     return spans
 
 

@@ -14,7 +14,7 @@ from verasig.features.feeds import (
     backfill_job_repository,
     feed_repository,
 )
-from verasig.features.feeds.backfill import backfill
+from verasig.features.feeds.backfill import FeedDeletedError, backfill
 from verasig.features.feeds.backfill_job_run import (
     BackfillJobRun,
     BackfillJobStatus,
@@ -296,9 +296,17 @@ class BackfillJobCoordinator:
     ) -> dict:
         phases = itertools.cycle(CAPTURE_PHASES)
         self._publish_progress(publisher, run_id, channel_id, mode, OPENING_PHASE)
+        inserted_so_far = 0
 
-        def on_batch(_inserted: int, _oldest: datetime) -> None:
-            self._publish_progress(publisher, run_id, channel_id, mode, next(phases))
+        def on_batch(inserted: int, oldest: datetime) -> None:
+            # `backfill` reports a cumulative insert count; fold only this batch's
+            # delta into the run so progress never re-aggregates the capture.
+            nonlocal inserted_so_far
+            batch_inserted, inserted_so_far = inserted - inserted_so_far, inserted
+            progress = self._advance_progress(
+                run_id, next(phases), batch_inserted, oldest
+            )
+            self._publish(publisher, progress, channel_id, mode)
 
         try:
             async with source:
@@ -316,6 +324,7 @@ class BackfillJobCoordinator:
                     on_batch=on_batch,
                     since=self._capture_cutoff(user_id, channel_id),
                     extend_newer=extend_newer,
+                    require_feed=True,
                 )
                 logger.info(
                     "backfill.run stream done: run=%s channel=%s inserted=%s cursor=%s",
@@ -350,23 +359,30 @@ class BackfillJobCoordinator:
         channel_id: int,
         mode: BackfillMode,
         phase: str,
-        **fields,
     ) -> None:
         sync = self._should_sync_from_capture(run_id, mode)
         progress = self._refresh_progress(run_id, phase, sync)
+        self._publish(publisher, progress, channel_id, mode)
+
+    @staticmethod
+    def _publish(
+        publisher: JobPublisher,
+        progress: BackfillProgress,
+        channel_id: int,
+        mode: BackfillMode,
+    ) -> None:
         publish_logged_progress(
             publisher,
             present_progress(progress),
             logger=logger,
             operation=_operation_for_mode(mode),
             external_id=channel_id,
-            phase=phase,
-            run_id=run_id,
+            phase=progress.phase,
+            run_id=progress.job_id,
             mode=mode,
             status=progress.status,
             fetched=progress.fetched,
             cursor=progress.cursor_message_id,
-            **fields,
         )
 
     async def _guard_then_wipe(
@@ -414,6 +430,18 @@ class BackfillJobCoordinator:
                 run = backfill_job_repository.read_run(session, run_id)
         return self._progress_from_run(run, phase)
 
+    def _advance_progress(
+        self, run_id: UUID, phase: str, inserted: int, oldest_posted_at: datetime
+    ) -> BackfillProgress:
+        with self._session_factory() as session:
+            run = backfill_job_repository.advance_run_progress(
+                session, run_id, inserted, oldest_posted_at
+            )
+            session.commit()
+        if run is None:  # the run row cascaded away with a deleted feed
+            raise FeedDeletedError(f"backfill run {run_id} vanished with its feed")
+        return self._progress_from_run(run, phase)
+
     def _forget_run(self, run_id: UUID) -> None:
         """Drop a finished run's per-run bookkeeping."""
         self._capture_generation_live.discard(run_id)
@@ -435,7 +463,9 @@ class BackfillJobCoordinator:
             )
             session.commit()
         self._forget_run(run_id)
-        return self._progress_from_run(run, "Backfill complete.")
+        return self._terminal_progress(
+            run, run_id, BackfillJobStatus.SUCCEEDED, "Backfill complete."
+        )
 
     def _finish_cancelled(
         self,
@@ -454,7 +484,9 @@ class BackfillJobCoordinator:
             )
             session.commit()
         self._forget_run(run_id)
-        return self._progress_from_run(run, "Backfill cancelled.")
+        return self._terminal_progress(
+            run, run_id, BackfillJobStatus.CANCELLED, "Backfill cancelled."
+        )
 
     def _finish_failed(
         self,
@@ -477,7 +509,26 @@ class BackfillJobCoordinator:
             )
             session.commit()
         self._forget_run(run_id)
-        return self._progress_from_run(run, "Backfill failed.")
+        return self._terminal_progress(
+            run, run_id, BackfillJobStatus.FAILED, "Backfill failed."
+        )
+
+    @staticmethod
+    def _terminal_progress(
+        run: BackfillJobRun | None, run_id: UUID, status: str, phase: str
+    ) -> BackfillProgress:
+        """A finished run's progress. A run whose feed was deleted mid-job has no
+        row left (it cascades with the feed), so report the terminal status bare."""
+        if run is not None:
+            return BackfillJobCoordinator._progress_from_run(run, phase)
+        return BackfillProgress(
+            job_id=run_id,
+            status=status,
+            phase=phase,
+            fetched=0,
+            oldest_posted_at=None,
+            cursor_message_id=None,
+        )
 
     @staticmethod
     def _progress_from_run(run: BackfillJobRun, phase: str) -> BackfillProgress:

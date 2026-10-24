@@ -135,6 +135,42 @@ def test_present_signals_orders_newest_first(db_session):
     assert str(_SIGNAL_ID) in ids
 
 
+def _reply_to_entry(session, message_id: int, text: str) -> None:
+    message_repository.insert_messages(
+        session, _USER_ID, [_message(message_id, text, 1)]
+    )
+    session.commit()
+
+
+def test_author_exit_of_a_filled_trade_is_not_a_cancel(db_session):
+    _seed(db_session)  # the backtest filled the trade (R_MULTIPLE)
+    _reply_to_entry(db_session, 4, "close")
+
+    signal = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)["signals"][0]
+
+    assert signal["cancelled"] is False
+    assert signal["effective"]["closedBy"] == "author"
+    assert [mod["kind"] for mod in signal["mods"]] == ["move_stop", "close"]
+
+
+def test_untested_close_with_cancel_wording_is_a_cancel(db_session):
+    _seed(db_session, status="verified", with_backtest=False)
+    _reply_to_entry(db_session, 4, "Cancelled")
+
+    signal = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)["signals"][0]
+
+    assert signal["cancelled"] is True
+
+
+def test_untested_close_after_management_is_an_author_exit(db_session):
+    _seed(db_session, status="verified", with_backtest=False)
+    _reply_to_entry(db_session, 4, "close")
+
+    signal = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)["signals"][0]
+
+    assert signal["cancelled"] is False
+
+
 def test_present_signals_caps_observer_and_reports_full_total(db_session):
     _seed_many(db_session, count=205)
 

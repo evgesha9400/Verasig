@@ -21,6 +21,7 @@ from verasig.domain.deletion import (
     DeletedSignalEvidence,
     DeletionConfidence,
 )
+from verasig.domain.message import RawTelegramMessage
 from verasig.domain.telegram_ports import TelegramSource
 from verasig.features.feeds import (
     deletion_repository,
@@ -61,6 +62,10 @@ async def rescan(
     on_progress: Callable[[int], None] | None = None,
 ) -> RescanResult:
     external_id = _resolve_external_id(session_factory, user_id, reference)
+    # Snapshot the stored side BEFORE the live walk: a message captured while the
+    # walk is in flight must not be on the stored side of the diff, or it would
+    # read as `stored − live` and be falsely CONFIRMED deleted.
+    stored, candidates = _read_stored(session_factory, user_id, external_id)
     logger.info(
         "rescan.live_message_ids begin: external_id=%s (walking the full live channel "
         "via the source — may take a while for large channels)",
@@ -74,7 +79,7 @@ async def rescan(
     )
     _guard_live_snapshot(live_ids, external_id)
     previous = _read_previous_evidence(session_factory, user_id, external_id)
-    evidence = _detect(session_factory, user_id, external_id, live_ids)
+    evidence = detect_deletions(external_id, stored, live_ids, candidates, _utc_now())
     written = _persist(session_factory, user_id, evidence)
     summary = _read_deletion_summary(session_factory, user_id, external_id)
     return _tally(external_id, evidence, written, previous, summary)
@@ -98,18 +103,15 @@ def _guard_live_snapshot(live_ids: set[int], external_id: int) -> None:
         )
 
 
-def _detect(
-    session_factory: sessionmaker,
-    user_id: UUID,
-    external_id: int,
-    live_ids: set[int],
-) -> list[DeletedSignalEvidence]:
+def _read_stored(
+    session_factory: sessionmaker, user_id: UUID, external_id: int
+) -> tuple[list[RawTelegramMessage], set[int]]:
     with session_factory() as session:
         stored = message_repository.read_messages(session, user_id, external_id)
         candidates = message_repository.candidate_message_ids(
             session, user_id, external_id
         )
-    return detect_deletions(external_id, stored, live_ids, candidates, _utc_now())
+    return stored, candidates
 
 
 def _persist(

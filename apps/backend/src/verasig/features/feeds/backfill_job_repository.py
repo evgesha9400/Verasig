@@ -141,6 +141,28 @@ def refresh_run_progress(session: Session, run_id: UUID) -> BackfillJobRun | Non
     return _row_to_run(_sync_progress(session, row))
 
 
+def advance_run_progress(
+    session: Session, run_id: UUID, inserted: int, oldest_posted_at: datetime
+) -> BackfillJobRun | None:
+    """Fold one committed batch into the run's progress in memory.
+
+    Avoids re-aggregating the whole capture (`count`/`min` over `raw_message`)
+    after every batch; the terminal transitions still re-sync from storage.
+    """
+    row = session.get(BackfillJobRunRow, run_id)
+    if row is None:
+        return None
+    row.fetched_count += inserted
+    if row.oldest_posted_at is None or oldest_posted_at < row.oldest_posted_at:
+        row.oldest_posted_at = oldest_posted_at
+    feed = session.get(FeedRow, (row.user_id, row.external_id))
+    row.cursor_external_message_id = (
+        feed.captured_through_external_message_id if feed else None
+    )
+    session.flush()
+    return _row_to_run(row)
+
+
 def mark_run_succeeded(
     session: Session, run_id: UUID, finished_at: datetime
 ) -> BackfillJobRun | None:

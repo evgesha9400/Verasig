@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from verasig.storage.models import BacktestResultRow
@@ -34,15 +34,27 @@ def insert_result(
     return row
 
 
+def delete_results_for_channel(
+    session: Session, user_id: UUID, channel_id: int
+) -> None:
+    """Drop a feed's backtests once its signals or risk model change, so no
+    result outlives the inputs it was computed from."""
+    session.execute(
+        delete(BacktestResultRow).where(
+            BacktestResultRow.user_id == user_id,
+            BacktestResultRow.external_id == channel_id,
+        )
+    )
+
+
 def read_latest_results(
     session: Session, user_id: UUID
 ) -> dict[int, BacktestResultRow]:
+    # DISTINCT ON keeps only each feed's newest result in Postgres.
     rows = session.scalars(
         select(BacktestResultRow)
         .where(BacktestResultRow.user_id == user_id)
+        .distinct(BacktestResultRow.external_id)
         .order_by(BacktestResultRow.external_id, BacktestResultRow.completed_at.desc())
     ).all()
-    latest: dict[int, BacktestResultRow] = {}
-    for row in rows:
-        latest.setdefault(row.external_id, row)
-    return latest
+    return {row.external_id: row for row in rows}

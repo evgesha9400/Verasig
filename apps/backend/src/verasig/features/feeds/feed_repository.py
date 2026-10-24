@@ -102,6 +102,23 @@ def upsert_feed_metadata(
     return _upsert_feed(session, user_id, channel, added_at, reset_status=False)
 
 
+def refresh_feed_metadata(
+    session: Session, user_id: UUID, channel: TelegramChannel
+) -> FeedRow | None:
+    """Refresh an existing feed's stream metadata; `None` when it no longer exists.
+
+    Unlike `upsert_feed_metadata` this never inserts, so a job that outlives a
+    `DELETE /feeds/{id}` cannot resurrect the feed the user just removed.
+    """
+    row = lock_feed(session, user_id, channel.channel_id)
+    if row is None:
+        return None
+    row.title = channel.title
+    row.meta = _metadata(channel)
+    session.flush()
+    return row
+
+
 def delete_feed(session: Session, user_id: UUID, external_id: int) -> None:
     logger.info(
         "delete_feed start: user=%s external_id=%s (cascade-deletes the feed and all "

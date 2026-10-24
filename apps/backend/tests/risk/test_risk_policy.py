@@ -180,3 +180,43 @@ def test_same_candle_stop_and_target_resolves_stop_first_with_pct_return():
     assert outcome.exit_reason == "stop"
     assert outcome.r_multiple == pytest.approx(-1.0)
     assert outcome.pct_return == pytest.approx(-0.5)
+
+
+def test_ladder_level_touched_after_the_exit_never_moves_the_average():
+    outcome = RiskConfigPolicy(
+        _config(entry_mode=EntryMode.LADDER, levels=3, weighting=Weighting.EQUAL)
+    ).simulate(
+        _folded(),
+        [
+            _bar(low=Decimal("109"), high=Decimal("111")),
+            _bar(1, low=Decimal("109"), high=Decimal("115")),
+            _bar(2, low=Decimal("99"), high=Decimal("101")),
+        ],
+    )
+
+    # only the 110 level filled before the target; 105/100 trade after the exit
+    assert outcome.exit_reason == "tp"
+    assert outcome.r_multiple == pytest.approx(1 / 3)
+
+
+def test_author_close_exits_an_open_risk_position_at_the_next_open():
+    close = _step(
+        at=_BASE + timedelta(minutes=2),
+        source_message_id=2,
+        event_type=SignalEventType.CLOSE,
+        effective_size=Decimal(0),
+        leg_size=Decimal(-1),
+        leg_price=None,
+    )
+    outcome = RiskConfigPolicy(_config(entry_mode=EntryMode.MID)).simulate(
+        _folded(timeline=[_step(), close], closed_at=close.at),
+        [
+            _bar(low=Decimal("104"), high=Decimal("106")),
+            _bar(1, low=Decimal("104"), high=Decimal("108")),
+            _bar(2, open=Decimal("107"), low=Decimal("90"), high=Decimal("120")),
+        ],
+    )
+
+    assert outcome.exit_reason == "close"
+    assert outcome.r_multiple == pytest.approx(0.2)
+    assert outcome.pct_return is not None and outcome.pct_return > 0

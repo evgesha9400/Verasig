@@ -91,3 +91,19 @@ def test_recognises_a_custom_direction_token_at_word_strength():
     overlay = {"directionTokens": {"\U0001f680": "BUY"}}
     hits = detect_directions("\U0001f680 entry now", overlay)
     assert any(h.normalized == "BUY" and h.confidence == 0.9 for h in hits)
+
+
+# --- horizons and leanings ---
+def test_does_not_read_a_time_horizon_as_a_direction():
+    assert _sides("short term chop") == []
+    assert _sides("short-term chop") == []
+    assert _sides("long term view") == []
+    assert _sides("long-term hold") == []
+    assert _sides("been a long time") == []
+
+
+def test_an_explicit_direction_outranks_a_leaning():
+    by_side = {
+        e.normalized: e.confidence for e in detect_directions("bearish, but buy")
+    }
+    assert 0.7 < by_side["SELL"] < by_side["BUY"]

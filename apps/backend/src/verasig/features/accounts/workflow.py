@@ -108,10 +108,14 @@ def confirm_email_change(
     existing = find_by_email(session, normalized)
     if existing is not None and existing.id != account.id:
         raise EmailTakenError(normalized)
-    applied = apply_pending_email(session, account.id)
+    applied = apply_pending_email(session, account.id, normalized)
     if applied is None:
         raise PendingEmailMismatchError()
     return applied
+
+
+def cancel_email_change(session: Session, account: UserAccount) -> UserAccount:
+    return set_pending_email(session, account.id, None)
 
 
 def change_plan(session: Session, account: UserAccount, plan: Plan) -> UserAccount:

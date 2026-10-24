@@ -139,6 +139,36 @@ def test_email_change_sets_pending_and_confirm_applies(client):
     assert confirmed.json()["pendingEmail"] is None
 
 
+def _cancel_pending_email(client, method: str, path: str) -> None:
+    registered = _register(client)
+    headers = _auth(registered["token"])
+    client.post("/user/email", headers=headers, json={"email": "next@example.com"})
+
+    cancelled = client.request(method, path, headers=headers)
+    user_id = read_user_id(registered["token"], SECRET)
+    stale_token = issue_email_change_token(
+        user_id, "next@example.com", SECRET, timedelta(minutes=15)
+    )
+    confirmed = client.post(
+        "/user/email/confirm", headers=headers, json={"token": stale_token}
+    )
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["email"] == "ada@example.com"
+    assert cancelled.json()["pendingEmail"] is None
+    # a confirmation link minted before the cancel no longer applies
+    assert confirmed.status_code == 400
+    assert confirmed.json()["error"]["code"] == "EMAIL_CONFIRM_MISMATCH"
+
+
+def test_delete_user_email_cancels_pending_change(client):
+    _cancel_pending_email(client, "DELETE", "/user/email")
+
+
+def test_post_user_email_cancel_cancels_pending_change(client):
+    _cancel_pending_email(client, "POST", "/user/email/cancel")
+
+
 def test_email_change_to_taken_email_returns_409(client):
     registered = _register(client)
     # a second account already owns the target address

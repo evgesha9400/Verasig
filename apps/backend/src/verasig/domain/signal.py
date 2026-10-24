@@ -38,6 +38,43 @@ def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
+# A symbol already carrying one of these quotes is a complete pair (EURUSD,
+# XAUUSD, ETHUSDC, ETHBTC); only a bare crypto base defaults to the USDT quote.
+_QUOTE_SUFFIXES = (
+    "USDT",
+    "USDC",
+    "USD",
+    "PERP",
+    "BTC",
+    "ETH",
+    "EUR",
+    "GBP",
+    "JPY",
+    "AUD",
+    "CAD",
+    "CHF",
+    "NZD",
+)
+# Index and equity symbols are complete as written - never USDT pairs.
+_NON_CRYPTO_SYMBOLS = frozenset(
+    {"NAS100", "US30", "SPX500", "GER40", "AAPL", "TSLA", "NVDA", "MSFT"}
+)
+
+
+def _has_quote(symbol: str) -> bool:
+    return any(
+        symbol.endswith(quote) and len(symbol) > len(quote) for quote in _QUOTE_SUFFIXES
+    )
+
+
+def _normalized_symbol(raw: str) -> str:
+    """Uppercase; append USDT only to a bare crypto base ("btc" -> "BTCUSDT")."""
+    symbol = raw.strip().upper()
+    if not symbol or symbol in _NON_CRYPTO_SYMBOLS or _has_quote(symbol):
+        return symbol
+    return f"{symbol}USDT"
+
+
 class TradeIntent(BaseModel):
     symbol: str
     side: Side
@@ -52,10 +89,7 @@ class TradeIntent(BaseModel):
     @field_validator("symbol")
     @classmethod
     def _normalize_symbol(cls, raw: str) -> str:
-        symbol = raw.strip().upper()
-        if symbol and not symbol.endswith("USDT"):
-            return f"{symbol}USDT"
-        return symbol
+        return _normalized_symbol(raw)
 
     @model_validator(mode="after")
     def _require_symbol(self) -> "TradeIntent":

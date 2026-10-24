@@ -145,7 +145,9 @@ def test_account_repository_round_trips_profile_plan_and_email(db_session):
     pending = account_repository.set_pending_email(
         db_session, account.id, "next@example.com"
     )
-    applied = account_repository.apply_pending_email(db_session, account.id)
+    applied = account_repository.apply_pending_email(
+        db_session, account.id, "next@example.com"
+    )
     planned = account_repository.set_plan(db_session, account.id, Plan.DESK)
     cancelled = account_repository.set_cancel_at(db_session, account.id, _instant())
 
@@ -154,6 +156,22 @@ def test_account_repository_round_trips_profile_plan_and_email(db_session):
     assert applied.email == "next@example.com"
     assert planned.plan is Plan.DESK
     assert cancelled.cancel_at == _instant()
+
+
+def test_apply_pending_email_refuses_a_replaced_pending_email(db_session):
+    account = account_repository.insert_account(db_session, _account())
+    account_repository.set_pending_email(db_session, account.id, "first@example.com")
+    # the pending address changed after the caller checked it (TOCTOU)
+    account_repository.set_pending_email(db_session, account.id, "second@example.com")
+
+    applied = account_repository.apply_pending_email(
+        db_session, account.id, "first@example.com"
+    )
+
+    assert applied is None
+    unchanged = account_repository.find_by_id(db_session, account.id)
+    assert unchanged.email == "user@example.com"
+    assert unchanged.pending_email == "second@example.com"
 
 
 def test_source_repository_round_trips_status_config_and_delete(db_session):

@@ -81,11 +81,13 @@ async def create_feed(
 ) -> dict:
     with request.app.state.session_factory() as session:
         source = _require_connected_source(request, session, user.id)
-        try:
-            async with source:
-                channel = await source.resolve_channel(payload.tag)
-        except ChannelReferenceResolutionError as error:
-            raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
+    # resolve with no session open, so no pooled connection idles through MTProto
+    try:
+        async with source:
+            channel = await source.resolve_channel(payload.tag)
+    except ChannelReferenceResolutionError as error:
+        raise ApiError(404, "CHANNEL_NOT_FOUND", str(error)) from error
+    with request.app.state.session_factory() as session:
         # resolve first so a re-add of an existing feed is not counted as new capacity
         try:
             require_source_capacity(user, session, channel.channel_id)
@@ -101,11 +103,15 @@ async def create_feed(
 def delete_feed(
     request: Request,
     external_id: str,
-    _subscription=Depends(require_feed),
+    subscription=Depends(require_feed),
 ) -> Response:
+    # Stop any in-flight capture first so it cannot write into the deleted feed.
+    request.app.state.backfill_jobs.cancel(
+        subscription.user_id, subscription.external_id
+    )
     with request.app.state.session_factory() as session:
         feed_repository.delete_feed(
-            session, _subscription.user_id, _subscription.external_id
+            session, subscription.user_id, subscription.external_id
         )
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

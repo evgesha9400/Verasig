@@ -5,7 +5,9 @@ patches the live position: move the stop (incl. to breakeven), set the
 take-profits, average in, reduce, or close it. `classify_patch` reads such a
 reply as a `LifecyclePatch` of effective-state deltas that the fold applies.
 Table-driven, EN + RU, offline. An inert reply yields a non-actionable patch
-so the fold emits no phantom lifecycle step.
+so the fold emits no phantom lifecycle step. A negated ("do not move SL to BE")
+or conditional ("close if price reaches 90") clause is not an instruction, so it
+is dropped before any action is read; the other clauses still apply.
 """
 
 import re
@@ -29,20 +31,54 @@ _TAKE_PROFITS = re.compile(
     r"(?:tps?|targets?|тейк\w*)\b\s*[:=@]?\s*((?:\d[\d.,]*[kmкм]?[\s,]*)+)",
     re.IGNORECASE,
 )
-
-_ADD = re.compile(
-    r"\badd\b|averag|\bavg\b|\bdca\b|scale\s*in|усред|добав|докуп", re.IGNORECASE
+# A clause ends at ; ! ? a newline, or a period / comma that is not inside a
+# number ("66.5k", "66,500").
+_CLAUSE_BREAK = re.compile(r"[;!?\n]|[.,](?!\d)")
+# A condition reaches across commas ("If it breaks 70k, close"), so it is scoped
+# to the sentence; a negation is scoped to its comma clause.
+_SENTENCE_BREAK = re.compile(r"[;!?\n]|\.(?!\d)")
+# "TP 1 hit" / "first target 66.5k tagged" report an outcome, not new targets.
+_OUTCOME = re.compile(
+    r"\b(?:hit|tagged|reached|smashed|done)\b|взят|достиг", re.IGNORECASE
 )
-_REDUCE = re.compile(r"reduc|trim|partial|сократ|частичн", re.IGNORECASE)
-_CLOSE = re.compile(
-    r"\bclos(?:e|ed|ing)|all\s*out|\bexit\b|stopped\s*out"
-    r"|(?:sl|tp|stop|take\s*profit)\s*hit|закры|стоп\s*выбит",
+
+# The keyword consumes its whole word so the add clause starts right after it.
+_ADD = re.compile(
+    r"\badd\b|averag\w*|\bavg\b|\bdca\b|scale\s*in|усред\w*|добав\w*|докуп\w*",
     re.IGNORECASE,
 )
+# "50 moving average" is an indicator, not an average-in.
+_MOVING_AVERAGE = re.compile(r"moving\s+averag\w*|скользящ\w*", re.IGNORECASE)
+# The add clause ends at the first stop / take-profit label or clause break.
+_LEVEL_LABEL = re.compile(
+    r"\b(?:sl|stop|tps?|targets?|take\s*profit)\b|стоп|тейк", re.IGNORECASE
+)
+# The lookahead also refuses a trailing digit or "." / "," + digit, so the
+# match cannot backtrack into the integer part of "2.5x" or "12.5%".
+_NOT_A_FACTOR = r"\b(?!\d|[.,]\d|\s*[%xхХ])"
+_ADD_AT_PRICE = re.compile(
+    r"(?:\bat\b|@)\s*(\d[\d.,]*[kmкм]?)" + _NOT_A_FACTOR, re.IGNORECASE
+)
+_ADD_LEADING_PRICE = re.compile(r"\s*(\d[\d.,]*[kmкм]?)" + _NOT_A_FACTOR, re.IGNORECASE)
+_REDUCE = re.compile(r"reduc|trim|partial|сократ|частичн", re.IGNORECASE)
+# A cancel withdraws the order (or position) outright, so it is a full close.
+_CLOSE = re.compile(
+    r"\bclos(?:e|es|ed|ing)\b|all\s*out|\bexit\b|stopped\s*out"
+    r"|(?:sl|tp|stop|take\s*profit)\s*hit|закры|стоп\s*выбит"
+    r"|\bcancel(?:s|l?ed|l?ing)?\b|отмен",
+    re.IGNORECASE,
+)
+_FULL_CLOSE = re.compile(r"close\s+all|all\s*out|fully\s+closed", re.IGNORECASE)
+_NEGATION = re.compile(
+    r"\b(?:do\s+not|don'?t|not|never)\b|(?<!\w)не(?!\w)", re.IGNORECASE
+)
+_CONDITIONAL = re.compile(r"\b(?:if|when)\b|(?<!\w)(?:если|когда)(?!\w)", re.IGNORECASE)
 
 _FACTOR = re.compile(r"(\d[\d.,]*)\s*(%|[xх])", re.IGNORECASE)
+# "+3.9%" / "-2%" is a reported PnL, never a size factor. The sign must be glued
+# to the number: "Close - 30%" uses the dash as a separator.
+_SIGNED_PERCENT = re.compile(r"(?<![\w.])[+\-−]\d[\d.,]*\s*%")
 _HALF_WORD = re.compile(r"\bhalf\b|½|наполовину", re.IGNORECASE)
-_PRICE = re.compile(r"\b(\d[\d.,]*[kmкм]?)\b(?!\s*[%xхХ])", re.IGNORECASE)
 
 
 @dataclass
@@ -78,17 +114,25 @@ def _stated_stop_loss(text: str) -> Decimal | None:
     return to_decimal(match.group(1)) if match else None
 
 
+def _clause_at(text: str, position: int) -> str:
+    breaks = [match.start() for match in _CLAUSE_BREAK.finditer(text)]
+    clause_start = max((b + 1 for b in breaks if b < position), default=0)
+    clause_end = min((b for b in breaks if b >= position), default=len(text))
+    return text[clause_start:clause_end]
+
+
 def _stated_take_profits(text: str) -> list[Decimal] | None:
-    match = _TAKE_PROFITS.search(text)
-    if match is None:
-        return None
-    prices = [to_decimal(token) for token in _NUMBER.findall(match.group(1))]
-    found = [price for price in prices if price is not None]
-    return found or None
+    for match in _TAKE_PROFITS.finditer(text):
+        if _OUTCOME.search(_clause_at(text, match.start())):
+            continue  # an outcome report ("TP1 hit"), not a new target set
+        prices = [to_decimal(token) for token in _NUMBER.findall(match.group(1))]
+        found = [price for price in prices if price is not None]
+        return found or None
+    return None
 
 
 def _stated_factor(text: str) -> Decimal | None:
-    match = _FACTOR.search(text)
+    match = _FACTOR.search(_SIGNED_PERCENT.sub(" ", text))
     if match is not None:
         value = to_decimal(match.group(1))
         if value is None:
@@ -97,8 +141,38 @@ def _stated_factor(text: str) -> Decimal | None:
     return _HALF if _HALF_WORD.search(text) else None
 
 
-def _stated_price(text: str) -> Decimal | None:
-    match = _PRICE.search(text)
+def _blank_parts(text: str, breaks: re.Pattern, marker: re.Pattern) -> str:
+    """Blank every part of ``text`` between ``breaks`` that ``marker`` matches;
+    the breaks stay, so "targets 67000, 68000" keeps its list intact."""
+    pieces: list[str] = []
+    start = 0
+    for match in breaks.finditer(text):
+        part = text[start : match.start()]
+        pieces.append("" if marker.search(part) else part)
+        pieces.append(match.group(0))
+        start = match.end()
+    part = text[start:]
+    pieces.append("" if marker.search(part) else part)
+    return "".join(pieces)
+
+
+def _instruction_text(text: str) -> str:
+    """``text`` without its conditional sentences and negated clauses."""
+    unconditional = _blank_parts(text, _SENTENCE_BREAK, _CONDITIONAL)
+    return _blank_parts(unconditional, _CLAUSE_BREAK, _NEGATION)
+
+
+def _stated_add_price(text: str, add_end: int) -> Decimal | None:
+    """The price of the add clause: "add … at/@ P" or "add P", never an SL/TP."""
+    clause = text[add_end:]
+    ends = [
+        match.start()
+        for match in (_LEVEL_LABEL.search(clause), _CLAUSE_BREAK.search(clause))
+        if match is not None
+    ]
+    if ends:
+        clause = clause[: min(ends)]
+    match = _ADD_AT_PRICE.search(clause) or _ADD_LEADING_PRICE.match(clause)
     return to_decimal(match.group(1)) if match else None
 
 
@@ -113,30 +187,45 @@ def _classify_take_profits(text: str, patch: LifecyclePatch) -> None:
     patch.set_take_profits = _stated_take_profits(text)
 
 
-def _close_or_partial(patch: LifecyclePatch, factor: Decimal | None) -> None:
-    if factor is None:
-        patch.close = True
+def _reduce_or_close(patch: LifecyclePatch, fraction: Decimal) -> None:
+    if fraction <= 0:
+        return  # "reduce 0%" is not actionable
+    if fraction >= 1:
+        patch.close = True  # "reduce 100%" / "reduce 150%" closes it all
     else:
-        patch.reduce_fraction = factor  # "close half" / "close 25%"
+        patch.reduce_fraction = fraction  # "close half" / "close 25%"
+
+
+def _classify_add(text: str, add_end: int, patch: LifecyclePatch) -> None:
+    factor = _stated_factor(text)
+    if factor is not None and factor <= 0:
+        return  # "add 0x" is not actionable
+    patch.add_multiplier = Decimal(1) if factor is None else factor
+    patch.add_price = _stated_add_price(text, add_end)
 
 
 def _classify_size(text: str, patch: LifecyclePatch) -> None:
-    factor = _stated_factor(text)
-    if _ADD.search(text):
-        patch.add_multiplier = factor or Decimal(1)
-        patch.add_price = _stated_price(text)
+    unindicated = _MOVING_AVERAGE.sub(" ", text)
+    add = _ADD.search(unindicated)
+    if add is not None:
+        _classify_add(unindicated, add.end(), patch)
         return
+    factor = _stated_factor(text)
     if _REDUCE.search(text):
-        patch.reduce_fraction = factor or _HALF
+        _reduce_or_close(patch, _HALF if factor is None else factor)
         return
     if _CLOSE.search(text):
-        _close_or_partial(patch, factor)
+        if factor is None or _FULL_CLOSE.search(text):
+            patch.close = True  # a bare or explicit full close
+        else:
+            _reduce_or_close(patch, factor)
 
 
 def classify_patch(text: str) -> LifecyclePatch:
     """Recognize an in-thread reply as a position patch (SL/BE/TP/add/reduce/close)."""
     patch = LifecyclePatch()
-    _classify_stop(text, patch)
-    _classify_take_profits(text, patch)
-    _classify_size(text, patch)
+    instruction = _instruction_text(text)
+    _classify_stop(instruction, patch)
+    _classify_take_profits(instruction, patch)
+    _classify_size(instruction, patch)
     return patch

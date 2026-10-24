@@ -3,6 +3,7 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from conftest import _auth
 from conftest import _register_token as _register
 from fakes import FakeSource, FakeTelegramAuth
@@ -832,3 +833,154 @@ def test_readd_after_delete_refetches_from_zero(client, app):
     assert readded.requested_befores[0] is None
     assert sorted(readded.yielded_ids) == [1, 2, 3]
     assert client.get("/feeds", headers=_auth(token)).json()["feeds"][0]["fetched"] == 3
+
+
+def _wait_until_job_settles(app, key: str) -> None:
+    import time
+
+    deadline = time.monotonic() + 5
+    while app.state.jobs.is_running(key) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not app.state.jobs.is_running(key)
+
+
+class _SlowResolveSource(FakeSource):
+    """Resolves instantly for `POST /feeds`, then stalls inside the backfill job."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.resolve_calls = 0
+
+    async def resolve_channel(self, reference):
+        self.resolve_calls += 1
+        if self.resolve_calls > 1:
+            await asyncio.sleep(0.3)
+        return await super().resolve_channel(reference)
+
+
+def test_delete_during_backfill_cancels_it_and_never_recreates_the_feed(client, app):
+    from verasig.features.accounts.tokens import read_user_id
+    from verasig.features.feeds import feed_repository
+    from verasig.features.feeds.backfill_job_run import backfill_job_key
+
+    token = _register(client)
+    source = _SlowResolveSource(_channel(), _messages(), live_ids={1, 2, 3})
+    _connect_and_subscribe(client, app, token, source)
+    user_id = read_user_id(token, app.state.jwt_secret)
+
+    started = client.post("/feeds/7/backfill", headers=_auth(token))
+    deleted = client.delete("/feeds/7", headers=_auth(token))
+    _wait_until_job_settles(app, backfill_job_key(user_id, 7))
+
+    assert started.status_code == 202
+    assert deleted.status_code == 204
+    with app.state.session_factory() as session:
+        assert feed_repository.read_feed(session, user_id, 7) is None
+    assert source.yielded_ids == []  # the in-flight capture never wrote a batch
+
+
+def test_backfill_job_refuses_to_recreate_a_missing_feed(client, app):
+    from verasig.features.accounts.tokens import read_user_id
+    from verasig.features.feeds import feed_repository
+    from verasig.features.feeds.backfill import FeedDeletedError, backfill
+
+    token = _register(client)
+    _connect_and_subscribe(client, app, token, FakeSource(_channel(), _messages()))
+    user_id = read_user_id(token, app.state.jwt_secret)
+    assert client.delete("/feeds/7", headers=_auth(token)).status_code == 204
+
+    async def run_job_backfill() -> None:
+        await backfill(
+            FakeSource(_channel(), _messages()),
+            user_id,
+            7,
+            app.state.session_factory,
+            batch_size=200,
+            require_feed=True,
+        )
+
+    with pytest.raises(FeedDeletedError):
+        asyncio.run(run_job_backfill())
+
+    with app.state.session_factory() as session:
+        assert feed_repository.read_feed(session, user_id, 7) is None
+
+
+class _AscendingRefreshSource(FakeSource):
+    """REFRESH yields oldest -> newest, as the Telethon adapter does."""
+
+    async def fetch_newer_batches(self, _channel_id, after_message_id, batch_size):
+        self.requested_afters.append(after_message_id)
+        after = after_message_id or 0
+        pending = [m for m in self.messages if m.message_id > after]
+        for batch in self._emit_batches(pending, batch_size):
+            yield batch
+
+
+def test_interrupted_refresh_keeps_cursor_contiguous_and_retry_fills_the_rest(
+    client, app
+):
+    token = _register(client)
+    _connect_and_subscribe(
+        client, app, token, FakeSource(_channel(), _many_messages(3))
+    )
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+
+    # 402 new messages (4..405); the refresh dies after its first 200-message batch
+    interrupted = _AscendingRefreshSource(
+        _channel(), _many_messages(405), fail_after_batch=1
+    )
+    app.state.telegram_source_factory = lambda _link: interrupted
+    client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        failed_body = "".join(response.iter_text())
+
+    retry = _AscendingRefreshSource(_channel(), _many_messages(405))
+    app.state.telegram_source_factory = lambda _link: retry
+    client.post("/feeds/7/backfill", headers=_auth(token), json={"mode": "refresh"})
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        "".join(response.iter_text())
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    assert "event: error" in failed_body
+    assert retry.requested_afters == [203]  # cursor stopped at the committed batch
+    assert listed["fetched"] == 405  # no gap left behind by the interruption
+
+
+def test_batch_progress_does_not_reaggregate_the_capture(client, app, monkeypatch):
+    from verasig.features.feeds import backfill_job_repository
+
+    token = _register(client)
+    source = FakeSource(_channel(), _many_messages(605), live_ids=set(range(1, 606)))
+    _connect_and_subscribe(client, app, token, source)
+    original = backfill_job_repository._read_stored_progress
+    aggregations: list[int] = []
+
+    def counting(session, user_id, external_id):
+        aggregations.append(external_id)
+        return original(session, user_id, external_id)
+
+    monkeypatch.setattr(backfill_job_repository, "_read_stored_progress", counting)
+
+    client.post("/feeds/7/backfill", headers=_auth(token))
+    with client.stream(
+        "GET", "/feeds/7/backfill/progress", headers=_auth(token)
+    ) as response:
+        body = "".join(response.iter_text())
+    job_aggregations = len(aggregations)
+    listed = client.get("/feeds", headers=_auth(token)).json()["feeds"][0]
+
+    # 4 batches, but only create / opening / indexing / success re-aggregate
+    assert job_aggregations == 4
+    assert '"fetched": 200' in body  # per-batch progress still counts up
+    assert '"fetched": 400' in body
+    assert "event: done" in body
+    assert listed["fetched"] == 605

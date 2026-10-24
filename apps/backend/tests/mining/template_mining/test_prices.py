@@ -139,3 +139,29 @@ def test_keeps_a_bare_target_value_that_is_not_an_ordinal():
 def test_keeps_the_raw_token_for_display():
     price = detect_prices("SL 2310")[0]
     assert "2310" in price.raw
+
+
+# --- dates and list ordinals are not prices ---
+def test_ignores_an_iso_date():
+    assert detect_prices("Posted 2026-05-04") == []
+
+
+def test_ignores_a_numbered_list_ordinal():
+    assert _values("1. 110\n2) 120") == [110, 120]
+
+
+# --- digit-led tickers are not price levels ---
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("1000PEPEUSDT LONG\nSL 0.007\nTP 0.01", [0.007, 0.01]),
+        ("1INCHUSDT LONG entry 0.3", [0.3]),
+        ("1MBABYDOGEUSDT short", []),
+    ],
+)
+def test_a_digit_led_ticker_is_not_a_level(text, expected):
+    assert _values(text) == expected
+
+
+def test_a_sentence_ending_period_still_ends_a_level():
+    assert _values("SL 95.") == [95]

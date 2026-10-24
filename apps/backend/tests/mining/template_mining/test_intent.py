@@ -120,3 +120,35 @@ def test_still_treats_a_bare_close_command_as_an_update():
 
 def test_still_treats_a_stop_move_as_an_update_even_with_restated_levels():
     assert _intent_of("Move SL to BE on gold buy, entry was 2320") == "update"
+
+
+# --- negated instructions ---
+def test_treats_a_negated_buy_as_commentary():
+    assert _intent_of("Do not buy BTC entry 100 sl 95 tp 110") == "commentary"
+    assert _intent_of("Don't short ETH here, entry 200") == "commentary"
+
+
+def test_a_negated_horizon_is_not_a_negated_direction():
+    text = "BTC LONG entry 100 sl 95 tp 110\nNo long-term hold, scalp only"
+    assert _intent_of(text) == "new_signal"
+
+
+# --- explicit cancellation wins over a restated setup ---
+def test_a_cancelled_complete_setup_is_an_update():
+    assert _intent_of("BTC LONG entry 100 sl 95 tp 110\nCancelled") == "update"
+    assert _intent_of("BTC LONG entry 100 sl 95 tp 110\nОтмена") == "update"
+
+
+def test_a_cancel_condition_inside_a_setup_is_not_a_cancellation():
+    text = "BTC LONG entry 100 sl 95 tp 110\nCancel if 4H closes below 90"
+    assert _intent_of(text) == "new_signal"
+
+
+# --- only a negation of the setup's own side vetoes it ---
+def test_negating_the_opposite_side_keeps_the_setup():
+    assert _intent_of("BTC LONG entry 100 sl 95 tp 110\nDo not sell") == "new_signal"
+    assert _intent_of("ETH SHORT entry 200 sl 210 tp 180\nDon't buy") == "new_signal"
+
+
+def test_negating_the_setup_side_in_russian_is_commentary():
+    assert _intent_of("BTC лонг вход 100 sl 95 tp 110\nне покупать") == "commentary"

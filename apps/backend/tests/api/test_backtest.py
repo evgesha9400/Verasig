@@ -84,6 +84,20 @@ def test_backtest_job_streams_phases_persists_outcomes_and_updates_chat(client, 
     assert deletion_listed.json()["feeds"][0]["score"] == 0
 
 
+def test_backtest_requires_a_verified_feed(client, app):
+    token, user_id = _register(client)
+    _seed(app, user_id)
+    with app.state.session_factory() as session:
+        feed_repository.set_status(session, user_id, 7, "backfilled")
+        session.commit()
+    app.state.market_data_factory = FakeMarketData
+
+    response = client.post("/feeds/7/backtest", headers=_auth(token))
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "FEED_NOT_VERIFIED"
+
+
 def test_backtest_foreign_user_is_not_found(client, app):
     owner, owner_id = _register(client, "owner@example.com")
     other, _other_id = _register(client, "other@example.com")

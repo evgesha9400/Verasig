@@ -16,11 +16,13 @@ from verasig.features.feeds import (
     message_repository,
 )
 from verasig.features.feeds.feed_views import feed_initials, feed_tint
+from verasig.features.mining.template_mining.intent import EXPLICIT_CANCEL
+from verasig.features.parser_overlay.repository import read_overlay
 from verasig.features.signals import (
     lifecycle_link_repository,
     outcome_repository,
 )
-from verasig.features.signals.fold import fold
+from verasig.features.signals.fold import applicable_patch, fold
 from verasig.features.signals.patch import LifecyclePatch, classify_patch
 from verasig.features.simulation import repository as backtest_repository
 from verasig.shared.time import format_short, format_time
@@ -100,17 +102,20 @@ def _project_user_signals(
     if feed_id is not None:
         feeds = [feed for feed in feeds if str(feed.external_id) == feed_id]
     latest_results = backtest_repository.read_latest_results(session, user_id)
+    overlay = read_overlay(session, user_id)
     signals: list[dict] = []
     for feed in feeds:
         signals.extend(
             _project_channel(
-                session, user_id, feed, latest_results.get(feed.external_id)
+                session, user_id, feed, latest_results.get(feed.external_id), overlay
             )
         )
     return signals
 
 
-def _project_channel(session: Session, user_id: UUID, feed, result) -> list[dict]:
+def _project_channel(
+    session: Session, user_id: UUID, feed, result, overlay: dict
+) -> list[dict]:
     channel_id = feed.external_id
     messages = message_repository.read_messages(session, user_id, channel_id)
     signals = outcome_repository.read_signals(session, channel_id, user_id)
@@ -118,7 +123,7 @@ def _project_channel(session: Session, user_id: UUID, feed, result) -> list[dict
         link.external_message_id: link.root_signal_id
         for link in lifecycle_link_repository.read_links(session, user_id, channel_id)
     }
-    folded = fold(signals, messages, manual_links=manual_links)
+    folded = fold(signals, messages, manual_links=manual_links, overlay=overlay)
     message_by_id = {message.message_id: message for message in messages}
     event_text_by_signal_id = {signal.id: signal.candidate_text for signal in signals}
     signal_message_ids = {signal.id: signal.message_id for signal in signals}
@@ -167,10 +172,32 @@ def _signal_row(
         "tp": [_decimal_text(value) for value in first.effective_take_profits],
         "tpText": _targets_text(first.effective_take_profits),
         "deleted": deleted,
-        "cancelled": folded.closed_at is not None,
+        "cancelled": _cancelled(folded, messages, outcome),
         "mods": _mods(folded, messages, manual_message_ids),
         "effective": _effective(folded),
     }
+
+
+def _cancelled(
+    folded: FoldedSignal, messages: dict[int, RawTelegramMessage], outcome: dict | None
+) -> bool:
+    """Closed by the author before entry, as opposed to an author exit.
+
+    A backtest decides it: an unfilled close is a cancel, a filled one an exit.
+    Untested, a close is a cancel when the reply says so or when it directly
+    follows the entry with no management step in between."""
+    if folded.closed_at is None:
+        return False
+    if outcome is not None:
+        return outcome.get("kind") == "UNFILLED"
+    close_index = next(
+        index
+        for index, step in enumerate(folded.timeline)
+        if step.event_type is SignalEventType.CLOSE
+    )
+    closing = folded.timeline[close_index]
+    text = messages[closing.source_message_id].text or ""
+    return bool(EXPLICIT_CANCEL.search(text)) or close_index == 1
 
 
 def _feed_fields(feed) -> dict:
@@ -191,18 +218,26 @@ def _mods(
     manual_message_ids: set[int],
 ) -> list[dict]:
     return [
-        _mod_row(folded, step, messages[step.source_message_id], manual_message_ids)
-        for step in folded.timeline[1:]
+        _mod_row(
+            folded,
+            step,
+            previous.effective_size,
+            messages[step.source_message_id],
+            manual_message_ids,
+        )
+        for previous, step in zip(folded.timeline, folded.timeline[1:])
     ]
 
 
 def _mod_row(
     folded: FoldedSignal,
     step: FoldStep,
+    size_before: Decimal,
     message: RawTelegramMessage,
     manual_message_ids: set[int],
 ) -> dict:
-    patch = classify_patch(message.text or "")
+    # Label the step by the patch the fold applied, not the raw reply text.
+    patch = applicable_patch(classify_patch(message.text or ""), size_before)
     return {
         "id": str(message.message_id),
         "kind": _mod_kind(folded.side, step, patch),

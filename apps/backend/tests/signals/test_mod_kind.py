@@ -2,10 +2,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
-from verasig.domain.lifecycle import FoldStep
+from verasig.domain.lifecycle import FoldedSignal, FoldStep
+from verasig.domain.message import RawTelegramMessage
 from verasig.domain.signal import Side, SignalEventType
 from verasig.features.signals.patch import LifecyclePatch
-from verasig.features.signals.views import _mod_kind
+from verasig.features.signals.views import _mod_kind, _mods
 
 _AT = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
 
@@ -38,3 +39,31 @@ def test_stop_patch_is_move_stop():
 def test_breakeven_patch_is_move_stop():
     patch = LifecyclePatch(stop_to_breakeven=True)
     assert _mod_kind(Side.LONG, _step(), patch) == "move_stop"
+
+
+def test_a_reply_after_close_is_labelled_by_what_the_fold_applied():
+    closed = _step().model_copy(
+        update={"event_type": SignalEventType.CLOSE, "effective_size": Decimal(0)}
+    )
+    stop_move = _step().model_copy(
+        update={"source_message_id": 3, "effective_size": Decimal(0)}
+    )
+    folded = FoldedSignal(
+        root_signal_id=uuid4(),
+        symbol="BTCUSDT",
+        side=Side.LONG,
+        timeline=[closed, stop_move],
+    )
+    reply = RawTelegramMessage(
+        channel_id=1,
+        message_id=3,
+        text="close all, SL 90",
+        posted_at=_AT,
+        captured_at=_AT,
+        has_media=False,
+        raw_payload={},
+    )
+
+    [mod] = _mods(folded, {3: reply}, set())
+
+    assert mod["kind"] == "move_stop"  # the close was not applied, the stop was

@@ -69,7 +69,7 @@ def update_profile(
 
 
 def set_pending_email(
-    session: Session, user_id: UUID, pending_email: str
+    session: Session, user_id: UUID, pending_email: str | None
 ) -> UserAccount | None:
     row = session.get(UserAccountRow, user_id)
     if row is None:
@@ -79,9 +79,18 @@ def set_pending_email(
     return _to_account(row)
 
 
-def apply_pending_email(session: Session, user_id: UUID) -> UserAccount | None:
-    row = session.get(UserAccountRow, user_id)
+def apply_pending_email(
+    session: Session, user_id: UUID, expected_email: str
+) -> UserAccount | None:
+    """Promote the pending email, only if it is still `expected_email`.
+
+    The row is locked and re-read, so a pending email replaced or cancelled after
+    the caller's check cannot be applied in its place.
+    """
+    row = session.get(UserAccountRow, user_id, with_for_update=True)
     if row is None or row.pending_email is None:
+        return None
+    if row.pending_email != expected_email:
         return None
     row.email = row.pending_email
     row.pending_email = None

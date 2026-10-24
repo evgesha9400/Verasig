@@ -103,6 +103,28 @@ def test_connect_rejects_bad_exchange_keys(client, app):
     assert response.json()["error"]["code"] == "EXCHANGE_KEYS_INVALID"
 
 
+def test_connect_rejects_keys_with_withdraw_permission(client, app):
+    from verasig.foundation.market_data.bybit_account import WithdrawPermissionError
+
+    async def withdraw_enabled(_api_key: str, _api_secret: str) -> None:
+        raise WithdrawPermissionError
+
+    app.state.exchange_verifier = withdraw_enabled
+    token, user_id = _register(client)
+    _set_plan(app, user_id, Plan.OPERATOR)
+
+    response = client.post(
+        "/exchanges/bybit/connect",
+        headers=_auth(token),
+        json={"apiKey": "J7n2Kp9XvR4mQ1wL", "apiSecret": "x9Tt3FqLm2Vb8RkD"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "EXCHANGE_KEYS_WITHDRAW_ENABLED"
+    with app.state.session_factory() as session:
+        assert exchange_repository.read_connections(session, user_id) == []
+
+
 def _read_connection(app, user_id: UUID):
     with app.state.session_factory() as session:
         row = exchange_repository.read_connections(session, user_id)[0]

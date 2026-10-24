@@ -38,7 +38,7 @@ def test_maps_single_entry_to_limit_single():
     entry = SignalEntry(type="single", price=100.5)
     fields = _fields(entry=entry, stop_loss=95.0, take_profits=[110.0, 120.0])
 
-    signal = candidate_to_signal(_candidate(fields), 7)
+    signal = candidate_to_signal(_candidate(fields), 7, "tpl_abc")
 
     assert signal.symbol == "BTCUSDT"
     assert signal.side is Side.LONG
@@ -53,11 +53,24 @@ def test_maps_single_entry_to_limit_single():
     assert signal.rule_id == "tpl_abc"
 
 
+def test_rule_id_is_the_claiming_family_not_the_candidates_own_key():
+    # A fallback match persists the general accepted family's key.
+    signal = candidate_to_signal(_candidate(_fields()), 7, "tpl_general")
+
+    assert signal.rule_id == "tpl_general"
+
+
+def test_maps_leverage_onto_the_signal():
+    signal = candidate_to_signal(_candidate(_fields(leverage=10.0)), 7, "tpl_abc")
+
+    assert signal.leverage == Decimal("10.0")
+
+
 def test_maps_range_entry_to_limit_range():
     entry = SignalEntry(type="range", min=200.0, max=210.0)
     fields = _fields(direction="SELL", entry=entry)
 
-    signal = candidate_to_signal(_candidate(fields), 7)
+    signal = candidate_to_signal(_candidate(fields), 7, "tpl_abc")
 
     assert signal.side is Side.SHORT
     assert signal.entry_type is EntryType.LIMIT_RANGE
@@ -68,7 +81,7 @@ def test_maps_range_entry_to_limit_range():
 def test_maps_market_entry_to_market():
     fields = _fields(entry=SignalEntry(type="market"))
 
-    signal = candidate_to_signal(_candidate(fields), 7)
+    signal = candidate_to_signal(_candidate(fields), 7, "tpl_abc")
 
     assert signal.entry_type is EntryType.MARKET
     assert signal.entry_low is None
@@ -78,13 +91,13 @@ def test_maps_market_entry_to_market():
 def test_missing_entry_defaults_to_market():
     fields = _fields(entry=None)
 
-    signal = candidate_to_signal(_candidate(fields), 7)
+    signal = candidate_to_signal(_candidate(fields), 7, "tpl_abc")
 
     assert signal.entry_type is EntryType.MARKET
 
 
 def test_carries_confidence_as_decimal():
-    signal = candidate_to_signal(_candidate(_fields(), confidence=0.625), 7)
+    signal = candidate_to_signal(_candidate(_fields(), confidence=0.625), 7, "tpl_abc")
 
     assert signal.confidence == Decimal("0.625")
 
@@ -92,10 +105,10 @@ def test_carries_confidence_as_decimal():
 def test_candidate_without_instrument_is_not_persistable():
     fields = _fields(instrument=None)
 
-    assert candidate_to_signal(_candidate(fields), 7) is None
+    assert candidate_to_signal(_candidate(fields), 7, "tpl_abc") is None
 
 
 def test_candidate_without_direction_is_not_persistable():
     fields = _fields(direction=None)
 
-    assert candidate_to_signal(_candidate(fields), 7) is None
+    assert candidate_to_signal(_candidate(fields), 7, "tpl_abc") is None
