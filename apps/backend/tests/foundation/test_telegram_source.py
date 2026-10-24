@@ -15,6 +15,8 @@ from verasig.foundation.telegram.telethon_source import (
     ChannelReferenceResolutionError,
     TelethonSource,
     _BoundedKeySet,
+    _LiveEventState,
+    _normalize_chat_id,
 )
 
 
@@ -407,7 +409,9 @@ async def test_fetch_newer_batches_pages_from_min_id():
 
     _channel_arg, kwargs = client.iter_calls[0]
     assert kwargs["min_id"] == 42  # only messages newer than id 42
-    assert kwargs["reverse"] is False
+    # oldest -> newest, so the committed top cursor advances contiguously and an
+    # interrupted refresh can never skip the ids below a newer committed batch
+    assert kwargs["reverse"] is True
 
 
 async def test_live_message_ids_reports_scan_progress():
@@ -542,3 +546,53 @@ def test_bounded_key_set_evicts_oldest_past_capacity():
     assert (1, 1) not in seen  # evicted
     assert (1, 2) in seen
     assert (1, 3) in seen
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (1001234567, 1001234567),  # positive id whose digits start with 100
+        (2358686814, 2358686814),
+        (-1001234567890, 1234567890),  # Bot-API channel chat id
+        (-1002358686814, 2358686814),
+        (-123456, 123456),  # basic-group chat id
+        (None, None),
+    ],
+)
+def test_normalize_chat_id_strips_only_the_negative_channel_prefix(raw, expected):
+    assert _normalize_chat_id(raw) == expected
+
+
+async def _deliver(state, message_id: int, mode: DeliveryMode) -> None:
+    await TelethonSource(client=None)._enqueue_delivery(
+        state, 1, FakeTelethonMessage(message_id), mode, gap_closed=False
+    )
+
+
+async def test_non_contiguous_push_does_not_advance_poll_watermark():
+    state = _LiveEventState(channel_ids={1}, last_seen_message_ids={1: 100})
+
+    await _deliver(state, 102, DeliveryMode.PUSH)  # push dropped 101
+
+    # the next poll must still walk from 100 so it recovers the dropped 101
+    assert state.last_seen_message_ids[1] == 100
+    assert state.queue.qsize() == 1
+
+
+async def test_contiguous_push_advances_poll_watermark():
+    state = _LiveEventState(channel_ids={1}, last_seen_message_ids={1: 100})
+
+    await _deliver(state, 101, DeliveryMode.PUSH)
+
+    assert state.last_seen_message_ids[1] == 101
+
+
+async def test_poll_advances_watermark_past_ids_already_pushed():
+    state = _LiveEventState(channel_ids={1}, last_seen_message_ids={1: 100})
+    await _deliver(state, 102, DeliveryMode.PUSH)
+
+    await _deliver(state, 101, DeliveryMode.POLL)  # the gap the push skipped
+    await _deliver(state, 102, DeliveryMode.POLL)  # already delivered by push
+
+    assert state.last_seen_message_ids[1] == 102
+    assert state.queue.qsize() == 2  # 102 is never re-emitted

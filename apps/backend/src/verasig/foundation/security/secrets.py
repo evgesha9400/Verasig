@@ -12,7 +12,12 @@ def hash_password(plain: str) -> str:
 
 
 def check_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+    try:
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except ValueError:
+        # bcrypt raises on input over 72 bytes (or a malformed hash): such a
+        # password can never have been hashed, so it simply does not match.
+        return False
 
 
 class SecretDecryptError(Exception):

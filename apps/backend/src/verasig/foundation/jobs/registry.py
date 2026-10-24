@@ -1,11 +1,17 @@
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import partial
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
+
+# A finished job nobody subscribed to is kept this long so a client that POSTs
+# and then opens the progress stream still replays its terminal event; after
+# that it is pruned (its terminal is durably persisted by the job's owner).
+SPENT_CHANNEL_TTL_SECONDS = 300.0
 
 
 def job_key(user_id: UUID, channel_id: int, kind: str) -> str:
@@ -31,6 +37,7 @@ class JobChannel:
     progress_events: list[tuple[str, dict]] = field(default_factory=list)
     terminal: tuple[str, dict] | None = None
     task: asyncio.Task | None = None
+    finished_at: float | None = None
 
 
 class JobPublisher:
@@ -50,8 +57,9 @@ class JobPublisher:
 
 
 class JobRegistry:
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._channels: dict[str, JobChannel] = {}
+        self._clock = clock
 
     def has_job(self, key: str) -> bool:
         return key in self._channels
@@ -67,6 +75,7 @@ class JobRegistry:
         channel = self._channels.get(key)
         if channel and channel.task and not channel.task.done():
             raise JobAlreadyRunningError(key)
+        self._prune_spent()
         channel = JobChannel()
         self._channels[key] = channel
         publisher = JobPublisher(partial(self._broadcast, key))
@@ -84,6 +93,7 @@ class JobRegistry:
             channel.progress_events = channel.progress_events[-20:]
         else:
             channel.terminal = (event, data)
+            channel.finished_at = self._clock()
         for queue in channel.subscribers:
             queue.put_nowait((event, data))
 
@@ -126,4 +136,21 @@ class JobRegistry:
         if channel.terminal is None or channel.subscribers:
             return
         if self._channels.get(key) is channel:
+            del self._channels[key]
+
+    def _prune_spent(self) -> None:
+        """Drop finished channels that no subscriber drained within the TTL.
+
+        `_evict_if_drained` only fires when a subscriber leaves, so a job whose
+        progress stream was never opened would otherwise stay in memory forever.
+        """
+        cutoff = self._clock() - SPENT_CHANNEL_TTL_SECONDS
+        spent = [
+            key
+            for key, channel in self._channels.items()
+            if channel.finished_at is not None
+            and channel.finished_at <= cutoff
+            and not channel.subscribers
+        ]
+        for key in spent:
             del self._channels[key]

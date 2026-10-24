@@ -22,6 +22,13 @@ def test_password_hash_round_trips_and_rejects_wrong_password():
     assert check_password("wrong horse battery staple", hashed) is False
 
 
+def test_check_password_treats_over_bcrypt_limit_input_as_mismatch():
+    hashed = hash_password("correct horse battery staple")
+
+    # 40 characters, 80 UTF-8 bytes: bcrypt raises; verification must just fail.
+    assert check_password("ж" * 40, hashed) is False
+
+
 def test_secret_cipher_encrypts_decrypts_and_stamps_primary_key():
     cipher = SecretCipher.from_spec(f"2026-06:{_key()},2026-01:{_key()}")
 

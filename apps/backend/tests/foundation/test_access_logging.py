@@ -86,3 +86,30 @@ def test_install_adds_filter_once(access_logger):
         if isinstance(existing, HealthCheckAccessLogFilter)
     ]
     assert len(health_filters) == 1
+
+
+def test_sse_query_token_is_redacted_from_access_log(access_logger):
+    log_filter = HealthCheckAccessLogFilter(access_logger.name)
+    record = _access_record("/feeds/7/backfill/progress?token=eyJhbGciOi.payload.sig")
+
+    assert log_filter.filter(record) is True
+    assert record.args[2] == "/feeds/7/backfill/progress?token=[REDACTED]"
+    assert "eyJhbGciOi" not in record.getMessage()
+
+
+def test_query_token_redaction_keeps_other_parameters(access_logger):
+    log_filter = HealthCheckAccessLogFilter(access_logger.name)
+    record = _access_record("/progress?a=1&token=secret-jwt&b=2")
+
+    log_filter.filter(record)
+
+    assert record.args[2] == "/progress?a=1&token=[REDACTED]&b=2"
+
+
+def test_similar_query_parameter_is_not_redacted(access_logger):
+    log_filter = HealthCheckAccessLogFilter(access_logger.name)
+    record = _access_record("/progress?mytoken=visible")
+
+    log_filter.filter(record)
+
+    assert record.args[2] == "/progress?mytoken=visible"

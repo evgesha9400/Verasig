@@ -14,6 +14,10 @@ class KeyVerificationError(Exception):
     pass
 
 
+class WithdrawPermissionError(KeyVerificationError):
+    """The keys verified but carry Bybit's `Wallet: Withdraw` permission."""
+
+
 async def verify_api_keys(
     api_key: str,
     api_secret: str,
@@ -38,6 +42,19 @@ async def verify_api_keys(
         raise KeyVerificationError from error
     if payload.get("retCode") != 0:
         raise KeyVerificationError
+    if _can_withdraw(payload.get("result")):
+        raise WithdrawPermissionError
+
+
+def _can_withdraw(result: object) -> bool:
+    # /v5/user/query-api lists wallet rights under result.permissions.Wallet;
+    # "Withdraw" there means the key can move funds off the exchange.
+    if not isinstance(result, dict):
+        return False
+    permissions = result.get("permissions")
+    if not isinstance(permissions, dict):
+        return False
+    return "Withdraw" in (permissions.get("Wallet") or [])
 
 
 def _timestamp_ms() -> int:

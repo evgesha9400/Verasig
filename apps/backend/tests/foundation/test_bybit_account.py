@@ -6,6 +6,7 @@ import pytest
 
 from verasig.foundation.market_data.bybit_account import (
     KeyVerificationError,
+    WithdrawPermissionError,
     verify_api_keys,
 )
 
@@ -65,3 +66,45 @@ async def test_verify_api_keys_rejects_non_json_2xx_body():
             transport=httpx.MockTransport(handler),
             timestamp_ms=lambda: 1234567890,
         )
+
+
+def _permissions_handler(wallet: list[str]):
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "retCode": 0,
+                "result": {
+                    "readOnly": 0,
+                    "permissions": {
+                        "ContractTrade": ["Order", "Position"],
+                        "Wallet": wallet,
+                    },
+                },
+            },
+        )
+
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_verify_api_keys_rejects_withdraw_permission():
+    with pytest.raises(WithdrawPermissionError):
+        await verify_api_keys(
+            "api-key",
+            "api-secret",
+            transport=httpx.MockTransport(
+                _permissions_handler(["AccountTransfer", "Withdraw"])
+            ),
+            timestamp_ms=lambda: 1234567890,
+        )
+
+
+@pytest.mark.asyncio
+async def test_verify_api_keys_accepts_trade_keys_without_withdraw():
+    await verify_api_keys(
+        "api-key",
+        "api-secret",
+        transport=httpx.MockTransport(_permissions_handler(["AccountTransfer"])),
+        timestamp_ms=lambda: 1234567890,
+    )

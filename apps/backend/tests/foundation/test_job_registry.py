@@ -183,3 +183,65 @@ async def test_has_job_tracks_active_job_keys():
     assert registry.has_job("job") is False
     registry.start("job", run)
     assert registry.has_job("job") is True
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+async def _finish_unobserved(registry: JobRegistry, key: str) -> None:
+    async def run(_publisher):
+        return {"ok": True}
+
+    registry.start(key, run)
+    while registry.channel(key).terminal is None:
+        await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_unsubscribed_finished_job_stays_replayable_within_ttl():
+    clock = _Clock()
+    registry = JobRegistry(clock=clock)
+    await _finish_unobserved(registry, "first")
+
+    clock.now += 299
+    await _finish_unobserved(registry, "second")
+
+    # POST-then-subscribe still replays the terminal of a just-finished job
+    assert await _collect(registry, "first") == [("done", {"ok": True})]
+
+
+@pytest.mark.asyncio
+async def test_unsubscribed_finished_job_is_pruned_after_ttl_on_next_start():
+    clock = _Clock()
+    registry = JobRegistry(clock=clock)
+    await _finish_unobserved(registry, "never-streamed")
+
+    clock.now += 301
+    await _finish_unobserved(registry, "next")
+
+    assert registry.has_job("never-streamed") is False
+    assert registry.has_job("next") is True
+
+
+@pytest.mark.asyncio
+async def test_running_job_is_never_pruned():
+    clock = _Clock()
+    registry = JobRegistry(clock=clock)
+    release = asyncio.Event()
+
+    async def run(_publisher):
+        await release.wait()
+        return {"ok": True}
+
+    registry.start("running", run)
+    clock.now += 10_000
+    await _finish_unobserved(registry, "other")
+
+    assert registry.has_job("running") is True
+    release.set()
+    assert await _collect(registry, "running") == [("done", {"ok": True})]

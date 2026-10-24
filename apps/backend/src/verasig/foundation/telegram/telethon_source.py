@@ -199,12 +199,14 @@ class TelethonSource(TelegramSource):
         after_message_id: int | None,
         batch_size: int,
     ) -> AsyncIterator[list[RawTelegramMessage]]:
-        # reverse=False streams newest->oldest; min_id excludes ids <= it, so we
-        # capture only the messages posted since the last capture (REFRESH).
+        # reverse=True streams oldest->newest strictly above min_id, so we capture
+        # only the messages posted since the last capture (REFRESH). Ascending
+        # order keeps the committed top cursor contiguous: an interrupted refresh
+        # resumes above the last committed batch instead of skipping a gap below it.
         batch: list[RawTelegramMessage] = []
         entity = self._read_entity(channel_id)
         messages = self._client.iter_messages(
-            entity, reverse=False, min_id=after_message_id or 0
+            entity, reverse=True, min_id=after_message_id or 0
         )
         async for message in messages:
             batch.append(self._to_raw_message(channel_id, message))
@@ -359,10 +361,10 @@ class TelethonSource(TelegramSource):
         captured_at = datetime.now(tz=timezone.utc)
         key = (channel_id, message.id)
         async with state.lock:
+            _advance_poll_watermark(state, channel_id, message.id, mode)
             if key in state.seen_messages:
                 return
             state.seen_messages.add(key)
-            _advance_last_seen(state, channel_id, message.id)
         await state.queue.put(
             TelegramDeliveryEvent(
                 message=self._to_raw_message(channel_id, message, captured_at),
@@ -383,22 +385,39 @@ class TelethonSource(TelegramSource):
             await _enqueue_deletion(state, channel_id, message_id, detected_at)
 
 
-def _advance_last_seen(
-    state: _LiveEventState, channel_id: int, message_id: int
+def _advance_poll_watermark(
+    state: _LiveEventState, channel_id: int, message_id: int, mode: DeliveryMode
 ) -> None:
+    """Advance the poll's `min_id` watermark only past ids known to be covered.
+
+    A poll walks every id above the watermark in ascending order, so each polled
+    id (even one a push already delivered) is covered. A push can skip ids, so it
+    advances the watermark only when it is the very next id; otherwise the next
+    poll still walks the gap and catches any message the push stream dropped.
+    """
     current = state.last_seen_message_ids.get(channel_id, 0)
-    if message_id > current:
-        state.last_seen_message_ids[channel_id] = message_id
+    if message_id <= current:
+        return
+    if mode is DeliveryMode.PUSH and (current == 0 or message_id != current + 1):
+        return
+    state.last_seen_message_ids[channel_id] = message_id
 
 
 def _normalize_chat_id(value) -> int | None:
+    """The bare channel id from a raw id or a Bot-API-style `-100<id>` chat id.
+
+    Only a negative id carries the `-100` channel prefix; a positive id is
+    already bare and is returned unchanged, even when its digits start with 100.
+    """
     if value is None:
         return None
-    raw = abs(int(value))
-    text = str(raw)
-    if text.startswith("100") and len(text) > 3:
-        return int(text[3:])
-    return raw
+    number = int(value)
+    if number >= 0:
+        return number
+    text = str(number)
+    if text.startswith("-100") and len(text) > 4:
+        return int(text[4:])
+    return abs(number)
 
 
 def _entity_channel_id(entity: Any) -> int | None:
