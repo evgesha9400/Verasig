@@ -22,6 +22,9 @@ const CSS = `
     box-shadow var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out);
 }
+.vrs-otp__input:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
 .vrs-otp__input:focus-visible {
   border-color: var(--border-focus);
   box-shadow: var(--focus-ring);

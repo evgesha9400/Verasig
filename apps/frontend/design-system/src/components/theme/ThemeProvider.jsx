@@ -23,10 +23,10 @@ const THEMES = {
     accent: '#5197FF',
     hover: '#82B6FF',
     press: '#2F6FE0',
-    text: '#2F6FE0',
+    text: '#1D56C9',
     quiet: 'rgba(81,151,255,0.12)',
     glow: 'rgba(81,151,255,0.28)',
-    verified: '#5197FF'
+    verified: '#0F6A30'
   }
 }
 

@@ -34,6 +34,8 @@ export function Tag({ swatch, onRemove, onClick, className = '', children, ...re
     .join(' ')
   function onKeyDown(event) {
     rest.onKeyDown && rest.onKeyDown(event)
+    // Keys on a child control (the remove button) belong to that control.
+    if (event.target !== event.currentTarget) return
     if (event.defaultPrevented) return
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()

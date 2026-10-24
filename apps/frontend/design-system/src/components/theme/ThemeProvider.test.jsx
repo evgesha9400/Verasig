@@ -84,9 +84,9 @@ describe('ThemeProvider accent palette', () => {
     expect(tokens.accent).toBe('#5197FF')
     expect(tokens.hover).toBe('#82B6FF')
     expect(tokens.press).toBe('#2F6FE0')
-    // accent-text must stay the darker azure (#2F6FE0 ~4.7:1 on white), NOT the
-    // light hover #82B6FF (~2.1:1) the prototype used — keeps accent text legible.
-    expect(tokens.accentText).toBe('#2F6FE0')
+    // accent-text is the deep azure (#1D56C9, >=5.4:1 even on the sunken and
+    // hover surfaces), NOT the light hover #82B6FF (~2.1:1) the prototype used.
+    expect(tokens.accentText).toBe('#1D56C9')
   })
 
   it('repoints the signal ramp to azure in light theme so direct signal users are not lime', async () => {
@@ -95,7 +95,14 @@ describe('ThemeProvider accent palette', () => {
     const tokens = accentTokens()
     expect(tokens.signal500).toBe('#5197FF')
     expect(tokens.signal600).toBe('#2F6FE0')
-    expect(tokens.verified).toBe('#5197FF')
+  })
+
+  it('keeps verified a distinct green in light theme, not the azure info/accent blue', async () => {
+    await renderTheme('light')
+
+    const tokens = accentTokens()
+    expect(tokens.verified).toBe('#0F6A30')
+    expect(tokens.verified).not.toBe(tokens.accent)
   })
 })
 

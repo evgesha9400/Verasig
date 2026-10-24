@@ -19,6 +19,21 @@ describe('Tag', () => {
     expect(onClick).toHaveBeenCalledTimes(2)
   })
 
+  it('lets Enter on the remove button remove the tag without activating it', () => {
+    const onClick = vi.fn()
+    const onRemove = vi.fn()
+    const { getByLabelText } = render(
+      <Tag onClick={onClick} onRemove={onRemove}>
+        BTC
+      </Tag>
+    )
+    const remove = getByLabelText('Remove')
+    fireEvent.keyDown(remove, { key: 'Enter' })
+    fireEvent.click(remove)
+    expect(onClick).not.toHaveBeenCalled()
+    expect(onRemove).toHaveBeenCalledTimes(1)
+  })
+
   it('stays a plain span with no keyboard affordance when not interactive', () => {
     const { getByText } = render(<Tag>BTC</Tag>)
     const tag = getByText('BTC')

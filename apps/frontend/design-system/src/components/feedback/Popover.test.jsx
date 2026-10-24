@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Popover } from './Popover.jsx'
 
@@ -25,5 +25,25 @@ describe('Popover hover-bridge', () => {
     // top-side panel opens above the trigger → bridge on its bottom edge
     const topRule = css.slice(css.indexOf("[data-side='top']::before"))
     expect(topRule.slice(0, 80)).toContain('bottom: -10px')
+  })
+})
+
+describe('Popover Escape dismissal', () => {
+  it('hides the panel on Escape while engaged and returns focus to the trigger', () => {
+    const { container, getByText } = render(
+      <Popover role="dialog" trigger={<span>t</span>}>
+        <button>Act</button>
+      </Popover>
+    )
+    const wrap = container.querySelector('.vrs-pop')
+    const action = getByText('Act')
+    act(() => action.focus())
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(wrap.getAttribute('data-dismissed')).toBe('true')
+    expect(document.activeElement).toBe(container.querySelector('.vrs-pop__trigger'))
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+
+    fireEvent.mouseLeave(wrap)
+    expect(wrap.hasAttribute('data-dismissed')).toBe(false)
   })
 })

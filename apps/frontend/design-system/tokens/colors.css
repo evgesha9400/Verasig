@@ -31,7 +31,7 @@
   --signal-glow: rgba(185, 238, 46, 0.28);
 
   /* ---- Support : Azure (links, info, data-viz) ---- */
-  --azure-700: #1f4fa8;
+  --azure-700: #1d56c9;
   --azure-600: #2f6fe0;
   --azure-500: #5197ff;
   --azure-400: #82b6ff;
@@ -102,10 +102,10 @@
   /* Surfaces */
   --bg-void: #e8ebee;
   --bg-app: #f4f6f8;
-  --surface-sunken: #edeff2;
+  --surface-sunken: #e8ecf1;
   --surface-card: #ffffff;
-  --surface-raised: #ffffff;
-  --surface-hover: #f0f2f5;
+  --surface-raised: #f7f9fb;
+  --surface-hover: #eef1f5;
   --surface-overlay: #ffffff;
 
   /* Text */
@@ -114,20 +114,20 @@
   --text-body: #2c353f;
   --text-muted: #525c67; /* AA-tuned for label contrast */
   --text-faint: #5e6772; /* AA-tuned for label contrast */
-  --text-on-accent: #0c1004;
+  --text-on-accent: #06090e; /* AA on the azure accent at rest and pressed */
 
   /* Borders */
   --border-subtle: rgba(12, 18, 26, 0.07);
   --border-default: rgba(12, 18, 26, 0.12);
   --border-strong: rgba(12, 18, 26, 0.2);
-  --border-focus: var(--azure-500);
+  --border-focus: var(--azure-600); /* >=3:1 ring on every light surface */
 
   /* Accent — azure on light surfaces (dark theme keeps the lime signal) */
   --accent: var(--azure-500);
   --accent-hover: var(--azure-400);
   --accent-press: var(--azure-600);
   --accent-quiet: rgba(81, 151, 255, 0.12);
-  --accent-text: var(--azure-600);
+  --accent-text: var(--azure-700); /* AA on sunken/hover surfaces too */
 
   --link: var(--azure-600);
   --link-hover: var(--azure-500);
@@ -143,12 +143,15 @@
   --signal-600: var(--azure-600);
   --signal-700: var(--azure-700);
 
-  /* Semantic backgrounds get a touch more saturation on white */
-  --verified-bg: rgba(81, 151, 255, 0.15);
-  --pending-bg: rgba(214, 150, 20, 0.14);
-  --rejected-bg: rgba(220, 60, 48, 0.1);
-  --info-bg: rgba(47, 111, 224, 0.1);
-  --pending-500: #c98a12;
-  --rejected-500: #e0463a;
-  --verified-500: var(--azure-500);
+  /* Semantic hues. Verified stays green (never the azure accent) so it reads
+     apart from info. Each foreground clears AA as text on its own tinted --*-bg
+     over both --surface-card and --surface-sunken (Badge, StatusPill, danger hover). */
+  --verified-500: #0f6a30;
+  --verified-bg: rgba(15, 106, 48, 0.1);
+  --pending-500: #855500;
+  --pending-bg: rgba(180, 120, 10, 0.12);
+  --rejected-500: #b42318;
+  --rejected-bg: rgba(180, 35, 24, 0.1);
+  --info-500: var(--azure-700);
+  --info-bg: rgba(29, 86, 201, 0.1);
 }

@@ -56,12 +56,15 @@ export function Input({
   disabled = false,
   id,
   className = '',
+  'aria-describedby': describedBy,
   ...rest
 }) {
   // Prefer an explicit id (lets callers wire their own labels), else fall back
   // to a collision-free generated id rather than one derived from the label.
   const generatedId = useId()
   const fieldId = id || generatedId
+  const message = error || hint
+  const msgId = `${fieldId}-msg`
   const boxCls = [
     'vrs-input',
     error ? 'is-error' : '',
@@ -85,12 +88,21 @@ export function Input({
       )}
       <div className={boxCls}>
         {iconLeft && <span className="vrs-input__icon">{iconLeft}</span>}
-        <input id={fieldId} disabled={disabled} required={required} {...rest} />
+        <input
+          id={fieldId}
+          disabled={disabled}
+          required={required}
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={
+            [describedBy, message ? msgId : ''].filter(Boolean).join(' ') || undefined
+          }
+          {...rest}
+        />
         {trailing}
       </div>
-      {(error || hint) && (
-        <span className={`vrs-field__hint ${error ? 'is-error' : ''}`}>
-          {error || hint}
+      {message && (
+        <span id={msgId} className={`vrs-field__hint ${error ? 'is-error' : ''}`}>
+          {message}
         </span>
       )}
     </div>

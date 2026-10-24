@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useId, useRef } from 'react'
 
 const CSS = `
 .vrs-dialog__scrim {
@@ -9,6 +9,7 @@ const CSS = `
 }
 @keyframes vrs-dialog-fade { from { opacity: 0; } to { opacity: 1; } }
 .vrs-dialog {
+  outline: none;
   width: 100%; max-width: 460px;
   background: var(--surface-card); border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl); box-shadow: var(--shadow-pop);
@@ -33,6 +34,29 @@ if (typeof document !== 'undefined' && !document.getElementById('vrs-dialog-css'
   document.head.appendChild(s)
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+function focusables(panel) {
+  return Array.from(panel.querySelectorAll(FOCUSABLE))
+}
+
+// Keep Tab / Shift+Tab cycling inside the open panel.
+function trapTab(event, panel) {
+  const items = focusables(panel)
+  event.preventDefault()
+  if (items.length === 0) return panel.focus()
+  const index = items.indexOf(document.activeElement)
+  const step = event.shiftKey ? -1 : 1
+  const next =
+    index === -1
+      ? event.shiftKey
+        ? items.length - 1
+        : 0
+      : (index + step + items.length) % items.length
+  items[next].focus()
+}
+
 /** Modal dialog. Render conditionally on `open`. */
 export function Dialog({
   open,
@@ -44,33 +68,55 @@ export function Dialog({
   className = '',
   children
 }) {
+  // Read onClose through a ref: a parent's inline closure must not re-run the
+  // effect, whose cleanup would pull focus back to the trigger mid-dialog.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const panelRef = useRef(null)
+  const titleId = useId()
+  const descId = useId()
   useEffect(() => {
     if (!open) return
     const previouslyFocused = document.activeElement
+    const panel = panelRef.current
+    if (panel) (focusables(panel)[0] || panel).focus()
     function onKeyDown(event) {
-      if (event.key === 'Escape') onClose && onClose()
+      if (event.key === 'Escape') onCloseRef.current && onCloseRef.current()
+      else if (event.key === 'Tab' && panel) trapTab(event, panel)
     }
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       previouslyFocused && previouslyFocused.focus && previouslyFocused.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return (
     <div className="vrs-dialog__scrim" onClick={onClose}>
       <div
         className={['vrs-dialog', className].filter(Boolean).join(' ')}
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={description ? descId : undefined}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="vrs-dialog__head">
           {icon && <span className="vrs-dialog__icon">{icon}</span>}
           <div className="vrs-dialog__titles">
-            {title && <div className="vrs-dialog__title">{title}</div>}
-            {description && <div className="vrs-dialog__desc">{description}</div>}
+            {title && (
+              <div className="vrs-dialog__title" id={titleId}>
+                {title}
+              </div>
+            )}
+            {description && (
+              <div className="vrs-dialog__desc" id={descId}>
+                {description}
+              </div>
+            )}
           </div>
           {onClose && (
             <button

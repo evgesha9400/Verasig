@@ -90,6 +90,29 @@ if (typeof document !== 'undefined' && !document.getElementById('vrs-menu-css'))
   document.head.appendChild(s)
 }
 
+const ITEM = '[role="menuitem"]:not(:disabled)'
+
+function enabledItems(menu) {
+  return menu ? Array.from(menu.querySelectorAll(ITEM)) : []
+}
+
+// Roving focus across enabled items: arrows wrap, Home/End jump to the ends.
+function moveFocus(event, menu) {
+  const items = enabledItems(menu)
+  if (items.length === 0) return
+  const index = items.indexOf(document.activeElement)
+  const last = items.length - 1
+  const targets = {
+    ArrowDown: index === -1 || index === last ? 0 : index + 1,
+    ArrowUp: index <= 0 ? last : index - 1,
+    Home: 0,
+    End: last
+  }
+  if (!(event.key in targets)) return
+  event.preventDefault()
+  items[targets[event.key]].focus()
+}
+
 function mergeHandlers(first, second) {
   return (event) => {
     first && first(event)
@@ -109,16 +132,22 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
+  const menuRef = useRef(null)
   const menuId = useId()
 
   useEffect(() => {
     if (!open) return
+    const first = enabledItems(menuRef.current)[0]
+    first && first.focus()
     function onPointerDown(event) {
       if (wrapRef.current && wrapRef.current.contains(event.target)) return
       setOpen(false)
     }
     function onKeyDown(event) {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      const triggerEl = wrapRef.current?.querySelector('button, [tabindex]')
+      triggerEl && triggerEl.focus()
     }
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -164,6 +193,7 @@ export function Menu({
       {triggerNode}
       {open && (
         <div
+          ref={menuRef}
           id={menuId}
           className="vrs-menu"
           role="menu"
@@ -174,6 +204,9 @@ export function Menu({
             if (item && !item.disabled) setOpen(false)
           }}
           {...rest}
+          onKeyDown={mergeHandlers(rest.onKeyDown, (event) =>
+            moveFocus(event, menuRef.current)
+          )}
         >
           {children}
         </div>

@@ -147,3 +147,201 @@ describe('colors.css text tokens meet WCAG AA on every surface', () => {
     }
   }
 })
+
+// ============================================================
+// Light-theme semantic separation + surface elevation guards.
+// Verified (green) and info (blue) must never collapse into one hue,
+// and the light surfaces must stay distinct so hover/raised states
+// remain visible on white.
+// ============================================================
+
+const SEMANTIC_TEXT_TOKENS = ['--verified-500', '--info-500']
+const ELEVATION_SURFACES = [
+  '--surface-sunken',
+  '--surface-card',
+  '--surface-raised',
+  '--surface-hover'
+]
+
+describe('colors.css semantic hues stay distinct', () => {
+  for (const theme of Object.keys(THEME_TOKENS)) {
+    const tokens = THEME_TOKENS[theme]
+
+    it(`${theme}: --verified-500 and --info-500 are different colors`, () => {
+      const verified = resolveHex('--verified-500', tokens).toLowerCase()
+      const info = resolveHex('--info-500', tokens).toLowerCase()
+      expect(verified).not.toBe(info)
+    })
+
+    it(`${theme}: verified/info text clears 4.5:1 on --surface-card`, () => {
+      const card = resolveHex('--surface-card', tokens)
+      for (const token of SEMANTIC_TEXT_TOKENS) {
+        const ratio = contrastRatio(resolveHex(token, tokens), card)
+        expect(ratio, `${token} on --surface-card`).toBeGreaterThanOrEqual(AA_NORMAL)
+      }
+    })
+
+    it(`${theme}: elevation surfaces are all distinct`, () => {
+      const hexes = ELEVATION_SURFACES.map((token) =>
+        resolveHex(token, tokens).toLowerCase()
+      )
+      expect(new Set(hexes).size).toBe(hexes.length)
+    })
+  }
+
+  it('light: verified is emerald and info is the deep azure', () => {
+    expect(resolveHex('--verified-500', LIGHT_TOKENS).toLowerCase()).toBe('#0f6a30')
+    expect(resolveHex('--info-500', LIGHT_TOKENS).toLowerCase()).toBe('#1d56c9')
+    expect(LIGHT_TOKENS['--verified-bg']).toBe('rgba(15, 106, 48, 0.1)')
+    expect(LIGHT_TOKENS['--info-bg']).toBe('rgba(29, 86, 201, 0.1)')
+  })
+})
+
+// ============================================================
+// Semantic text sits on its own tinted --*-bg (Badge, StatusPill,
+// danger hover). Alpha-composite each tint over the opaque light
+// surfaces it renders on and require AA for the matching foreground.
+// ============================================================
+
+function parseRgba(value) {
+  const match = value.match(
+    /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/
+  )
+  if (!match) throw new Error(`not an rgba() literal: ${value}`)
+  return { rgb: match.slice(1, 4).map(Number), alpha: Number(match[4]) }
+}
+
+function composite(rgbaValue, backgroundHex) {
+  const { rgb, alpha } = parseRgba(rgbaValue)
+  return (
+    '#' +
+    rgb
+      .map((channel, i) => {
+        const base = parseInt(backgroundHex.slice(1 + i * 2, 3 + i * 2), 16)
+        return Math.round(channel * alpha + base * (1 - alpha))
+      })
+      .map((channel) => channel.toString(16).padStart(2, '0'))
+      .join('')
+  )
+}
+
+describe('light semantic text clears AA on its own tinted background', () => {
+  for (const hue of ['verified', 'info', 'pending', 'rejected']) {
+    for (const surface of ['--surface-card', '--surface-sunken']) {
+      it(`--${hue}-500 on --${hue}-bg over ${surface}`, () => {
+        const background = composite(
+          LIGHT_TOKENS[`--${hue}-bg`],
+          resolveHex(surface, LIGHT_TOKENS)
+        )
+        const ratio = contrastRatio(
+          resolveHex(`--${hue}-500`, LIGHT_TOKENS),
+          background
+        )
+        expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL)
+      })
+    }
+  }
+})
+
+// ============================================================
+// Light accent text (selected segments, accent icon buttons, tabs)
+// must clear AA on every opaque surface, and the light focus ring
+// must clear the 3:1 non-text floor on every opaque surface.
+// ============================================================
+
+describe('light accent text and focus ring contrast', () => {
+  it('--accent-text clears 4.5:1 on all opaque surfaces', () => {
+    const foreground = resolveHex('--accent-text', LIGHT_TOKENS)
+    for (const surface of OPAQUE_SURFACES) {
+      const ratio = contrastRatio(foreground, resolveHex(surface, LIGHT_TOKENS))
+      expect(ratio, surface).toBeGreaterThanOrEqual(AA_NORMAL)
+    }
+  })
+
+  it('--border-focus clears 3:1 on all opaque surfaces', () => {
+    const ring = resolveHex('--border-focus', LIGHT_TOKENS)
+    for (const surface of OPAQUE_SURFACES) {
+      const ratio = contrastRatio(ring, resolveHex(surface, LIGHT_TOKENS))
+      expect(ratio, surface).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('keeps ThemeProvider light accent text equal to --azure-700', () => {
+    expect(colorsCss).toMatch(/--azure-700:\s*#1d56c9/i)
+    expect(themeProvider).toMatch(/text:\s*'#1D56C9'/)
+    expect(themeProvider).toMatch(/verified:\s*'#0F6A30'/)
+  })
+})
+
+// ============================================================
+// --text-on-accent must stay legible on the primary button at rest
+// and while pressed (the :active fill is a black color-mix of the
+// accent, read from Button.jsx so the test tracks the real CSS).
+// ============================================================
+
+const buttonSource = readFileSync(
+  join(here, '../src/components/core/Button.jsx'),
+  'utf8'
+)
+
+function primaryPressMix() {
+  const match = buttonSource.match(
+    /\.vrs-btn__primary:active:not\(:disabled\)\s*\{[^}]*color-mix\(in srgb, var\(--accent\) (\d+)%, #000\)/
+  )
+  expect(match).not.toBeNull()
+  return Number(match[1]) / 100
+}
+
+function mixWithBlack(hex, weight) {
+  return (
+    '#' +
+    [1, 3, 5]
+      .map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * weight))
+      .map((channel) => channel.toString(16).padStart(2, '0'))
+      .join('')
+  )
+}
+
+describe('--text-on-accent clears AA on the primary button', () => {
+  for (const theme of Object.keys(THEME_TOKENS)) {
+    const tokens = THEME_TOKENS[theme]
+
+    it(`${theme}: on --accent at rest`, () => {
+      const ratio = contrastRatio(
+        resolveHex('--text-on-accent', tokens),
+        resolveHex('--accent', tokens)
+      )
+      expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL)
+    })
+
+    it(`${theme}: on the pressed (:active) fill`, () => {
+      const pressed = mixWithBlack(resolveHex('--accent', tokens), primaryPressMix())
+      const ratio = contrastRatio(resolveHex('--text-on-accent', tokens), pressed)
+      expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL)
+    })
+  }
+})
+
+// ============================================================
+// Light theme replaces the deep black dark-UI shadows with soft,
+// ink-tinted ones so cards and popovers do not look smudged on white.
+// ============================================================
+
+describe('effects.css light shadows', () => {
+  const effectsCss = readFileSync(join(here, 'effects.css'), 'utf8')
+
+  it('overrides every elevation shadow with a soft ink tint under [data-theme="light"]', () => {
+    const start = effectsCss.indexOf("[data-theme='light']")
+    expect(start).toBeGreaterThan(-1)
+    const light = parseDeclarations(effectsCss.slice(start))
+    for (const token of [
+      '--shadow-xs',
+      '--shadow-sm',
+      '--shadow-md',
+      '--shadow-lg',
+      '--shadow-pop'
+    ]) {
+      expect(light[token], token).toMatch(/rgba\(12, 18, 26, 0\.(0[5-9]|1[0-4])\)/)
+    }
+  })
+})

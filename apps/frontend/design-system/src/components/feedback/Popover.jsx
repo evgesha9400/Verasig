@@ -1,3 +1,6 @@
+import { useCallback, useRef } from 'react'
+import { useEscapeDismiss } from './useEscapeDismiss.js'
+
 const CSS = `
 .vrs-pop {
   position: relative;
@@ -75,6 +78,10 @@ const CSS = `
   pointer-events: auto;
   transform: translateY(0);
 }
+.vrs-pop[data-dismissed] .vrs-pop__panel {
+  opacity: 0;
+  pointer-events: none;
+}
 `
 
 if (typeof document !== 'undefined' && !document.getElementById('vrs-pop-css')) {
@@ -89,19 +96,33 @@ export function Popover({
   side = 'bottom',
   align = 'start',
   role = 'tooltip',
+  label,
   className = '',
   panelClassName = '',
   children,
   ...rest
 }) {
+  const triggerRef = useRef(null)
+  // Escape from inside the panel must not strand focus on a hidden control.
+  const closeNow = useCallback(() => {
+    const trigger = triggerRef.current
+    if (trigger && trigger.parentElement.contains(document.activeElement))
+      trigger.focus()
+  }, [])
+  const dismiss = useEscapeDismiss(rest, closeNow)
   return (
-    <span className={['vrs-pop', className].filter(Boolean).join(' ')} {...rest}>
-      <span className="vrs-pop__trigger" tabIndex={0}>
+    <span
+      className={['vrs-pop', className].filter(Boolean).join(' ')}
+      {...rest}
+      {...dismiss}
+    >
+      <span className="vrs-pop__trigger" ref={triggerRef} tabIndex={0}>
         {trigger}
       </span>
       <span
         className={['vrs-pop__panel', panelClassName].filter(Boolean).join(' ')}
         role={role}
+        aria-label={label}
         data-side={side}
         data-align={align}
       >

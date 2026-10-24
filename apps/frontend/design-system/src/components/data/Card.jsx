@@ -13,6 +13,9 @@ const CSS = `
 .vrs-card.vrs-card__interactive:active { transform: translateY(1px); }
 .vrs-card.vrs-card__interactive:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--shadow-md); }
 .vrs-card__selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--glow-soft); }
+/* Selected outranks the generic interactive hover; focus still adds its ring. */
+.vrs-card.vrs-card__interactive.vrs-card__selected:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--glow-soft); }
+.vrs-card.vrs-card__interactive.vrs-card__selected:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring), var(--glow-soft); }
 .vrs-card__overlay { background: var(--surface-overlay); box-shadow: var(--shadow-pop); }
 .vrs-card__glow { border-color: transparent; box-shadow: var(--glow-signal); }
 .vrs-card__head { display: flex; align-items: center; gap: 12px; padding: 14px var(--space-5); border-bottom: 1px solid var(--border-subtle); }

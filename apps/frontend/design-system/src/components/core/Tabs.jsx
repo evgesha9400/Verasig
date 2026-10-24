@@ -21,6 +21,7 @@ const CSS = `
 .vrs-tabs__pill { background: var(--surface-sunken); padding: 4px; border-radius: var(--radius-md); gap: 2px; }
 .vrs-tabs__pill .vrs-tab { padding: 6px 13px; border-radius: var(--radius-sm); }
 .vrs-tabs__pill .vrs-tab[aria-selected="true"] { background: var(--surface-raised); box-shadow: var(--shadow-xs); }
+.vrs-tabs__pill .vrs-tab:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .vrs-tab__count {
   font-family: var(--font-mono); font-size: var(--text-3xs); color: var(--text-faint);
   background: var(--surface-hover); border-radius: var(--radius-pill); padding: 1px 6px;

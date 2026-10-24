@@ -44,12 +44,17 @@ p {
   margin: 0;
 }
 
+/* Link colors reach only class-less anchors, at zero specificity, so a
+   classed anchor (<Button as="a">, <Card as="a">, .mk-nav__brand) always keeps
+   its own color — including on hover. */
 a {
-  color: var(--link);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease-out);
 }
-a:hover {
+:where(a:not([class])) {
+  color: var(--link);
+}
+:where(a:not([class]):hover) {
   color: var(--link-hover);
 }
 
@@ -75,7 +80,6 @@ samp {
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-  border-radius: var(--radius-sm);
 }
 .vrs-input :is(input, textarea):focus-visible {
   box-shadow: none;

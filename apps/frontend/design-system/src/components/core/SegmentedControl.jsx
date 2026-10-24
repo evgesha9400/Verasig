@@ -35,14 +35,14 @@ const CSS = `
     box-shadow var(--dur-fast) var(--ease-out),
     transform var(--dur-instant) var(--ease-out);
 }
-.vrs-seg__radio:hover:not(:disabled) {
+.vrs-seg__radio:hover:not(:disabled):not([aria-checked='true']) {
   color: var(--text-strong);
   background: var(--surface-hover);
 }
 .vrs-seg__radio[aria-checked='true'] {
   background-color: var(--surface-card);
   background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface-card) 90%, #fff), var(--surface-card));
-  color: var(--accent);
+  color: var(--accent-text);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 1px 1.5px rgba(0,0,0,0.3);
 }
 .vrs-seg__radio:active:not(:disabled) {

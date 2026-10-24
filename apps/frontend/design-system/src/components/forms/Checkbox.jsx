@@ -4,13 +4,14 @@ const CSS = `
 .vrs-check input { position: absolute; opacity: 0; width: 0; height: 0; }
 .vrs-check__box {
   flex: none; width: 18px; height: 18px; margin-top: 1px;
-  border-radius: var(--radius-xs); border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  border: 1.5px solid color-mix(in srgb, var(--text-muted) 72%, var(--border-strong));
   background: var(--surface-sunken);
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--text-on-accent);
   transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
-.vrs-check:hover .vrs-check__box { border-color: var(--accent); }
+.vrs-check:hover:not(.is-disabled) .vrs-check__box { border-color: var(--accent); }
 .vrs-check input:checked + .vrs-check__box { background: var(--accent); border-color: var(--accent); }
 .vrs-check input:focus-visible + .vrs-check__box { box-shadow: var(--focus-ring); }
 .vrs-check__box svg { width: 12px; height: 12px; stroke-width: 3; opacity: 0; transform: scale(0.6); transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-snap); }

@@ -2,7 +2,7 @@ const CSS = `
 .vrs-toast {
   display: flex; align-items: flex-start; gap: 11px;
   width: 340px; padding: 13px 14px;
-  background: var(--ink-800); border: 1px solid var(--border-strong);
+  background: var(--surface-overlay); border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   font-family: var(--font-sans);
   animation: vrs-toast-in var(--dur-base) var(--ease-out);
