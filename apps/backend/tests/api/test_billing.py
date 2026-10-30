@@ -37,7 +37,7 @@ def _checkout_session(
     user_id,
     subscription_id: str = "sub_1",
     customer_id: str = "cus_1",
-    payment_status: str = "no_payment_required",
+    payment_status: str = "paid",
     plan: str | None = "trader",
 ) -> dict:
     return {
@@ -59,11 +59,13 @@ def _subscription(
     price_id: str = STRIPE_PRICE_TRADER_MONTHLY,
     cancel_at_period_end: bool = False,
     cancel_at: int | None = None,
+    user_id=None,
 ) -> dict:
     return {
         "id": subscription_id,
         "object": "subscription",
         "customer": "cus_1",
+        "metadata": {"user_id": str(user_id), "plan": "trader"} if user_id else {},
         "status": status,
         "cancel_at_period_end": cancel_at_period_end,
         "cancel_at": cancel_at,
@@ -112,11 +114,17 @@ def _account(app, user_id):
 
 
 def _subscribe(client, user_id, subscription_id: str = "sub_1") -> None:
+    """Checkout completes, then Stripe reports the new subscription as trialing."""
     payload = _event(
         "checkout.session.completed",
         _checkout_session(user_id, subscription_id=subscription_id),
     )
     assert _post_event(client, payload).status_code == 200
+    created = _event(
+        "customer.subscription.created",
+        _subscription(subscription_id, status="trialing", user_id=user_id),
+    )
+    assert _post_event(client, created).status_code == 200
 
 
 # --- Webhook signature -----------------------------------------------------
@@ -174,16 +182,61 @@ def test_completed_checkout_starts_the_trader_trial(client, app):
     assert account.stripe_subscription_id == "sub_1"
 
 
-def test_completed_checkout_paid_upfront_is_active(client):
+def test_completed_checkout_alone_grants_trader(client):
     token, user_id = _register(client)
-    payload = _event(
-        "checkout.session.completed",
-        _checkout_session(user_id, payment_status="paid"),
-    )
+    payload = _event("checkout.session.completed", _checkout_session(user_id))
 
     _post_event(client, payload)
 
-    assert _me(client, token)["subscriptionStatus"] == "active"
+    me = _me(client, token)
+    assert me["plan"] == "trader"
+    assert me["subscriptionStatus"] == "active"
+
+
+def test_subscription_created_before_checkout_completed_keeps_trialing(client, app):
+    token, user_id = _register(client)
+    _post_event(
+        client,
+        _event(
+            "customer.subscription.created",
+            _subscription(status="trialing", user_id=user_id),
+        ),
+    )
+
+    _post_event(
+        client, _event("checkout.session.completed", _checkout_session(user_id))
+    )
+
+    me = _me(client, token)
+    assert me["plan"] == "trader"
+    assert me["subscriptionStatus"] == "trialing"
+    assert _account(app, user_id).stripe_customer_id == "cus_1"
+
+
+def test_subscription_created_without_verasig_metadata_is_ignored(client):
+    token, _user_id = _register(client)
+
+    _post_event(
+        client,
+        _event("customer.subscription.created", _subscription(status="trialing")),
+    )
+
+    assert _me(client, token)["plan"] == "free"
+
+
+def test_subscription_created_while_another_is_paying_is_ignored(client, app):
+    _token, user_id = _register(client)
+    _subscribe(client, user_id)
+
+    _post_event(
+        client,
+        _event(
+            "customer.subscription.created",
+            _subscription("sub_2", status="trialing", user_id=user_id),
+        ),
+    )
+
+    assert _account(app, user_id).stripe_subscription_id == "sub_1"
 
 
 def test_redelivered_checkout_keeps_the_newer_subscription_status(client):

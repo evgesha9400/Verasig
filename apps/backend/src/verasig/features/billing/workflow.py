@@ -22,8 +22,10 @@ logger = logging.getLogger(__name__)
 
 TRIAL_DAYS = 7
 _FOR_SALE = frozenset({Plan.TRADER})
-# A completed subscription Checkout either charged now or started the trial.
-_CHECKOUT_STATUS_BY_PAYMENT = {"paid": "active", "no_payment_required": "trialing"}
+# Provisional status from a completed Checkout. Stripe reports a trial Checkout
+# as "paid" too (its first invoice is zero), so the exact status (trialing) comes
+# from customer.subscription.created, which may arrive before or after.
+_CHECKOUT_STATUS_BY_PAYMENT = {"paid": "active", "no_payment_required": "active"}
 # Stripe never moves a canceled subscription to another status.
 _ENDED_STATUS = "canceled"
 
@@ -129,7 +131,9 @@ def _checkout_completed(session: Session, _settings: Settings, checkout: dict) -
         status=(
             account.subscription_status
             if redelivered
-            else _CHECKOUT_STATUS_BY_PAYMENT.get(checkout.get("payment_status"))
+            else _CHECKOUT_STATUS_BY_PAYMENT.get(
+                checkout.get("payment_status"), "incomplete"
+            )
         ),
         customer_id=checkout.get("customer"),
         subscription_id=subscription_id,
@@ -137,19 +141,37 @@ def _checkout_completed(session: Session, _settings: Settings, checkout: dict) -
     )
 
 
-def _subscription_updated(
+def _subscription_created(
     session: Session, settings: Settings, subscription: dict
 ) -> None:
     account = _current_subscriber(session, subscription["id"])
     if account is None:
-        return
+        # Not linked yet: Checkout put the user id in the subscription metadata.
+        account = _metadata_subscriber(session, subscription)
+    if account is not None:
+        _apply_subscription(session, settings, account, subscription)
+
+
+def _subscription_updated(
+    session: Session, settings: Settings, subscription: dict
+) -> None:
+    account = _current_subscriber(session, subscription["id"])
+    if account is not None:
+        _apply_subscription(session, settings, account, subscription)
+
+
+def _apply_subscription(
+    session: Session, settings: Settings, account: UserAccount, subscription: dict
+) -> None:
     repository.save_subscription(
         session,
         account.id,
-        plan=_plan_for_price(settings, subscription) or account.plan,
+        plan=_plan_for_price(settings, subscription)
+        or _plan_from_metadata(subscription.get("metadata") or {})
+        or account.plan,
         status=subscription["status"],
-        customer_id=account.stripe_customer_id,
-        subscription_id=account.stripe_subscription_id,
+        customer_id=subscription.get("customer") or account.stripe_customer_id,
+        subscription_id=subscription["id"],
         cancel_at=_cancel_at(subscription),
     )
 
@@ -198,6 +220,7 @@ def _invoice_handler(status: str) -> Callable[[Session, Settings, dict], None]:
 
 _HANDLERS: dict[str, Callable[[Session, Settings, dict], None]] = {
     "checkout.session.completed": _checkout_completed,
+    "customer.subscription.created": _subscription_created,
     "customer.subscription.updated": _subscription_updated,
     "customer.subscription.deleted": _subscription_deleted,
     "invoice.paid": _invoice_handler("active"),
@@ -216,6 +239,17 @@ def _current_subscriber(
         return None
     account = repository.lock_by_subscription_id(session, subscription_id)
     if account is None or account.subscription_status == _ENDED_STATUS:
+        return None
+    return account
+
+
+def _metadata_subscriber(session: Session, subscription: dict) -> UserAccount | None:
+    metadata = subscription.get("metadata") or {}
+    user_id = _parse_uuid(metadata.get("user_id"))
+    if _plan_from_metadata(metadata) is None or user_id is None:
+        return None
+    account = repository.lock_by_id(session, user_id)
+    if account is None or not _accepts_checkout(account, subscription["id"]):
         return None
     return account
 
