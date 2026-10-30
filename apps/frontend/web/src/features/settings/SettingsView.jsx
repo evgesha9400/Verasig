@@ -1,19 +1,41 @@
 import { useState } from 'react'
-import { Card, Input, Button, Badge, Banner, Dialog } from '@verasig/design-system'
+import { Card, Input, Button, Badge, Banner } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import {
   cancelEmailChange as cancelEmailChangeRequest,
-  cancelSubscription,
   changeEmail,
-  changeSubscription,
   requestPasswordReset,
-  resumeSubscription as resumeSubscriptionRequest,
   updateProfile
 } from '../../shared/api/userApi.js'
+import { createCheckout, openBillingPortal } from '../../shared/api/billingApi.js'
 import { normalizeAccountName, validateAccountName } from '../../shared/accountName.js'
+import { redirectTo } from '../../shared/navigation.js'
+import { PLANS } from '../../domain/plan/planCatalog.js'
 
 function errorMessage(error) {
   return error?.message || 'Account update failed. Try again.'
+}
+
+// Header badge per Stripe subscription status. No status means never subscribed.
+const STATUS_BADGE = {
+  trialing: { tone: 'info', label: 'Trial' },
+  active: { tone: 'verified', label: 'Active' },
+  past_due: { tone: 'rejected', label: 'Past due' },
+  unpaid: { tone: 'rejected', label: 'Unpaid' },
+  incomplete: { tone: 'pending', label: 'Incomplete' },
+  paused: { tone: 'pending', label: 'Paused' },
+  canceled: { tone: 'neutral', label: 'Ended' }
+}
+
+const PAYMENT_FAILED_STATUSES = new Set(['past_due', 'unpaid'])
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC'
+  })
 }
 
 export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
@@ -122,81 +144,69 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
   }
 
   /* ---- subscription ---- */
-  const PLANS = [
-    {
-      id: 'observer',
-      name: 'Observer',
-      price: 0,
-      blurb: 'Watch before you trust.',
-      feats: ['1 source', '200 most recent signals', 'Manual review only']
-    },
-    {
-      id: 'operator',
-      name: 'Operator',
-      price: 49,
-      blurb: 'Verify and route, live.',
-      feats: ['10 sources', 'Unlimited signals', '1 exchange']
-    },
-    {
-      id: 'desk',
-      name: 'Desk',
-      price: 190,
-      blurb: 'For teams running size.',
-      feats: ['Unlimited sources', 'Multi-exchange routing', 'API access']
+  // `user.plan` is the effective plan from the backend: free unless Stripe says
+  // the subscription is trialing or active.
+  const current = PLANS.find((p) => p.id === user.plan) || PLANS[0]
+  const freePlan = PLANS[0]
+  const hasBilling = Boolean(user.subscriptionStatus)
+  const paymentFailed = PAYMENT_FAILED_STATUSES.has(user.subscriptionStatus)
+  const statusBadge = user.cancelAt
+    ? { tone: 'pending', label: 'Cancelling' }
+    : STATUS_BADGE[user.subscriptionStatus]
+  const [billingBusy, setBillingBusy] = useState(null) // null | 'month' | 'year' | 'portal'
+
+  async function goToStripe(action, requestUrl) {
+    setBillingBusy(action)
+    try {
+      const { url } = await requestUrl()
+      redirectTo(url)
+    } catch (caughtError) {
+      setBillingBusy(null)
+      onToast('rejected', 'Billing unavailable', errorMessage(caughtError))
     }
-  ]
-  const current = PLANS.find((p) => p.id === user.plan) || PLANS[1]
-  const [planTarget, setPlanTarget] = useState(null)
-  const [cancelOpen, setCancelOpen] = useState(false)
-  function choosePlan(p) {
-    if (p.id === user.plan) return
-    if (p.price === 0) {
-      setCancelOpen(true)
-      return
-    }
-    setPlanTarget(p)
   }
-  function confirmPlan() {
-    const p = planTarget
-    setPlanTarget(null)
-    void applyBackendUser(
-      'subscription',
-      () => changeSubscription(authToken, p.id),
-      () =>
-        onToast(
-          'verified',
-          'Plan changed',
-          `You're on ${p.name} now. The difference is prorated on your next invoice.`
-        )
-    )
+  function startCheckout(plan, interval) {
+    void goToStripe(interval, () => createCheckout(authToken, plan.id, interval))
   }
-  function confirmCancel() {
-    setCancelOpen(false)
-    void applyBackendUser(
-      'subscription',
-      () => cancelSubscription(authToken),
-      () =>
-        onToast(
-          'pending',
-          'Subscription cancelled',
-          `${current.name} stays active until the end of the billing period.`
-        )
-    )
-  }
-  function resumeSubscription() {
-    void applyBackendUser(
-      'subscription',
-      () => resumeSubscriptionRequest(authToken),
-      () =>
-        onToast(
-          'verified',
-          'Subscription resumed',
-          `${current.name} will renew as usual.`
-        )
-    )
+  function manageBilling() {
+    void goToStripe('portal', () => openBillingPortal(authToken))
   }
 
-  const planUpDown = (p) => (p.price > current.price ? 'Upgrade' : 'Downgrade')
+  function planMeta() {
+    if (user.cancelAt) return `Ends ${formatDate(user.cancelAt)} · no further charges`
+    if (user.subscriptionStatus === 'trialing') return 'Free trial · billed by Stripe'
+    if (current.monthlyPrice > 0) return 'Billed by Stripe'
+    return 'Free forever'
+  }
+
+  function planAction(plan) {
+    if (!plan.available) return <Badge tone="neutral">Coming soon</Badge>
+    if (plan.monthlyPrice === 0 || current.monthlyPrice > 0) return null
+    return (
+      <div className="vrs-plan__actions">
+        <Button
+          variant="primary"
+          size="sm"
+          loading={billingBusy === 'month'}
+          disabled={billingBusy !== null}
+          onClick={() => startCheckout(plan, 'month')}
+        >
+          {plan.trial ? 'Start 7-day trial' : `Upgrade to ${plan.name}`}
+        </Button>
+        {plan.yearlyMonthlyPrice != null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={billingBusy === 'year'}
+            disabled={billingBusy !== null}
+            onClick={() => startCheckout(plan, 'year')}
+          >
+            Pay yearly · ${plan.yearlyMonthlyPrice}/mo
+          </Button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="vrs-page vrs-set">
@@ -344,149 +354,83 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         title="Subscription"
         subtitle="Plan, billing and renewal"
         headerActions={
-          user.cancelAt ? (
-            <Badge tone="pending" dot>
-              Cancelling
+          statusBadge ? (
+            <Badge tone={statusBadge.tone} dot>
+              {statusBadge.label}
             </Badge>
-          ) : (
-            <Badge tone="verified" dot>
-              Active
-            </Badge>
-          )
+          ) : undefined
         }
         footer={
-          !user.cancelAt && user.plan !== 'observer' ? (
+          hasBilling ? (
             <>
               <span className="vrs-help">
-                Cancelling keeps {current.name} active until the end of the billing
-                period.
+                Cancel, resume, change your card and download invoices on Stripe.
               </span>
-              <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
-                Cancel subscription
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={billingBusy === 'portal'}
+                disabled={billingBusy !== null}
+                onClick={manageBilling}
+              >
+                Manage billing
               </Button>
             </>
           ) : undefined
         }
       >
         <div className="vrs-form">
-          <div className="vrs-row-between">
-            <div>
-              <div className="vrs-set-plan__name">{current.name}</div>
-              <div className="vrs-set-plan__meta vrs-mono">
-                {user.cancelAt
-                  ? `Ends ${user.cancelAt} · no further charges`
-                  : current.price === 0
-                    ? 'Free forever'
-                    : 'Renews Jul 8, 2026 · billed monthly'}
-              </div>
-            </div>
-            <div className="vrs-set-plan__price vrs-mono">
-              ${current.price}
-              <span>/mo</span>
-            </div>
+          <div>
+            <div className="vrs-set-plan__name">{current.name}</div>
+            <div className="vrs-set-plan__meta vrs-mono">{planMeta()}</div>
           </div>
 
           {user.cancelAt && (
             <Banner
               tone="pending"
-              title={`Subscription ends ${user.cancelAt}`}
-              actions={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  loading={busy === 'subscription'}
-                  disabled={busy === 'subscription'}
-                  onClick={resumeSubscription}
-                >
-                  Resume subscription
-                </Button>
-              }
+              title={`Subscription ends ${formatDate(user.cancelAt)}`}
             >
-              You keep full {current.name} access until then. After that your account
-              drops to Observer — sources stay saved, routing stops.
+              You keep {current.name} until then. After that your account moves to{' '}
+              {freePlan.name}: sources stay saved, routing stops. You can resume in
+              billing before then.
+            </Banner>
+          )}
+
+          {paymentFailed && (
+            <Banner tone="rejected" title="Payment failed">
+              Paid limits are paused until the payment goes through. Update your card in
+              billing.
             </Banner>
           )}
 
           <div className="vrs-plan-grid">
             {PLANS.map((p) => {
-              const isCurrent = p.id === user.plan
+              const isCurrent = p.id === current.id
               return (
                 <div key={p.id} className={`vrs-plan ${isCurrent ? 'is-current' : ''}`}>
                   <div className="vrs-plan__head">
-                    <span className="vrs-plan__name">{p.name}</span>
+                    <h3 className="vrs-plan__name">{p.name}</h3>
                     {isCurrent && <Badge tone="verified">Current</Badge>}
                   </div>
                   <div className="vrs-plan__price vrs-mono">
-                    ${p.price}
+                    ${p.monthlyPrice}
                     <span>/mo</span>
                   </div>
-                  <div className="vrs-plan__blurb">{p.blurb}</div>
+                  <div className="vrs-plan__blurb">{p.tagline}</div>
                   <div className="vrs-plan__feats">
-                    {p.feats.map((f) => (
+                    {p.includes.map((f) => (
                       <span key={f} className="vrs-plan__feat">
                         <Icon name="check" size={13} /> {f}
                       </span>
                     ))}
                   </div>
-                  {!isCurrent && (
-                    <Button
-                      variant={p.price > current.price ? 'primary' : 'ghost'}
-                      size="sm"
-                      onClick={() => choosePlan(p)}
-                    >
-                      {p.price === 0 ? 'Downgrade' : `${planUpDown(p)} to ${p.name}`}
-                    </Button>
-                  )}
+                  {!isCurrent && planAction(p)}
                 </div>
               )
             })}
           </div>
         </div>
       </Card>
-
-      {/* ---- dialogs ---- */}
-      <Dialog
-        open={!!planTarget}
-        onClose={() => setPlanTarget(null)}
-        title={planTarget ? `${planUpDown(planTarget)} to ${planTarget.name}?` : ''}
-        description={planTarget ? `$${planTarget.price}/mo, prorated from today.` : ''}
-        icon={<Icon name="arrowUp" size={19} />}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setPlanTarget(null)}>
-              Keep {current.name}
-            </Button>
-            <Button variant="primary" size="sm" onClick={confirmPlan}>
-              {planTarget ? `Switch to ${planTarget.name}` : ''}
-            </Button>
-          </>
-        }
-      >
-        The change applies immediately. Your next invoice on Jul 8, 2026 includes the
-        prorated difference. Sources, labels and exchange connections are untouched.
-      </Dialog>
-
-      <Dialog
-        open={cancelOpen}
-        onClose={() => setCancelOpen(false)}
-        title="Cancel subscription?"
-        description={`${current.name} stays active until Jul 8, 2026.`}
-        icon={<Icon name="alert" size={19} />}
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setCancelOpen(false)}>
-              Keep {current.name}
-            </Button>
-            <Button variant="danger" size="sm" onClick={confirmCancel}>
-              Cancel subscription
-            </Button>
-          </>
-        }
-      >
-        After Jul 8 your account drops to Observer: 1 source, 200 most recent signals,
-        no exchange routing. Your sources, labels and backtest history are kept. You can
-        resume any time before then.
-      </Dialog>
     </div>
   )
 }

@@ -20,8 +20,8 @@ describe('Pipeline stepper', () => {
     expect(steps[3].classList.contains('is-active')).toBe(true) // verify
   })
 
-  it('locks steps beyond the plan for an observer', () => {
-    const { container } = render(<Pipeline current="verify" plan="observer" />)
+  it('locks steps beyond the plan for a free user', () => {
+    const { container } = render(<Pipeline current="verify" plan="free" />)
     const steps = container.querySelectorAll('.vrs-pipe__step')
     expect(steps[3].classList.contains('is-locked')).toBe(false) // verify (reachable)
     expect(steps[4].classList.contains('is-locked')).toBe(true) // exchange
