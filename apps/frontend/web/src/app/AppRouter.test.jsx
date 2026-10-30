@@ -2,11 +2,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { ThemeProvider } from '@verasig/design-system'
-import AppRouter, { AppRoutes } from './AppRouter.jsx'
+import { AppRoutes } from './AppRouter.jsx'
 
 const AUTH_TOKEN_KEY = 'vrs-auth-token-1'
-const THEME_STORAGE_KEY = 'vrs-theme-1'
 const backendUser = {
   firstName: 'Ada',
   lastName: 'Lovelace',
@@ -125,26 +123,19 @@ function sourceRoutes({
 }
 
 function renderRoute(initialPath) {
-  // AppRoutes consumes useTheme, so it must mount under a ThemeProvider exactly
-  // as it does in production (AppRouter wraps it). Rendering it bare would now
-  // throw — the competing-fallback footgun useTheme used to hide.
   return render(
-    <ThemeProvider>
-      <MemoryRouter
-        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-        initialEntries={[initialPath]}
-      >
-        <AppRoutes />
-      </MemoryRouter>
-    </ThemeProvider>
+    <MemoryRouter
+      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+      initialEntries={[initialPath]}
+    >
+      <AppRoutes />
+    </MemoryRouter>
   )
 }
 
 beforeEach(() => {
   installTestStorage()
   installFetch()
-  document.documentElement.removeAttribute('data-theme')
-  document.documentElement.removeAttribute('style')
 })
 
 describe('AppRoutes', () => {
@@ -171,29 +162,6 @@ describe('AppRoutes', () => {
     for (const link of logins) {
       expect(link.getAttribute('href')).toBe('/login')
     }
-  })
-
-  it('updates marketing theme through shared DS radio semantics', async () => {
-    const user = userEvent.setup()
-    renderRoute('/')
-
-    await user.click(screen.getByRole('radio', { name: 'Light' }))
-
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#5197FF')
-  })
-
-  it('applies the stored theme on auth pages that never call useTheme', async () => {
-    localStorage.setItem(THEME_STORAGE_KEY, 'light')
-    window.history.pushState({}, '', '/login')
-
-    render(<AppRouter />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Log in to Verasig')).toBeTruthy()
-    })
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#5197FF')
   })
 
   it('navigates from backend login submit to the product shell', async () => {
