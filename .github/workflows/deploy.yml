@@ -1,0 +1,122 @@
+name: Deploy
+
+# Push to main -> build the site image (Dockerfile.site) -> publish it to GHCR by
+# digest -> ask the mac-server platform (evgesha9400/mac-server, service `verasig`)
+# to deploy that digest -> run the @smoke E2E specs against https://verasig.io.
+# serverctl verifies the deploy and restores the previous image if it fails.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/evgesha9400/verasig
+  SITE_URL: https://verasig.io
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.site
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=https://github.com/evgesha9400/Verasig
+      - run: echo "Pushed ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: build_and_push
+    # Kill switch. A skipped job leaves the run green: after onboarding, confirm
+    # this job ran, not only that the run passed.
+    if: vars.ENABLE_MAC_SERVER_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Join the deployment tailnet
+        uses: tailscale/github-action@306e68a486fd2350f2bfc3b19fcd143891a4a2d8 # v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:ci
+      - name: Configure ssh to the mac-server deploy receiver
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          KNOWN_HOSTS: ${{ vars.MAC_SERVER_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<CONFIG
+          Host mac-server-deploy
+            HostName ${DEPLOY_HOST}
+            User evgesha
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+          CONFIG
+          chmod 600 ~/.ssh/config
+      - name: Request deploy of this digest
+        env:
+          IMAGE_DIGEST: ${{ needs.build_and_push.outputs.digest }}
+        # The forced-command receiver takes this literal request; expanding it on
+        # the runner is intended.
+        run: |
+          # shellcheck disable=SC2029
+          ssh mac-server-deploy "deploy production ${IMAGE}@${IMAGE_DIGEST}"
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+        working-directory: apps/frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/frontend/web
+      # Read-only specs only (@smoke); the live site never registers users.
+      - run: npm run e2e -- --grep @smoke
+        working-directory: apps/frontend/web
+        env:
+          CI: "1"
+          E2E_BASE_URL: ${{ env.SITE_URL }}
+          E2E_API_URL: ${{ env.SITE_URL }}/api
+          E2E_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-playwright-report
+          path: apps/frontend/web/playwright-report
+          retention-days: 7
