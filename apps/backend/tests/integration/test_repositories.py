@@ -59,7 +59,7 @@ def _account(email: str = "user@example.com") -> UserAccount:
         password_hash="hash",
         first_name="Ada",
         last_name="Lovelace",
-        plan=Plan.OBSERVER,
+        plan=Plan.FREE,
         pending_email=None,
         cancel_at=None,
         created_at=_instant(),
@@ -148,14 +148,10 @@ def test_account_repository_round_trips_profile_plan_and_email(db_session):
     applied = account_repository.apply_pending_email(
         db_session, account.id, "next@example.com"
     )
-    planned = account_repository.set_plan(db_session, account.id, Plan.DESK)
-    cancelled = account_repository.set_cancel_at(db_session, account.id, _instant())
 
     assert renamed.first_name == "Grace"
     assert pending.pending_email == "next@example.com"
     assert applied.email == "next@example.com"
-    assert planned.plan is Plan.DESK
-    assert cancelled.cancel_at == _instant()
 
 
 def test_apply_pending_email_refuses_a_replaced_pending_email(db_session):

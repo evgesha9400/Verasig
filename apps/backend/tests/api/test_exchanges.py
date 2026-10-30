@@ -4,7 +4,7 @@ from conftest import _auth
 from conftest import _register_user as _register
 
 from verasig.domain.account import Plan
-from verasig.features.accounts import repository as account_repository
+from verasig.features.billing import repository as billing_repository
 from verasig.features.exchanges import repository as exchange_repository
 
 
@@ -23,9 +23,17 @@ class FakeVerifier:
             raise KeyVerificationError
 
 
-def _set_plan(app, user_id: UUID, plan: Plan) -> None:
+def _subscribe(app, user_id: UUID, plan: Plan) -> None:
     with app.state.session_factory() as session:
-        account_repository.set_plan(session, user_id, plan)
+        billing_repository.save_subscription(
+            session,
+            user_id,
+            plan=plan,
+            status="active",
+            customer_id="cus_test",
+            subscription_id="sub_test",
+            cancel_at=None,
+        )
         session.commit()
 
 
@@ -42,7 +50,7 @@ def test_exchanges_catalog_starts_disconnected(client):
     assert bybit["account"] is None
 
 
-def test_observer_cannot_connect_exchange(client):
+def test_free_cannot_connect_exchange(client):
     token, _user_id = _register(client)
 
     response = client.post(
@@ -55,11 +63,11 @@ def test_observer_cannot_connect_exchange(client):
     assert response.json()["error"]["code"] == "PLAN_LIMIT_EXCHANGES"
 
 
-def test_operator_connects_and_disconnects_bybit(client, app):
+def test_trader_connects_and_disconnects_bybit(client, app):
     verifier = FakeVerifier()
     app.state.exchange_verifier = verifier
     token, user_id = _register(client)
-    _set_plan(app, user_id, Plan.OPERATOR)
+    _subscribe(app, user_id, Plan.TRADER)
 
     connected = client.post(
         "/exchanges/bybit/connect",
@@ -91,7 +99,7 @@ def test_connect_rejects_bad_exchange_keys(client, app):
     verifier.reject = True
     app.state.exchange_verifier = verifier
     token, user_id = _register(client)
-    _set_plan(app, user_id, Plan.OPERATOR)
+    _subscribe(app, user_id, Plan.TRADER)
 
     response = client.post(
         "/exchanges/bybit/connect",
@@ -111,7 +119,7 @@ def test_connect_rejects_keys_with_withdraw_permission(client, app):
 
     app.state.exchange_verifier = withdraw_enabled
     token, user_id = _register(client)
-    _set_plan(app, user_id, Plan.OPERATOR)
+    _subscribe(app, user_id, Plan.TRADER)
 
     response = client.post(
         "/exchanges/bybit/connect",

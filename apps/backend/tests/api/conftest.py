@@ -14,6 +14,12 @@ from verasig.features.accounts.tokens import read_user_id
 # freshly minted token (register_user) must use the same value.
 JWT_SECRET = "s" * 32
 
+# Stripe test settings: fake ids only, no request ever reaches Stripe.
+STRIPE_WEBHOOK_SECRET = "whsec_test_secret"
+STRIPE_PRICE_TRADER_MONTHLY = "price_trader_monthly"
+STRIPE_PRICE_TRADER_YEARLY = "price_trader_yearly"
+SITE_URL = "https://verasig.test"
+
 
 @pytest.fixture
 def app(session_factory, pg_url):
@@ -22,6 +28,11 @@ def app(session_factory, pg_url):
         database_url_override=pg_url,
         jwt_secret=JWT_SECRET,
         secret_keys=f"test:{base64.b64encode(os.urandom(32)).decode()}",
+        stripe_secret_key="sk_test_fake",
+        stripe_webhook_secret=STRIPE_WEBHOOK_SECRET,
+        stripe_price_trader_monthly=STRIPE_PRICE_TRADER_MONTHLY,
+        stripe_price_trader_yearly=STRIPE_PRICE_TRADER_YEARLY,
+        site_url=SITE_URL,
     )
     return create_app(settings, session_factory=session_factory)
 

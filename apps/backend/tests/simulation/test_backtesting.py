@@ -59,7 +59,7 @@ def _account() -> UserAccount:
         password_hash="hash",
         first_name="Ada",
         last_name="Lovelace",
-        plan=Plan.OPERATOR,
+        plan=Plan.TRADER,
         pending_email=None,
         cancel_at=None,
         created_at=_BASE,

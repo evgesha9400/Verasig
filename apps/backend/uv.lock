@@ -1296,6 +1296,19 @@ wheels = [
 ]
 
 [[package]]
+name = "stripe"
+version = "16.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/2d/f105dfd56ada798dc698a13a992d9153802cbdabf7a6bab8084c0c187e3f/stripe-16.1.0.tar.gz", hash = "sha256:21e72b6779b8cff337ca8d2b8d30138f2d68f6a8d739701076f06a418ad75b8c", size = 1624677, upload-time = "2026-10-29T19:53:41.12Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/50/4ecff21d2ff5f867aa05c48b5f4338c80bae51d9dcbd943b373cb52ca71c/stripe-16.1.0-py3-none-any.whl", hash = "sha256:3798e07a0603c8923710414cd1942ae847ed43cebbf34c3258417c189711ea70", size = 2645741, upload-time = "2026-10-29T19:53:39.094Z" },
+]
+
+[[package]]
 name = "telethon"
 version = "1.43.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1447,6 +1460,7 @@ dependencies = [
     { name = "regex" },
     { name = "sqlalchemy" },
     { name = "sse-starlette" },
+    { name = "stripe" },
     { name = "telethon" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1476,6 +1490,7 @@ requires-dist = [
     { name = "regex", specifier = ">=2026.6.28" },
     { name = "sqlalchemy", specifier = ">=2.0.50" },
     { name = "sse-starlette", specifier = ">=3.4.4" },
+    { name = "stripe", specifier = ">=16.1.0" },
     { name = "telethon", specifier = ">=1.43.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
 ]

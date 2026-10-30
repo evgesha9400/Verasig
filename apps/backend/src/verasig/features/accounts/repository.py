@@ -1,4 +1,3 @@
-from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -8,7 +7,7 @@ from verasig.domain.account import Plan, UserAccount
 from verasig.storage.models import UserAccountRow
 
 
-def _to_account(row: UserAccountRow) -> UserAccount:
+def to_account(row: UserAccountRow) -> UserAccount:
     return UserAccount(
         id=row.id,
         email=row.email,
@@ -19,6 +18,9 @@ def _to_account(row: UserAccountRow) -> UserAccount:
         pending_email=row.pending_email,
         cancel_at=row.cancel_at,
         created_at=row.created_at,
+        stripe_customer_id=row.stripe_customer_id,
+        stripe_subscription_id=row.stripe_subscription_id,
+        subscription_status=row.subscription_status,
     )
 
 
@@ -36,19 +38,19 @@ def insert_account(session: Session, account: UserAccount) -> UserAccount:
     )
     session.add(row)
     session.flush()
-    return _to_account(row)
+    return to_account(row)
 
 
 def find_by_email(session: Session, email: str) -> UserAccount | None:
     row = session.scalars(
         select(UserAccountRow).where(UserAccountRow.email == email)
     ).one_or_none()
-    return _to_account(row) if row else None
+    return to_account(row) if row else None
 
 
 def find_by_id(session: Session, user_id: UUID) -> UserAccount | None:
     row = session.get(UserAccountRow, user_id)
-    return _to_account(row) if row else None
+    return to_account(row) if row else None
 
 
 def update_profile(
@@ -65,7 +67,7 @@ def update_profile(
     if last_name is not None:
         row.last_name = last_name
     session.flush()
-    return _to_account(row)
+    return to_account(row)
 
 
 def set_pending_email(
@@ -76,7 +78,7 @@ def set_pending_email(
         return None
     row.pending_email = pending_email
     session.flush()
-    return _to_account(row)
+    return to_account(row)
 
 
 def apply_pending_email(
@@ -95,24 +97,4 @@ def apply_pending_email(
     row.email = row.pending_email
     row.pending_email = None
     session.flush()
-    return _to_account(row)
-
-
-def set_plan(session: Session, user_id: UUID, plan: Plan) -> UserAccount | None:
-    row = session.get(UserAccountRow, user_id)
-    if row is None:
-        return None
-    row.plan = plan.value
-    session.flush()
-    return _to_account(row)
-
-
-def set_cancel_at(
-    session: Session, user_id: UUID, cancel_at: datetime | None
-) -> UserAccount | None:
-    row = session.get(UserAccountRow, user_id)
-    if row is None:
-        return None
-    row.cancel_at = cancel_at
-    session.flush()
-    return _to_account(row)
+    return to_account(row)

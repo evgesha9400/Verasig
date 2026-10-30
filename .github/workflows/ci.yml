@@ -32,6 +32,11 @@ jobs:
   e2e:
     needs: check
     runs-on: ubuntu-latest
+    env:
+      # Throwaway value shared by the site container and the checkout spec, which
+      # signs a simulated Stripe webhook with it. Not a real Stripe secret.
+      VERASIG_STRIPE_WEBHOOK_SECRET: whsec_ci_e2e_only
+      E2E_STRIPE_WEBHOOK_SECRET: whsec_ci_e2e_only
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

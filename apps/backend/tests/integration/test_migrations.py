@@ -1,6 +1,11 @@
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import make_url
 
 
 def test_migrations_apply(pg_url):
@@ -282,3 +287,109 @@ def test_retired_lab_tables_absent_after_upgrade(pg_url):
     command.upgrade(cfg, "head")
     tables = set(inspect(create_engine(pg_url, future=True)).get_table_names())
     assert tables.isdisjoint(_RETIRED_LAB_TABLES)
+
+
+@pytest.fixture
+def fresh_db_url(pg_url):
+    """An empty database in the shared container, for stepping through revisions."""
+    name = f"migrate_{uuid4().hex[:12]}"
+    admin = create_engine(pg_url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.execute(text(f"CREATE DATABASE {name}"))
+    yield make_url(pg_url).set(database=name).render_as_string(hide_password=False)
+    with admin.connect() as connection:
+        connection.execute(text(f"DROP DATABASE {name} WITH (FORCE)"))
+    admin.dispose()
+
+
+def _insert_account(connection, email: str, plan: str) -> None:
+    connection.execute(
+        text(
+            """
+            INSERT INTO user_account
+                (id, email, password_hash, first_name, last_name, plan, created_at)
+            VALUES (:id, :email, 'hash', 'Ada', 'Lovelace', :plan, :now)
+            """
+        ),
+        {"id": uuid4(), "email": email, "plan": plan, "now": datetime.now(tz=UTC)},
+    )
+
+
+def test_billing_migration_remaps_old_plans_and_adds_billing_columns(fresh_db_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", fresh_db_url.replace("%", "%%"))
+    command.upgrade(cfg, "0001_init")
+    engine = create_engine(fresh_db_url, future=True)
+    with engine.begin() as connection:
+        _insert_account(connection, "observer@example.com", "observer")
+        _insert_account(connection, "operator@example.com", "operator")
+        _insert_account(connection, "desk@example.com", "desk")
+
+    command.upgrade(cfg, "head")
+
+    with engine.connect() as connection:
+        plans = dict(
+            connection.execute(text("SELECT email, plan FROM user_account")).all()
+        )
+    columns = {column["name"] for column in inspect(engine).get_columns("user_account")}
+    engine.dispose()
+    assert plans == {
+        "observer@example.com": "free",
+        "operator@example.com": "trader",
+        "desk@example.com": "desk",
+    }
+    assert {
+        "stripe_customer_id",
+        "stripe_subscription_id",
+        "subscription_status",
+        "cancel_at",
+    } <= columns
+
+
+def test_billing_migration_rejects_old_plan_names_and_defaults_to_free(fresh_db_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", fresh_db_url.replace("%", "%%"))
+    command.upgrade(cfg, "head")
+    engine = create_engine(fresh_db_url, future=True)
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO user_account
+                    (id, email, password_hash, first_name, last_name, created_at)
+                VALUES (:id, 'default@example.com', 'hash', 'Ada', 'Lovelace', now())
+                """
+            ),
+            {"id": uuid4()},
+        )
+        default_plan = connection.execute(
+            text("SELECT plan FROM user_account WHERE email = 'default@example.com'")
+        ).scalar_one()
+    with pytest.raises(Exception, match="ck_user_account_plan"):
+        with engine.begin() as connection:
+            _insert_account(connection, "old@example.com", "observer")
+    engine.dispose()
+    assert default_plan == "free"
+
+
+def test_billing_migration_downgrades_back_to_the_old_plan_names(fresh_db_url):
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", fresh_db_url.replace("%", "%%"))
+    command.upgrade(cfg, "head")
+    engine = create_engine(fresh_db_url, future=True)
+    with engine.begin() as connection:
+        _insert_account(connection, "free@example.com", "free")
+        _insert_account(connection, "trader@example.com", "trader")
+
+    command.downgrade(cfg, "0001_init")
+
+    with engine.connect() as connection:
+        plans = dict(
+            connection.execute(text("SELECT email, plan FROM user_account")).all()
+        )
+    engine.dispose()
+    assert plans == {
+        "free@example.com": "observer",
+        "trader@example.com": "operator",
+    }
