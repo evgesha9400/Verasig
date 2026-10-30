@@ -131,7 +131,8 @@ Local webhook: `stripe listen --latest --forward-to localhost:8000/billing/webho
 then put the `whsec_...` it prints into `VERASIG_STRIPE_WEBHOOK_SECRET`. `--latest`
 matters: the webhook only reads events of the Stripe API release the `stripe` SDK is
 pinned to (`endive`) and answers `400 BILLING_WEBHOOK_API_VERSION` to others; an
-account's default version can be older (the sandbox default was `2022-08-01`). A
+older Stripe account's default version can be years behind (one test account sent
+`2022-08-01`). A
 dashboard webhook endpoint must likewise use an `endive` API version and send:
 `checkout.session.completed`, `customer.subscription.created`,
 `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`,
