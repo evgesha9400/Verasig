@@ -127,11 +127,15 @@ answer `503 BILLING_NOT_CONFIGURED` while a value below is blank.
 | `VERASIG_STRIPE_PRICE_TRADER_YEARLY` | Price id of Trader, $468 per year ($39 per month). |
 | `VERASIG_SITE_URL` | Public web origin that Checkout and the portal return to. Default `http://localhost:5173`; the site is `https://verasig.io`. |
 
-Local webhook: `stripe listen --forward-to localhost:8000/billing/webhook`, then put
-the `whsec_...` it prints into `VERASIG_STRIPE_WEBHOOK_SECRET`. The webhook endpoint
-needs these events: `checkout.session.completed`,
-`customer.subscription.created`, `customer.subscription.updated`,
-`customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`.
+Local webhook: `stripe listen --latest --forward-to localhost:8000/billing/webhook`,
+then put the `whsec_...` it prints into `VERASIG_STRIPE_WEBHOOK_SECRET`. `--latest`
+matters: the webhook only reads events of the Stripe API release the `stripe` SDK is
+pinned to (`endive`) and answers `400 BILLING_WEBHOOK_API_VERSION` to others; an
+account's default version can be older (the sandbox default was `2022-08-01`). A
+dashboard webhook endpoint must likewise use an `endive` API version and send:
+`checkout.session.completed`, `customer.subscription.created`,
+`customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`,
+`invoice.payment_failed`.
 
 ## Documents
 
