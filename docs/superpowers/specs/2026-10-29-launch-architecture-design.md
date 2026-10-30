@@ -235,6 +235,14 @@ Each project gets its own spec, plan, and build cycle.
 
 Projects 4 and 7 can run in parallel with project 3.
 
+Project 7 status, 2026-10-30: Stripe billing is built on branch
+`claude/stripe-billing-c797b4` (Checkout with a 7-day Trader trial, the customer
+portal, the webhook as the only writer of the plan, plans renamed to free, trader
+and desk). It was checked against a Stripe sandbox. Desk is shown as coming soon
+and cannot be bought (working assumption, see section 12). The landing pricing
+section is on `claude/landing-pricing-a60a8e`. Live keys and the live webhook are
+still open.
+
 ## 12. Unknowns to settle in the named project
 
 | Unknown | Project |
