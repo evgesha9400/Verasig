@@ -10,7 +10,8 @@ function parseEventData(event) {
 }
 
 function progressUrl(token, path) {
-  const url = new URL(createApiUrl(path))
+  // The base resolves a same-origin API URL such as /api (the deployed site).
+  const url = new URL(createApiUrl(path), window.location.origin)
   url.searchParams.set('token', token)
   return url.toString()
 }

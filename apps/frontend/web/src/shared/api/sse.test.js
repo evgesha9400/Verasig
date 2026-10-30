@@ -73,3 +73,20 @@ describe('streamJobProgress', () => {
     expect(source.closed).toBe(false)
   })
 })
+
+describe('streamJobProgress with a same-origin API base', () => {
+  it('resolves a relative /api base against the page origin', async () => {
+    vi.stubEnv('VITE_VERASIG_API_URL', '/api')
+    vi.resetModules()
+    const { streamJobProgress: stream } = await import('./sse.js')
+    globalThis.EventSource = FakeEventSource
+
+    stream('jwt-token', '/feeds/7/mine/progress')
+
+    expect(FakeEventSource.last.url).toBe(
+      `${window.location.origin}/api/feeds/7/mine/progress?token=jwt-token`
+    )
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+})

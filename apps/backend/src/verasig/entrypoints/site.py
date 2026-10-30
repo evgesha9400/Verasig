@@ -1,6 +1,6 @@
 """One process for the deployed site: the API under /api, the built web app at /."""
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from sqlalchemy.orm import sessionmaker
 from starlette.applications import Starlette
@@ -14,13 +14,17 @@ from verasig.entrypoints.api import create_app
 
 
 class SinglePageFiles(StaticFiles):
-    """Static files that answer unknown paths with index.html (client routes)."""
+    """Static files that answer unknown client routes with index.html.
+
+    A missing file path (one with an extension, such as an asset from an older
+    deploy) stays a 404, so the browser does not get HTML for a script.
+    """
 
     async def get_response(self, path: str, scope: Scope):
         try:
             return await super().get_response(path, scope)
         except HTTPException as error:
-            if error.status_code != 404:
+            if error.status_code != 404 or PurePosixPath(path).suffix:
                 raise
             return await super().get_response("index.html", scope)
 

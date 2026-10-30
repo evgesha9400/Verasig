@@ -1,11 +1,14 @@
+import asyncio
 import base64
 import os
 
 import pytest
+from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from verasig.config import Settings, SettingsError
 from verasig.entrypoints.site import create_site
+from verasig.foundation.http.sse import sse_stream
 
 INDEX_HTML = '<!doctype html><div id="root"></div>'
 
@@ -29,8 +32,12 @@ def _settings(pg_url, web_dist_dir):
 
 
 @pytest.fixture
-def site_client(session_factory, pg_url, web_dist):
-    site = create_site(_settings(pg_url, web_dist), session_factory=session_factory)
+def site(session_factory, pg_url, web_dist):
+    return create_site(_settings(pg_url, web_dist), session_factory=session_factory)
+
+
+@pytest.fixture
+def site_client(site):
     with TestClient(site) as client:
         yield client
 
@@ -67,3 +74,39 @@ def test_site_requires_web_dist_dir(pg_url):
 def test_site_requires_index_html(pg_url, tmp_path):
     with pytest.raises(SettingsError, match="index.html"):
         create_site(_settings(pg_url, tmp_path))
+
+
+def test_progress_stream_passes_through_api_mount(site, site_client):
+    api = site.routes[0].app
+    router = APIRouter()
+
+    @router.post("/dummy/start")
+    async def start():
+        async def run(publisher):
+            publisher.progress({"step": 1})
+            await asyncio.sleep(0)
+            return {"ok": True}
+
+        api.state.jobs.start("dummy", run)
+        return {"jobId": "dummy"}
+
+    @router.get("/dummy/progress")
+    def progress():
+        return sse_stream(api.state.jobs, "dummy")
+
+    api.include_router(router)
+    assert site_client.post("/api/dummy/start").status_code == 200
+
+    with site_client.stream("GET", "/api/dummy/progress?token=t") as response:
+        body = "".join(response.iter_text())
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert 'data: {"step": 1}' in body
+    assert "event: done" in body
+
+
+def test_missing_hashed_asset_is_404_not_index(site_client):
+    response = site_client.get("/assets/old-deploy-chunk.js")
+    assert response.status_code == 404
+    assert '<div id="root">' not in response.text
