@@ -75,7 +75,7 @@ def test_post_feed_requires_telegram_link(client):
     assert response.json()["error"]["code"] == "TELEGRAM_NOT_CONNECTED"
 
 
-def test_observer_second_feed_hits_source_limit(client, app):
+def test_free_second_feed_hits_source_limit(client, app):
     token = _register(client)
     _connect_telegram(client, app, token)
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(7), [])
@@ -91,9 +91,9 @@ def test_observer_second_feed_hits_source_limit(client, app):
     assert response.json()["error"]["code"] == "PLAN_LIMIT_SOURCES"
 
 
-def test_observer_can_re_add_existing_feed_without_hitting_limit(client, app):
+def test_free_can_re_add_existing_feed_without_hitting_limit(client, app):
     # re-adding a feed the user already owns (same channel) is not a new source;
-    # it must not be blocked by the observer single-source limit.
+    # it must not be blocked by the free single-source limit.
     token = _register(client)
     _connect_telegram(client, app, token)
     app.state.telegram_source_factory = lambda _link: FakeSource(_channel(7), [])

@@ -2158,10 +2158,16 @@ button.vrs-pipe__step:active {
   gap: 8px;
 }
 .vrs-plan__name {
+  margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--text-strong);
+}
+.vrs-plan__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .vrs-plan__price {
   font-size: var(--text-lg);

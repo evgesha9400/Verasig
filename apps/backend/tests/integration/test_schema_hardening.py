@@ -26,7 +26,7 @@ def _insert_account(session) -> None:
                 (id, email, password_hash, first_name, last_name, plan, created_at)
             VALUES
                 (:id, 'hardening@example.com', 'hash', 'Ada', 'Lovelace',
-                 'observer', :now)
+                 'free', :now)
             """
         ),
         {"id": _USER_ID, "now": _NOW},

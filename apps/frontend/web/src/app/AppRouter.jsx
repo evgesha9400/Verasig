@@ -1,9 +1,19 @@
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate
+} from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Banner, Button, Loader } from '@verasig/design-system'
 import { LoginView } from '../features/auth/LoginView.jsx'
 import { RegisterView } from '../features/auth/RegisterView.jsx'
 import { getCurrentUser, login, logout, register } from '../shared/api/authApi.js'
+import { createCheckout } from '../shared/api/billingApi.js'
+import { redirectTo } from '../shared/navigation.js'
+import { PLANS } from '../domain/plan/planCatalog.js'
 import { forgetAuthToken, readAuthToken, rememberAuthToken } from './session.js'
 import Marketing from '../features/marketing/MarketingView.jsx'
 import { ProductApp } from './ProductApp.jsx'
@@ -23,6 +33,15 @@ function createInitialSession() {
 // failure or server error keeps it so the session survives the outage.
 function isRejectedToken(error) {
   return error?.status === 401 || error?.status === 403
+}
+
+// `/signup?plan=<id>` names a plan to buy right after registering; only a plan
+// that is for sale counts.
+function planToBuy(search) {
+  const planId = new URLSearchParams(search).get('plan')
+  return PLANS.find(
+    (plan) => plan.id === planId && plan.available && plan.monthlyPrice > 0
+  )
 }
 
 function SessionBoot() {
@@ -63,6 +82,7 @@ function SessionUnavailable({ onRetry }) {
 export function AppRoutes() {
   const [session, setSession] = useState(createInitialSession)
   const navigate = useNavigate()
+  const location = useLocation()
   const authenticated = session.status === 'authenticated'
   const checkingSession = session.status === 'checking'
   const sessionUnavailable = session.status === 'unavailable'
@@ -106,6 +126,17 @@ export function AppRoutes() {
   async function registerAndOpenProduct(account) {
     const authSession = await register(account)
     rememberAuthToken(authSession.token)
+    const plan = planToBuy(location.search)
+    if (plan) {
+      // Both outcomes leave the page; the app boots from the stored token.
+      try {
+        const { url } = await createCheckout(authSession.token, plan.id, 'month')
+        redirectTo(url)
+      } catch {
+        redirectTo(`${ROUTES.app}?checkout=error`)
+      }
+      return
+    }
     setSession({
       status: 'authenticated',
       token: authSession.token,

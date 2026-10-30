@@ -63,7 +63,7 @@ def _account() -> UserAccount:
         password_hash="hash",
         first_name="Ada",
         last_name="Lovelace",
-        plan=Plan.OBSERVER,
+        plan=Plan.FREE,
         pending_email=None,
         cancel_at=None,
         created_at=_instant(),
@@ -144,7 +144,7 @@ def test_confirmed_signals_surface_through_the_signals_view(session_factory):
     confirm_review(session_factory, user_id, 1, review.review_id, keys)
 
     with session_factory() as session:
-        result = present_signals(session, user_id, plan=Plan.OPERATOR)
+        result = present_signals(session, user_id, plan=Plan.TRADER)
     symbols = sorted(signal["symbol"] for signal in result["signals"])
     assert symbols == ["BTCUSDT", "ETHUSDT"]
 

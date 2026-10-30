@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from verasig.domain.account import UserAccount
+from verasig.features.accounts.plans import effective_plan
 from verasig.foundation.http.schemas import CamelModel
 
 
@@ -9,6 +10,7 @@ class UserOut(CamelModel):
     last_name: str
     email: str
     plan: str
+    subscription_status: str | None
     pending_email: str | None
     cancel_at: datetime | None
 
@@ -18,7 +20,8 @@ def user_out(account: UserAccount) -> UserOut:
         first_name=account.first_name,
         last_name=account.last_name,
         email=account.email,
-        plan=account.plan.value,
+        plan=effective_plan(account).value,
+        subscription_status=account.subscription_status,
         pending_email=account.pending_email,
         cancel_at=account.cancel_at,
     )

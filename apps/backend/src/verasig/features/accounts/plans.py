@@ -18,16 +18,27 @@ class PlanLimits:
 
 
 PLAN_LIMITS = {
-    Plan.OBSERVER: PlanLimits(sources=1, signals=200, exchanges=0),
-    Plan.OPERATOR: PlanLimits(sources=10, signals=None, exchanges=1),
+    Plan.FREE: PlanLimits(sources=1, signals=200, exchanges=0),
+    Plan.TRADER: PlanLimits(sources=10, signals=None, exchanges=1),
     Plan.DESK: PlanLimits(sources=None, signals=None, exchanges=None),
 }
+
+# Stripe subscription statuses that keep the paid plan. Any other status (past
+# due, unpaid, canceled, incomplete, paused) or no subscription at all is free.
+PAYING_STATUSES = frozenset({"active", "trialing"})
+
+
+def effective_plan(user: UserAccount) -> Plan:
+    """The plan whose limits apply: the stored plan only while Stripe says paying."""
+    if user.subscription_status in PAYING_STATUSES:
+        return user.plan
+    return Plan.FREE
 
 
 def require_source_capacity(
     user: UserAccount, session: Session, channel_id: int | None = None
 ) -> None:
-    limit = PLAN_LIMITS[user.plan].sources
+    limit = PLAN_LIMITS[effective_plan(user)].sources
     if limit is None:
         return
     # re-adding a feed the user already owns is not a new source; it must not be

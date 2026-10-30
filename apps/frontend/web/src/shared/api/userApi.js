@@ -15,15 +15,3 @@ export function cancelEmailChange(token) {
 export function requestPasswordReset(token) {
   return post('/user/password/reset-request', token)
 }
-
-export function changeSubscription(token, plan) {
-  return post('/user/subscription/change', token, { plan })
-}
-
-export function cancelSubscription(token) {
-  return post('/user/subscription/cancel', token)
-}
-
-export function resumeSubscription(token) {
-  return post('/user/subscription/resume', token)
-}

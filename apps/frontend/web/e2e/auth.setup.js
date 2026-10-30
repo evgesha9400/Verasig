@@ -4,14 +4,11 @@ import path from 'node:path'
 import { expect, request, test as setup } from '@playwright/test'
 
 import { AUTH_STATE_PATH } from './auth-state-path.js'
+import { API_URL, APP_ORIGIN } from './urls.js'
 
 // The web app stores its session as a bare JWT under this localStorage key
 // (see apps/frontend/web/src/app/session.js) and sends it as a Bearer header.
 const TOKEN_KEY = 'vrs-auth-token-1'
-
-const API_URL =
-  process.env.E2E_API_URL || process.env.VITE_VERASIG_API_URL || 'http://localhost:8000'
-const APP_ORIGIN = process.env.E2E_BASE_URL || 'http://localhost:5173'
 
 // E2E_REGISTER=1 (CI) registers a throwaway user instead of logging in, so a
 // fresh database needs no seeded account. Never set it against the live site.

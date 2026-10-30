@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -10,9 +10,7 @@ from verasig.features.accounts.repository import (
     apply_pending_email,
     find_by_email,
     insert_account,
-    set_cancel_at,
     set_pending_email,
-    set_plan,
     update_profile,
 )
 
@@ -52,7 +50,7 @@ def register_account(
         password_hash=hash_password(password),
         first_name=normalized_first_name,
         last_name=normalized_last_name,
-        plan=Plan.OBSERVER,
+        plan=Plan.FREE,
         pending_email=None,
         cancel_at=None,
         created_at=datetime.now(tz=UTC),
@@ -116,15 +114,3 @@ def confirm_email_change(
 
 def cancel_email_change(session: Session, account: UserAccount) -> UserAccount:
     return set_pending_email(session, account.id, None)
-
-
-def change_plan(session: Session, account: UserAccount, plan: Plan) -> UserAccount:
-    return set_plan(session, account.id, plan)
-
-
-def cancel_subscription(session: Session, account: UserAccount) -> UserAccount:
-    return set_cancel_at(session, account.id, datetime.now(tz=UTC) + timedelta(days=30))
-
-
-def resume_subscription(session: Session, account: UserAccount) -> UserAccount:
-    return set_cancel_at(session, account.id, None)

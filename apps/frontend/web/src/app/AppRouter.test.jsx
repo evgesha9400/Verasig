@@ -3,13 +3,16 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppRoutes } from './AppRouter.jsx'
+import { redirectTo } from '../shared/navigation.js'
+
+vi.mock('../shared/navigation.js', () => ({ redirectTo: vi.fn() }))
 
 const AUTH_TOKEN_KEY = 'vrs-auth-token-1'
 const backendUser = {
   firstName: 'Ada',
   lastName: 'Lovelace',
   email: 'ada@example.com',
-  plan: 'observer',
+  plan: 'free',
   pendingEmail: null,
   cancelAt: null
 }
@@ -205,6 +208,78 @@ describe('AppRoutes', () => {
     })
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
     expect(screen.getByText('ada@example.com')).toBeTruthy()
+  })
+
+  function submitSignup() {
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: 'Ada Lovelace' }
+    })
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'ada@example.com' }
+    })
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'correct horse battery staple' }
+    })
+    fireEvent.submit(screen.getByText('Create account').closest('form'))
+  }
+
+  it('sends a Trader signup straight to Stripe Checkout', async () => {
+    redirectTo.mockReset()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      'POST /billing/checkout': () =>
+        jsonResponse({ url: 'https://checkout.stripe.com/c/pay/cs_1', id: 'cs_1' })
+    })
+
+    renderRoute('/signup?plan=trader')
+    submitSignup()
+
+    await waitFor(() =>
+      expect(redirectTo).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_1')
+    )
+    const checkoutCall = fetch.mock.calls.find(([url]) =>
+      url.endsWith('/billing/checkout')
+    )
+    expect(checkoutCall[1].headers.Authorization).toBe('Bearer register-token')
+    expect(JSON.parse(checkoutCall[1].body)).toEqual({
+      plan: 'trader',
+      interval: 'month'
+    })
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
+  })
+
+  it('opens the app with a notice when Checkout cannot start after signup', async () => {
+    redirectTo.mockReset()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      'POST /billing/checkout': () =>
+        jsonResponse({ error: { code: 'BILLING_NOT_CONFIGURED', message: 'Off' } }, 503)
+    })
+
+    renderRoute('/signup?plan=trader')
+    submitSignup()
+
+    await waitFor(() => expect(redirectTo).toHaveBeenCalledWith('/app?checkout=error'))
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
+  })
+
+  it('ignores a signup plan that cannot be bought', async () => {
+    redirectTo.mockReset()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      ...sourceRoutes()
+    })
+
+    renderRoute('/signup?plan=desk')
+    submitSignup()
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
+    })
+    expect(redirectTo).not.toHaveBeenCalled()
   })
 
   it('redirects unauthenticated app visits to login', async () => {

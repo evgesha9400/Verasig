@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from verasig.domain.account import UserAccount
-from verasig.features.accounts.plans import PLAN_LIMITS
+from verasig.features.accounts.plans import PLAN_LIMITS, effective_plan
 from verasig.features.exchanges import repository as exchange_repository
 from verasig.features.exchanges.catalog import EXCHANGE_CATALOG, catalog_item
 from verasig.foundation.security.secrets import SecretCipher
@@ -83,7 +83,7 @@ def _available_exchange(exchange_id: str) -> dict:
 def _require_exchange_capacity(
     session: Session, user: UserAccount, exchange_id: str
 ) -> None:
-    limit = PLAN_LIMITS[user.plan].exchanges
+    limit = PLAN_LIMITS[effective_plan(user)].exchanges
     if limit is None:
         return
     if _connected_exchange_count(session, user.id, exchange_id) < limit:

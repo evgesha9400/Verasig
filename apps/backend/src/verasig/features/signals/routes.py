@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
 
 from verasig.domain.account import UserAccount
+from verasig.features.accounts.plans import effective_plan
 from verasig.features.signals.schemas import LinkModIn
 from verasig.features.signals.views import (
     link_modifier,
@@ -22,7 +23,9 @@ def list_signals(
     user: UserAccount = Depends(get_current_user),
 ) -> dict:
     with request.app.state.session_factory() as session:
-        result = present_signals(session, user.id, feed_id, status, user.plan)
+        result = present_signals(
+            session, user.id, feed_id, status, effective_plan(user)
+        )
         session.commit()
         return result
 

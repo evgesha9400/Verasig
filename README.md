@@ -113,6 +113,31 @@ Compose uses `apps/backend/.env`, `apps/backend/Dockerfile`,
 - Keep environment variable names unchanged (`VERASIG_*`) in this phase.
 - Keep the tracked template at `apps/backend/.env.example`.
 
+### Stripe billing
+
+Stripe is the only source of a paid plan: hosted Checkout, the customer portal,
+and one webhook (`POST /billing/webhook`) that writes the plan. Billing requests
+answer `503 BILLING_NOT_CONFIGURED` while a value below is blank.
+
+| Variable | Meaning |
+|---|---|
+| `VERASIG_STRIPE_SECRET_KEY` | Stripe secret key (`sk_test_...` until launch). Site: `VERASIG_STRIPE_SECRET_KEY_FILE`. |
+| `VERASIG_STRIPE_WEBHOOK_SECRET` | Signing secret of the webhook endpoint (`whsec_...`). Site: `VERASIG_STRIPE_WEBHOOK_SECRET_FILE`. |
+| `VERASIG_STRIPE_PRICE_TRADER_MONTHLY` | Price id of Trader, $49 per month. |
+| `VERASIG_STRIPE_PRICE_TRADER_YEARLY` | Price id of Trader, $468 per year ($39 per month). |
+| `VERASIG_SITE_URL` | Public web origin that Checkout and the portal return to. Default `http://localhost:5173`; the site is `https://verasig.io`. |
+
+Local webhook: `stripe listen --latest --forward-to localhost:8000/billing/webhook`,
+then put the `whsec_...` it prints into `VERASIG_STRIPE_WEBHOOK_SECRET`. `--latest`
+matters: the webhook only reads events of the Stripe API release the `stripe` SDK is
+pinned to (`endive`) and answers `400 BILLING_WEBHOOK_API_VERSION` to others; an
+older Stripe account's default version can be years behind (one test account sent
+`2022-08-01`). A
+dashboard webhook endpoint must likewise use an `endive` API version and send:
+`checkout.session.completed`, `customer.subscription.created`,
+`customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`,
+`invoice.payment_failed`.
+
 ## Documents
 
 - [Graphify protocol](docs/GRAPHIFY.md)

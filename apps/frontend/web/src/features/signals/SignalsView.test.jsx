@@ -111,7 +111,7 @@ function renderView({
   onListSignals = vi.fn().mockResolvedValue(backendBody()),
   onLinkSignalModifier = vi.fn().mockResolvedValue({}),
   viewFeeds = feeds,
-  plan = 'operator',
+  plan = 'trader',
   onUpgrade = vi.fn(),
   initial
 } = {}) {
@@ -327,12 +327,12 @@ describe('SignalsView', () => {
         limit: 200
       })
     )
-    renderView({ onListSignals, plan: 'observer' })
+    renderView({ onListSignals, plan: 'free' })
 
     expect(
       await screen.findByText(/200 most recent of 644 detected signals/)
     ).toBeTruthy()
-    expect(screen.getByText(/Observer/)).toBeTruthy()
+    expect(screen.getByText(/Free check/)).toBeTruthy()
   })
 
   it('does not render the plan-limit notice when under the limit', async () => {
@@ -351,7 +351,7 @@ describe('SignalsView', () => {
         limit: 200
       })
     )
-    const { onUpgrade } = renderView({ onListSignals, plan: 'observer' })
+    const { onUpgrade } = renderView({ onListSignals, plan: 'free' })
 
     fireEvent.click(await screen.findByRole('button', { name: 'Upgrade' }))
     expect(onUpgrade).toHaveBeenCalledTimes(1)

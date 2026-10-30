@@ -13,7 +13,9 @@ import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
 import { TemplateMiningPage } from '../features/template-mining/TemplateMiningPage.jsx'
 import { SettingsView } from '../features/settings/SettingsView.jsx'
 import { useWorkflowState } from './workflow/useWorkflowState.js'
-import { isStepLocked } from '../domain/workflow/stepAccess.js'
+import { useCheckoutReturn } from '../features/billing/useCheckoutReturn.js'
+import { isStepLocked, unlockingPlan } from '../domain/workflow/stepAccess.js'
+import { PLANS } from '../domain/plan/planCatalog.js'
 import {
   connectTelegram as connectTelegramApi,
   verifyTelegram
@@ -41,7 +43,8 @@ const USER_DEFAULTS = {
   firstName: 'Mara',
   lastName: 'Voss',
   email: 'mara@northwave.io',
-  plan: 'operator',
+  plan: 'free',
+  subscriptionStatus: null,
   pendingEmail: null,
   cancelAt: null
 }
@@ -212,6 +215,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     setBackTarget
   } = useWorkflowState(authToken, user.plan)
   const { overlay, saveOverlay } = useParserOverlay(authToken, fireToast)
+  useCheckoutReturn(authToken, { onUser: updateUser, onToast: fireToast })
 
   useEffect(() => {
     const root = document.documentElement
@@ -487,11 +491,12 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
             : 'Backtesting'
       title = featureName
       subtitle = lockedByPlan
-        ? `${activeFeed.name} · Available on a higher plan`
+        ? `${activeFeed.name} · Available on a paid plan`
         : `${activeFeed.name} · Coming soon`
       body = (
         <PaidFeaturePlaceholder
           feature={featureName}
+          planName={PLANS.find((p) => p.id === unlockingPlan(pipelineStep))?.name}
           lockedByPlan={lockedByPlan}
           onDone={() => {
             void refreshSources().catch(() => {})

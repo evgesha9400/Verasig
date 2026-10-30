@@ -22,7 +22,7 @@ describe('authApi', () => {
           firstName: 'Ada',
           lastName: 'Lovelace',
           email: 'ada@example.com',
-          plan: 'observer',
+          plan: 'free',
           pendingEmail: null,
           cancelAt: null
         }
@@ -55,7 +55,7 @@ describe('authApi', () => {
             firstName: 'Mara',
             lastName: 'Voss',
             email: 'mara@example.com',
-            plan: 'observer',
+            plan: 'free',
             pendingEmail: null,
             cancelAt: null
           }
@@ -90,7 +90,7 @@ describe('authApi', () => {
         firstName: 'Ada',
         lastName: 'Lovelace',
         email: 'ada@example.com',
-        plan: 'observer',
+        plan: 'free',
         pendingEmail: null,
         cancelAt: null
       })

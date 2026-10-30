@@ -71,6 +71,9 @@ services:
       VERASIG_DB_PORT: "5432"
       VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
       VERASIG_CORS_ORIGINS: '["http://localhost:8080"]'
+      VERASIG_SITE_URL: http://localhost:8080
+      # CI sets a throwaway value; the checkout E2E signs its webhook with it.
+      VERASIG_STRIPE_WEBHOOK_SECRET: ${VERASIG_STRIPE_WEBHOOK_SECRET:-}
     ports:
       - "8080:8000"
     read_only: true

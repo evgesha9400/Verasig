@@ -1,5 +1,5 @@
-// The feed workflow, flat and ordered. Tiers read left→right: Observer owns
-// mine→verify, Operator adds exchange→backtest, Desk adds execution.
+// The feed workflow, flat and ordered. Tiers read left→right: Free owns
+// mine→verify, Trader adds exchange→backtest, Desk adds execution.
 // Position ≠ tier: Execution sits after Backtest because it is a Desk
 // refinement whose edits re-run the backtest. A future `live` step appends here.
 export const PIPELINE_STEPS = [
