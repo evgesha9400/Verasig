@@ -30,6 +30,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -234,16 +235,45 @@ class DeletedSignalEvidenceRow(Base):
 
 class UserAccountRow(Base):
     __tablename__ = "user_account"
-    __table_args__ = (enum_check("plan", Plan, name="ck_user_account_plan"),)
+    __table_args__ = (
+        enum_check("plan", Plan, name="ck_user_account_plan"),
+        Index(
+            "uq_user_account_stripe_customer_id",
+            "stripe_customer_id",
+            unique=True,
+            postgresql_where=text("stripe_customer_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_user_account_stripe_subscription_id",
+            "stripe_subscription_id",
+            unique=True,
+            postgresql_where=text("stripe_subscription_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
-    plan: Mapped[str] = mapped_column(String, nullable=False, default="observer")
+    plan: Mapped[str] = mapped_column(
+        String, nullable=False, default=Plan.FREE.value, server_default=Plan.FREE.value
+    )
     pending_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Mirrors Stripe: when the subscription ends because it was cancelled.
     cancel_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    stripe_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Stripe's subscription status (trialing, active, past_due, canceled, ...).
+    subscription_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The last Checkout started; expired when a new one starts.
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
+    # Creation time of the newest Stripe event applied; older events are skipped.
+    stripe_event_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(

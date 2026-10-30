@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Icon, ThemeToggle, useTheme } from '@verasig/design-system'
+import { Button, Icon } from '@verasig/design-system'
+import { PLANS } from '../../domain/plan/planCatalog.js'
 import './marketing.css'
 
 /* ---------- brand mark ---------- */
@@ -26,7 +27,7 @@ function Mark({ size = 26 }) {
 }
 
 /* ========================================================== NAV ===== */
-function Nav({ theme, onThemeChange, loginPath, signupPath }) {
+function Nav({ loginPath, signupPath }) {
   return (
     <header className="mk-nav">
       <div className="mk-nav__inner">
@@ -39,11 +40,10 @@ function Nav({ theme, onThemeChange, loginPath, signupPath }) {
         <nav className="mk-nav__links">
           <a href="#how">How it works</a>
           <a href="#integrations">Integrations</a>
+          <a href="#pricing">Pricing</a>
           <a href="#principles">Principles</a>
         </nav>
         <div className="mk-nav__actions">
-          <ThemeToggle value={theme} onChange={onThemeChange} />
-          <span className="mk-nav__divider" aria-hidden="true" />
           <Link className="mk-nav__signin" to={loginPath}>
             Log in
           </Link>
@@ -354,6 +354,86 @@ function Integrations() {
   )
 }
 
+/* ======================================================== PRICING ===== */
+const CTA_LABEL = { free: 'Start a free check', trader: 'Start 7-day trial' }
+
+function PlanCard({ plan }) {
+  const cls = [
+    'mk-plan',
+    plan.highlight && 'is-highlight',
+    !plan.available && 'is-soon'
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return (
+    <article className={cls} aria-labelledby={`plan-${plan.id}`}>
+      <h3 className="mk-plan__name" id={`plan-${plan.id}`}>
+        {plan.name}
+      </h3>
+      <p className="mk-plan__tag">{plan.tagline}</p>
+      <div className="mk-plan__price">
+        <span className="mk-plan__amount">${plan.monthlyPrice}</span>
+        {plan.monthlyPrice > 0 && <span className="mk-plan__per">/month</span>}
+      </div>
+      <p className="mk-plan__note">
+        {plan.yearlyMonthlyPrice !== null &&
+          `or $${plan.yearlyMonthlyPrice}/month billed yearly`}
+      </p>
+      {plan.available ? (
+        <Button
+          as={Link}
+          to={plan.ctaPath}
+          variant={plan.highlight ? 'primary' : 'secondary'}
+          size="lg"
+          fullWidth
+        >
+          {CTA_LABEL[plan.id]}
+        </Button>
+      ) : (
+        <Button variant="secondary" size="lg" fullWidth disabled>
+          Coming soon
+        </Button>
+      )}
+      <p className="mk-plan__trial">{plan.trial}</p>
+      <ul className="mk-plan__list">
+        {plan.includes.map((item) => (
+          <li key={item}>
+            <Icon name="check" size={14} />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </article>
+  )
+}
+
+export function Pricing() {
+  return (
+    <section className="mk-sec" id="pricing" style={{ paddingTop: 0 }}>
+      <div className="mk-sec__head">
+        <span className="v-eyebrow">
+          <span className="mk-dot" />
+          Pricing
+        </span>
+        <h2 className="mk-sec__title">
+          Check for free.
+          <br />
+          Pay to trade live.
+        </h2>
+        <p className="mk-sec__lead">
+          Start with one feed at no cost. Move to Trader when you want full backtests
+          and live trading on Bybit.
+        </p>
+      </div>
+      <div className="mk-plans">
+        {PLANS.map((plan) => (
+          <PlanCard plan={plan} key={plan.id} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 /* ==================================================== PRINCIPLES ===== */
 const PRINCIPLES = [
   {
@@ -449,6 +529,7 @@ function Footer() {
       links: [
         ['How it works', '#how'],
         ['Integrations', '#integrations'],
+        ['Pricing', '#pricing'],
         ['Principles', '#principles']
       ]
     },
@@ -494,18 +575,13 @@ function Footer() {
 
 /* ==================================================== ROOT ===== */
 export default function Marketing({ loginPath = '/login', signupPath = '/signup' }) {
-  const [theme, setTheme] = useTheme()
   return (
     <div className="mk-page">
-      <Nav
-        theme={theme}
-        onThemeChange={setTheme}
-        loginPath={loginPath}
-        signupPath={signupPath}
-      />
+      <Nav loginPath={loginPath} signupPath={signupPath} />
       <Hero loginPath={loginPath} signupPath={signupPath} />
       <HowItWorks />
       <Integrations />
+      <Pricing />
       <Principles />
       <CTA loginPath={loginPath} signupPath={signupPath} />
       <Footer />

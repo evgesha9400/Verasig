@@ -31,12 +31,12 @@ _SIGNAL_ID = UUID("60000000-0000-0000-0000-000000000003")
 def test_present_signals_projects_lifecycle_outcomes(db_session):
     _seed(db_session)
 
-    result = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)
+    result = present_signals(db_session, _USER_ID, plan=Plan.TRADER)
 
     signal = result["signals"][0]
     assert result["orphanMods"] == []
     assert result["limitReached"] is False
-    assert result["limit"] is None  # operator is unlimited
+    assert result["limit"] is None  # trader is unlimited
     assert result["total"] == len(result["signals"])
     assert signal["id"] == str(_SIGNAL_ID)
     assert signal["feedId"] == "7"
@@ -59,7 +59,7 @@ def test_present_signals_projects_lifecycle_outcomes(db_session):
 def test_present_signals_includes_verified_feed_without_backtest(db_session):
     _seed(db_session, status="verified", with_backtest=False)
 
-    result = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)
+    result = present_signals(db_session, _USER_ID, plan=Plan.TRADER)
 
     assert result["signals"][0]["status"] == "untested"
     assert result["signals"][0]["text"] == "BTC long entry"
@@ -68,7 +68,7 @@ def test_present_signals_includes_verified_feed_without_backtest(db_session):
 def test_present_signals_filters_confirmed_deleted_evidence(db_session):
     _seed(db_session, deleted=True)
 
-    result = present_signals(db_session, _USER_ID, status="deleted", plan=Plan.OPERATOR)
+    result = present_signals(db_session, _USER_ID, status="deleted", plan=Plan.TRADER)
 
     assert len(result["signals"]) == 1
     assert result["signals"][0]["status"] == "deleted"
@@ -78,7 +78,7 @@ def test_present_signals_filters_confirmed_deleted_evidence(db_session):
 def test_present_signals_ignores_deletion_when_not_signal_candidate(db_session):
     _seed(db_session, deleted=True, deleted_was_candidate=False)
 
-    result = present_signals(db_session, _USER_ID, status="deleted", plan=Plan.OPERATOR)
+    result = present_signals(db_session, _USER_ID, status="deleted", plan=Plan.TRADER)
 
     assert result["signals"] == []
 
@@ -128,7 +128,7 @@ def test_present_signals_orders_newest_first(db_session):
             _USER_ID,
         )
 
-    result = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)
+    result = present_signals(db_session, _USER_ID, plan=Plan.TRADER)
 
     ids = [signal["id"] for signal in result["signals"]]
     assert ids[0] == str(signal_id)  # newest first
@@ -146,7 +146,7 @@ def test_author_exit_of_a_filled_trade_is_not_a_cancel(db_session):
     _seed(db_session)  # the backtest filled the trade (R_MULTIPLE)
     _reply_to_entry(db_session, 4, "close")
 
-    signal = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)["signals"][0]
+    signal = present_signals(db_session, _USER_ID, plan=Plan.TRADER)["signals"][0]
 
     assert signal["cancelled"] is False
     assert signal["effective"]["closedBy"] == "author"
@@ -157,7 +157,7 @@ def test_untested_close_with_cancel_wording_is_a_cancel(db_session):
     _seed(db_session, status="verified", with_backtest=False)
     _reply_to_entry(db_session, 4, "Cancelled")
 
-    signal = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)["signals"][0]
+    signal = present_signals(db_session, _USER_ID, plan=Plan.TRADER)["signals"][0]
 
     assert signal["cancelled"] is True
 
@@ -166,15 +166,15 @@ def test_untested_close_after_management_is_an_author_exit(db_session):
     _seed(db_session, status="verified", with_backtest=False)
     _reply_to_entry(db_session, 4, "close")
 
-    signal = present_signals(db_session, _USER_ID, plan=Plan.OPERATOR)["signals"][0]
+    signal = present_signals(db_session, _USER_ID, plan=Plan.TRADER)["signals"][0]
 
     assert signal["cancelled"] is False
 
 
-def test_present_signals_caps_observer_and_reports_full_total(db_session):
+def test_present_signals_caps_free_and_reports_full_total(db_session):
     _seed_many(db_session, count=205)
 
-    result = present_signals(db_session, _USER_ID, plan=Plan.OBSERVER)
+    result = present_signals(db_session, _USER_ID, plan=Plan.FREE)
 
     assert result["limit"] == 200
     assert result["total"] == 205  # pre-cap count
@@ -182,10 +182,10 @@ def test_present_signals_caps_observer_and_reports_full_total(db_session):
     assert result["limitReached"] is True
 
 
-def test_present_signals_under_limit_for_observer(db_session):
+def test_present_signals_under_limit_for_free(db_session):
     _seed_many(db_session, count=3)
 
-    result = present_signals(db_session, _USER_ID, plan=Plan.OBSERVER)
+    result = present_signals(db_session, _USER_ID, plan=Plan.FREE)
 
     assert result["limit"] == 200
     assert result["total"] == 3
@@ -203,7 +203,7 @@ def _seed_many(session, *, count: int) -> None:
             password_hash="hash",
             first_name="Ada",
             last_name="Lovelace",
-            plan=Plan.OBSERVER,
+            plan=Plan.FREE,
             pending_email=None,
             cancel_at=None,
             created_at=_BASE,
@@ -277,7 +277,7 @@ def _seed(
             password_hash="hash",
             first_name="Ada",
             last_name="Lovelace",
-            plan=Plan.OPERATOR,
+            plan=Plan.TRADER,
             pending_email=None,
             cancel_at=None,
             created_at=_BASE,

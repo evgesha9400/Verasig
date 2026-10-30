@@ -116,7 +116,7 @@ describe('AuditReview', () => {
     expect(screen.queryByText(/SYM1USDT SELL/)).toBeNull()
   })
 
-  it('caps the observer parsed bucket to 200 and shows the notice', async () => {
+  it('caps the free parsed bucket to 200 and shows the notice', async () => {
     const many = Array.from({ length: 205 }, (_, idx) =>
       parsedSignal(idx + 1, 'rule_a')
     )
@@ -131,7 +131,7 @@ describe('AuditReview', () => {
         messages={messages}
         templates={RULES}
         hasAccepted
-        plan="observer"
+        plan="free"
         onUpgrade={onUpgrade}
       />
     )
@@ -145,7 +145,7 @@ describe('AuditReview', () => {
   })
 
   it('does not cap or show the notice for a paid plan', () => {
-    renderReview({ plan: 'operator' })
+    renderReview({ plan: 'trader' })
     expect(screen.queryByText(/most recent of/)).toBeNull()
     expect(screen.getByText(/1\s*[–-]\s*25 of 30/)).toBeTruthy()
   })

@@ -4,8 +4,8 @@
 // the client-side Verify preview cap + the "you're capped" notice text. Keep the
 // two in sync when a plan's cap changes.
 const SIGNAL_LIMIT_BY_PLAN = {
-  observer: 200,
-  operator: null,
+  free: 200,
+  trader: null,
   desk: null
 }
 

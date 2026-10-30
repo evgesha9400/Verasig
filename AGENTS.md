@@ -33,6 +33,11 @@ logs in via the API and reuses the session.
   - Specs then run **already authenticated**, against the real backend + your real feeds.
   - The backend just needs to be up on `:8000`; `make dev` is simplest, but `make serve` works too.
 - `npm run e2e:ui` — interactive runner. `npm run e2e:report` — open the last HTML report.
+- `checkout.spec.js` (Trader signup → stub Stripe Checkout → signed webhook → Settings) needs
+  `E2E_STRIPE_WEBHOOK_SECRET` in `e2e/.env`, equal to the backend's
+  `VERASIG_STRIPE_WEBHOOK_SECRET`; it skips locally without it. CI sets both to one throwaway value.
+  The browser never reaches Stripe: `e2e/stripe-stub.js` routes `**/billing/checkout|portal` to stub
+  pages and signs the webhook in node.
 
 ### Ad-hoc (agent driving the Playwright MCP)
 

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from conftest import _auth
 
@@ -204,39 +204,12 @@ def test_password_reset_request_is_accepted(client):
     assert response.status_code == 202
 
 
-def test_subscription_change_cancel_and_resume(client):
+def test_fake_subscription_routes_are_gone(client):
     registered = _register(client)
 
-    changed = client.post(
-        "/user/subscription/change",
-        headers=_auth(registered["token"]),
-        json={"plan": "operator"},
-    )
-    cancelled = client.post(
-        "/user/subscription/cancel",
-        headers=_auth(registered["token"]),
-    )
-    resumed = client.post(
-        "/user/subscription/resume",
-        headers=_auth(registered["token"]),
-    )
-    cancel_at = datetime.fromisoformat(cancelled.json()["cancelAt"])
+    responses = [
+        client.post(f"/user/subscription/{action}", headers=_auth(registered["token"]))
+        for action in ("change", "cancel", "resume")
+    ]
 
-    assert changed.status_code == 200
-    assert changed.json()["plan"] == "operator"
-    assert cancelled.status_code == 200
-    assert cancel_at > datetime.now(tz=UTC) + timedelta(days=29)
-    assert resumed.status_code == 200
-    assert resumed.json()["cancelAt"] is None
-
-
-def test_subscription_change_rejects_invalid_plan(client):
-    registered = _register(client)
-
-    response = client.post(
-        "/user/subscription/change",
-        headers=_auth(registered["token"]),
-        json={"plan": "invalid"},
-    )
-
-    assert response.status_code == 422
+    assert [response.status_code for response in responses] == [404, 404, 404]

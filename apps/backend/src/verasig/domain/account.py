@@ -5,8 +5,8 @@ from uuid import UUID
 
 
 class Plan(StrEnum):
-    OBSERVER = "observer"
-    OPERATOR = "operator"
+    FREE = "free"
+    TRADER = "trader"
     DESK = "desk"
 
 
@@ -21,3 +21,8 @@ class UserAccount:
     pending_email: str | None
     cancel_at: datetime | None
     created_at: datetime
+    stripe_customer_id: str | None = None
+    stripe_subscription_id: str | None = None
+    subscription_status: str | None = None
+    stripe_checkout_session_id: str | None = None
+    stripe_event_at: datetime | None = None

@@ -21,7 +21,8 @@ def test_register_returns_token_and_user(client):
         "firstName": "Ada",
         "lastName": "Lovelace",
         "email": "ada@example.com",
-        "plan": "observer",
+        "plan": "free",
+        "subscriptionStatus": None,
         "pendingEmail": None,
         "cancelAt": None,
     }

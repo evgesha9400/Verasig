@@ -2,16 +2,17 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { ThemeProvider } from '@verasig/design-system'
-import AppRouter, { AppRoutes } from './AppRouter.jsx'
+import { AppRoutes } from './AppRouter.jsx'
+import { redirectTo } from '../shared/navigation.js'
+
+vi.mock('../shared/navigation.js', () => ({ redirectTo: vi.fn() }))
 
 const AUTH_TOKEN_KEY = 'vrs-auth-token-1'
-const THEME_STORAGE_KEY = 'vrs-theme-1'
 const backendUser = {
   firstName: 'Ada',
   lastName: 'Lovelace',
   email: 'ada@example.com',
-  plan: 'observer',
+  plan: 'free',
   pendingEmail: null,
   cancelAt: null
 }
@@ -125,26 +126,19 @@ function sourceRoutes({
 }
 
 function renderRoute(initialPath) {
-  // AppRoutes consumes useTheme, so it must mount under a ThemeProvider exactly
-  // as it does in production (AppRouter wraps it). Rendering it bare would now
-  // throw — the competing-fallback footgun useTheme used to hide.
   return render(
-    <ThemeProvider>
-      <MemoryRouter
-        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-        initialEntries={[initialPath]}
-      >
-        <AppRoutes />
-      </MemoryRouter>
-    </ThemeProvider>
+    <MemoryRouter
+      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+      initialEntries={[initialPath]}
+    >
+      <AppRoutes />
+    </MemoryRouter>
   )
 }
 
 beforeEach(() => {
   installTestStorage()
   installFetch()
-  document.documentElement.removeAttribute('data-theme')
-  document.documentElement.removeAttribute('style')
 })
 
 describe('AppRoutes', () => {
@@ -171,29 +165,6 @@ describe('AppRoutes', () => {
     for (const link of logins) {
       expect(link.getAttribute('href')).toBe('/login')
     }
-  })
-
-  it('updates marketing theme through shared DS radio semantics', async () => {
-    const user = userEvent.setup()
-    renderRoute('/')
-
-    await user.click(screen.getByRole('radio', { name: 'Light' }))
-
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#5197FF')
-  })
-
-  it('applies the stored theme on auth pages that never call useTheme', async () => {
-    localStorage.setItem(THEME_STORAGE_KEY, 'light')
-    window.history.pushState({}, '', '/login')
-
-    render(<AppRouter />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Log in to Verasig')).toBeTruthy()
-    })
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#5197FF')
   })
 
   it('navigates from backend login submit to the product shell', async () => {
@@ -237,6 +208,78 @@ describe('AppRoutes', () => {
     })
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
     expect(screen.getByText('ada@example.com')).toBeTruthy()
+  })
+
+  function submitSignup() {
+    fireEvent.change(screen.getByLabelText(/full name/i), {
+      target: { value: 'Ada Lovelace' }
+    })
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'ada@example.com' }
+    })
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'correct horse battery staple' }
+    })
+    fireEvent.submit(screen.getByText('Create account').closest('form'))
+  }
+
+  it('sends a Trader signup straight to Stripe Checkout', async () => {
+    redirectTo.mockReset()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      'POST /billing/checkout': () =>
+        jsonResponse({ url: 'https://checkout.stripe.com/c/pay/cs_1', id: 'cs_1' })
+    })
+
+    renderRoute('/signup?plan=trader')
+    submitSignup()
+
+    await waitFor(() =>
+      expect(redirectTo).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_1')
+    )
+    const checkoutCall = fetch.mock.calls.find(([url]) =>
+      url.endsWith('/billing/checkout')
+    )
+    expect(checkoutCall[1].headers.Authorization).toBe('Bearer register-token')
+    expect(JSON.parse(checkoutCall[1].body)).toEqual({
+      plan: 'trader',
+      interval: 'month'
+    })
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
+  })
+
+  it('opens the app with a notice when Checkout cannot start after signup', async () => {
+    redirectTo.mockReset()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      'POST /billing/checkout': () =>
+        jsonResponse({ error: { code: 'BILLING_NOT_CONFIGURED', message: 'Off' } }, 503)
+    })
+
+    renderRoute('/signup?plan=trader')
+    submitSignup()
+
+    await waitFor(() => expect(redirectTo).toHaveBeenCalledWith('/app?checkout=error'))
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('register-token')
+  })
+
+  it('ignores a signup plan that cannot be bought', async () => {
+    redirectTo.mockReset()
+    installFetch({
+      'POST /auth/register': () =>
+        jsonResponse({ token: 'register-token', user: backendUser }, 201),
+      ...sourceRoutes()
+    })
+
+    renderRoute('/signup?plan=desk')
+    submitSignup()
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Sources').length).toBeGreaterThan(0)
+    })
+    expect(redirectTo).not.toHaveBeenCalled()
   })
 
   it('redirects unauthenticated app visits to login', async () => {

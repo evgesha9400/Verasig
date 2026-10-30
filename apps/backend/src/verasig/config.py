@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     secret_keys: str = ""
     cors_origins: list[str] = ["http://localhost:5173"]
     web_dist_dir: Path | None = None
+    # Stripe billing. Blank values fail at request time (see the *_spec methods).
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_trader_monthly: str = ""
+    stripe_price_trader_yearly: str = ""
+    # Public origin of the web app: Checkout and the portal return here.
+    site_url: str = "http://localhost:5173"
 
     @property
     def database_url(self) -> str:
@@ -80,6 +87,24 @@ class Settings(BaseSettings):
             )
         return secret
 
+    def stripe_secret_key_spec(self) -> str:
+        return _required("VERASIG_STRIPE_SECRET_KEY", self.stripe_secret_key)
+
+    def stripe_webhook_secret_spec(self) -> str:
+        return _required("VERASIG_STRIPE_WEBHOOK_SECRET", self.stripe_webhook_secret)
+
+    def stripe_trader_price_spec(self, interval: str) -> str:
+        if interval == "year":
+            return _required(
+                "VERASIG_STRIPE_PRICE_TRADER_YEARLY", self.stripe_price_trader_yearly
+            )
+        return _required(
+            "VERASIG_STRIPE_PRICE_TRADER_MONTHLY", self.stripe_price_trader_monthly
+        )
+
+    def site_url_spec(self) -> str:
+        return _required("VERASIG_SITE_URL", self.site_url).rstrip("/")
+
     def _is_local(self) -> bool:
         return (self.env.strip().lower() or "local") == "local"
 
@@ -94,3 +119,9 @@ def _is_dev_key(entry: str) -> bool:
         return base64.b64decode(encoded, validate=True) == _DEV_KEY
     except binascii.Error:
         return False
+
+
+def _required(name: str, value: str) -> str:
+    if not value.strip():
+        raise SettingsError(f"{name} must be set to use billing")
+    return value.strip()

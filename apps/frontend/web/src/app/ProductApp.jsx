@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Button,
-  IconButton,
-  ToastStack,
-  Toast,
-  Dialog,
-  useTheme
-} from '@verasig/design-system'
+import { Button, IconButton, ToastStack, Toast, Dialog } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { Shell } from './layout/Shell.jsx'
 import { Pipeline } from '../features/pipeline/Pipeline.jsx'
@@ -20,7 +13,9 @@ import { ExchangesView } from '../features/exchanges/ExchangesView.jsx'
 import { TemplateMiningPage } from '../features/template-mining/TemplateMiningPage.jsx'
 import { SettingsView } from '../features/settings/SettingsView.jsx'
 import { useWorkflowState } from './workflow/useWorkflowState.js'
-import { isStepLocked } from '../domain/workflow/stepAccess.js'
+import { useCheckoutReturn } from '../features/billing/useCheckoutReturn.js'
+import { isStepLocked, unlockingPlan } from '../domain/workflow/stepAccess.js'
+import { PLANS } from '../domain/plan/planCatalog.js'
 import {
   connectTelegram as connectTelegramApi,
   verifyTelegram
@@ -48,7 +43,8 @@ const USER_DEFAULTS = {
   firstName: 'Mara',
   lastName: 'Voss',
   email: 'mara@northwave.io',
-  plan: 'operator',
+  plan: 'free',
+  subscriptionStatus: null,
   pendingEmail: null,
   cancelAt: null
 }
@@ -148,8 +144,6 @@ export function useParserOverlay(authToken, fireToast) {
 }
 
 export function ProductApp({ authToken, user: sessionUser, onLogout }) {
-  const [theme, setTheme] = useTheme()
-
   const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
   const [gapChecks, setGapChecks] = useState({}) // { [feedId]: { scanned } }
   const gapStreamsRef = useRef(new Map()) // feedId -> open rescan SSE subscription
@@ -221,6 +215,7 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
     setBackTarget
   } = useWorkflowState(authToken, user.plan)
   const { overlay, saveOverlay } = useParserOverlay(authToken, fireToast)
+  useCheckoutReturn(authToken, { onUser: updateUser, onToast: fireToast })
 
   useEffect(() => {
     const root = document.documentElement
@@ -496,11 +491,12 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
             : 'Backtesting'
       title = featureName
       subtitle = lockedByPlan
-        ? `${activeFeed.name} · Available on a higher plan`
+        ? `${activeFeed.name} · Available on a paid plan`
         : `${activeFeed.name} · Coming soon`
       body = (
         <PaidFeaturePlaceholder
           feature={featureName}
+          planName={PLANS.find((p) => p.id === unlockingPlan(pipelineStep))?.name}
           lockedByPlan={lockedByPlan}
           onDone={() => {
             void refreshSources().catch(() => {})
@@ -555,8 +551,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onExit={onExit}
         actions={actions}
         pipeline={pipeline}
-        theme={theme}
-        onThemeChange={setTheme}
         onLogout={onLogout}
         user={user}
         onOpenSettings={openSettings}

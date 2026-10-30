@@ -23,10 +23,6 @@ describe('design-system barrel', () => {
     'Toast',
     'ToastStack',
     'Tooltip',
-    'ThemeProvider',
-    'ThemeToggle',
-    'useTheme',
-    'SegmentedControl',
     'InteractiveCard',
     'ChoiceCard',
     'RadioCard',
@@ -99,38 +95,6 @@ describe('design-system interaction contracts', () => {
     expect(button.getAttribute('type')).toBe('button')
     fireEvent.click(button)
     expect(onClick).toHaveBeenCalledOnce()
-  })
-
-  it('ThemeToggle renders radio options and calls onChange', () => {
-    const onChange = vi.fn()
-    render(<DS.ThemeToggle value="dark" onChange={onChange} />)
-
-    expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeTruthy()
-    expect(
-      screen.getByRole('radio', { name: 'Dark' }).getAttribute('aria-checked')
-    ).toBe('true')
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Light' }))
-    expect(onChange).toHaveBeenCalledWith('light')
-  })
-
-  it('SegmentedControl exposes radiogroup and radio semantics', () => {
-    const onChange = vi.fn()
-    render(
-      <DS.SegmentedControl
-        label="Density"
-        value="regular"
-        onChange={onChange}
-        options={[
-          { value: 'compact', label: 'Compact' },
-          { value: 'regular', label: 'Regular' }
-        ]}
-      />
-    )
-
-    expect(screen.getByRole('radiogroup', { name: 'Density' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('radio', { name: 'Compact' }))
-    expect(onChange).toHaveBeenCalledWith('compact')
   })
 
   it('InteractiveCard renders a real button for clickable cards', () => {

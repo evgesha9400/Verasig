@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from verasig.config import Settings
 from verasig.features.accounts import auth_routes, user_routes
+from verasig.features.billing import routes as billing_routes
 from verasig.features.exchanges import routes as exchange_routes
 from verasig.features.feeds import routes as feed_routes
 from verasig.features.feeds.backfill_job_coordinator import BackfillJobCoordinator
@@ -32,6 +33,7 @@ ALL_ROUTERS: Sequence[APIRouter] = (
     health_routes.router,
     auth_routes.router,
     user_routes.router,
+    billing_routes.router,
     source_routes.router,
     exchange_routes.router,
     feed_routes.router,

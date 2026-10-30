@@ -5,13 +5,13 @@ import { config as loadEnv } from 'dotenv'
 import { defineConfig, devices } from '@playwright/test'
 
 import { AUTH_STATE_PATH } from './e2e/auth-state-path.js'
+import { APP_ORIGIN } from './e2e/urls.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
-// Local, git-ignored login creds for the real-backend session (see e2e/.env.example).
+// Local, git-ignored settings (see e2e/.env.example): login creds for the
+// real-backend session and E2E_STRIPE_WEBHOOK_SECRET for checkout.spec.js.
 loadEnv({ path: path.join(HERE, 'e2e', '.env') })
-
-const APP_URL = process.env.E2E_BASE_URL || 'http://localhost:5173'
 
 export default defineConfig({
   testDir: './e2e',
@@ -19,7 +19,7 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: APP_URL,
+    baseURL: APP_ORIGIN,
     trace: 'on-first-retry'
   },
   projects: [
@@ -36,7 +36,7 @@ export default defineConfig({
   // The backend (:8000) must be up separately for login + data to resolve.
   webServer: {
     command: 'npm run dev',
-    url: APP_URL,
+    url: APP_ORIGIN,
     reuseExistingServer: true,
     timeout: 120_000
   }

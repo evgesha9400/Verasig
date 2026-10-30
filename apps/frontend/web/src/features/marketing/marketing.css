@@ -95,12 +95,6 @@
 .mk-nav__signin:hover {
   color: var(--text-strong);
 }
-.mk-nav__divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border-default);
-  flex: none;
-}
 
 /* ---- Hero ---- */
 .mk-hero {
@@ -870,6 +864,126 @@
   border: 1px solid var(--border-default);
 }
 
+/* ---- Pricing (plan cards) ---- */
+.mk-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.mk-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 26px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+}
+/* Trader: the one plan that trades live, lit like the hero preview. */
+.mk-plan.is-highlight {
+  background:
+    radial-gradient(
+      90% 60% at 100% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 70%
+    ),
+    var(--surface-raised);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow:
+    0 0 0 1px var(--accent-quiet),
+    var(--shadow-lg);
+}
+/* Desk: same "not yet" language as the integration rows. */
+.mk-plan.is-soon {
+  background: var(--surface-sunken);
+  border-style: dashed;
+}
+.mk-plan__name {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.mk-plan__tag {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.mk-plan__price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 28px;
+}
+.mk-plan__amount {
+  font-family: var(--font-mono);
+  font-size: clamp(40px, 4.4vw, 52px);
+  font-weight: var(--fw-medium);
+  font-feature-settings: 'tnum' 1;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
+}
+.mk-plan.is-highlight .mk-plan__amount {
+  color: var(--accent-text);
+}
+.mk-plan__per {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.mk-plan__note,
+.mk-plan__trial {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  min-height: 18px;
+}
+.mk-plan__note {
+  margin: 10px 0 24px;
+}
+.mk-plan__trial {
+  margin-top: 10px;
+  text-align: center;
+}
+.mk-plan__list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mk-plan__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-body);
+}
+.mk-plan__list svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--accent-text);
+}
+.mk-plan.is-soon .mk-plan__list svg {
+  color: var(--text-faint);
+}
+/* Stacked cards need no row alignment: collapse the empty note slots. */
+@media (max-width: 900px) {
+  .mk-plan__note:empty,
+  .mk-plan__trial:empty {
+    min-height: 0;
+    margin-top: 0;
+  }
+}
+
 /* ---- Auth dialog form ---- */
 .mk-auth {
   display: flex;
@@ -943,7 +1057,8 @@
   .mk-stats__inner {
     grid-template-columns: repeat(2, 1fr);
   }
-  .mk-int-cols {
+  .mk-int-cols,
+  .mk-plans {
     grid-template-columns: 1fr;
   }
   .mk-foot__inner {

@@ -10,12 +10,13 @@ import { PIPELINE_STEPS } from './pipelineSteps.js'
 // The furthest step each plan can reach (inclusive). Forward-compatible: adding
 // a `live` step + a `desk`/new tier is a one-line change here.
 export const PLAN_MAX_STEP = {
-  observer: 'verify',
-  operator: 'backtest',
+  free: 'verify',
+  trader: 'backtest',
   desk: 'execution'
 }
 
-const DEFAULT_PLAN = 'operator'
+// An unknown plan unlocks no more than the free plan.
+const DEFAULT_PLAN = 'free'
 
 // Where a feed opens by status, before capping by plan. Completed loaders hand
 // off to the next actionable step (backfilled → mine, analyzed → backtest).
@@ -44,7 +45,7 @@ export function maxStepIndex(plan) {
 
 // The step a feed should open at: its last actionable step, never beyond the
 // plan cap. A verified feed opens at Verify for every tier (Backtest is a later
-// step that has not run yet); an observer never lands past Verify.
+// step that has not run yet); a free user never lands past Verify.
 export function landingStepForFeed(feed, plan) {
   const status = feed?.status || 'new'
   const mappedIndex = stepIndex(LANDING_STEP_BY_STATUS[status] || 'backfill')
@@ -55,4 +56,9 @@ export function landingStepForFeed(feed, plan) {
 // A step is locked when it sits beyond what the plan unlocks.
 export function isStepLocked(stepId, plan) {
   return stepIndex(stepId) > maxStepIndex(plan)
+}
+
+// The cheapest plan that reaches a step (plans are listed cheapest first).
+export function unlockingPlan(stepId) {
+  return Object.keys(PLAN_MAX_STEP).find((plan) => !isStepLocked(stepId, plan))
 }

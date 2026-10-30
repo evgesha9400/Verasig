@@ -1,6 +1,5 @@
 from pydantic import field_validator, model_validator
 
-from verasig.domain.account import Plan
 from verasig.features.accounts.name_validation import (
     validate_account_name,
     validate_account_name_pair,
@@ -40,7 +39,3 @@ class EmailChangeIn(CamelModel):
 
 class EmailConfirmIn(CamelModel):
     token: str
-
-
-class SubscriptionChangeIn(CamelModel):
-    plan: Plan

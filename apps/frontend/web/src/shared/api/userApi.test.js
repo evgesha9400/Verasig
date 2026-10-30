@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   cancelEmailChange,
-  cancelSubscription,
   changeEmail,
-  changeSubscription,
   requestPasswordReset,
-  resumeSubscription,
   updateProfile
 } from './userApi.js'
 
@@ -20,7 +17,7 @@ const user = {
   firstName: 'Grace',
   lastName: 'Hopper',
   email: 'grace@example.com',
-  plan: 'operator',
+  plan: 'trader',
   pendingEmail: null,
   cancelAt: null
 }
@@ -92,52 +89,6 @@ describe('userApi', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       'http://localhost:8000/user/password/reset-request',
-      {
-        method: 'POST',
-        headers: { Authorization: 'Bearer jwt-token' }
-      }
-    )
-  })
-
-  it('changes subscription plan', async () => {
-    fetch.mockResolvedValueOnce(jsonResponse({ ...user, plan: 'desk' }))
-
-    await changeSubscription('jwt-token', 'desk')
-
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/user/subscription/change',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer jwt-token'
-        },
-        body: JSON.stringify({ plan: 'desk' })
-      }
-    )
-  })
-
-  it('cancels and resumes subscription', async () => {
-    fetch
-      .mockResolvedValueOnce(
-        jsonResponse({ ...user, cancelAt: '2026-07-08T00:00:00Z' })
-      )
-      .mockResolvedValueOnce(jsonResponse({ ...user, cancelAt: null }))
-
-    await cancelSubscription('jwt-token')
-    await resumeSubscription('jwt-token')
-
-    expect(fetch).toHaveBeenNthCalledWith(
-      1,
-      'http://localhost:8000/user/subscription/cancel',
-      {
-        method: 'POST',
-        headers: { Authorization: 'Bearer jwt-token' }
-      }
-    )
-    expect(fetch).toHaveBeenNthCalledWith(
-      2,
-      'http://localhost:8000/user/subscription/resume',
       {
         method: 'POST',
         headers: { Authorization: 'Bearer jwt-token' }

@@ -54,7 +54,7 @@ def _account() -> UserAccount:
         password_hash="hash",
         first_name="Ada",
         last_name="Lovelace",
-        plan=Plan.OBSERVER,
+        plan=Plan.FREE,
         pending_email=None,
         cancel_at=None,
         created_at=_FIRST,

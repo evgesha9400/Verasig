@@ -1,4 +1,5 @@
 import { Banner, Button } from '@verasig/design-system'
+import { PLANS } from '../../domain/plan/planCatalog.js'
 
 /* Verasig — shared "you're capped" affordance.
    The single notice shown wherever a plan truncates the signals a user sees
@@ -7,7 +8,7 @@ import { Banner, Button } from '@verasig/design-system'
    Renders nothing unless `shown`. */
 export function PlanLimitNotice({ shown, total, limit, plan, onUpgrade }) {
   if (!shown) return null
-  const planLabel = plan ? plan[0].toUpperCase() + plan.slice(1) : 'current'
+  const planLabel = PLANS.find((p) => p.id === plan)?.name || 'current'
   return (
     <Banner
       tone="info"
