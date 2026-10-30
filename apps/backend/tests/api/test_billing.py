@@ -611,6 +611,22 @@ def test_checkout_rejects_a_user_who_is_already_subscribed(client, checkout_call
     assert checkout_calls == []
 
 
+def test_checkout_rejects_a_user_whose_payment_failed(client, checkout_calls):
+    token, user_id = _register(client)
+    _subscribe(client, user_id)
+    _post_event(client, _event("invoice.payment_failed", _invoice()))
+
+    response = client.post(
+        "/billing/checkout",
+        headers=_auth(token),
+        json={"plan": "trader", "interval": "month"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "BILLING_ALREADY_SUBSCRIBED"
+    assert checkout_calls == []
+
+
 def test_checkout_fails_loudly_without_a_price_id(client, app, checkout_calls):
     token, _user_id = _register(client)
     app.state.settings = app.state.settings.model_copy(

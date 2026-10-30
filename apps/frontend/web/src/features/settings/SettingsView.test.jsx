@@ -283,10 +283,19 @@ describe('SettingsView', () => {
     expect(screen.queryByText(/Jul 8/)).toBeNull()
   })
 
-  it('warns about a failed payment', () => {
+  it('warns about a failed payment and offers no second subscription', () => {
     renderSettings({ user: { ...user, subscriptionStatus: 'past_due' } })
 
     expect(screen.getByText('Payment failed')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Manage billing' })).toBeTruthy()
+    expect(within(planCard('Trader')).queryByRole('button')).toBeNull()
+  })
+
+  it('offers Trader again after the subscription ended', () => {
+    renderSettings({ user: { ...user, subscriptionStatus: 'canceled' } })
+
+    expect(
+      within(planCard('Trader')).getByRole('button', { name: 'Start 7-day trial' })
+    ).toBeTruthy()
   })
 })

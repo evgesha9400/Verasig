@@ -28,6 +28,8 @@ const STATUS_BADGE = {
 }
 
 const PAYMENT_FAILED_STATUSES = new Set(['past_due', 'unpaid'])
+// Terminal statuses: only then may the user start a new subscription.
+const ENDED_STATUSES = new Set(['canceled', 'incomplete_expired'])
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -150,6 +152,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
   const freePlan = PLANS[0]
   const hasBilling = Boolean(user.subscriptionStatus)
   const paymentFailed = PAYMENT_FAILED_STATUSES.has(user.subscriptionStatus)
+  const canSubscribe = !hasBilling || ENDED_STATUSES.has(user.subscriptionStatus)
   const statusBadge = user.cancelAt
     ? { tone: 'pending', label: 'Cancelling' }
     : STATUS_BADGE[user.subscriptionStatus]
@@ -181,7 +184,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
 
   function planAction(plan) {
     if (!plan.available) return <Badge tone="neutral">Coming soon</Badge>
-    if (plan.monthlyPrice === 0 || current.monthlyPrice > 0) return null
+    if (plan.monthlyPrice === 0 || !canSubscribe) return null
     return (
       <div className="vrs-plan__actions">
         <Button

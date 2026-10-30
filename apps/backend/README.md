@@ -35,6 +35,7 @@
 |---|---|
 | Health | `GET /health` |
 | Auth/User | `/auth/*`, `/user/*` |
+| Billing | `POST /billing/checkout`, `POST /billing/portal`, `POST /billing/webhook` (Stripe-signed, no auth) |
 | Telegram | `/telegram/connect`, `/telegram/verify`, `/telegram/status` |
 | Feeds | `/feeds`, `/feeds/{id}/backfill`, `/feeds/{id}/messages` |
 | Mining | `/feeds/{id}/mine`, `/feeds/{id}/mine/progress`, `/feeds/{id}/mining/confirm` |

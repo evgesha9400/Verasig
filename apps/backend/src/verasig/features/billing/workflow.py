@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from verasig.config import Settings
 from verasig.domain.account import Plan, UserAccount
-from verasig.features.accounts.plans import PAYING_STATUSES, effective_plan
+from verasig.features.accounts.plans import PAYING_STATUSES
 from verasig.features.billing import repository
 
 logger = logging.getLogger(__name__)
@@ -26,8 +26,8 @@ _FOR_SALE = frozenset({Plan.TRADER})
 # as "paid" too (its first invoice is zero), so the exact status (trialing) comes
 # from customer.subscription.created, which may arrive before or after.
 _CHECKOUT_STATUS_BY_PAYMENT = {"paid": "active", "no_payment_required": "active"}
-# Stripe never moves a canceled subscription to another status.
-_ENDED_STATUS = "canceled"
+# Terminal Stripe statuses: such a subscription never changes again.
+_ENDED_STATUSES = frozenset({"canceled", "incomplete_expired"})
 
 
 class PlanNotForSaleError(Exception):
@@ -35,7 +35,7 @@ class PlanNotForSaleError(Exception):
 
 
 class AlreadySubscribedError(Exception):
-    """Raised when a user who already pays starts another Checkout."""
+    """Raised when a user with a live subscription starts another Checkout."""
 
 
 class NoBillingCustomerError(Exception):
@@ -52,7 +52,9 @@ def start_checkout(
     """Create a Stripe Checkout Session; returns its (url, id)."""
     if plan not in _FOR_SALE:
         raise PlanNotForSaleError(plan)
-    if effective_plan(user) is not Plan.FREE:
+    # A past-due subscription is still live: it is fixed in the portal, not
+    # replaced by a second one.
+    if user.subscription_status and user.subscription_status not in _ENDED_STATUSES:
         raise AlreadySubscribedError(user.id)
     price_id = settings.stripe_trader_price_spec(interval)
     api_key = settings.stripe_secret_key_spec()
@@ -238,7 +240,7 @@ def _current_subscriber(
     if not subscription_id:
         return None
     account = repository.lock_by_subscription_id(session, subscription_id)
-    if account is None or account.subscription_status == _ENDED_STATUS:
+    if account is None or account.subscription_status in _ENDED_STATUSES:
         return None
     return account
 
