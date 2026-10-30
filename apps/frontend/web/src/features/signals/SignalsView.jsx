@@ -1,0 +1,1002 @@
+import { useState, useMemo, useEffect } from 'react'
+import { Select, Tabs, Badge, Button, Icon, Pill, Loader } from '@verasig/design-system'
+import {
+  SIGNALS,
+  SOURCES,
+  MOD_KINDS,
+  ORPHAN_MODS,
+  ORPHAN_LINKED_MOD
+} from '../../domain/demo-data/seed.js'
+import { linkSignalModifier, listSignals } from '../../shared/api/signalsApi.js'
+import { Pager } from '../../shared/components/Pager.jsx'
+import { PlanLimitNotice } from '../../shared/components/PlanLimitNotice.jsx'
+
+const PAGE_SIZE = 25
+
+/* Verasig prototype — Signals page: extracted output of analyzed feeds, filterable by source & feed.
+   Signals can carry `mods` — follow-up updates (close / avg down / avg up / move stop / cancel)
+   the author posted as replies to the original signal message. The row shows the EFFECTIVE
+   state (averaged entry, author exits baked into PnL) plus an updates chip; the full chain
+   lives in the expanded detail. */
+export function SignalsView({
+  feeds,
+  onGoToSources,
+  initial,
+  authToken,
+  plan,
+  onUpgrade,
+  onListSignals = listSignals,
+  onLinkSignalModifier = linkSignalModifier
+}) {
+  const useBackend = Boolean(authToken)
+  const signalFeeds = useMemo(() => feeds.filter(isSignalFeed), [feeds])
+  const feedById = useMemo(
+    () => Object.fromEntries(feeds.map((f) => [f.id, f])),
+    [feeds]
+  )
+  // feedSource is a module-level helper (below); no per-render local copy needed.
+  const [source, setSource] = useState((initial && initial.source) || 'all')
+  const [feed, setFeed] = useState((initial && initial.feed) || 'all')
+  const [tab, setTab] = useState((initial && initial.tab) || 'all') // all | tested | untested | skipped | deleted
+  const [openId, setOpenId] = useState(null)
+  // Orphan update (no reply link): open → user links it to the suggestion, or dismisses.
+  const [orphanState, setOrphanState] = useState('open') // open | linked | dismissed
+  const [dismissedOrphans, setDismissedOrphans] = useState(() => new Set())
+  const [linkingOrphanId, setLinkingOrphanId] = useState(null)
+  const [page, setPage] = useState(0)
+  const [backendSignals, setBackendSignals] = useState({
+    loading: useBackend,
+    error: null,
+    signals: [],
+    orphanMods: [],
+    total: 0,
+    limit: null,
+    limitReached: false
+  })
+
+  // Deep-link presets (e.g. the "View deleted signals" link on a scam feed) re-apply when they change.
+  useEffect(() => {
+    if (!initial) return
+    if (initial.source != null) setSource(initial.source)
+    if (initial.feed != null) setFeed(initial.feed)
+    if (initial.tab != null) setTab(initial.tab)
+    setOpenId(null)
+  }, [initial])
+
+  // Any filter/tab change returns the list to the first page.
+  useEffect(() => {
+    setPage(0)
+  }, [tab, source, feed])
+
+  const signalFeedKey = useMemo(
+    () => signalFeeds.map((f) => `${f.id}:${f.status}`).join('|'),
+    [signalFeeds]
+  )
+
+  useEffect(() => {
+    if (!useBackend) {
+      setBackendSignals({
+        loading: false,
+        error: null,
+        signals: [],
+        orphanMods: [],
+        total: 0,
+        limit: null,
+        limitReached: false
+      })
+      return undefined
+    }
+
+    let active = true
+    setBackendSignals((current) => ({ ...current, loading: true, error: null }))
+
+    onListSignals(authToken)
+      .then((body) => {
+        if (!active) return
+        setBackendSignals({
+          loading: false,
+          error: null,
+          signals: body.signals || [],
+          orphanMods: body.orphanMods || [],
+          total: body.total ?? (body.signals || []).length,
+          limit: body.limit ?? null,
+          limitReached: Boolean(body.limitReached)
+        })
+      })
+      .catch((error) => {
+        if (!active) return
+        setBackendSignals((current) => ({
+          ...current,
+          loading: false,
+          error: error?.message || 'Could not load signals.'
+        }))
+      })
+
+    return () => {
+      active = false
+    }
+  }, [authToken, onListSignals, signalFeedKey, useBackend])
+
+  async function refreshBackendSignals() {
+    if (!useBackend) return null
+    const body = await onListSignals(authToken)
+    setBackendSignals({
+      loading: false,
+      error: null,
+      signals: body.signals || [],
+      orphanMods: body.orphanMods || [],
+      total: body.total ?? (body.signals || []).length,
+      limit: body.limit ?? null,
+      limitReached: Boolean(body.limitReached)
+    })
+    return body
+  }
+
+  // distinct sources present across signal-producing feeds
+  const sourceIds = useMemo(
+    () => [...new Set(signalFeeds.map(feedSource))],
+    [signalFeeds]
+  )
+
+  // feed options narrow to the chosen source
+  const feedOptions = useMemo(() => {
+    const fs = signalFeeds.filter((f) => source === 'all' || feedSource(f) === source)
+    return [
+      { value: 'all', label: 'All feeds' },
+      ...fs.map((f) => ({ value: f.id, label: f.name }))
+    ]
+  }, [signalFeeds, source])
+
+  function changeSource(v) {
+    setSource(v)
+    if (feed !== 'all') {
+      const f = feedById[feed]
+      if (v !== 'all' && (!f || feedSource(f) !== v)) setFeed('all')
+    }
+  }
+
+  // Manually linking the demo orphan attaches it to its suggested signal as a late close.
+  const demoSignals = useMemo(() => {
+    if (orphanState !== 'linked') return SIGNALS
+    return SIGNALS.map((s) =>
+      s.id === ORPHAN_MODS[0].suggestId
+        ? { ...s, mods: [...(s.mods || []), ORPHAN_LINKED_MOD] }
+        : s
+    )
+  }, [orphanState])
+
+  const allSignals = useMemo(() => {
+    const rows = useBackend ? backendSignals.signals : demoSignals
+    return rows.map((row) => normalizeSignal(row, !useBackend))
+  }, [backendSignals.signals, demoSignals, useBackend])
+
+  const orphanMods = useMemo(() => {
+    const rows = useBackend ? backendSignals.orphanMods : ORPHAN_MODS
+    return rows.map(normalizeOrphan)
+  }, [backendSignals.orphanMods, useBackend])
+
+  // base set: signals from analyzed feeds, respecting source + feed (not the tab — used for tab counts)
+  const scoped = useMemo(() => {
+    const signalFeedIds = new Set(signalFeeds.map((f) => f.id))
+    return allSignals
+      .filter((s) => signalFeedIds.has(s.feedId) || !feedById[s.feedId])
+      .filter((s) => source === 'all' || signalSource(s, feedById[s.feedId]) === source)
+      .filter((s) => feed === 'all' || s.feedId === feed)
+      .sort((a, b) => sortKey(b) - sortKey(a))
+  }, [allSignals, signalFeeds, source, feed, feedById])
+
+  // Tab buckets — Tested / Not tested / Skipped exclude deleted; Deleted is its own bucket.
+  const live = scoped.filter((s) => !s.deleted)
+  const testedCount = live.filter((s) => s.status === 'tested').length
+  const untestedCount = live.filter((s) => s.status === 'untested').length
+  const skippedCount = live.filter((s) => s.status === 'skipped').length
+  const deletedCount = scoped.filter((s) => s.deleted).length
+  const visible =
+    tab === 'tested'
+      ? live.filter((s) => s.status === 'tested')
+      : tab === 'untested'
+        ? live.filter((s) => s.status === 'untested')
+        : tab === 'skipped'
+          ? live.filter((s) => s.status === 'skipped')
+          : tab === 'deleted'
+            ? scoped.filter((s) => s.deleted)
+            : scoped
+
+  // Client-side pagination — same window math as the Verify review (25/page).
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const safePage = Math.min(page, pageCount - 1)
+  const windowStart = safePage * PAGE_SIZE
+  const pageRows = visible.slice(windowStart, windowStart + PAGE_SIZE)
+
+  // Orphan card visibility: pending updates belong to a feed — show while that feed is in scope.
+  const orphan = orphanMods.find((item) => {
+    const orphanFeed = feedById[item.feedId]
+    return (
+      !dismissedOrphans.has(item.id) &&
+      tab === 'all' &&
+      (feed === 'all' || feed === item.feedId) &&
+      (source === 'all' || signalSource(item, orphanFeed) === source) &&
+      (signalFeeds.some((f) => f.id === item.feedId) || !orphanFeed)
+    )
+  })
+  const orphanFeed = orphan ? displayFeed(orphan, feedById[orphan.feedId]) : null
+  const orphanVisible = Boolean(orphan) && (useBackend || orphanState === 'open')
+  const suggested = orphan ? allSignals.find((s) => s.id === orphan.suggestId) : null
+
+  function dismissOrphan(orphanId) {
+    setDismissedOrphans((current) => new Set([...current, orphanId]))
+    if (!useBackend) setOrphanState('dismissed')
+  }
+
+  async function linkOrphan(item) {
+    if (!item || !item.suggestId) return
+    if (!useBackend) {
+      setOrphanState('linked')
+      setOpenId(item.suggestId)
+      return
+    }
+
+    setLinkingOrphanId(item.id)
+    setBackendSignals((current) => ({ ...current, error: null }))
+    try {
+      await onLinkSignalModifier(authToken, item.suggestId, item.id)
+      setOpenId(item.suggestId)
+      await refreshBackendSignals()
+    } catch (error) {
+      setBackendSignals((current) => ({
+        ...current,
+        error: error?.message || 'Could not link update.'
+      }))
+    } finally {
+      setLinkingOrphanId(null)
+    }
+  }
+
+  if (backendSignals.loading) {
+    return (
+      <div className="vrs-page">
+        <Loader
+          variant="bar"
+          size="lg"
+          title="Loading signals"
+          note="Reading extracted signals from verified feeds."
+        />
+      </div>
+    )
+  }
+
+  // ---- empty state: nothing verified or analyzed yet ----
+  if (signalFeeds.length === 0) {
+    return (
+      <div className="vrs-page">
+        <div className="vrs-empty vrs-empty--lg">
+          <svg
+            width="34"
+            height="34"
+            viewBox="0 0 40 40"
+            fill="none"
+            style={{ color: 'var(--text-faint)' }}
+          >
+            <path
+              d="M4 22 L11 22 L17 30 L24 9 L30 18"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="30" cy="18" r="3" fill="currentColor" />
+          </svg>
+          <div className="vrs-empty__title">No signals yet</div>
+          <div className="vrs-empty__note">
+            Backfill, mine, and verify a feed under Sources. Once a feed is verified,
+            its extracted signals stream here.
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            iconRight={<Icon name="arrowRight" size={14} />}
+            onClick={onGoToSources}
+          >
+            Go to sources
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="vrs-page">
+      {/* filter bar */}
+      <div className="vrs-sig-filters">
+        <div className="vrs-sig-filters__group">
+          <Select
+            label="Source"
+            value={source}
+            onChange={(e) => changeSource(e.target.value)}
+            options={[
+              { value: 'all', label: 'All sources' },
+              ...sourceIds.map((id) => ({ value: id, label: SOURCES[id] || id }))
+            ]}
+          />
+          <Select
+            label="Feed"
+            value={feed}
+            onChange={(e) => setFeed(e.target.value)}
+            options={feedOptions}
+          />
+        </div>
+        <div className="vrs-sig-filters__count">
+          <span className="vrs-sig-count__v">{visible.length}</span>
+          <span className="vrs-sig-count__l">
+            {visible.length === 1 ? 'signal' : 'signals'}
+          </span>
+        </div>
+      </div>
+
+      {backendSignals.error && (
+        <div className="vrs-empty vrs-empty--sm">
+          <div className="vrs-empty__note">{backendSignals.error}</div>
+        </div>
+      )}
+
+      {/* tabs */}
+      <div style={{ marginTop: 4 }}>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'all', label: 'All', count: scoped.length },
+            { id: 'tested', label: 'Tested', count: testedCount },
+            { id: 'untested', label: 'Not tested', count: untestedCount },
+            { id: 'skipped', label: 'Skipped', count: skippedCount },
+            { id: 'deleted', label: 'Deleted', count: deletedCount }
+          ]}
+        />
+      </div>
+
+      {/* unlinked update — parser couldn't tie it to a signal, needs a human call */}
+      {orphanVisible && (
+        <div className="vrs-orphan vrs-fade-in">
+          <div className="vrs-orphan__main">
+            <div className="vrs-orphan__head">
+              <Icon name="alert" size={15} />
+              <span className="vrs-orphan__t">Unlinked update</span>
+              <Badge tone="pending" dot>
+                Needs review
+              </Badge>
+            </div>
+            <div className="vrs-orphan__msg">
+              <span
+                className="vrs-sigrow__av"
+                style={{ background: orphanFeed && orphanFeed.tint }}
+              >
+                {orphanFeed && orphanFeed.initials}
+              </span>
+              <pre className="vrs-orphan__txt">{orphan.text}</pre>
+              <span className="vrs-orphan__time">
+                {orphan.date} · {orphan.time}
+              </span>
+            </div>
+            <div className="vrs-orphan__why">{orphan.reason}</div>
+          </div>
+          <div className="vrs-orphan__side">
+            {suggested && (
+              <div className="vrs-orphan__sug">
+                <span className="vrs-sig-lvl__k">Closest match</span>
+                <span className="vrs-orphan__sugsig">
+                  <span className={`vrs-side vrs-side--${sideClass(suggested.side)}`}>
+                    {suggested.side}
+                  </span>
+                  {suggested.symbol}
+                  <span className="vrs-orphan__sugid">{suggested.id}</span>
+                </span>
+              </div>
+            )}
+            <div className="vrs-orphan__btns">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => dismissOrphan(orphan.id)}
+              >
+                Dismiss
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                iconLeft={<Icon name="link" size={14} />}
+                loading={linkingOrphanId === orphan.id}
+                disabled={!orphan.suggestId || linkingOrphanId === orphan.id}
+                onClick={() => linkOrphan(orphan)}
+              >
+                Link to {orphan.suggestId}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* plan cap — global, feed-independent: states the 200-of-N truncation */}
+      <PlanLimitNotice
+        shown={backendSignals.limitReached}
+        total={backendSignals.total}
+        limit={backendSignals.limit}
+        plan={plan}
+        onUpgrade={onUpgrade}
+      />
+
+      {/* column header */}
+      <div className="vrs-sig-head">
+        <span className="vrs-sig-head__sym">Signal</span>
+        <span className="vrs-sig-head__feed">Feed</span>
+        <span className="vrs-sig-head__st">Status</span>
+        <span className="vrs-sig-head__time">Time</span>
+      </div>
+
+      {/* list */}
+      <div className="vrs-stack-xs">
+        {visible.length === 0 ? (
+          <div className="vrs-empty vrs-empty--sm">
+            <div className="vrs-empty__note">
+              {tab === 'tested'
+                ? 'No tested signals for these filters.'
+                : tab === 'untested'
+                  ? 'No untested signals for these filters.'
+                  : tab === 'skipped'
+                    ? 'No skipped signals for these filters.'
+                    : tab === 'deleted'
+                      ? 'No deleted signals for these filters.'
+                      : 'No signals match these filters.'}
+            </div>
+          </div>
+        ) : (
+          pageRows.map((s) => {
+            const f = displayFeed(s, feedById[s.feedId])
+            const open = openId === s.id
+            const untested = s.status === 'untested'
+            const tested = s.status === 'tested'
+            // A tested signal was entered, so a close reply is an author exit, not a
+            // pre-entry cancellation.
+            const cancelled = Boolean(s.cancelled) && !tested
+            const skipped = s.status === 'skipped' && !cancelled
+            const deleted = s.deleted
+            const mods = s.mods || []
+            const authorExit = s.effective && s.effective.closedBy === 'author'
+            const changedEntry = hasChangedValue(s.effective?.entry, s.entry)
+            const changedStop = hasChangedValue(s.effective?.stop, s.stop)
+            const changedTargets = hasChangedValue(s.effective?.tpText, s.tp)
+            return (
+              <div key={s.id} className={`vrs-sig-item ${open ? 'is-open' : ''}`}>
+                <button
+                  className={`vrs-sigrow s-${s.status} ${deleted ? 'is-deleted' : ''} ${cancelled ? 'is-cancelled' : ''}`}
+                  onClick={() => setOpenId(open ? null : s.id)}
+                >
+                  <span className="vrs-sigrow__rail" aria-hidden="true" />
+                  <span className="vrs-sigrow__main">
+                    <span className="vrs-sigrow__sym">
+                      <span className={`vrs-side vrs-side--${sideClass(s.side)}`}>
+                        {s.side}
+                      </span>
+                      {s.symbol}
+                      {mods.length > 0 && (
+                        <span className="vrs-modtag">
+                          <Icon name="reply" size={10} />
+                          <span className="vrs-modtag__t">
+                            {mods.length} update{mods.length > 1 ? 's' : ''}
+                          </span>
+                        </span>
+                      )}
+                    </span>
+                    <span className="vrs-sigrow__id">
+                      {s.id} · {SOURCES[signalSource(s, f)] || 'Telegram'}
+                      {authorExit ? ' · author exit' : ''}
+                    </span>
+                  </span>
+                  <span className="vrs-sigrow__feed">
+                    <span className="vrs-sigrow__av" style={{ background: f.tint }}>
+                      {f.initials}
+                    </span>
+                    <span className="vrs-sigrow__feedname">{f.name}</span>
+                  </span>
+                  <span className="vrs-sigrow__st">
+                    {deleted ? (
+                      <Badge tone="rejected" dot>
+                        Deleted
+                      </Badge>
+                    ) : cancelled ? (
+                      <Badge tone="neutral" dot>
+                        Cancelled
+                      </Badge>
+                    ) : skipped ? (
+                      <Badge tone="neutral" dot>
+                        Skipped
+                      </Badge>
+                    ) : untested ? (
+                      <Badge tone="pending" dot>
+                        Not tested
+                      </Badge>
+                    ) : (
+                      <>
+                        <Badge tone="verified" dot>
+                          Tested
+                        </Badge>
+                        {s.outcome && (
+                          <Pill tone={s.outcome} numeric>
+                            <Icon
+                              name={s.outcome === 'profit' ? 'arrowUp' : 'arrowDown'}
+                              size={11}
+                            />
+                            {s.pnl}
+                          </Pill>
+                        )}
+                      </>
+                    )}
+                  </span>
+                  <span className="vrs-sigrow__time">
+                    {s.date} · {s.time}
+                  </span>
+                  <span className="vrs-sigrow__chev" aria-hidden="true">
+                    <Icon name="chevronRight" size={15} />
+                  </span>
+                </button>
+
+                {open && (
+                  <div className="vrs-sig-detail vrs-fade-in">
+                    {/* LEFT — the raw Telegram conversation Verasig extracted this signal from */}
+                    <div className="vrs-sig-pane vrs-sig-pane--msg">
+                      <div className="vrs-sig-pane__eyebrow">
+                        {mods.length > 0
+                          ? `Conversation · ${1 + mods.length} messages`
+                          : 'Original message'}
+                      </div>
+                      <div className="vrs-stack-xs">
+                        <div className="vrs-sig-bubble">
+                          <div className="vrs-sig-bubble__head">
+                            <span
+                              className="vrs-sigrow__av"
+                              style={{ background: f.tint }}
+                            >
+                              {f.initials}
+                            </span>
+                            <span className="vrs-sig-bubble__who">
+                              <span className="vrs-sig-bubble__name">{f.name}</span>
+                              <span className="vrs-sig-bubble__tag">{f.tag}</span>
+                            </span>
+                            <span className="vrs-sig-bubble__time">
+                              {s.date} · {s.time}
+                            </span>
+                          </div>
+                          <pre className="vrs-sig-bubble__text">{s.text}</pre>
+                        </div>
+                        {mods.map((m) => {
+                          const k = MOD_KINDS[m.kind] || {}
+                          return (
+                            <div
+                              key={m.id}
+                              className="vrs-sig-bubble vrs-sig-bubble--mod"
+                            >
+                              <div className="vrs-sig-bubble__head">
+                                <span
+                                  className="vrs-sigrow__av"
+                                  style={{ background: f.tint }}
+                                >
+                                  {f.initials}
+                                </span>
+                                <span className="vrs-sig-bubble__who">
+                                  <span className="vrs-sig-bubble__name">{f.name}</span>
+                                </span>
+                                <Badge tone={k.tone || 'neutral'}>{k.label}</Badge>
+                                <span className="vrs-sig-bubble__time">
+                                  {m.date} · {m.time}
+                                </span>
+                              </div>
+                              {m.via === 'reply' ? (
+                                <div className="vrs-replyq">
+                                  <span className="vrs-replyq__who">{f.name}</span>
+                                  <span className="vrs-replyq__txt">
+                                    {(s.text || '').split('\n')[0]}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div
+                                  className={`vrs-via ${m.via === 'manual' ? 'vrs-via--manual' : ''}`}
+                                >
+                                  <Icon name="link" size={11} />
+                                  {m.via === 'manual'
+                                    ? 'Linked manually — no reply in chat'
+                                    : 'Link inferred — no reply in chat'}
+                                </div>
+                              )}
+                              <pre className="vrs-sig-bubble__text">{m.text}</pre>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* RIGHT — the structured signal Verasig parsed, plus the position timeline */}
+                    <div className="vrs-sig-pane vrs-sig-pane--extract">
+                      <div className="vrs-sig-pane__eyebrow">Extracted signal</div>
+                      <div className="vrs-sig-fields">
+                        <div className="vrs-sig-field">
+                          <span className="vrs-sig-lvl__k">Direction</span>
+                          <span className="vrs-sig-lvl__v">
+                            <span
+                              className={`vrs-side vrs-side--${sideClass(s.side)}`}
+                              style={{ marginRight: 0 }}
+                            >
+                              {s.side}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="vrs-sig-field">
+                          <span className="vrs-sig-lvl__k">Entry</span>
+                          {changedEntry ? (
+                            <span className="vrs-sig-lvl__v">
+                              <s className="vrs-eff-was">{s.entry}</s>{' '}
+                              {s.effective.entry}{' '}
+                              <span className="vrs-eff-note">
+                                {s.effective.entryNote}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="vrs-sig-lvl__v">{s.entry}</span>
+                          )}
+                        </div>
+                        <div className="vrs-sig-field">
+                          <span className="vrs-sig-lvl__k">Stop</span>
+                          {changedStop ? (
+                            <span className="vrs-sig-lvl__v vrs-sig-lvl__v--stop">
+                              <s className="vrs-eff-was">{s.stop}</s> {s.effective.stop}{' '}
+                              <span className="vrs-eff-note">
+                                {s.effective.stopNote}
+                              </span>
+                            </span>
+                          ) : (
+                            <span
+                              className={`vrs-sig-lvl__v ${s.stop ? 'vrs-sig-lvl__v--stop' : 'vrs-sig-lvl__v--none'}`}
+                            >
+                              {s.stop || 'None'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="vrs-sig-field vrs-sig-field--wide">
+                          <span className="vrs-sig-lvl__k">Targets</span>
+                          {changedTargets ? (
+                            <span className="vrs-sig-lvl__v">
+                              <s className="vrs-eff-was">{s.tp || 'None'}</s>{' '}
+                              {s.effective.tpText}
+                            </span>
+                          ) : (
+                            <span
+                              className={`vrs-sig-lvl__v ${s.tp ? '' : 'vrs-sig-lvl__v--none'}`}
+                            >
+                              {s.tp || 'None'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* position timeline — how the updates played the position */}
+                      {mods.length > 0 && (
+                        <div className="vrs-tl">
+                          <div
+                            className="vrs-sig-pane__eyebrow"
+                            style={{ marginBottom: 7 }}
+                          >
+                            Position timeline
+                          </div>
+                          <div className={`vrs-tl__row ${untested ? 'is-muted' : ''}`}>
+                            <span className="vrs-tl__ic">
+                              <Icon name="spark" size={11} />
+                            </span>
+                            <span className="vrs-tl__lbl">
+                              {untested
+                                ? 'Entry (queued for backtest)'
+                                : `Entry filled @ ${s.entry}`}
+                            </span>
+                            <span className="vrs-tl__time">{s.time}</span>
+                          </div>
+                          {mods.map((m) => {
+                            const k = MOD_KINDS[m.kind] || {}
+                            return (
+                              <div
+                                key={m.id}
+                                className={`vrs-tl__row ${m.late ? 'is-late' : ''}`}
+                              >
+                                <span className="vrs-tl__ic">
+                                  <Icon
+                                    name={m.late ? 'alert' : k.icon || 'reply'}
+                                    size={11}
+                                  />
+                                </span>
+                                <span className="vrs-tl__lbl">
+                                  {k.label}
+                                  {m.price ? ` @ ${m.price}` : ''}
+                                  <span className="vrs-tl__fx">{m.effect}</span>
+                                </span>
+                                <span className="vrs-tl__time">{m.time}</span>
+                              </div>
+                            )
+                          })}
+                          {authorExit && s.outcome && (
+                            <div className="vrs-tl__row is-final">
+                              <span className="vrs-tl__ic">
+                                <Icon name="check" size={11} />
+                              </span>
+                              <span className="vrs-tl__lbl">
+                                Closed by author
+                                <Pill
+                                  tone={s.outcome}
+                                  numeric
+                                  style={{ marginLeft: 8 }}
+                                >
+                                  <Icon
+                                    name={
+                                      s.outcome === 'profit' ? 'arrowUp' : 'arrowDown'
+                                    }
+                                    size={11}
+                                  />
+                                  {s.pnl}
+                                </Pill>
+                              </span>
+                            </div>
+                          )}
+                          {!authorExit && tested && s.outcome && (
+                            <div className="vrs-tl__row is-final">
+                              <span className="vrs-tl__ic">
+                                <Icon
+                                  name={s.outcome === 'profit' ? 'check' : 'x'}
+                                  size={11}
+                                />
+                              </span>
+                              <span className="vrs-tl__lbl">
+                                {s.outcome === 'profit'
+                                  ? 'Closed on backtest'
+                                  : 'Closed at stop'}
+                                <Pill
+                                  tone={s.outcome}
+                                  numeric
+                                  style={{ marginLeft: 8 }}
+                                >
+                                  <Icon
+                                    name={
+                                      s.outcome === 'profit' ? 'arrowUp' : 'arrowDown'
+                                    }
+                                    size={11}
+                                  />
+                                  {s.pnl}
+                                </Pill>
+                              </span>
+                            </div>
+                          )}
+                          {s.effective && s.effective.note && (
+                            <div className="vrs-tl__note">{s.effective.note}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {tested && !deleted && s.outcome && mods.length === 0 && (
+                        <div className={`vrs-sig-result vrs-sig-result--${s.outcome}`}>
+                          <Pill tone={s.outcome} numeric>
+                            <Icon
+                              name={s.outcome === 'profit' ? 'arrowUp' : 'arrowDown'}
+                              size={11}
+                            />
+                            {s.pnl}
+                          </Pill>
+                          <span>
+                            {s.outcome === 'profit'
+                              ? 'Closed in profit on backtest.'
+                              : 'Closed at a loss on backtest.'}
+                          </span>
+                        </div>
+                      )}
+                      {deleted ? (
+                        <div className="vrs-sig-skipnote vrs-sig-skipnote--deleted">
+                          <Icon name="alert" size={13} /> Removed from the channel —
+                          this signal was deleted from the feed&rsquo;s history after
+                          extraction.
+                        </div>
+                      ) : cancelled ? (
+                        <div className="vrs-sig-skipnote">
+                          <Icon name="x" size={13} /> Cancelled by the author before
+                          entry — excluded from the backtest.
+                        </div>
+                      ) : untested ? (
+                        <div className="vrs-sig-skipnote vrs-sig-skipnote--untested">
+                          <Icon name="clock" size={13} /> Queued for backtest — has risk
+                          management but hasn&rsquo;t been run yet.
+                        </div>
+                      ) : (
+                        skipped && (
+                          <div className="vrs-sig-skipnote">
+                            <Icon name="x" size={13} /> Skipped from backtest — no
+                            stop-loss or target defined.
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      <Pager
+        page={safePage}
+        pageCount={pageCount}
+        windowStart={windowStart}
+        pageSize={PAGE_SIZE}
+        total={visible.length}
+        onPageChange={setPage}
+      />
+    </div>
+  )
+}
+
+function isSignalFeed(feed) {
+  return feed.status === 'verified' || feed.status === 'analyzed'
+}
+
+function normalizeSignal(signal, demoMode) {
+  const tp = formatTargets(signal.tpText || signal.tp)
+  return {
+    ...signal,
+    id: String(signal.id),
+    feedId: String(signal.feedId),
+    side: signal.side || '',
+    symbol: formatSymbol(signal.symbol),
+    status: signal.deleted ? 'deleted' : signal.status,
+    pnl: formatPnl(signal.pnl),
+    entry: signal.entry || null,
+    stop: signal.stop || null,
+    tp,
+    text:
+      signal.text || (demoMode ? rawMessage(signal) : 'Original message unavailable'),
+    mods: (signal.mods || []).map(normalizeMod),
+    effective: normalizeEffective(signal.effective)
+  }
+}
+
+function normalizeMod(mod) {
+  return {
+    ...mod,
+    id: String(mod.id),
+    price: mod.price || null,
+    effect: mod.effect || null
+  }
+}
+
+function normalizeOrphan(orphan) {
+  return {
+    ...orphan,
+    id: String(orphan.id),
+    feedId: String(orphan.feedId),
+    suggestId: orphan.suggestId ? String(orphan.suggestId) : null
+  }
+}
+
+function normalizeEffective(effective) {
+  if (!effective) return null
+  return {
+    ...effective,
+    tpText: formatTargets(effective.tpText || effective.tp)
+  }
+}
+
+function displayFeed(signal, feed) {
+  return {
+    ...(feed || {}),
+    id: signal.feedId,
+    name: feed?.name || signal.feedName || 'Unknown feed',
+    tag: feed?.tag ?? signal.feedTag ?? null,
+    initials: feed?.initials || signal.feedInitials || '?',
+    tint: feed?.tint || signal.feedTint || 'var(--viz-1)',
+    source: feed?.source || signal.source || 'telegram'
+  }
+}
+
+function signalSource(signal, feed) {
+  return signal.source || feedSource(feed)
+}
+
+function feedSource(feed) {
+  return (feed && feed.source) || 'telegram'
+}
+
+function sideClass(side) {
+  return String(side || '').toLowerCase()
+}
+
+function formatSymbol(symbol) {
+  if (!symbol) return ''
+  if (symbol.includes('/')) return symbol
+  if (symbol.endsWith('USDT') && symbol.length > 4) {
+    return `${symbol.slice(0, -4)}/USDT`
+  }
+  return symbol
+}
+
+function formatTargets(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join(' / ') || null
+  }
+  return value || null
+}
+
+function formatPnl(value) {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') return value
+  return `${value > 0 ? '+' : ''}${value}%`
+}
+
+function hasChangedValue(next, base) {
+  if (next === null || next === undefined || next === '') return false
+  return String(next) !== String(base || '')
+}
+
+// Stable per-id hash so each signal's reconstructed source message looks consistent across renders.
+function hashId(id) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return h
+}
+
+// Reconstruct the messy, free-form Telegram post Verasig parsed this signal out of.
+// Skipped signals (no stop/target) come from loose calls with no risk management —
+// which is exactly why they were skipped.
+function rawMessage(s) {
+  const base = s.symbol.split('/')[0]
+  const side = s.side
+  const h = hashId(s.id)
+
+  if (!s.stop && !s.tp) {
+    const loose = [
+      `${side} ${s.symbol} here ${s.entry} 🚀\nsmall size, no hard stop — mental SL only. updates to follow`,
+      `quick idea — ${side.toLowerCase()} ${base} around ${s.entry}\nliking this setup, will post levels later`,
+      `aping ${base} ${side.toLowerCase()} @ ${s.entry}\nmanage your own risk, NFA`
+    ]
+    return loose[h % loose.length]
+  }
+
+  const tmpl = h % 3
+  if (tmpl === 0) {
+    let m = `${side === 'LONG' ? '🟢' : '🔴'} ${side}  ${s.symbol}\nEntry  ${s.entry}\nStop-loss  ${s.stop}\nTargets  ${s.tp}`
+    if (h % 2 === 0) m += `\nLeverage  5–10x`
+    return m
+  }
+  if (tmpl === 1) {
+    let m = `$${base} ${side}\nEntry: ${s.entry}\nSL: ${s.stop}\nTP: ${s.tp}`
+    if (h % 2 === 1) m += `\nRisk 2% of book`
+    return m
+  }
+  return `${side} ${s.symbol} @ ${s.entry}\nstop ${s.stop}\ntargets ${s.tp}\nclose half at first TP, then move SL to break-even`
+}
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+]
+
+// Sortable recency key (descending newest). Backend rows carry an ISO `at`; demo
+// rows only have 'Jun 7' + '14:32', which sorts by month, day and time.
+function sortKey(s) {
+  const ts = s.at ? Date.parse(s.at) : NaN
+  if (!Number.isNaN(ts)) return ts
+  const month = Math.max(0, MONTHS.indexOf((s.date.match(/[A-Za-z]{3}/) || [''])[0]))
+  const day = parseInt((s.date.match(/\d+/) || [0])[0], 10)
+  const [h, m] = s.time.split(':').map((n) => parseInt(n, 10))
+  return month * 1000000 + day * 10000 + h * 100 + m
+}

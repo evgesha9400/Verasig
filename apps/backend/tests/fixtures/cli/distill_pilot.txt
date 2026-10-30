@@ -1,0 +1,40 @@
+I reviewed the labeled examples and distilled the rules below.
+
+```json
+{
+  "filter_rule": {
+    "include_patterns": [
+      "(?i)\\b(long|short|buy|sell|лонг|шорт|куп|прод)",
+      "(?i)\\$?[A-Z]{2,10}(?:USDT)?\\b",
+      "(?i)\\b(entry|sl|tp|target|stop|тейк|стоп|вход)\\b"
+    ],
+    "exclude_patterns": [],
+    "matched_reason_template": "distilled_filter",
+    "recall_target": 0.95
+  },
+  "parser_rules": [
+    {
+      "patterns": [
+        "(?i)(?P<symbol>[A-Z]{2,10})\\s+(?P<side>long|short|buy|sell|лонг|шорт)(?:.*?(?:entry|вход)[:\\s]+(?P<entry>[\\d.,]+k?))?(?:.*?(?:sl|стоп)[:\\s]+(?P<sl>[\\d.,]+k?))?(?:.*?(?:tp|тейк)[:\\s]+(?P<tp>[\\d.,]+k?))?"
+      ],
+      "field_map": {
+        "symbol": "symbol",
+        "side": "side",
+        "entry": "entry",
+        "sl": "stop_loss",
+        "tp": "take_profit"
+      },
+      "side_aliases": {
+        "long": "LONG",
+        "buy": "LONG",
+        "short": "SHORT",
+        "sell": "SHORT",
+        "лонг": "LONG",
+        "шорт": "SHORT"
+      }
+    }
+  ]
+}
+```
+
+These should hold recall on the positives while keeping precision on the fields.

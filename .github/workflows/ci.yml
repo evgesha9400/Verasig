@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.9.17
+          python-version: "3.12"
+      - run: make env install
+      - run: make check
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: make env
+      # The production site image (Dockerfile.site) with Postgres: CI tests what deploys.
+      - run: docker compose --profile site up -d --wait site
+      - run: npm ci
+        working-directory: apps/frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/frontend/web
+      - run: npm run e2e
+        working-directory: apps/frontend/web
+        env:
+          CI: "1"
+          E2E_REGISTER: "1"
+          E2E_BASE_URL: http://localhost:8080
+          E2E_API_URL: http://localhost:8080/api
+      - if: failure()
+        run: docker compose --profile site logs site
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/frontend/web/playwright-report
+          retention-days: 7

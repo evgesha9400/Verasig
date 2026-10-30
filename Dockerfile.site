@@ -1,0 +1,28 @@
+# The deployed site: the backend API under /api and the built web app at /,
+# served by one uvicorn process (verasig.entrypoints.site).
+
+FROM node:22-slim AS web
+WORKDIR /workspace
+COPY apps/frontend/package.json apps/frontend/package-lock.json ./
+COPY apps/frontend/design-system/package.json design-system/
+COPY apps/frontend/web/package.json web/
+RUN npm ci
+COPY apps/frontend/ ./
+RUN VITE_VERASIG_API_URL=/api npm run build --workspace verasig-web
+
+FROM python:3.12-slim
+RUN pip install --no-cache-dir uv==0.9.17
+WORKDIR /app
+
+# Same dependency layering as apps/backend/Dockerfile.
+COPY apps/backend/pyproject.toml apps/backend/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY apps/backend/ ./
+RUN uv sync --frozen --no-dev
+
+COPY --from=web /workspace/web/dist /app/web
+ENV VERASIG_WEB_DIST_DIR=/app/web \
+    UV_CACHE_DIR=/tmp/uv
+LABEL org.opencontainers.image.source=https://github.com/evgesha9400/Verasig
+EXPOSE 8000
+ENTRYPOINT ["/app/scripts/start-site.sh"]

@@ -1,0 +1,13 @@
+# BEGIN graphify-recursively managed ignores
+node_modules/
+__pycache__/
+.ruff_cache/
+.pytest_cache/
+.codegraph/
+.venv/
+.DS_Store
+dist/
+*.log
+*.lock
+*-lock.json
+# END graphify-recursively managed ignores

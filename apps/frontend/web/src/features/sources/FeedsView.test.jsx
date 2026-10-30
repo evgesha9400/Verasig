@@ -1,0 +1,588 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { FeedsView } from './FeedsView.jsx'
+
+const feed = {
+  id: 'delta',
+  name: 'Delta Futures',
+  initials: 'DF',
+  tint: '#5197ff',
+  source: 'telegram',
+  status: 'analyzed',
+  score: 86,
+  fetched: 18420,
+  lastDate: 'Jun 6',
+  signalDeletion: true,
+  deletedCount: 0
+}
+
+describe('FeedsView', () => {
+  it('uses shared popover content for feed flags', () => {
+    render(
+      <FeedsView
+        feeds={[feed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    // Interactive content (a button) → dialog semantics, not tooltip.
+    expect(screen.getByRole('dialog').textContent).toContain(
+      'Confirmed signal deletion'
+    )
+  })
+
+  it('uses shared menu item roles for feed options', () => {
+    const onCheckGaps = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[feed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={onCheckGaps}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /check gaps/i }))
+
+    expect(onCheckGaps).toHaveBeenCalledWith(feed)
+  })
+
+  it.each(['new', 'backfilling', 'backfilled', 'cancelled', 'failed'])(
+    'disables Check gaps for %s feeds',
+    (status) => {
+      const unreviewedFeed = { ...feed, status, signalDeletion: false }
+
+      render(
+        <FeedsView
+          feeds={[unreviewedFeed]}
+          onStartBackfill={() => {}}
+          onRetry={() => {}}
+          onResume={() => {}}
+          onFetchNew={() => {}}
+          onRefetchFull={() => {}}
+          onRemove={() => {}}
+          onViewDeleted={() => {}}
+          onCheckGaps={() => {}}
+          onBacktest={() => {}}
+        />
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+
+      expect(screen.getByRole('menuitem', { name: /check gaps/i }).disabled).toBe(true)
+    }
+  )
+
+  it.each(['verified', 'analyzed'])('enables Check gaps for %s feeds', (status) => {
+    const reviewedFeed = { ...feed, status, signalDeletion: false }
+    const onCheckGaps = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={onCheckGaps}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    const item = screen.getByRole('menuitem', { name: /check gaps/i })
+    fireEvent.click(item)
+
+    expect(item.disabled).toBe(false)
+    expect(onCheckGaps).toHaveBeenCalledWith(reviewedFeed)
+  })
+
+  it('enables Check gaps for a backfilled feed with saved rules', () => {
+    const reviewedFeed = {
+      ...feed,
+      status: 'backfilled',
+      hasRisk: true,
+      signalDeletion: false
+    }
+    const onCheckGaps = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={onCheckGaps}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    const item = screen.getByRole('menuitem', { name: /check gaps/i })
+    fireEvent.click(item)
+
+    expect(item.disabled).toBe(false)
+    expect(onCheckGaps).toHaveBeenCalledWith(reviewedFeed)
+  })
+
+  it.each(['verified', 'analyzed'])('shows Review templates for %s feeds', (status) => {
+    const reviewedFeed = { ...feed, status, signalDeletion: false }
+    const onReviewTemplates = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onReviewTemplates={onReviewTemplates}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /review templates/i }))
+
+    expect(onReviewTemplates).toHaveBeenCalledWith(reviewedFeed)
+  })
+
+  it('opens a backfilled reviewed feed from the row click', () => {
+    const reviewedBackfilledFeed = {
+      ...feed,
+      status: 'backfilled',
+      hasRisk: true,
+      signalDeletion: false
+    }
+    const onOpenFeed = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[reviewedBackfilledFeed]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onReviewTemplates={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Ready to backtest')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Delta Futures'))
+
+    expect(onOpenFeed).toHaveBeenCalledWith(reviewedBackfilledFeed)
+  })
+
+  it('keeps Fetch new messages wording in the menu and confirmation copy', async () => {
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'verified', signalDeletion: false }]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /fetch new messages/i }))
+
+    expect(await screen.findByText('Fetch new messages?')).toBeTruthy()
+    expect(screen.getByText(/Existing labels and rules are kept/)).toBeTruthy()
+  })
+
+  it('shows a loading state while checking gaps', () => {
+    const reviewedFeed = { ...feed, status: 'verified', signalDeletion: false }
+
+    render(
+      <FeedsView
+        feeds={[reviewedFeed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        gapChecks={{ [reviewedFeed.id]: { scanned: null } }}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    const item = screen.getByRole('menuitem', { name: /checking gaps/i })
+
+    expect(item.disabled).toBe(true)
+    expect(item.getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('shows Scam badge on a verified feed with signal deletion', () => {
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'verified', signalDeletion: true }]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Scam')).toBeTruthy()
+  })
+
+  it('shows the cumulative deleted counter', () => {
+    render(
+      <FeedsView
+        feeds={[{ ...feed, signalDeletion: false, deletedCount: 3 }]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    expect(screen.getByText('3 deleted')).toBeTruthy()
+  })
+
+  it('confirms before removing a feed', async () => {
+    const onRemove = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[feed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={onRemove}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /remove feed/i }))
+
+    expect(onRemove).not.toHaveBeenCalled()
+    expect(await screen.findByText('Remove this feed?')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove feed' }))
+
+    expect(onRemove).toHaveBeenCalledWith(feed)
+  })
+
+  it('confirms before fetching new messages', async () => {
+    const onFetchNew = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[feed]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={onFetchNew}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /fetch new messages/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch new' }))
+
+    expect(onFetchNew).toHaveBeenCalledWith(feed)
+  })
+
+  it('adds a Telegram feed by channel tag', async () => {
+    const onAddFeed = vi.fn().mockResolvedValue()
+
+    render(
+      <FeedsView
+        feeds={[]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+        onAddFeed={onAddFeed}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText(/channel tag/i), {
+      target: { value: '@pilot' }
+    })
+    fireEvent.submit(screen.getByRole('button', { name: /add feed/i }).closest('form'))
+
+    await waitFor(() => {
+      expect(onAddFeed).toHaveBeenCalledWith('@pilot')
+    })
+  })
+
+  it('shows the failure reason when adding a feed is rejected', async () => {
+    const onAddFeed = vi
+      .fn()
+      .mockRejectedValue(new Error('Cannot resolve Telegram channel reference.'))
+
+    render(
+      <FeedsView
+        feeds={[]}
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+        onAddFeed={onAddFeed}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText(/channel tag/i), {
+      target: { value: '@ghost' }
+    })
+    fireEvent.submit(screen.getByRole('button', { name: /add feed/i }).closest('form'))
+
+    expect(await screen.findByText('Feed not added')).toBeTruthy()
+    expect(screen.getByText('Cannot resolve Telegram channel reference.')).toBeTruthy()
+  })
+
+  it('shows failed backfill progress and opens the feed from the row', () => {
+    const failedFeed = {
+      ...feed,
+      status: 'failed',
+      fetched: 200,
+      lastDate: 'Jun 1, 2026',
+      signalDeletion: false
+    }
+    const onOpenFeed = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[failedFeed]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    expect(screen.getByText('Failed')).toBeTruthy()
+    expect(screen.getByText('200 fetched')).toBeTruthy()
+    expect(screen.getByText('through Jun 1, 2026')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Delta Futures'))
+
+    expect(onOpenFeed).toHaveBeenCalledWith(failedFeed)
+  })
+
+  it('does not open the feed when the gear menu is clicked', () => {
+    const onOpenFeed = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'backfilled', signalDeletion: false }]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+
+    expect(onOpenFeed).not.toHaveBeenCalled()
+  })
+
+  it('opens the feed on Enter only when the row itself has focus', () => {
+    const onOpenFeed = vi.fn()
+
+    render(
+      <FeedsView
+        feeds={[{ ...feed, status: 'backfilled', signalDeletion: false }]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Options' }), { key: 'Enter' })
+    expect(onOpenFeed).not.toHaveBeenCalled()
+
+    const row = screen.getByRole('button', { name: 'Options' }).closest('.vrs-feed-row')
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onOpenFeed).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('FeedsView deletion visibility', () => {
+  function renderWith(props) {
+    return render(
+      <FeedsView
+        onStartBackfill={() => {}}
+        onRetry={() => {}}
+        onResume={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+        onBacktest={() => {}}
+        {...props}
+      />
+    )
+  }
+
+  it('shows how many deleted messages were signals', () => {
+    renderWith({
+      feeds: [
+        {
+          id: 'x',
+          name: 'X',
+          initials: 'X',
+          status: 'analyzed',
+          score: 0,
+          deletedCount: 4,
+          deletedSignalCount: 2
+        }
+      ]
+    })
+    expect(screen.getByText('4 deleted · 2 signals')).toBeTruthy()
+  })
+
+  it('omits the signal suffix when no deletion is a signal', () => {
+    renderWith({
+      feeds: [
+        {
+          id: 'x',
+          name: 'X',
+          initials: 'X',
+          status: 'analyzed',
+          score: 9,
+          deletedCount: 3,
+          deletedSignalCount: 0
+        }
+      ]
+    })
+    expect(screen.getByText('3 deleted')).toBeTruthy()
+  })
+
+  it('shows a live scanned count while checking gaps', () => {
+    renderWith({
+      feeds: [
+        { id: 'x', name: 'X', initials: 'X', status: 'verified', deletedCount: 0 }
+      ],
+      gapChecks: { x: { scanned: 1200 } }
+    })
+    expect(screen.getByText(/checking · 1\.2K scanned/i)).toBeTruthy()
+  })
+})
+
+describe('FeedsView feed navigation', () => {
+  const newFeed = { id: 'nf', name: 'New Feed', initials: 'NF', status: 'new' }
+
+  it('opens a new feed from the row click', () => {
+    const onOpenFeed = vi.fn()
+    render(
+      <FeedsView
+        feeds={[newFeed]}
+        onOpenFeed={onOpenFeed}
+        onFetchNew={() => {}}
+        onRefetchFull={() => {}}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+    fireEvent.click(screen.getByText('New Feed'))
+    expect(onOpenFeed).toHaveBeenCalledWith(newFeed)
+  })
+
+  it('re-fetch confirm warns about the wipe and passes the chosen depth', () => {
+    const onRefetchFull = vi.fn()
+    const reviewed = { ...newFeed, status: 'analyzed', score: 80 }
+    render(
+      <FeedsView
+        feeds={[reviewed]}
+        onOpenFeed={() => {}}
+        onFetchNew={() => {}}
+        onRefetchFull={onRefetchFull}
+        onRemove={() => {}}
+        onViewDeleted={() => {}}
+        onCheckGaps={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /re-fetch full history/i }))
+    expect(screen.getByText(/counter restarts at zero/i)).toBeTruthy()
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'all' } })
+    fireEvent.click(screen.getByRole('button', { name: /wipe & re-fetch/i }))
+    expect(onRefetchFull).toHaveBeenCalledWith(reviewed, 'all')
+  })
+})

@@ -1,0 +1,19 @@
+{
+  "name": "verasig-frontend-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "design-system",
+    "web"
+  ],
+  "scripts": {
+    "format": "prettier --write \"web/**/*.{js,jsx,ts,tsx,json,css,html}\" \"design-system/**/*.{js,jsx,ts,tsx,json,css,html}\" \"package*.json\"",
+    "format:check": "prettier --check \"web/**/*.{js,jsx,ts,tsx,json,css,html}\" \"design-system/**/*.{js,jsx,ts,tsx,json,css,html}\" \"package*.json\"",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspace @verasig/design-system && npm run test --workspace verasig-web -- --run",
+    "build": "npm run build --workspace verasig-web"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.4"
+  }
+}

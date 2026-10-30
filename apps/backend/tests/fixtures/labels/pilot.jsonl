@@ -1,0 +1,40 @@
+{"channel_id": 7, "message_id": 1, "label": "signal", "expected": {"symbol": "BTCUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 2, "label": "signal", "expected": {"symbol": "ETHUSDT", "side": "SHORT"}}
+{"channel_id": 7, "message_id": 3, "label": "signal", "expected": {"symbol": "SOLUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 4, "label": "signal", "expected": {"symbol": "BNBUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 5, "label": "signal", "expected": {"symbol": "XRPUSDT", "side": "SHORT"}}
+{"channel_id": 7, "message_id": 6, "label": "signal", "expected": {"symbol": "ADAUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 7, "label": "signal", "expected": {"symbol": "AVAXUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 8, "label": "signal", "expected": {"symbol": "LINKUSDT", "side": "SHORT"}}
+{"channel_id": 7, "message_id": 9, "label": "signal", "expected": {"symbol": "DOGEUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 10, "label": "signal", "expected": {"symbol": "MATICUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 11, "label": "signal", "expected": {"symbol": "BTCUSDT", "side": "SHORT"}}
+{"channel_id": 7, "message_id": 12, "label": "signal", "expected": {"symbol": "DOTUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 13, "label": "signal", "expected": {"symbol": "BTCUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 14, "label": "signal", "expected": {"symbol": "ETHUSDT", "side": "SHORT"}}
+{"channel_id": 7, "message_id": 15, "label": "signal", "expected": {"symbol": "SOLUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 16, "label": "signal", "expected": {"symbol": "ADAUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 17, "label": "signal", "expected": {"symbol": "BTCUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 18, "label": "signal", "expected": {"symbol": "ETHUSDT", "side": "SHORT"}}
+{"channel_id": 7, "message_id": 19, "label": "signal", "expected": {"symbol": "AVAXUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 20, "label": "signal", "expected": {"symbol": "LINKUSDT", "side": "LONG"}}
+{"channel_id": 7, "message_id": 21, "label": "noise"}
+{"channel_id": 7, "message_id": 22, "label": "noise"}
+{"channel_id": 7, "message_id": 23, "label": "noise"}
+{"channel_id": 7, "message_id": 24, "label": "noise"}
+{"channel_id": 7, "message_id": 25, "label": "noise"}
+{"channel_id": 7, "message_id": 26, "label": "noise"}
+{"channel_id": 7, "message_id": 27, "label": "noise"}
+{"channel_id": 7, "message_id": 28, "label": "noise"}
+{"channel_id": 7, "message_id": 29, "label": "noise"}
+{"channel_id": 7, "message_id": 30, "label": "noise"}
+{"channel_id": 7, "message_id": 31, "label": "noise"}
+{"channel_id": 7, "message_id": 32, "label": "noise"}
+{"channel_id": 7, "message_id": 33, "label": "noise"}
+{"channel_id": 7, "message_id": 34, "label": "noise"}
+{"channel_id": 7, "message_id": 35, "label": "noise"}
+{"channel_id": 7, "message_id": 36, "label": "noise"}
+{"channel_id": 7, "message_id": 37, "label": "noise"}
+{"channel_id": 7, "message_id": 38, "label": "noise"}
+{"channel_id": 7, "message_id": 39, "label": "noise"}
+{"channel_id": 7, "message_id": 40, "label": "noise"}

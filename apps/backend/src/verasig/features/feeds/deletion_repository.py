@@ -1,0 +1,144 @@
+"""Deletion repository functions.
+
+The domain `DeletedSignalEvidence` speaks `channel_id`/`message_id`; storage
+speaks `external_id`/`external_message_id` and is user-owned.
+"""
+
+from dataclasses import dataclass
+from uuid import UUID
+
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+
+from verasig.domain.deletion import DeletedSignalEvidence
+from verasig.storage.models import DeletedSignalEvidenceRow
+
+# Rows per INSERT: 10 bound columns per row keeps each statement far below
+# PostgreSQL's 65,535 bind-parameter limit, however large the evidence set.
+_UPSERT_CHUNK = 2000
+
+
+@dataclass(frozen=True)
+class DeletionSummary:
+    # Confirmed deletions only. Suspected id-gaps are detected and persisted for
+    # provider-hygiene scoring, but never surfaced to the user (no value).
+    signal_deletion: bool = False
+    deleted_count: int = 0
+    deleted_signal_count: int = 0
+
+
+def _deletion_values(user_id: UUID, evidence: DeletedSignalEvidence) -> dict:
+    return {
+        "id": evidence.id,
+        "user_id": user_id,
+        "external_id": evidence.channel_id,
+        "external_message_id": evidence.message_id,
+        "confidence": evidence.confidence.value,
+        "method": evidence.method.value,
+        "original_text": evidence.original_text,
+        "first_seen_at": evidence.first_seen_at,
+        "detected_at": evidence.detected_at,
+        "was_signal_candidate": evidence.was_signal_candidate,
+    }
+
+
+def upsert_deletion_evidence(
+    session: Session, user_id: UUID, evidence: list[DeletedSignalEvidence]
+) -> int:
+    """Persist evidence; upgrade SUSPECTED->CONFIRMED only, preserving detected_at."""
+    written = 0
+    for start in range(0, len(evidence), _UPSERT_CHUNK):
+        chunk = evidence[start : start + _UPSERT_CHUNK]
+        written += _upsert_evidence_chunk(session, user_id, chunk)
+    return written
+
+
+def _upsert_evidence_chunk(
+    session: Session, user_id: UUID, evidence: list[DeletedSignalEvidence]
+) -> int:
+    statement = pg_insert(DeletedSignalEvidenceRow).values(
+        [_deletion_values(user_id, item) for item in evidence]
+    )
+    statement = statement.on_conflict_do_update(
+        index_elements=["user_id", "external_id", "external_message_id"],
+        set_={
+            "confidence": statement.excluded.confidence,
+            "method": statement.excluded.method,
+            "original_text": statement.excluded.original_text,
+            "first_seen_at": statement.excluded.first_seen_at,
+            "was_signal_candidate": statement.excluded.was_signal_candidate,
+        },
+        # Refresh only on the SUSPECTED->CONFIRMED upgrade. An already-CONFIRMED
+        # row's `was_signal_candidate` is fixed at first confirmation — fine for the
+        # wired `Rescan`, which only runs post-mine so candidacy is already known. A
+        # future live-delete path that could CONFIRM *before* mining would need an
+        # explicit recompute (the rule-era recompute is gone — ADR 0016).
+        where=(
+            (DeletedSignalEvidenceRow.confidence == "SUSPECTED")
+            & (statement.excluded.confidence == "CONFIRMED")
+        ),
+    ).returning(DeletedSignalEvidenceRow.id)
+    return len(session.execute(statement).fetchall())
+
+
+def _row_to_deletion(row: DeletedSignalEvidenceRow) -> DeletedSignalEvidence:
+    return DeletedSignalEvidence(
+        id=row.id,
+        channel_id=row.external_id,
+        message_id=row.external_message_id,
+        confidence=row.confidence,
+        method=row.method,
+        original_text=row.original_text,
+        first_seen_at=row.first_seen_at,
+        detected_at=row.detected_at,
+        was_signal_candidate=row.was_signal_candidate,
+    )
+
+
+def read_deletion_evidence(
+    session: Session, user_id: UUID, external_id: int
+) -> list[DeletedSignalEvidence]:
+    rows = session.scalars(
+        select(DeletedSignalEvidenceRow).where(
+            DeletedSignalEvidenceRow.user_id == user_id,
+            DeletedSignalEvidenceRow.external_id == external_id,
+        )
+    ).all()
+    return [_row_to_deletion(row) for row in rows]
+
+
+def summarize_deletions(
+    session: Session,
+    user_id: UUID,
+    external_ids: list[int],
+) -> dict[int, DeletionSummary]:
+    """Confirmed-deletion counts per feed, aggregated in PostgreSQL.
+
+    Suspected id-gaps are internal-only (hygiene), never surfaced. A CONFIRMED
+    deletion of a signal candidate is a signal deletion (ADR 0016):
+    `was_signal_candidate` is authoritative, set at detection time iff the deleted
+    message had a persisted `signal`, which only the miner writes on Confirm.
+    """
+    if not external_ids:
+        return {}
+    signal_count = func.count().filter(
+        DeletedSignalEvidenceRow.was_signal_candidate.is_(True)
+    )
+    rows = session.execute(
+        select(DeletedSignalEvidenceRow.external_id, func.count(), signal_count)
+        .where(
+            DeletedSignalEvidenceRow.user_id == user_id,
+            DeletedSignalEvidenceRow.external_id.in_(external_ids),
+            DeletedSignalEvidenceRow.confidence == "CONFIRMED",
+        )
+        .group_by(DeletedSignalEvidenceRow.external_id)
+    ).all()
+    summaries = {external_id: DeletionSummary() for external_id in external_ids}
+    for external_id, deleted_count, deleted_signal_count in rows:
+        summaries[external_id] = DeletionSummary(
+            signal_deletion=deleted_signal_count > 0,
+            deleted_count=deleted_count,
+            deleted_signal_count=deleted_signal_count,
+        )
+    return summaries

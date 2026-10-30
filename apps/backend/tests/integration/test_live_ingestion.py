@@ -1,0 +1,213 @@
+from collections.abc import AsyncIterator
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+from seed import insert_source
+
+from verasig.domain.account import Plan, UserAccount
+from verasig.domain.channel import TelegramChannel
+from verasig.domain.deletion import DeletionConfidence, DeletionMethod
+from verasig.domain.message import DeliveryMode, RawTelegramMessage
+from verasig.domain.signal import Side, Signal
+from verasig.domain.telegram import (
+    TelegramDeletionEvent,
+    TelegramDeliveryEvent,
+    TelegramLiveEvent,
+)
+from verasig.features.accounts import repository as account_repository
+from verasig.features.feeds import (
+    deletion_repository,
+    feed_repository,
+    message_repository,
+)
+from verasig.features.feeds.live import ingest_live
+from verasig.features.signals import outcome_repository
+
+_CHANNEL_ID = 7
+_USER_ID = UUID("a0000000-0000-0000-0000-000000000001")
+_POSTED = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+
+
+class FakeLiveSource:
+    def __init__(self, events: list[TelegramLiveEvent]) -> None:
+        self.events = events
+        self.requested_channel_ids: list[list[int]] = []
+
+    def live_events(self, channel_ids: list[int]) -> AsyncIterator[TelegramLiveEvent]:
+        async def _events() -> AsyncIterator[TelegramLiveEvent]:
+            self.requested_channel_ids.append(channel_ids)
+            for event in self.events:
+                yield event
+
+        return _events()
+
+
+def _channel() -> TelegramChannel:
+    return TelegramChannel(
+        channel_id=_CHANNEL_ID,
+        handle="pilot",
+        title="Pilot",
+        is_private=False,
+        first_seen_at=_POSTED,
+    )
+
+
+def _account() -> UserAccount:
+    return UserAccount(
+        id=_USER_ID,
+        email="live@example.com",
+        password_hash="hash",
+        first_name="Ada",
+        last_name="Lovelace",
+        plan=Plan.OBSERVER,
+        pending_email=None,
+        cancel_at=None,
+        created_at=_POSTED,
+    )
+
+
+def _message(message_id: int, captured_at: datetime) -> RawTelegramMessage:
+    return RawTelegramMessage(
+        channel_id=_CHANNEL_ID,
+        message_id=message_id,
+        text="BTC long 65000",
+        posted_at=_POSTED,
+        captured_at=captured_at,
+        has_media=False,
+        raw_payload={"id": message_id},
+    )
+
+
+def _delivery(
+    message_id: int, mode: DeliveryMode, captured_at: datetime
+) -> TelegramDeliveryEvent:
+    return TelegramDeliveryEvent(
+        message=_message(message_id, captured_at),
+        mode=mode,
+        captured_at=captured_at,
+        gap_closed=mode is not DeliveryMode.PUSH,
+    )
+
+
+def _deletion(message_id: int, detected_at: datetime) -> TelegramDeletionEvent:
+    return TelegramDeletionEvent(
+        channel_id=_CHANNEL_ID,
+        message_id=message_id,
+        detected_at=detected_at,
+    )
+
+
+def _seed_channel(session_factory) -> None:
+    with session_factory() as session:
+        account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
+        feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
+        session.commit()
+
+
+def _seed_captured_signal(session_factory, message: RawTelegramMessage) -> None:
+    with session_factory() as session:
+        account_repository.insert_account(session, _account())
+        insert_source(session, _USER_ID)
+        feed_repository.create_feed(session, _USER_ID, _channel(), _POSTED)
+        message_repository.insert_messages(session, _USER_ID, [message])
+        outcome_repository.insert_signals(
+            session,
+            [
+                Signal(
+                    channel_id=_CHANNEL_ID,
+                    message_id=message.message_id,
+                    candidate_text=message.text or "",
+                    symbol="BTCUSDT",
+                    side=Side.LONG,
+                )
+            ],
+            _USER_ID,
+        )
+        session.commit()
+
+
+async def test_live_ingestion_persists_push_and_dedupes_later_poll(
+    session_factory,
+):
+    _seed_channel(session_factory)
+    push_at = _POSTED + timedelta(seconds=1)
+    poll_at = _POSTED + timedelta(seconds=3)
+    source = FakeLiveSource(
+        [
+            _delivery(10, DeliveryMode.PUSH, push_at),
+            _delivery(10, DeliveryMode.POLL, poll_at),
+        ]
+    )
+
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
+
+    assert result.inserted == 1
+    assert result.duplicates == 1
+    assert result.captured_by_mode == {DeliveryMode.PUSH: 1}
+    assert source.requested_channel_ids == [[_CHANNEL_ID]]
+    with session_factory() as session:
+        messages = message_repository.read_messages(session, _USER_ID, _CHANNEL_ID)
+    assert [message.message_id for message in messages] == [10]
+    assert messages[0].captured_at == push_at
+
+
+async def test_live_ingestion_dedupes_catch_up_against_backfilled_row(
+    session_factory,
+):
+    captured_at = _POSTED + timedelta(seconds=1)
+    _seed_captured_signal(session_factory, _message(10, captured_at))
+    source = FakeLiveSource(
+        [_delivery(10, DeliveryMode.CATCH_UP, _POSTED + timedelta(seconds=4))]
+    )
+
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
+
+    assert result.inserted == 0
+    assert result.duplicates == 1
+    assert result.captured_by_mode == {}
+    with session_factory() as session:
+        messages = message_repository.read_messages(session, _USER_ID, _CHANNEL_ID)
+    assert len(messages) == 1
+    assert messages[0].captured_at == captured_at
+
+
+async def test_live_ingestion_persists_confirmed_delete_event_with_stored_text(
+    session_factory,
+):
+    captured_at = _POSTED + timedelta(seconds=1)
+    detected_at = _POSTED + timedelta(seconds=5)
+    _seed_captured_signal(session_factory, _message(10, captured_at))
+    source = FakeLiveSource([_deletion(10, detected_at)])
+
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
+
+    assert result.deleted == 1
+    with session_factory() as session:
+        evidence = deletion_repository.read_deletion_evidence(
+            session, _USER_ID, _CHANNEL_ID
+        )
+    assert len(evidence) == 1
+    assert evidence[0].confidence is DeletionConfidence.CONFIRMED
+    assert evidence[0].method is DeletionMethod.LIVE_EVENT
+    assert evidence[0].message_id == 10
+    assert evidence[0].original_text == "BTC long 65000"
+    assert evidence[0].first_seen_at == captured_at
+    assert evidence[0].detected_at == detected_at
+    assert evidence[0].was_signal_candidate is True
+
+
+async def test_live_ingestion_reports_median_capture_latency(session_factory):
+    _seed_channel(session_factory)
+    source = FakeLiveSource(
+        [
+            _delivery(10, DeliveryMode.POLL, _POSTED + timedelta(seconds=2)),
+            _delivery(11, DeliveryMode.POLL, _POSTED + timedelta(seconds=4)),
+            _delivery(12, DeliveryMode.POLL, _POSTED + timedelta(seconds=6)),
+        ]
+    )
+
+    result = await ingest_live(source, _USER_ID, [_CHANNEL_ID], session_factory)
+
+    assert result.median_latency == timedelta(seconds=4)
+    assert result.median_latency <= timedelta(seconds=4)

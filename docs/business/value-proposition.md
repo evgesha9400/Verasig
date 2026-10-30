@@ -6,7 +6,7 @@
 - Category: signal performance operating system.
 - First surface: web dashboard.
 - First source: Telegram.
-- First exchange mode: observe-only (simulated outcomes; no execution at Stage 0). [docs/adr/0003]
+- First exchange mode: observe-only (simulated outcomes; no execution). [docs/adr/0003]
 
 ## Customer
 
@@ -28,7 +28,7 @@
 
 - Capture every raw signal.
 - Parse every recognized trade signal.
-- Simulate outcomes against historical market data only; no execution at Stage 0.
+- Simulate outcomes against historical market data only; no execution.
 - Log every order intent and gateway decision.
 - Score each channel by simulated outcome (conservative, evidence-backed). [docs/adr/0003]
 - Preserve data for later strategy research.

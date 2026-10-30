@@ -1,0 +1,7 @@
+I read the message and extracted the single trade below.
+
+```json
+{"symbol":"BTC","side":"LONG","entry_type":"LIMIT_SINGLE","entry_low":"65000","entry_high":"65000","stop_loss":"64000","take_profits":["67000","68000"],"leverage":"10","confidence":null}
+```
+
+No other tradable instructions were present.

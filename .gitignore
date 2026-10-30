@@ -1,9 +1,15 @@
-# Secrets — NEVER commit (full Telegram account access lives here)
+# Secrets — NEVER commit (full Telegram account access lives in backend scope)
 .env
 .env.*
-secrets/
+# but templates ARE tracked (fresh clone: make env)
+!.env.example
+apps/backend/secrets/
 *.session
 *.session-journal
+
+# Node
+node_modules/
+*.tsbuildinfo
 
 # Python / uv
 .venv/
@@ -19,4 +25,46 @@ build/
 *.sqlite
 *.db
 data/
+!apps/frontend/design-system/src/components/data/
+!apps/frontend/design-system/src/components/data/**
 .DS_Store
+prototype/.thumbnail
+prototype/screenshots/
+prototype/uploads/
+IDEAS.md
+
+# Local tool state
+.local-run/
+.playwright-mcp/
+.superpowers/
+/*.png
+graphify-out/
+graphify-out/.graphify_python
+graphify-out/.graphify_*.json
+graphify-out/cache/
+graphify-out/.graphify_root
+graphify-out/cost.json
+graphify-out/manifest.json
+.graphify_ast.json
+.graphify_incremental.json
+apps/graphify-out/
+# Codegraph
+.codegraph/
+
+# IDE metadata (JetBrains)
+.idea/
+
+# Template-mining dev-only preview + exported real feed data (not committed)
+apps/frontend/web/dev/realFeedMessages.json
+apps/frontend/web/dev/index.html
+apps/frontend/web/mining-preview.html
+apps/frontend/web/dev/mining-preview.jsx
+
+# Playwright e2e — auth state is a real credential; the rest is generated
+apps/frontend/web/e2e/.auth/
+apps/frontend/web/test-results/
+apps/frontend/web/playwright-report/
+apps/frontend/web/playwright/.cache/
+
+# local NOTES.md processing queue (personal, not versioned)
+NOTES.md

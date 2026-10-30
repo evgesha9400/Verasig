@@ -1,0 +1,122 @@
+/* ============================================================
+   Verasig — Base layer
+   Light reset + element defaults wired to tokens.
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-app);
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-regular);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-family: var(--font-display);
+  color: var(--text-heading);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-tight);
+}
+
+p {
+  margin: 0;
+}
+
+/* Link colors reach only class-less anchors, at zero specificity, so a
+   classed anchor (<Button as="a">, <Card as="a">, .mk-nav__brand) always keeps
+   its own color — including on hover. */
+a {
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+:where(a:not([class])) {
+  color: var(--link);
+}
+:where(a:not([class]):hover) {
+  color: var(--link-hover);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+  font-feature-settings: 'ss01', 'cv01';
+}
+
+::selection {
+  background: var(--signal-500);
+  color: var(--text-on-accent);
+}
+
+/* Fallback focus ring for any focusable element that doesn't style its own.
+   Composite controls (Input wraps a native <input>) draw their focus
+   affordance on the wrapper via :focus-within, so suppress this blunt ring on
+   a native control nested inside such a wrapper — otherwise it paints a second,
+   concentric ring inside the wrapper's. Select bears the ring on the <select>
+   itself, so it is intentionally left untouched. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.vrs-input :is(input, textarea):focus-visible {
+  box-shadow: none;
+}
+
+/* ---- Reusable brand helpers ---- */
+
+/* Eyebrow / overline — small caps mono label */
+.v-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Mono numeric — for metrics, IDs, latencies */
+.v-mono {
+  font-family: var(--font-mono);
+  font-feature-settings:
+    'tnum' 1,
+    'ss01' 1;
+  letter-spacing: var(--ls-normal);
+}
+
+/* Gradient ink panel used behind heroes / section headers */
+.v-grain {
+  background-image:
+    radial-gradient(120% 80% at 100% 0%, rgba(185, 238, 46, 0.06), transparent 55%),
+    radial-gradient(90% 60% at 0% 0%, rgba(81, 151, 255, 0.05), transparent 50%);
+}
+
+/* Thin grid texture (signal lattice) */
+.v-lattice {
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 32px 32px;
+}

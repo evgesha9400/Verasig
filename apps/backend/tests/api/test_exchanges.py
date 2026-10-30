@@ -1,0 +1,132 @@
+from uuid import UUID
+
+from conftest import _auth
+from conftest import _register_user as _register
+
+from verasig.domain.account import Plan
+from verasig.features.accounts import repository as account_repository
+from verasig.features.exchanges import repository as exchange_repository
+
+
+class FakeVerifier:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self.reject = False
+
+    async def __call__(self, api_key: str, api_secret: str) -> None:
+        self.calls.append((api_key, api_secret))
+        if self.reject:
+            from verasig.foundation.market_data.bybit_account import (
+                KeyVerificationError,
+            )
+
+            raise KeyVerificationError
+
+
+def _set_plan(app, user_id: UUID, plan: Plan) -> None:
+    with app.state.session_factory() as session:
+        account_repository.set_plan(session, user_id, plan)
+        session.commit()
+
+
+def test_exchanges_catalog_starts_disconnected(client):
+    token, _user_id = _register(client)
+
+    response = client.get("/exchanges", headers=_auth(token))
+
+    bybit = response.json()["exchanges"][0]
+    assert response.status_code == 200
+    assert bybit["id"] == "bybit"
+    assert bybit["kind"] == "Derivatives · Spot"
+    assert bybit["connected"] is False
+    assert bybit["account"] is None
+
+
+def test_observer_cannot_connect_exchange(client):
+    token, _user_id = _register(client)
+
+    response = client.post(
+        "/exchanges/bybit/connect",
+        headers=_auth(token),
+        json={"apiKey": "J7n2Kp9XvR4mQ1wL", "apiSecret": "x9Tt3FqLm2Vb8RkD"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "PLAN_LIMIT_EXCHANGES"
+
+
+def test_operator_connects_and_disconnects_bybit(client, app):
+    verifier = FakeVerifier()
+    app.state.exchange_verifier = verifier
+    token, user_id = _register(client)
+    _set_plan(app, user_id, Plan.OPERATOR)
+
+    connected = client.post(
+        "/exchanges/bybit/connect",
+        headers=_auth(token),
+        json={"apiKey": "J7n2Kp9XvR4mQ1wL", "apiSecret": "x9Tt3FqLm2Vb8RkD"},
+    )
+    catalog = client.get("/exchanges", headers=_auth(token))
+    disconnected = client.post("/exchanges/bybit/disconnect", headers=_auth(token))
+    after = client.get("/exchanges", headers=_auth(token))
+
+    row = _read_connection(app, user_id)
+    assert connected.status_code == 200
+    assert connected.json()["connected"] is True
+    assert connected.json()["account"] == "J7n2…wL · trade-only"
+    assert "apiSecret" not in connected.json()
+    assert catalog.json()["exchanges"][0]["account"] == "J7n2…wL · trade-only"
+    assert row.api_key_encrypted.startswith("v1:")
+    assert row.api_secret_encrypted.startswith("v1:")
+    assert "J7n2Kp9XvR4mQ1wL" not in row.api_key_encrypted
+    assert "x9Tt3FqLm2Vb8RkD" not in row.api_secret_encrypted
+    assert verifier.calls == [("J7n2Kp9XvR4mQ1wL", "x9Tt3FqLm2Vb8RkD")]
+    assert disconnected.status_code == 200
+    assert disconnected.json()["connected"] is False
+    assert after.json()["exchanges"][0]["connected"] is False
+
+
+def test_connect_rejects_bad_exchange_keys(client, app):
+    verifier = FakeVerifier()
+    verifier.reject = True
+    app.state.exchange_verifier = verifier
+    token, user_id = _register(client)
+    _set_plan(app, user_id, Plan.OPERATOR)
+
+    response = client.post(
+        "/exchanges/bybit/connect",
+        headers=_auth(token),
+        json={"apiKey": "bad-key-value", "apiSecret": "bad-secret-value"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "EXCHANGE_KEYS_INVALID"
+
+
+def test_connect_rejects_keys_with_withdraw_permission(client, app):
+    from verasig.foundation.market_data.bybit_account import WithdrawPermissionError
+
+    async def withdraw_enabled(_api_key: str, _api_secret: str) -> None:
+        raise WithdrawPermissionError
+
+    app.state.exchange_verifier = withdraw_enabled
+    token, user_id = _register(client)
+    _set_plan(app, user_id, Plan.OPERATOR)
+
+    response = client.post(
+        "/exchanges/bybit/connect",
+        headers=_auth(token),
+        json={"apiKey": "J7n2Kp9XvR4mQ1wL", "apiSecret": "x9Tt3FqLm2Vb8RkD"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "EXCHANGE_KEYS_WITHDRAW_ENABLED"
+    with app.state.session_factory() as session:
+        assert exchange_repository.read_connections(session, user_id) == []
+
+
+def _read_connection(app, user_id: UUID):
+    with app.state.session_factory() as session:
+        row = exchange_repository.read_connections(session, user_id)[0]
+        session.expunge(row)
+        return row

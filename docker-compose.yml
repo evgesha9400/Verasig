@@ -1,0 +1,119 @@
+name: verasig
+
+x-backend-service: &backend-service
+  build: ./apps/backend
+  image: verasig-backend:local
+  env_file: [apps/backend/.env]
+  environment:
+    VERASIG_DB_HOST: db
+    VERASIG_DB_PORT: "5432"
+    VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+
+services:
+  db:
+    image: postgres:16
+    ports:
+      - "127.0.0.1:${VERASIG_DB_PORT:-5434}:5432"     # exposed to host for local backend/CLI
+    environment:
+      POSTGRES_USER: ${VERASIG_DB_USER:-verasig}
+      POSTGRES_PASSWORD: ${VERASIG_DB_PASSWORD:-verasig}
+      POSTGRES_DB: ${VERASIG_DB_NAME:-verasig}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VERASIG_DB_USER:-verasig}"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  migrate:
+    <<: *backend-service
+    entrypoint: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    <<: *backend-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/backend/secrets:/secrets:ro     # read-only provided secrets (gitignored)
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  # The deployed site image (Dockerfile.site): API under /api, web app at /.
+  # Opt-in: `docker compose --profile site up -d --wait site` (CI E2E uses it).
+  site:
+    profiles: [site]
+    build:
+      context: .
+      dockerfile: Dockerfile.site
+    image: verasig-site:local
+    env_file: [apps/backend/.env]
+    environment:
+      VERASIG_DB_HOST: db
+      VERASIG_DB_PORT: "5432"
+      VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      VERASIG_CORS_ORIGINS: '["http://localhost:8080"]'
+    ports:
+      - "8080:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  frontend:
+    image: node:22-slim
+    working_dir: /workspace
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_VERASIG_API_URL: http://localhost:8000
+    command:
+      [
+        "sh",
+        "-lc",
+        "npm ci && npm run dev --workspace verasig-web -- --host 0.0.0.0",
+      ]
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/frontend:/workspace
+      - frontend_node_modules:/workspace/node_modules
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+    name: verasig_pgdata
+  frontend_node_modules: {}
