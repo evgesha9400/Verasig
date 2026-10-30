@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Button,
-  IconButton,
-  ToastStack,
-  Toast,
-  Dialog,
-  useTheme
-} from '@verasig/design-system'
+import { Button, IconButton, ToastStack, Toast, Dialog } from '@verasig/design-system'
 import { Icon } from '@verasig/design-system'
 import { Shell } from './layout/Shell.jsx'
 import { Pipeline } from '../features/pipeline/Pipeline.jsx'
@@ -151,8 +144,6 @@ export function useParserOverlay(authToken, fireToast) {
 }
 
 export function ProductApp({ authToken, user: sessionUser, onLogout }) {
-  const [theme, setTheme] = useTheme()
-
   const [user, setUser] = useState(() => mergeUserDefaults(sessionUser))
   const [gapChecks, setGapChecks] = useState({}) // { [feedId]: { scanned } }
   const gapStreamsRef = useRef(new Map()) // feedId -> open rescan SSE subscription
@@ -560,8 +551,6 @@ export function ProductApp({ authToken, user: sessionUser, onLogout }) {
         onExit={onExit}
         actions={actions}
         pipeline={pipeline}
-        theme={theme}
-        onThemeChange={setTheme}
         onLogout={onLogout}
         user={user}
         onOpenSettings={openSettings}

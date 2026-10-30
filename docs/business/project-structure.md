@@ -117,8 +117,7 @@ apps/frontend/
 |-- design-system/
 |   |-- src/
 |   |   |-- components/
-|   |   |-- icons/
-|   |   `-- theme/
+|   |   `-- icons/
 |   |-- tokens/
 |   |-- index.js
 |   |-- package.json
