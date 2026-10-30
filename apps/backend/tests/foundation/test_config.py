@@ -1,3 +1,5 @@
+import base64
+
 import pytest
 
 from verasig.config import Settings, SettingsError
@@ -164,3 +166,42 @@ def test_jwt_secret_spec_accepts_strong_secret_when_not_local(monkeypatch):
     monkeypatch.setenv("VERASIG_ENV", "staging")
 
     assert Settings(_env_file=None, jwt_secret="s" * 32).jwt_secret_spec() == "s" * 32
+
+
+DEV_KEYRING = "dev:" + base64.b64encode(bytes(32)).decode()
+
+
+def test_secret_key_spec_rejects_dev_keyring_outside_local():
+    with pytest.raises(SettingsError, match="VERASIG_SECRET_KEYS"):
+        Settings(
+            _env_file=None, env="production", secret_keys=DEV_KEYRING
+        ).secret_key_spec()
+
+
+def test_secret_key_spec_rejects_dev_key_anywhere_in_keyring():
+    real = "k2:" + base64.b64encode(b"\x01" * 32).decode()
+    with pytest.raises(SettingsError):
+        Settings(
+            _env_file=None, env="production", secret_keys=f"{real},{DEV_KEYRING}"
+        ).secret_key_spec()
+
+
+def test_secret_key_spec_accepts_dev_keyring_locally():
+    assert (
+        Settings(_env_file=None, secret_keys=DEV_KEYRING).secret_key_spec()
+        == DEV_KEYRING
+    )
+
+
+def test_database_url_rejects_default_password_outside_local():
+    with pytest.raises(SettingsError, match="VERASIG_DB_PASSWORD"):
+        Settings(_env_file=None, env="production").database_url
+
+
+def test_database_url_allows_override_outside_local():
+    settings = Settings(
+        _env_file=None,
+        env="production",
+        database_url_override="postgresql+psycopg://u:p@h/d",
+    )
+    assert settings.database_url == "postgresql+psycopg://u:p@h/d"
