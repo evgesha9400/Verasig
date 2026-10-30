@@ -57,6 +57,41 @@ services:
       retries: 20
       start_period: 5s
 
+  # The deployed site image (Dockerfile.site): API under /api, web app at /.
+  # Opt-in: `docker compose --profile site up -d --wait site` (CI E2E uses it).
+  site:
+    profiles: [site]
+    build:
+      context: .
+      dockerfile: Dockerfile.site
+    image: verasig-site:local
+    env_file: [apps/backend/.env]
+    environment:
+      VERASIG_DB_HOST: db
+      VERASIG_DB_PORT: "5432"
+      VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      VERASIG_CORS_ORIGINS: '["http://localhost:8080"]'
+    ports:
+      - "8080:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
   frontend:
     image: node:22-slim
     working_dir: /workspace
