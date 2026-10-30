@@ -9,27 +9,25 @@ const user = {
 }
 
 describe('Shell user menu', () => {
-  it('uses shared menu and theme-toggle semantics', () => {
-    const onThemeChange = vi.fn()
+  it('uses shared menu semantics', () => {
+    const onLogout = vi.fn()
 
     render(
       <Shell
         nav="sources"
         onNavigate={() => {}}
         title="Sources"
-        theme="dark"
-        onThemeChange={onThemeChange}
         user={user}
-        onLogout={() => {}}
+        onLogout={onLogout}
       >
         <div />
       </Shell>
     )
 
     fireEvent.click(screen.getByRole('button', { expanded: false }))
-    fireEvent.click(screen.getByRole('radio', { name: 'Light' }))
-
     expect(screen.getByRole('menu')).toBeTruthy()
-    expect(onThemeChange).toHaveBeenCalledWith('light')
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Log out' }))
+    expect(onLogout).toHaveBeenCalledOnce()
   })
 })

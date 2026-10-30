@@ -95,12 +95,6 @@
 .mk-nav__signin:hover {
   color: var(--text-strong);
 }
-.mk-nav__divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border-default);
-  flex: none;
-}
 
 /* ---- Hero ---- */
 .mk-hero {

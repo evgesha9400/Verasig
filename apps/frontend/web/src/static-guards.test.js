@@ -36,8 +36,6 @@ describe('frontend design-system guards', () => {
       read('app/app.css')
     ].join('\n')
 
-    expect(pageCss).not.toContain('.mk-theme__btn')
-    expect(pageCss).not.toContain('.vrs-um__seg-btn')
     expect(pageCss).not.toContain('.vrs-menu button')
     expect(pageCss).not.toContain('.vrs-swipe-btn')
     expect(pageCss).not.toContain('.vrs-next-card')
