@@ -268,6 +268,14 @@ class UserAccountRow(Base):
     stripe_subscription_id: Mapped[str | None] = mapped_column(String, nullable=True)
     # Stripe's subscription status (trialing, active, past_due, canceled, ...).
     subscription_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The last Checkout started; expired when a new one starts.
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
+    # Creation time of the newest Stripe event applied; older events are skipped.
+    stripe_event_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

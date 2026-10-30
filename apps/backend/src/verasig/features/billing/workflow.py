@@ -28,6 +28,11 @@ _FOR_SALE = frozenset({Plan.TRADER})
 _CHECKOUT_STATUS_BY_PAYMENT = {"paid": "active", "no_payment_required": "active"}
 # Terminal Stripe statuses: such a subscription never changes again.
 _ENDED_STATUSES = frozenset({"canceled", "incomplete_expired"})
+# Payload shapes change only between named Stripe releases ("endive"); the
+# handlers read the shape of the release the stripe SDK is pinned to.
+_API_RELEASE = stripe.api_version.rpartition(".")[2]
+
+_Handler = Callable[[Session, Settings, dict, datetime], None]
 
 
 class PlanNotForSaleError(Exception):
@@ -46,32 +51,51 @@ class WebhookSignatureError(Exception):
     """Raised when a webhook body is not signed with our webhook secret."""
 
 
+class WebhookApiVersionError(Exception):
+    """Raised when a webhook event comes from another Stripe API release."""
+
+
 def start_checkout(
-    settings: Settings, user: UserAccount, plan: Plan, interval: str
+    session: Session, settings: Settings, user: UserAccount, plan: Plan, interval: str
 ) -> tuple[str, str]:
     """Create a Stripe Checkout Session; returns its (url, id)."""
     if plan not in _FOR_SALE:
         raise PlanNotForSaleError(plan)
-    # A past-due subscription is still live: it is fixed in the portal, not
-    # replaced by a second one.
-    if user.subscription_status and user.subscription_status not in _ENDED_STATUSES:
-        raise AlreadySubscribedError(user.id)
     price_id = settings.stripe_trader_price_spec(interval)
     api_key = settings.stripe_secret_key_spec()
     site_url = settings.site_url_spec()
-    metadata = {"user_id": str(user.id), "plan": plan.value}
+    # Locked so two clicks cannot both pass the checks below.
+    account = repository.lock_by_id(session, user.id)
+    # A past-due subscription is still live: it is fixed in the portal, not
+    # replaced by a second one.
+    if account.subscription_status not in {None, *_ENDED_STATUSES}:
+        raise AlreadySubscribedError(account.id)
+    # Only one Checkout may be open, so a second tab cannot start a second
+    # subscription. A completed or expired session cannot be expired again.
+    if account.stripe_checkout_session_id:
+        try:
+            stripe.checkout.Session.expire(
+                account.stripe_checkout_session_id, api_key=api_key
+            )
+        except stripe.InvalidRequestError:
+            pass
+    metadata = {"user_id": str(account.id), "plan": plan.value}
+    subscription_data: dict = {"metadata": metadata}
+    # One trial per customer: a Stripe customer exists once a Checkout completed.
+    if account.stripe_customer_id is None:
+        subscription_data["trial_period_days"] = TRIAL_DAYS
     customer = (
-        {"customer": user.stripe_customer_id}
-        if user.stripe_customer_id
-        else {"customer_email": user.email}
+        {"customer": account.stripe_customer_id}
+        if account.stripe_customer_id
+        else {"customer_email": account.email}
     )
-    session = stripe.checkout.Session.create(
+    checkout = stripe.checkout.Session.create(
         api_key=api_key,
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
         payment_method_collection="always",
-        subscription_data={"trial_period_days": TRIAL_DAYS, "metadata": metadata},
-        client_reference_id=str(user.id),
+        subscription_data=subscription_data,
+        client_reference_id=str(account.id),
         metadata=metadata,
         success_url=(
             f"{site_url}/app?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
@@ -79,7 +103,8 @@ def start_checkout(
         cancel_url=f"{site_url}/app?checkout=cancelled",
         **customer,
     )
-    return session.url, session.id
+    repository.set_checkout_session(session, account.id, checkout.id)
+    return checkout.url, checkout.id
 
 
 def open_portal(settings: Settings, user: UserAccount) -> str:
@@ -104,18 +129,32 @@ def handle_webhook(
         event = stripe.Webhook.construct_event(payload, signature, secret).to_dict()
     except (stripe.SignatureVerificationError, ValueError) as error:
         raise WebhookSignatureError(str(error)) from error
+    api_version = event.get("api_version") or ""
+    if api_version.rpartition(".")[2] != _API_RELEASE:
+        raise WebhookApiVersionError(
+            f"Stripe event API version {api_version or 'unknown'} is not from the "
+            f"{_API_RELEASE} release; set the webhook endpoint to an "
+            f"{_API_RELEASE} version"
+        )
     handler = _HANDLERS.get(event["type"])
     logger.info(
         "billing webhook %s %s handled=%s", event["type"], event["id"], bool(handler)
     )
     if handler is not None:
-        handler(session, settings, event["data"]["object"])
+        event_at = datetime.fromtimestamp(event["created"], tz=UTC)
+        handler(session, settings, event["data"]["object"], event_at)
 
 
 # --- event handlers ---------------------------------------------------------
+#
+# Stripe delivers events out of order and retries them for days. Every handler
+# skips an event older than the last one applied to the account (same-second
+# events all apply: Stripe stamps a Checkout's events with one second).
 
 
-def _checkout_completed(session: Session, _settings: Settings, checkout: dict) -> None:
+def _checkout_completed(
+    session: Session, _settings: Settings, checkout: dict, event_at: datetime
+) -> None:
     plan = _plan_from_metadata(checkout.get("metadata") or {})
     subscription_id = checkout.get("subscription")
     user_id = _parse_uuid(checkout.get("client_reference_id"))
@@ -123,7 +162,9 @@ def _checkout_completed(session: Session, _settings: Settings, checkout: dict) -
         logger.warning("billing checkout %s is not a Verasig plan", checkout.get("id"))
         return
     account = repository.lock_by_id(session, user_id)
-    if account is None or not _accepts_checkout(account, subscription_id):
+    if account is None or _is_stale(account, event_at):
+        return
+    if not _accepts_subscription(account, subscription_id):
         return
     redelivered = subscription_id == account.stripe_subscription_id
     repository.save_subscription(
@@ -140,52 +181,56 @@ def _checkout_completed(session: Session, _settings: Settings, checkout: dict) -
         customer_id=checkout.get("customer"),
         subscription_id=subscription_id,
         cancel_at=account.cancel_at if redelivered else None,
+        event_at=event_at,
     )
 
 
 def _subscription_created(
-    session: Session, settings: Settings, subscription: dict
+    session: Session, settings: Settings, subscription: dict, event_at: datetime
 ) -> None:
     account = _current_subscriber(session, subscription["id"])
     if account is None:
         # Not linked yet: Checkout put the user id in the subscription metadata.
         account = _metadata_subscriber(session, subscription)
-    if account is not None:
-        _apply_subscription(session, settings, account, subscription)
+    if account is not None and not _is_stale(account, event_at):
+        _apply_subscription(session, settings, account, subscription, event_at)
 
 
 def _subscription_updated(
-    session: Session, settings: Settings, subscription: dict
+    session: Session, settings: Settings, subscription: dict, event_at: datetime
 ) -> None:
     account = _current_subscriber(session, subscription["id"])
-    if account is not None:
-        _apply_subscription(session, settings, account, subscription)
+    if account is not None and not _is_stale(account, event_at):
+        _apply_subscription(session, settings, account, subscription, event_at)
 
 
 def _apply_subscription(
-    session: Session, settings: Settings, account: UserAccount, subscription: dict
+    session: Session,
+    settings: Settings,
+    account: UserAccount,
+    subscription: dict,
+    event_at: datetime,
 ) -> None:
     repository.save_subscription(
         session,
         account.id,
-        plan=_plan_for_price(settings, subscription)
-        or _plan_from_metadata(subscription.get("metadata") or {})
-        or account.plan,
+        plan=_plan_for_price(settings, subscription),
         status=subscription["status"],
         customer_id=subscription.get("customer") or account.stripe_customer_id,
         subscription_id=subscription["id"],
         cancel_at=_cancel_at(subscription),
+        event_at=event_at,
     )
 
 
 def _subscription_deleted(
-    session: Session, _settings: Settings, subscription: dict
+    session: Session, _settings: Settings, subscription: dict, event_at: datetime
 ) -> None:
     account = _current_subscriber(session, subscription["id"])
-    if account is None:
+    if account is None or _is_stale(account, event_at):
         return
     # The ended subscription id stays stored: a replayed Checkout event for it
-    # is then recognised and ignored (see _accepts_checkout).
+    # is then recognised and ignored (see _accepts_subscription).
     repository.save_subscription(
         session,
         account.id,
@@ -194,15 +239,17 @@ def _subscription_deleted(
         customer_id=account.stripe_customer_id,
         subscription_id=account.stripe_subscription_id,
         cancel_at=None,
+        event_at=event_at,
     )
 
 
-def _invoice_handler(status: str) -> Callable[[Session, Settings, dict], None]:
-    def handle(session: Session, _settings: Settings, invoice: dict) -> None:
+def _invoice_handler(status: str) -> _Handler:
+    def handle(
+        session: Session, _settings: Settings, invoice: dict, event_at: datetime
+    ) -> None:
         details = (invoice.get("parent") or {}).get("subscription_details") or {}
-        subscription_id = details.get("subscription")
-        account = _current_subscriber(session, subscription_id)
-        if account is None:
+        account = _current_subscriber(session, details.get("subscription"))
+        if account is None or _is_stale(account, event_at):
             return
         # The trial starts with a paid zero invoice; it must not end the trial.
         if status == "active" and account.subscription_status == "trialing":
@@ -215,12 +262,13 @@ def _invoice_handler(status: str) -> Callable[[Session, Settings, dict], None]:
             customer_id=account.stripe_customer_id,
             subscription_id=account.stripe_subscription_id,
             cancel_at=account.cancel_at,
+            event_at=event_at,
         )
 
     return handle
 
 
-_HANDLERS: dict[str, Callable[[Session, Settings, dict], None]] = {
+_HANDLERS: dict[str, _Handler] = {
     "checkout.session.completed": _checkout_completed,
     "customer.subscription.created": _subscription_created,
     "customer.subscription.updated": _subscription_updated,
@@ -231,6 +279,10 @@ _HANDLERS: dict[str, Callable[[Session, Settings, dict], None]] = {
 
 
 # --- helpers ----------------------------------------------------------------
+
+
+def _is_stale(account: UserAccount, event_at: datetime) -> bool:
+    return account.stripe_event_at is not None and event_at < account.stripe_event_at
 
 
 def _current_subscriber(
@@ -251,17 +303,27 @@ def _metadata_subscriber(session: Session, subscription: dict) -> UserAccount | 
     if _plan_from_metadata(metadata) is None or user_id is None:
         return None
     account = repository.lock_by_id(session, user_id)
-    if account is None or not _accepts_checkout(account, subscription["id"]):
+    if account is None or not _accepts_subscription(account, subscription["id"]):
         return None
     return account
 
 
-def _accepts_checkout(account: UserAccount, subscription_id: str) -> bool:
+def _accepts_subscription(account: UserAccount, subscription_id: str) -> bool:
     """A redelivery of the paying subscription, or a new one replacing a lapsed one."""
     if not account.stripe_subscription_id:
         return True
     paying = account.subscription_status in PAYING_STATUSES
-    return paying if subscription_id == account.stripe_subscription_id else not paying
+    if subscription_id == account.stripe_subscription_id:
+        return paying
+    if paying:
+        # Stripe bills this one, but the account keeps its current subscription.
+        logger.error(
+            "billing subscription %s ignored: user %s already pays through %s",
+            subscription_id,
+            account.id,
+            account.stripe_subscription_id,
+        )
+    return not paying
 
 
 def _plan_from_metadata(metadata: dict) -> Plan | None:
@@ -272,7 +334,8 @@ def _plan_from_metadata(metadata: dict) -> Plan | None:
     return plan if plan in _FOR_SALE else None
 
 
-def _plan_for_price(settings: Settings, subscription: dict) -> Plan | None:
+def _plan_for_price(settings: Settings, subscription: dict) -> Plan:
+    """The plan a subscription's price buys; an unknown price buys nothing."""
     plans_by_price = {
         price_id: Plan.TRADER
         for price_id in (
@@ -284,7 +347,10 @@ def _plan_for_price(settings: Settings, subscription: dict) -> Plan | None:
     price_id = subscription["items"]["data"][0]["price"]["id"]
     plan = plans_by_price.get(price_id)
     if plan is None:
-        logger.warning("billing subscription %s has unknown price", subscription["id"])
+        logger.error(
+            "billing subscription %s has unknown price %s", subscription["id"], price_id
+        )
+        return Plan.FREE
     return plan
 
 

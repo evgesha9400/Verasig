@@ -1,7 +1,8 @@
 """Stripe billing: launch plan names and the account's subscription fields.
 
-Renames the plans (observer -> free, operator -> trader) and adds the Stripe
-customer, subscription and status columns that the billing webhook writes.
+Renames the plans (observer -> free, operator -> trader), adds the Stripe
+columns that Checkout and the billing webhook write, and clears cancel_at,
+which the removed fake subscription flow wrote.
 
 Revision ID: 0002_stripe_billing
 Revises: 0001_init
@@ -38,6 +39,16 @@ def upgrade() -> None:
     op.add_column(
         "user_account", sa.Column("subscription_status", sa.String(), nullable=True)
     )
+    op.add_column(
+        "user_account",
+        sa.Column("stripe_checkout_session_id", sa.String(), nullable=True),
+    )
+    op.add_column(
+        "user_account",
+        sa.Column("stripe_event_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    # cancel_at now mirrors Stripe; values the removed fake flow wrote go.
+    op.execute("UPDATE user_account SET cancel_at = NULL")
     for column in ("stripe_customer_id", "stripe_subscription_id"):
         op.create_index(
             f"uq_user_account_{column}",
@@ -51,6 +62,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     for column in ("stripe_customer_id", "stripe_subscription_id"):
         op.drop_index(f"uq_user_account_{column}", table_name="user_account")
+    op.drop_column("user_account", "stripe_event_at")
+    op.drop_column("user_account", "stripe_checkout_session_id")
     op.drop_column("user_account", "subscription_status")
     op.drop_column("user_account", "stripe_subscription_id")
     op.drop_column("user_account", "stripe_customer_id")

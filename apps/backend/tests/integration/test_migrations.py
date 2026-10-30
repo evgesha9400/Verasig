@@ -302,16 +302,25 @@ def fresh_db_url(pg_url):
     admin.dispose()
 
 
-def _insert_account(connection, email: str, plan: str) -> None:
+def _insert_account(
+    connection, email: str, plan: str, cancel_at: datetime | None = None
+) -> None:
     connection.execute(
         text(
             """
             INSERT INTO user_account
-                (id, email, password_hash, first_name, last_name, plan, created_at)
-            VALUES (:id, :email, 'hash', 'Ada', 'Lovelace', :plan, :now)
+                (id, email, password_hash, first_name, last_name, plan, cancel_at,
+                 created_at)
+            VALUES (:id, :email, 'hash', 'Ada', 'Lovelace', :plan, :cancel_at, :now)
             """
         ),
-        {"id": uuid4(), "email": email, "plan": plan, "now": datetime.now(tz=UTC)},
+        {
+            "id": uuid4(),
+            "email": email,
+            "plan": plan,
+            "cancel_at": cancel_at,
+            "now": datetime.now(tz=UTC),
+        },
     )
 
 
@@ -322,7 +331,10 @@ def test_billing_migration_remaps_old_plans_and_adds_billing_columns(fresh_db_ur
     engine = create_engine(fresh_db_url, future=True)
     with engine.begin() as connection:
         _insert_account(connection, "observer@example.com", "observer")
-        _insert_account(connection, "operator@example.com", "operator")
+        # the removed fake cancel flow wrote cancel_at without any subscription
+        _insert_account(
+            connection, "operator@example.com", "operator", datetime.now(tz=UTC)
+        )
         _insert_account(connection, "desk@example.com", "desk")
 
     command.upgrade(cfg, "head")
@@ -331,6 +343,9 @@ def test_billing_migration_remaps_old_plans_and_adds_billing_columns(fresh_db_ur
         plans = dict(
             connection.execute(text("SELECT email, plan FROM user_account")).all()
         )
+        cancel_ats = connection.execute(
+            text("SELECT count(*) FROM user_account WHERE cancel_at IS NOT NULL")
+        ).scalar_one()
     columns = {column["name"] for column in inspect(engine).get_columns("user_account")}
     engine.dispose()
     assert plans == {
@@ -338,6 +353,7 @@ def test_billing_migration_remaps_old_plans_and_adds_billing_columns(fresh_db_ur
         "operator@example.com": "trader",
         "desk@example.com": "desk",
     }
+    assert cancel_ats == 0
     assert {
         "stripe_customer_id",
         "stripe_subscription_id",

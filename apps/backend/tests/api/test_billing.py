@@ -1,4 +1,6 @@
+import itertools
 import json
+import logging
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -17,16 +19,27 @@ from stripe import WebhookSignature
 from verasig.features.accounts import repository as account_repository
 
 _PERIOD_END = 1_798_761_600  # 2027-01-01T00:00:00Z
+# Same release as the pinned stripe SDK (endive); monthly versions do not break.
+_API_VERSION = "2026-09-30.endive"
+# Events are stamped in posting order unless a test says otherwise.
+_EVENT_CLOCK = itertools.count(1_793_000_000)
 
 
 # --- Stripe payload builders ---------------------------------------------
 
 
-def _event(event_type: str, obj: dict) -> str:
+def _event(
+    event_type: str,
+    obj: dict,
+    created: int | None = None,
+    api_version: str = _API_VERSION,
+) -> str:
     return json.dumps(
         {
             "id": f"evt_{event_type}",
             "object": "event",
+            "api_version": api_version,
+            "created": next(_EVENT_CLOCK) if created is None else created,
             "type": event_type,
             "data": {"object": obj},
         }
@@ -114,15 +127,21 @@ def _account(app, user_id):
 
 
 def _subscribe(client, user_id, subscription_id: str = "sub_1") -> None:
-    """Checkout completes, then Stripe reports the new subscription as trialing."""
+    """Checkout completes, then Stripe reports the new subscription as trialing.
+
+    Stripe stamps both events with the same second (sandbox, 2026-10-30).
+    """
+    second = next(_EVENT_CLOCK)
     payload = _event(
         "checkout.session.completed",
         _checkout_session(user_id, subscription_id=subscription_id),
+        created=second,
     )
     assert _post_event(client, payload).status_code == 200
     created = _event(
         "customer.subscription.created",
         _subscription(subscription_id, status="trialing", user_id=user_id),
+        created=second,
     )
     assert _post_event(client, created).status_code == 200
 
@@ -158,6 +177,36 @@ def test_webhook_fails_loudly_without_a_webhook_secret(client, app):
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "BILLING_NOT_CONFIGURED"
     assert "VERASIG_STRIPE_WEBHOOK_SECRET" in response.json()["error"]["message"]
+
+
+def test_webhook_rejects_events_from_another_api_release(client):
+    token, user_id = _register(client)
+    payload = _event(
+        "checkout.session.completed",
+        _checkout_session(user_id),
+        api_version="2022-08-01",
+    )
+
+    response = _post_event(client, payload)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "BILLING_WEBHOOK_API_VERSION"
+    assert "2022-08-01" in response.json()["error"]["message"]
+    assert _me(client, token)["plan"] == "free"
+
+
+def test_older_event_does_not_overwrite_newer_state(client):
+    token, user_id = _register(client)
+    _subscribe(client, user_id)
+    failed_at = next(_EVENT_CLOCK)
+    _post_event(
+        client, _event("customer.subscription.updated", _subscription(status="active"))
+    )
+
+    # a payment failure Stripe retried after the card was fixed
+    _post_event(client, _event("invoice.payment_failed", _invoice(), created=failed_at))
+
+    assert _me(client, token)["subscriptionStatus"] == "active"
 
 
 def test_webhook_acknowledges_an_unhandled_event_type(client):
@@ -302,13 +351,20 @@ def test_checkout_of_a_new_subscription_after_the_old_one_ended(client, app):
     assert _account(app, user_id).stripe_subscription_id == "sub_2"
 
 
-def test_checkout_of_a_second_subscription_while_paying_is_ignored(client, app):
+def test_checkout_of_a_second_subscription_while_paying_is_ignored(client, app, caplog):
     _token, user_id = _register(client)
     _subscribe(client, user_id)
 
-    _subscribe(client, user_id, subscription_id="sub_2")
+    # verasig.* loggers do not propagate (configure_app_logging), so attach here
+    billing_logger = logging.getLogger("verasig.features.billing.workflow")
+    billing_logger.addHandler(caplog.handler)
+    try:
+        _subscribe(client, user_id, subscription_id="sub_2")
+    finally:
+        billing_logger.removeHandler(caplog.handler)
 
     assert _account(app, user_id).stripe_subscription_id == "sub_1"
+    assert "sub_2" in caplog.text
 
 
 # --- customer.subscription.updated / deleted -------------------------------
@@ -385,7 +441,7 @@ def test_yearly_price_maps_to_trader(client, app):
     assert _me(client, token)["plan"] == "trader"
 
 
-def test_unknown_price_keeps_the_stored_plan(client):
+def test_unknown_price_is_not_a_paid_plan(client):
     token, user_id = _register(client)
     _subscribe(client, user_id)
 
@@ -394,7 +450,7 @@ def test_unknown_price_keeps_the_stored_plan(client):
         _event("customer.subscription.updated", _subscription(price_id="price_other")),
     )
 
-    assert _me(client, token)["plan"] == "trader"
+    assert _me(client, token)["plan"] == "free"
 
 
 def test_update_for_a_stale_subscription_is_ignored(client):
@@ -509,12 +565,26 @@ def checkout_calls(monkeypatch) -> list[dict]:
 
     def create(**params):
         calls.append(params)
+        session_id = f"cs_test_{len(calls)}"
         return SimpleNamespace(
-            id="cs_test_1", url="https://checkout.stripe.com/c/pay/cs_test_1"
+            id=session_id, url=f"https://checkout.stripe.com/c/pay/{session_id}"
         )
 
     monkeypatch.setattr(stripe.checkout.Session, "create", create)
     return calls
+
+
+@pytest.fixture
+def expired_sessions(monkeypatch) -> list[str]:
+    expired: list[str] = []
+
+    def expire(session_id, **params):
+        expired.append(session_id)
+        if session_id == "cs_test_done":
+            raise stripe.InvalidRequestError("Session is complete", param=None)
+
+    monkeypatch.setattr(stripe.checkout.Session, "expire", expire)
+    return expired
 
 
 def test_checkout_creates_a_trader_trial_session(client, checkout_calls):
@@ -579,6 +649,40 @@ def test_checkout_reuses_the_stored_stripe_customer(client, checkout_calls):
 
     assert checkout_calls[0]["customer"] == "cus_1"
     assert "customer_email" not in checkout_calls[0]
+    # one trial per customer
+    assert checkout_calls[0]["subscription_data"] == {
+        "metadata": {"user_id": str(user_id), "plan": "trader"}
+    }
+
+
+def test_a_new_checkout_expires_the_previous_open_one(
+    client, checkout_calls, expired_sessions
+):
+    token, _user_id = _register(client)
+    body = {"plan": "trader", "interval": "month"}
+
+    first = client.post("/billing/checkout", headers=_auth(token), json=body)
+    second = client.post("/billing/checkout", headers=_auth(token), json=body)
+
+    assert first.json()["id"] == "cs_test_1"
+    assert second.json()["id"] == "cs_test_2"
+    assert expired_sessions == ["cs_test_1"]
+
+
+def test_checkout_proceeds_when_the_previous_session_already_completed(
+    client, checkout_calls, monkeypatch
+):
+    token, _user_id = _register(client)
+    body = {"plan": "trader", "interval": "month"}
+
+    def expire(session_id, **params):
+        raise stripe.InvalidRequestError("Session is complete", param=None)
+
+    monkeypatch.setattr(stripe.checkout.Session, "expire", expire)
+    client.post("/billing/checkout", headers=_auth(token), json=body)
+    second = client.post("/billing/checkout", headers=_auth(token), json=body)
+
+    assert second.status_code == 200
 
 
 @pytest.mark.parametrize("plan", ["free", "desk"])

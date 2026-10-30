@@ -194,7 +194,8 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
           disabled={billingBusy !== null}
           onClick={() => startCheckout(plan, 'month')}
         >
-          {plan.trial ? 'Start 7-day trial' : `Upgrade to ${plan.name}`}
+          {/* One trial per customer: a returning subscriber pays from day one. */}
+          {plan.trial && !hasBilling ? 'Start 7-day trial' : `Upgrade to ${plan.name}`}
         </Button>
         {plan.yearlyMonthlyPrice != null && (
           <Button

@@ -37,6 +37,7 @@ def save_subscription(
     customer_id: str | None,
     subscription_id: str | None,
     cancel_at: datetime | None,
+    event_at: datetime | None,
 ) -> UserAccount | None:
     row = session.get(UserAccountRow, user_id)
     if row is None:
@@ -46,5 +47,14 @@ def save_subscription(
     row.stripe_customer_id = customer_id
     row.stripe_subscription_id = subscription_id
     row.cancel_at = cancel_at
+    row.stripe_event_at = event_at
     session.flush()
     return to_account(row)
+
+
+def set_checkout_session(
+    session: Session, user_id: UUID, checkout_session_id: str
+) -> None:
+    row = session.get(UserAccountRow, user_id)
+    row.stripe_checkout_session_id = checkout_session_id
+    session.flush()

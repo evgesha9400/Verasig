@@ -291,11 +291,11 @@ describe('SettingsView', () => {
     expect(within(planCard('Trader')).queryByRole('button')).toBeNull()
   })
 
-  it('offers Trader again after the subscription ended', () => {
+  it('offers Trader again without a second trial after the subscription ended', () => {
     renderSettings({ user: { ...user, subscriptionStatus: 'canceled' } })
 
-    expect(
-      within(planCard('Trader')).getByRole('button', { name: 'Start 7-day trial' })
-    ).toBeTruthy()
+    const card = planCard('Trader')
+    expect(within(card).getByRole('button', { name: 'Upgrade to Trader' })).toBeTruthy()
+    expect(within(card).queryByRole('button', { name: 'Start 7-day trial' })).toBeNull()
   })
 })

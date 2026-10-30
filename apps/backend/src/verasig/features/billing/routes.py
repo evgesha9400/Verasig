@@ -11,6 +11,7 @@ from verasig.features.billing.workflow import (
     AlreadySubscribedError,
     NoBillingCustomerError,
     PlanNotForSaleError,
+    WebhookApiVersionError,
     WebhookSignatureError,
     handle_webhook,
     open_portal,
@@ -31,9 +32,15 @@ def checkout(
     user: UserAccount = Depends(get_current_user),
 ) -> CheckoutOut:
     try:
-        url, session_id = start_checkout(
-            request.app.state.settings, user, payload.plan, payload.interval
-        )
+        with request.app.state.session_factory() as session:
+            url, session_id = start_checkout(
+                session,
+                request.app.state.settings,
+                user,
+                payload.plan,
+                payload.interval,
+            )
+            session.commit()
     except PlanNotForSaleError as error:
         raise ApiError(
             400, "BILLING_PLAN_NOT_FOR_SALE", "This plan cannot be bought"
@@ -77,6 +84,9 @@ async def webhook(request: Request) -> dict:
         raise ApiError(
             400, "BILLING_WEBHOOK_SIGNATURE", "Invalid Stripe signature"
         ) from error
+    except WebhookApiVersionError as error:
+        logger.error("billing webhook rejected: %s", error)
+        raise ApiError(400, "BILLING_WEBHOOK_API_VERSION", str(error)) from error
     except SettingsError as error:
         raise _not_configured(error) from error
     return {"received": True}

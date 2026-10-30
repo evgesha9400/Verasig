@@ -21,6 +21,8 @@ def to_account(row: UserAccountRow) -> UserAccount:
         stripe_customer_id=row.stripe_customer_id,
         stripe_subscription_id=row.stripe_subscription_id,
         subscription_status=row.subscription_status,
+        stripe_checkout_session_id=row.stripe_checkout_session_id,
+        stripe_event_at=row.stripe_event_at,
     )
 
 

@@ -10,6 +10,8 @@ import crypto from 'node:crypto'
 const CHECKOUT_PATH = '/e2e/stripe-checkout'
 const PORTAL_PATH = '/e2e/stripe-portal'
 export const STUB_SESSION_ID = 'cs_test_e2e'
+// The backend only reads events from the Stripe release its SDK pins (endive).
+const STRIPE_API_VERSION = '2026-10-28.endive'
 
 function stubPage(title, body) {
   const style =
@@ -92,6 +94,8 @@ export function checkoutCompletedEvent(userId) {
   return JSON.stringify({
     id: 'evt_e2e_checkout_completed',
     object: 'event',
+    api_version: STRIPE_API_VERSION,
+    created: Math.floor(Date.now() / 1000),
     type: 'checkout.session.completed',
     data: {
       object: {

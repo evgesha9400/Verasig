@@ -33,6 +33,7 @@ def _subscribe(app, user_id: UUID, plan: Plan) -> None:
             customer_id="cus_test",
             subscription_id="sub_test",
             cancel_at=None,
+            event_at=None,
         )
         session.commit()
 
