@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 // These specs run with the stored session (see auth.setup.js) — the login form
 // is never touched. They act AS the real account, so keep them read-only.
 
-test('reuses the session and reaches the app without a login form', async ({
+test('reuses the session and reaches the app without a login form @smoke', async ({
   page
 }) => {
   await page.goto('/app')

@@ -7,3 +7,12 @@ __pycache__/
 dist/
 build/
 .DS_Store
+**/node_modules
+**/dist
+**/secrets
+**/.env
+**/*.session
+**/*.session-journal
+**/test-results
+**/playwright-report
+apps/frontend/web/e2e/.auth

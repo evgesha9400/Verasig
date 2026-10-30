@@ -1,6 +1,11 @@
+import base64
+import binascii
+from pathlib import Path
 from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEV_KEY = bytes(32)
 
 
 class SettingsError(ValueError):
@@ -26,11 +31,16 @@ class Settings(BaseSettings):
     jwt_ttl_days: int = 7
     secret_keys: str = ""
     cors_origins: list[str] = ["http://localhost:5173"]
+    web_dist_dir: Path | None = None
 
     @property
     def database_url(self) -> str:
         if self.database_url_override:
             return self.database_url_override
+        if self.db_password == "verasig" and not self._is_local():
+            raise SettingsError(
+                "VERASIG_DB_PASSWORD=verasig is only allowed when VERASIG_ENV=local"
+            )
         user = quote(self.db_user, safe="")
         password = quote(self.db_password, safe="")
         database = quote(self.db_name, safe="")
@@ -46,20 +56,41 @@ class Settings(BaseSettings):
                 "VERASIG_SECRET_KEYS must be set to a comma-separated "
                 "key_id:base64key keyring"
             )
+        if not self._is_local() and any(
+            _is_dev_key(entry) for entry in spec.split(",")
+        ):
+            raise SettingsError(
+                "VERASIG_SECRET_KEYS must not contain the development key "
+                "outside local environments"
+            )
         return spec
 
     def jwt_secret_spec(self) -> str:
         secret = self.jwt_secret.strip()
         if not secret:
             raise SettingsError("VERASIG_JWT_SECRET must not be blank")
-        env = self.env.strip().lower() or "local"
-        if secret == "dev-secret" and env != "local":
+        if secret == "dev-secret" and not self._is_local():
             raise SettingsError(
                 "VERASIG_JWT_SECRET=dev-secret is only allowed when VERASIG_ENV=local"
             )
-        if env != "local" and len(secret) < 32:
+        if not self._is_local() and len(secret) < 32:
             raise SettingsError(
                 "VERASIG_JWT_SECRET must be at least 32 characters outside "
                 "local environments"
             )
         return secret
+
+    def _is_local(self) -> bool:
+        return (self.env.strip().lower() or "local") == "local"
+
+
+def _is_dev_key(entry: str) -> bool:
+    """A keyring entry whose key decodes to the all-zero development key.
+
+    Entries that fail to decode are left for SecretCipher.from_spec to reject.
+    """
+    _, _, encoded = entry.strip().partition(":")
+    try:
+        return base64.b64decode(encoded, validate=True) == _DEV_KEY
+    except binascii.Error:
+        return False
