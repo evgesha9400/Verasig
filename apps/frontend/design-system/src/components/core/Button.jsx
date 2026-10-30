@@ -60,18 +60,6 @@ const CSS = `
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09), 0 0 12px -2px var(--signal-glow), 0 2px 8px -4px rgba(0,0,0,0.5);
 }
 .vrs-btn__secondary:active:not(:disabled) { color: var(--text-strong); background-image: none; background-color: var(--surface-card); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
-/* Light: a clean white key with a soft ink shadow instead of the dark bevel. */
-[data-theme='light'] .vrs-btn__secondary {
-  background-image: linear-gradient(180deg, var(--surface-card), var(--surface-raised));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), var(--shadow-xs);
-}
-[data-theme='light'] .vrs-btn__secondary:hover:not(:disabled) {
-  background-image: linear-gradient(180deg, var(--surface-card), var(--surface-hover));
-  box-shadow: 0 0 12px -2px var(--signal-glow), var(--shadow-sm);
-}
-[data-theme='light'] .vrs-btn__secondary:active:not(:disabled) {
-  background-image: none; background-color: var(--surface-hover); box-shadow: inset 0 1px 2px rgba(12,18,26,0.12);
-}
 
 /* ---- Ghost: quiet until touched ---- */
 .vrs-btn__ghost { background: transparent; color: var(--text-body); }
@@ -87,14 +75,11 @@ const CSS = `
 .vrs-btn__danger:hover:not(:disabled) { color: var(--rejected-500); background: var(--rejected-bg); border-color: color-mix(in srgb, var(--rejected-500) 62%, transparent); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--rejected-500) 40%, transparent); }
 .vrs-btn__danger:active:not(:disabled) { color: var(--rejected-500); background: color-mix(in srgb, var(--rejected-500) 18%, transparent); }
 
-/* Focus ring last, and as specific as every themed :hover/:active box-shadow
+/* Focus ring last, and as specific as every variant :hover/:active box-shadow
    above, so a keyboard-focused button never loses its ring to a variant state. */
 .vrs-btn:focus-visible,
 .vrs-btn:focus-visible:hover:not(:disabled),
-.vrs-btn:focus-visible:active:not(:disabled),
-[data-theme='light'] .vrs-btn:focus-visible,
-[data-theme='light'] .vrs-btn:focus-visible:hover:not(:disabled),
-[data-theme='light'] .vrs-btn:focus-visible:active:not(:disabled) {
+.vrs-btn:focus-visible:active:not(:disabled) {
   outline: none; box-shadow: var(--focus-ring), 0 0 18px var(--signal-glow);
 }
 

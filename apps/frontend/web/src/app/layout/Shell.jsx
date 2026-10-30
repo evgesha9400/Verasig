@@ -4,12 +4,11 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
-  ThemeToggle,
   Icon
 } from '@verasig/design-system'
 
 /* Verasig prototype — user account popover (Vercel-style) */
-export function UserMenu({ user, theme, onThemeChange, onLogout, onOpenSettings }) {
+export function UserMenu({ user, onLogout, onOpenSettings }) {
   return (
     <Menu
       className="vrs-um"
@@ -59,13 +58,6 @@ export function UserMenu({ user, theme, onThemeChange, onLogout, onOpenSettings 
 
       <MenuSeparator />
 
-      <div className="vrs-um__row">
-        <span className="vrs-um__row-lbl">Theme</span>
-        <ThemeToggle value={theme} onChange={onThemeChange} />
-      </div>
-
-      <MenuSeparator />
-
       <MenuItem iconRight={<Icon name="logout" size={16} />} onClick={onLogout}>
         Log out
       </MenuItem>
@@ -84,8 +76,6 @@ export function Shell({
   children,
   onExit,
   pipeline,
-  theme,
-  onThemeChange,
   onLogout,
   user,
   onOpenSettings
@@ -134,13 +124,7 @@ export function Shell({
         </nav>
 
         <div className="vrs-sb__foot">
-          <UserMenu
-            user={user}
-            theme={theme}
-            onThemeChange={onThemeChange}
-            onLogout={onLogout}
-            onOpenSettings={onOpenSettings}
-          />
+          <UserMenu user={user} onLogout={onLogout} onOpenSettings={onOpenSettings} />
         </div>
       </aside>
 

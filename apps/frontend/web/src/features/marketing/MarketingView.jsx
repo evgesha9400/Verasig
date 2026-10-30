@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Icon, ThemeToggle, useTheme } from '@verasig/design-system'
+import { Button, Icon } from '@verasig/design-system'
 import { PLANS } from '../../domain/plan/planCatalog.js'
 import './marketing.css'
 
@@ -27,7 +27,7 @@ function Mark({ size = 26 }) {
 }
 
 /* ========================================================== NAV ===== */
-function Nav({ theme, onThemeChange, loginPath, signupPath }) {
+function Nav({ loginPath, signupPath }) {
   return (
     <header className="mk-nav">
       <div className="mk-nav__inner">
@@ -44,8 +44,6 @@ function Nav({ theme, onThemeChange, loginPath, signupPath }) {
           <a href="#principles">Principles</a>
         </nav>
         <div className="mk-nav__actions">
-          <ThemeToggle value={theme} onChange={onThemeChange} />
-          <span className="mk-nav__divider" aria-hidden="true" />
           <Link className="mk-nav__signin" to={loginPath}>
             Log in
           </Link>
@@ -577,15 +575,9 @@ function Footer() {
 
 /* ==================================================== ROOT ===== */
 export default function Marketing({ loginPath = '/login', signupPath = '/signup' }) {
-  const [theme, setTheme] = useTheme()
   return (
     <div className="mk-page">
-      <Nav
-        theme={theme}
-        onThemeChange={setTheme}
-        loginPath={loginPath}
-        signupPath={signupPath}
-      />
+      <Nav loginPath={loginPath} signupPath={signupPath} />
       <Hero loginPath={loginPath} signupPath={signupPath} />
       <HowItWorks />
       <Integrations />
