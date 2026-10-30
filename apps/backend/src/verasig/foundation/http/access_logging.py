@@ -43,7 +43,10 @@ def _record_request_path(record: logging.LogRecord) -> str | None:
 
 
 def _is_health_access_record(record: logging.LogRecord) -> bool:
-    return _record_request_path(record) == HEALTH_PATH
+    # The site entrypoint mounts the API at /api, so the logged path is then
+    # /api/health.
+    path = _record_request_path(record)
+    return path is not None and path.endswith(HEALTH_PATH)
 
 
 def _redact_query_token(record: logging.LogRecord) -> None:

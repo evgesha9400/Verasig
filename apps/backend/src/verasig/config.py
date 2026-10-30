@@ -1,5 +1,6 @@
 import base64
 import binascii
+from pathlib import Path
 from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,6 +31,7 @@ class Settings(BaseSettings):
     jwt_ttl_days: int = 7
     secret_keys: str = ""
     cors_origins: list[str] = ["http://localhost:5173"]
+    web_dist_dir: Path | None = None
 
     @property
     def database_url(self) -> str:

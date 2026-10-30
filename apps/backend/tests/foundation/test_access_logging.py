@@ -113,3 +113,16 @@ def test_similar_query_parameter_is_not_redacted(access_logger):
     log_filter.filter(record)
 
     assert record.args[2] == "/progress?mytoken=visible"
+
+
+def test_mounted_health_access_log_dropped_at_info_level(access_logger):
+    access_logger.setLevel(logging.INFO)
+    log_filter = HealthCheckAccessLogFilter(access_logger.name)
+    assert log_filter.filter(_access_record("/api/health")) is False
+
+
+def test_token_query_redacted_under_api_mount(access_logger):
+    log_filter = HealthCheckAccessLogFilter(access_logger.name)
+    record = _access_record("/api/feeds/x/backfill/progress?token=abc")
+    assert log_filter.filter(record) is True
+    assert "abc" not in record.getMessage()
