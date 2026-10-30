@@ -1,6 +1,6 @@
 # Launch architecture: temporary-site launch and capability redesign
 
-Date: 2026-10-29. Status: approved by the user 2026-10-29.
+Date: 2026-10-29. Status: approved by the user 2026-10-29. Hosting revised and approved 2026-10-30.
 
 This is the umbrella design. It records the decisions that every launch project shares
 and splits the work into seven projects. Each project gets its own spec, plan, and
@@ -12,7 +12,7 @@ channel (the UI may say "channel" in marketing copy). New terms this design adds
 
 ## 1. Goal
 
-Ship Verasig to a temporary public hostname before buying a domain, and prove the
+Ship Verasig to a public site (`verasig.io`, revised 2026-10-30), and prove the
 whole paid journey works there with real services and no real money.
 
 Done means all of these hold on the temporary site:
@@ -175,23 +175,25 @@ user (section 4.3), and the Bybit subaccount API is unverified.
 
 ## 8. Hosting
 
-- One AWS Lightsail server, 2 GB RAM, 2 vCPU, $12/month, region eu-west-1. Postgres
-  runs on the same server with daily snapshots.
-- HTTPS through an IP-based hostname (sslip.io) until a domain is bought.
-- The built web app is served as static files behind a reverse proxy on the same
-  server, which ends HTTPS and forwards API calls to the backend. Today the frontend
-  runs only as a Vite dev server, so project 1 adds this. Project 1 picks the proxy.
-- Capacity estimate after the backtest fix: about 80 users with 10 feeds each.
-  Today the server can run one backtest at a time.
+- Revised 2026-10-30: the temporary site runs on the user's mac-server through its
+  existing platform (`serverctl`, Tailscale deploy, Cloudflare Tunnel). This
+  replaces the earlier Lightsail plan. Revisit before real-money live trading,
+  because the server depends on home internet and power.
+- Domain `verasig.io` (Cloudflare). Cloudflare ends HTTPS; the tunnel forwards to
+  one loopback port.
+- One image holds the backend and the built web app. One process serves the web
+  app at `/` and the API at `/api`. Postgres runs in the same Compose project.
+  Project 1 has the details.
+- Capacity: measured 2026-10-30, other services use about 1.4 GB of the 7.75 GB
+  Colima VM. Until project 2, one backtest at a time.
 
 ## 9. CI/CD
 
 - GitHub Actions. The repo `evgesha9400/Verasig` is public; the default branch is
   `develop`.
 - Every pull request and push: `make check`, then the CI E2E suite (section 10).
-- Every merge to `main`: build the backend image and the web app, push to GitHub
-  Container Registry,
-  deploy over SSH to the server (pull, migrate, restart), then run the live-site check.
+- Every merge to `main`: build one image, push it to GitHub Container Registry,
+  deploy it with `serverctl` on the mac-server, then run the live-site check.
 - One environment. The temporary site is production.
 
 ## 10. End-to-end tests
@@ -237,10 +239,7 @@ Projects 4 and 7 can run in parallel with project 3.
 
 | Unknown | Project |
 |---|---|
-| sslip.io HTTPS certificate rate limits | 1 |
-| Deploy credentials: SSH key in GitHub secrets or AWS sign-in without stored keys | 1 |
-| Which AWS account hosts the server | 1 |
-| Reverse proxy choice | 1 |
+| SSE streams through Cloudflare without buffering | 1 (checked fully in 4) |
 | Sell Desk at launch, or show it as coming soon | before 7 |
 | Whether Stripe accepts the product | 7 (apply during 1) |
 | Legal entity country (decides tax duties) | 7 |
