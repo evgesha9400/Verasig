@@ -13,11 +13,40 @@ const API_URL =
   process.env.E2E_API_URL || process.env.VITE_VERASIG_API_URL || 'http://localhost:8000'
 const APP_ORIGIN = process.env.E2E_BASE_URL || 'http://localhost:5173'
 
-setup('authenticate via API login', async () => {
-  const { email, password } = readCredentials()
-  const token = await logInForToken(email, password)
+// E2E_REGISTER=1 (CI) registers a throwaway user instead of logging in, so a
+// fresh database needs no seeded account. Never set it against the live site.
+setup('authenticate via API', async () => {
+  const token =
+    process.env.E2E_REGISTER === '1'
+      ? await registerForToken()
+      : await logInWithCredentials()
   writeStorageState(token)
 })
+
+async function logInWithCredentials() {
+  const { email, password } = readCredentials()
+  return logInForToken(email, password)
+}
+
+async function registerForToken() {
+  const api = await request.newContext()
+  const response = await api.post(`${API_URL}/auth/register`, {
+    data: {
+      firstName: 'Test',
+      lastName: 'Runner',
+      email: `e2e-${Date.now()}@example.com`,
+      password: crypto.randomUUID()
+    }
+  })
+  expect(
+    response.ok(),
+    `POST ${API_URL}/auth/register failed (HTTP ${response.status()}).`
+  ).toBeTruthy()
+  const { token } = await response.json()
+  expect(token, 'Register succeeded but the response carried no token.').toBeTruthy()
+  await api.dispose()
+  return token
+}
 
 function readCredentials() {
   const email = process.env.E2E_EMAIL
