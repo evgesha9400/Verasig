@@ -95,9 +95,9 @@ describe('Button as an anchor keeps its variant color on hover', () => {
 })
 
 // jsdom cannot force :focus-visible + :hover either, so prove from the CSS that
-// whenever any variant/theme/state rule sets box-shadow, a focus-ring rule
+// whenever any variant/state rule sets box-shadow, a focus-ring rule
 // still applies under the same conditions and wins the cascade.
-const STATE_TOKENS = [':hover', ':active', ':not(:disabled)', "[data-theme='light']"]
+const STATE_TOKENS = [':hover', ':active', ':not(:disabled)']
 
 function specificity(selector) {
   return (selector.replace(/:not\(/g, '(').match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) || [])
@@ -143,49 +143,15 @@ function focusRingCoverage(css, root) {
     .map((shadow) => shadow.selector)
 }
 
-describe('focus ring survives every variant, theme and pointer state', () => {
+describe('focus ring survives every variant and pointer state', () => {
   it('Button: no box-shadow rule can override the :focus-visible ring', () => {
     render(<Button variant="secondary">Go</Button>)
     expect(focusRingCoverage(buttonCss(), 'vrs-btn')).toEqual([])
-  })
-
-  it('Button: light secondary and :hover box-shadows are explicitly covered', () => {
-    const rings = cssRules(buttonCss())
-      .filter((r) => /var\(--focus-ring\)/.test(r.body))
-      .flatMap((r) => r.selector.split(',').map((x) => x.trim()))
-    expect(rings).toContain('.vrs-btn:focus-visible')
-    expect(rings).toContain('.vrs-btn:focus-visible:hover:not(:disabled)')
-    expect(rings).toContain(
-      "[data-theme='light'] .vrs-btn:focus-visible:hover:not(:disabled)"
-    )
   })
 
   it('IconButton: no box-shadow rule can override the :focus-visible ring', () => {
     render(<IconButton label="Close" variant="solid" />)
     const css = document.getElementById('vrs-iconbtn-css').textContent
     expect(focusRingCoverage(css, 'vrs-iconbtn')).toEqual([])
-  })
-})
-
-describe('light pressed keys drop the hover gradient', () => {
-  it.each([
-    [
-      'vrs-button-css',
-      "[data-theme='light'] .vrs-btn__secondary:active:not(:disabled)"
-    ],
-    [
-      'vrs-iconbtn-css',
-      "[data-theme='light'] .vrs-iconbtn__solid:active:not(:disabled)"
-    ]
-  ])('%s %s clears background-image', (id, selector) => {
-    render(
-      <>
-        <Button variant="secondary">Go</Button>
-        <IconButton label="Close" variant="solid" />
-      </>
-    )
-    expect(ruleBody(document.getElementById(id).textContent, selector)).toMatch(
-      /background-image:\s*none/
-    )
   })
 })

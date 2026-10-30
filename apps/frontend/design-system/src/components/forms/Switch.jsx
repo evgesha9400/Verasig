@@ -19,15 +19,6 @@ const CSS = `
 }
 .vrs-switch input:checked + .vrs-switch__track { background: var(--accent); border-color: var(--accent); }
 .vrs-switch input:checked + .vrs-switch__track .vrs-switch__thumb { transform: translateX(16px); background: var(--text-on-accent); }
-/* Light: a white thumb on the pressed-azure track (4.7:1 thumb vs track;
-   dark keeps the dark thumb on lime). */
-[data-theme='light'] .vrs-switch input:checked + .vrs-switch__track {
-  background: var(--accent-press); border-color: var(--accent-press);
-}
-[data-theme='light'] .vrs-switch input:checked + .vrs-switch__track .vrs-switch__thumb {
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(12, 18, 26, 0.25);
-}
 .vrs-switch input:focus-visible + .vrs-switch__track { box-shadow: var(--focus-ring); }
 .vrs-switch__label { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-strong); }
 `
