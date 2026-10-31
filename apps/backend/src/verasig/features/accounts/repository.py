@@ -100,3 +100,19 @@ def apply_pending_email(
     row.pending_email = None
     session.flush()
     return to_account(row)
+
+
+def set_password_hash(
+    session: Session, user_id: UUID, password_hash: str, expected_hash: str
+) -> UserAccount | None:
+    """Replace the password hash, only if it is still `expected_hash`.
+
+    The row is locked and re-read, so two resets racing on one token cannot
+    both succeed.
+    """
+    row = session.get(UserAccountRow, user_id, with_for_update=True)
+    if row is None or row.password_hash != expected_hash:
+        return None
+    row.password_hash = password_hash
+    session.flush()
+    return to_account(row)

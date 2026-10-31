@@ -8,6 +8,7 @@ x-backend-service: &backend-service
     VERASIG_DB_HOST: db
     VERASIG_DB_PORT: "5432"
     VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+    VERASIG_SMTP_HOST: mailpit
 
 services:
   db:
@@ -25,6 +26,13 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+
+  # Mail catcher for local dev and CI: SMTP on 1025, web UI and API on 8025.
+  mailpit:
+    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 
   migrate:
     <<: *backend-service
@@ -44,6 +52,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_started
     healthcheck:
       test:
         [
@@ -72,6 +82,9 @@ services:
       VERASIG_SECRET_KEYS: ${VERASIG_SECRET_KEYS:-dev:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
       VERASIG_CORS_ORIGINS: '["http://localhost:8080"]'
       VERASIG_SITE_URL: http://localhost:8080
+      VERASIG_SMTP_HOST: mailpit
+      VERASIG_SMTP_PORT: "1025"
+      VERASIG_SMTP_TLS: none
       # CI sets a throwaway value; the checkout E2E signs its webhook with it.
       VERASIG_STRIPE_WEBHOOK_SECRET: ${VERASIG_STRIPE_WEBHOOK_SECRET:-}
     ports:
@@ -82,6 +95,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test:
         [

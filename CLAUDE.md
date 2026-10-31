@@ -36,6 +36,10 @@ logs in via the API and reuses the session.
   `VERASIG_STRIPE_WEBHOOK_SECRET`; it skips locally without it. CI sets both to one throwaway value.
   The browser never reaches Stripe: `e2e/stripe-stub.js` routes `**/billing/checkout|portal` to stub
   pages and signs the webhook in node.
+- `password-reset.spec.js` (Forgot password → email → reset link → log in) reads the email from
+  Mailpit's HTTP API and needs `E2E_MAIL_API_URL=http://localhost:8025` in `e2e/.env`; it skips
+  locally without it. `make dev` starts Mailpit (`db-up`) and the backend `.env` sends to it; open
+  `http://localhost:8025` to read caught mail. The `site` compose profile sends to Mailpit too.
 
 ### Ad-hoc (agent driving the Playwright MCP)
 

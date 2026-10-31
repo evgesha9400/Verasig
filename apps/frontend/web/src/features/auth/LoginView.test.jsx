@@ -55,4 +55,27 @@ describe('LoginView', () => {
     fireEvent.click(screen.getByText('Create an account'))
     expect(onRegister).toHaveBeenCalledOnce()
   })
+
+  it('calls onForgotPassword when Forgot password? is clicked', () => {
+    const onForgotPassword = vi.fn()
+    render(
+      <LoginView
+        onLogin={() => {}}
+        onRegister={() => {}}
+        onForgotPassword={onForgotPassword}
+      />
+    )
+    fireEvent.click(screen.getByText('Forgot password?'))
+    expect(onForgotPassword).toHaveBeenCalledOnce()
+  })
+
+  it('confirms a finished password reset', () => {
+    render(<LoginView onLogin={() => {}} onRegister={() => {}} passwordReset />)
+    expect(screen.getByText('Password updated')).toBeTruthy()
+  })
+
+  it('shows no reset notice on a plain visit', () => {
+    render(<LoginView onLogin={() => {}} onRegister={() => {}} />)
+    expect(screen.queryByText('Password updated')).toBeNull()
+  })
 })

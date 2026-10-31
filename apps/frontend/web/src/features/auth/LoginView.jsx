@@ -8,7 +8,7 @@ function errorMessage(error) {
   return error?.message || 'Login failed. Check your details and try again.'
 }
 
-export function LoginView({ onLogin, onRegister }) {
+export function LoginView({ onLogin, onRegister, onForgotPassword, passwordReset }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -47,6 +47,11 @@ export function LoginView({ onLogin, onRegister }) {
           <div className="auth-eyebrow">Welcome back</div>
           <h1 className="auth-title">Log in to Verasig</h1>
           <p className="auth-lede">Pick up where your sources left off.</p>
+          {passwordReset && (
+            <Banner tone="verified" title="Password updated">
+              Log in with your new password.
+            </Banner>
+          )}
           <form className="auth-form" onSubmit={handleSubmit}>
             <Input
               label="Email"
@@ -72,8 +77,7 @@ export function LoginView({ onLogin, onRegister }) {
             />
             <div className="auth-row">
               <Checkbox label="Remember me" />
-              {/* Placeholder until password recovery exists: never navigates. */}
-              <TextLink as="a" className="auth-forgot">
+              <TextLink className="auth-forgot" onClick={onForgotPassword}>
                 Forgot password?
               </TextLink>
             </div>

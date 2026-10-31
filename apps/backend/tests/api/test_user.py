@@ -193,7 +193,7 @@ def test_email_change_to_taken_email_returns_409(client):
     assert response.json()["error"]["code"] == "AUTH_EMAIL_TAKEN"
 
 
-def test_password_reset_request_is_accepted(client):
+def test_authenticated_password_reset_request_route_is_gone(client):
     registered = _register(client)
 
     response = client.post(
@@ -201,7 +201,7 @@ def test_password_reset_request_is_accepted(client):
         headers=_auth(registered["token"]),
     )
 
-    assert response.status_code == 202
+    assert response.status_code == 404
 
 
 def test_fake_subscription_routes_are_gone(client):

@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './client.js'
-import { getCurrentUser, login, logout, register } from './authApi.js'
+import {
+  forgotPassword,
+  getCurrentUser,
+  login,
+  logout,
+  register,
+  resetPassword
+} from './authApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -112,6 +119,30 @@ describe('authApi', () => {
     expect(fetch).toHaveBeenCalledWith('http://localhost:8000/auth/logout', {
       method: 'POST',
       headers: { Authorization: 'Bearer jwt-token' }
+    })
+  })
+
+  it('asks for a password reset link without a token', async () => {
+    fetch.mockResolvedValueOnce(new Response(null, { status: 202 }))
+
+    await forgotPassword('ada@example.com')
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/auth/password/forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ada@example.com' })
+    })
+  })
+
+  it('sets a new password with the emailed token', async () => {
+    fetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    await resetPassword('reset-token', 'a brand new passphrase')
+
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/auth/password/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'reset-token', password: 'a brand new passphrase' })
     })
   })
 

@@ -1,3 +1,13 @@
+import logging
+import re
+from datetime import timedelta
+
+from conftest import JWT_SECRET, SITE_URL
+
+from verasig.features.accounts.repository import find_by_email
+from verasig.features.accounts.tokens import issue_password_reset_token
+
+
 def _register_payload(email: str = "Ada@Example.com") -> dict:
     return {
         "firstName": "Ada",
@@ -233,3 +243,177 @@ def test_logout_is_stateless_no_content(client):
 
     assert response.status_code == 204
     assert response.content == b""
+
+
+# --- Password reset by email -----------------------------------------------
+
+NEW_PASSWORD = "a brand new passphrase"
+
+
+class RecordingMailer:
+    def __init__(self, error: Exception | None = None):
+        self.sent = []
+        self._error = error
+
+    def send(self, message) -> None:
+        if self._error is not None:
+            raise self._error
+        self.sent.append(message)
+
+
+def _mailed_token(mailer: RecordingMailer) -> str:
+    text = mailer.sent[-1].get_body(("plain",)).get_content()
+    match = re.search(re.escape(SITE_URL) + r"/reset-password\?token=(\S+)", text)
+    assert match, text
+    return match.group(1)
+
+
+def _forgot(client, email: str = "ada@example.com"):
+    return client.post("/auth/password/forgot", json={"email": email})
+
+
+def _reset(client, token: str, password: str = NEW_PASSWORD):
+    return client.post(
+        "/auth/password/reset", json={"token": token, "password": password}
+    )
+
+
+def _login(client, password: str):
+    return client.post(
+        "/auth/login", json={"email": "ada@example.com", "password": password}
+    )
+
+
+def test_forgot_password_mails_a_reset_link_for_a_known_email(client, app):
+    app.state.mailer = mailer = RecordingMailer()
+    _register(client)
+
+    response = _forgot(client, "  ADA@example.com ")
+
+    assert response.status_code == 202
+    assert response.content == b""
+    (message,) = mailer.sent
+    assert message["To"] == "ada@example.com"
+    assert (
+        f"{SITE_URL}/reset-password?token="
+        in message.get_body(("plain",)).get_content()
+    )
+
+
+def test_forgot_password_answers_the_same_for_an_unknown_email(client, app):
+    app.state.mailer = mailer = RecordingMailer()
+    _register(client)
+
+    known = _forgot(client, "ada@example.com")
+    unknown = _forgot(client, "nobody@example.com")
+
+    assert (unknown.status_code, unknown.content) == (known.status_code, known.content)
+    assert len(mailer.sent) == 1
+
+
+def test_forgot_password_still_accepts_when_mail_fails(client, app, caplog):
+    app.state.mailer = RecordingMailer(error=OSError("smtp down"))
+    _register(client)
+
+    # verasig.* loggers do not propagate (configure_app_logging), so attach here
+    routes_logger = logging.getLogger("verasig.features.accounts.auth_routes")
+    routes_logger.addHandler(caplog.handler)
+    try:
+        response = _forgot(client)
+    finally:
+        routes_logger.removeHandler(caplog.handler)
+
+    assert response.status_code == 202
+    record = next(
+        r for r in caplog.records if r.getMessage() == "password reset email failed"
+    )
+    assert record.email == "ada@example.com"
+    assert "token" not in caplog.text
+    assert "token" not in str(vars(record))
+
+
+def test_forgot_password_answers_the_same_when_the_site_url_is_missing(client, app):
+    # all per-account work happens after the response, so a broken mail setup
+    # cannot make a known email answer differently from an unknown one.
+    app.state.mailer = mailer = RecordingMailer()
+    app.state.settings = app.state.settings.model_copy(update={"site_url": " "})
+    _register(client)
+
+    known = _forgot(client, "ada@example.com")
+    unknown = _forgot(client, "nobody@example.com")
+
+    assert (known.status_code, known.content) == (202, b"")
+    assert (unknown.status_code, unknown.content) == (202, b"")
+    assert mailer.sent == []
+
+
+def test_reset_password_with_the_mailed_token_changes_the_password(client, app):
+    app.state.mailer = mailer = RecordingMailer()
+    _register(client)
+    _forgot(client)
+
+    response = _reset(client, _mailed_token(mailer))
+
+    assert response.status_code == 204
+    assert _login(client, NEW_PASSWORD).status_code == 200
+    assert _login(client, "correct horse battery staple").status_code == 401
+
+
+def test_reset_token_works_only_once(client, app):
+    app.state.mailer = mailer = RecordingMailer()
+    _register(client)
+    _forgot(client)
+    token = _mailed_token(mailer)
+
+    assert _reset(client, token).status_code == 204
+    response = _reset(client, token, "another new passphrase")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "AUTH_INVALID_TOKEN"
+    assert _login(client, NEW_PASSWORD).status_code == 200
+
+
+def test_reset_token_dies_when_the_password_changes_another_way(client, app):
+    app.state.mailer = mailer = RecordingMailer()
+    _register(client)
+    _forgot(client)
+    older = _mailed_token(mailer)
+    _forgot(client)
+    assert _reset(client, _mailed_token(mailer)).status_code == 204
+
+    response = _reset(client, older, "another new passphrase")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "AUTH_INVALID_TOKEN"
+
+
+def test_reset_rejects_an_expired_token(client, session_factory):
+    _register(client)
+    with session_factory() as session:
+        account = find_by_email(session, "ada@example.com")
+    expired = issue_password_reset_token(
+        account.id, account.password_hash, JWT_SECRET, timedelta(seconds=-1)
+    )
+
+    response = _reset(client, expired)
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "AUTH_INVALID_TOKEN"
+
+
+def test_reset_rejects_an_access_token(client):
+    registered = _register(client)
+
+    response = _reset(client, registered["token"])
+
+    assert response.status_code == 400
+
+
+def test_reset_rejects_a_short_password(client, app):
+    app.state.mailer = mailer = RecordingMailer()
+    _register(client)
+    _forgot(client)
+
+    response = _reset(client, _mailed_token(mailer), "short")
+
+    assert response.status_code == 422
