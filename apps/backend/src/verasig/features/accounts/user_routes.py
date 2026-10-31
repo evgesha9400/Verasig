@@ -1,10 +1,7 @@
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Request
 
 from verasig.domain.account import UserAccount
-from verasig.features.accounts.mailer import (
-    send_email_confirm,
-    send_password_reset_requested,
-)
+from verasig.features.accounts.mailer import send_email_confirm
 from verasig.features.accounts.profile_schemas import (
     EmailChangeIn,
     EmailConfirmIn,
@@ -109,9 +106,3 @@ def confirm_email(
             ) from error
         session.commit()
     return user_out(updated)
-
-
-@router.post("/password/reset-request", status_code=status.HTTP_202_ACCEPTED)
-def request_password_reset(user: UserAccount = Depends(get_current_user)) -> Response:
-    send_password_reset_requested(user.email)
-    return Response(status_code=status.HTTP_202_ACCEPTED)

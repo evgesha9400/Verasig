@@ -2,7 +2,7 @@ import base64
 
 import pytest
 
-from verasig.config import Settings, SettingsError
+from verasig.config import MailConfig, Settings, SettingsError
 
 CONFIG_ENV_KEYS = (
     "VERASIG_DATABASE_URL_OVERRIDE",
@@ -20,6 +20,12 @@ CONFIG_ENV_KEYS = (
     "VERASIG_CLAUDE_CODE_OAUTH_TOKEN",
     "VERASIG_CLAUDE_CODE_MODEL",
     "VERASIG_CLAUDE_CODE_TIMEOUT_SECONDS",
+    "VERASIG_SMTP_HOST",
+    "VERASIG_SMTP_PORT",
+    "VERASIG_SMTP_USER",
+    "VERASIG_SMTP_PASSWORD",
+    "VERASIG_SMTP_TLS",
+    "VERASIG_MAIL_FROM",
 )
 
 
@@ -205,3 +211,39 @@ def test_database_url_allows_override_outside_local():
         database_url_override="postgresql+psycopg://u:p@h/d",
     )
     assert settings.database_url == "postgresql+psycopg://u:p@h/d"
+
+
+def test_mail_spec_is_none_locally_without_smtp_host():
+    assert Settings(_env_file=None).mail_spec() is None
+
+
+def test_mail_spec_rejects_blank_smtp_host_outside_local():
+    with pytest.raises(SettingsError, match="VERASIG_SMTP_HOST"):
+        Settings(_env_file=None, env="production").mail_spec()
+
+
+def test_mail_spec_carries_smtp_settings():
+    settings = Settings(
+        _env_file=None,
+        env="production",
+        smtp_host="smtp.example.com",
+        smtp_port=465,
+        smtp_user="resend",
+        smtp_password="key",
+        smtp_tls="ssl",
+        mail_from="Verasig <no-reply@verasig.io>",
+    )
+
+    assert settings.mail_spec() == MailConfig(
+        host="smtp.example.com",
+        port=465,
+        user="resend",
+        password="key",
+        tls="ssl",
+        sender="Verasig <no-reply@verasig.io>",
+    )
+
+
+def test_mail_spec_rejects_unknown_tls_mode():
+    with pytest.raises(SettingsError, match="VERASIG_SMTP_TLS"):
+        Settings(_env_file=None, smtp_host="mailpit", smtp_tls="tls").mail_spec()

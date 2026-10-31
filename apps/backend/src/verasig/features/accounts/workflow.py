@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
@@ -9,10 +9,13 @@ from verasig.features.accounts.passwords import check_password, hash_password
 from verasig.features.accounts.repository import (
     apply_pending_email,
     find_by_email,
+    find_by_id,
     insert_account,
+    set_password_hash,
     set_pending_email,
     update_profile,
 )
+from verasig.features.accounts.tokens import password_fingerprint
 
 
 class EmailTakenError(Exception):
@@ -25,6 +28,10 @@ class InvalidCredentialsError(Exception):
 
 class PendingEmailMismatchError(Exception):
     """Raised when an email confirmation token does not match account state."""
+
+
+class ResetLinkInvalidError(Exception):
+    """Raised when a password reset token no longer matches its account."""
 
 
 def normalize_email(email: str) -> str:
@@ -114,3 +121,21 @@ def confirm_email_change(
 
 def cancel_email_change(session: Session, account: UserAccount) -> UserAccount:
     return set_pending_email(session, account.id, None)
+
+
+def find_account(session: Session, email: str) -> UserAccount | None:
+    return find_by_email(session, normalize_email(email))
+
+
+def reset_password(
+    session: Session, user_id: UUID, fingerprint: str, new_password: str
+) -> UserAccount:
+    account = find_by_id(session, user_id)
+    if account is None or password_fingerprint(account.password_hash) != fingerprint:
+        raise ResetLinkInvalidError()
+    updated = set_password_hash(
+        session, user_id, hash_password(new_password), account.password_hash
+    )
+    if updated is None:
+        raise ResetLinkInvalidError()
+    return updated

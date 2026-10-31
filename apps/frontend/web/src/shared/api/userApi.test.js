@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  cancelEmailChange,
-  changeEmail,
-  requestPasswordReset,
-  updateProfile
-} from './userApi.js'
+import { cancelEmailChange, changeEmail, updateProfile } from './userApi.js'
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -80,19 +75,5 @@ describe('userApi', () => {
       method: 'POST',
       headers: { Authorization: 'Bearer jwt-token' }
     })
-  })
-
-  it('requests a password reset without a body', async () => {
-    fetch.mockResolvedValueOnce(new Response(null, { status: 202 }))
-
-    await requestPasswordReset('jwt-token')
-
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8000/user/password/reset-request',
-      {
-        method: 'POST',
-        headers: { Authorization: 'Bearer jwt-token' }
-      }
-    )
   })
 })

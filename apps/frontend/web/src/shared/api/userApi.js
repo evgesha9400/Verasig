@@ -11,7 +11,3 @@ export function changeEmail(token, email) {
 export function cancelEmailChange(token) {
   return post('/user/email/cancel', token)
 }
-
-export function requestPasswordReset(token) {
-  return post('/user/password/reset-request', token)
-}

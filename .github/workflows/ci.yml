@@ -45,7 +45,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/frontend/package-lock.json
       - run: make env
-      # The production site image (Dockerfile.site) with Postgres: CI tests what deploys.
+      # The production site image (Dockerfile.site) with Postgres and the Mailpit
+      # mail catcher: CI tests what deploys, and reads reset emails from Mailpit.
       - run: docker compose --profile site up -d --wait site
       - run: npm ci
         working-directory: apps/frontend
@@ -58,6 +59,7 @@ jobs:
           E2E_REGISTER: "1"
           E2E_BASE_URL: http://localhost:8080
           E2E_API_URL: http://localhost:8080/api
+          E2E_MAIL_API_URL: http://localhost:8025
       - if: failure()
         run: docker compose --profile site logs site
       - if: failure()

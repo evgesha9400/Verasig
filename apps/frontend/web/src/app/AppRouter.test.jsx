@@ -282,6 +282,44 @@ describe('AppRoutes', () => {
     expect(redirectTo).not.toHaveBeenCalled()
   })
 
+  it('opens forgot password from the login page', async () => {
+    renderRoute('/login')
+
+    fireEvent.click(screen.getByText('Forgot password?'))
+
+    expect(await screen.findByText('Reset your password')).toBeTruthy()
+  })
+
+  it('resets the password from the emailed link, then asks for a login', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stored-token')
+    installFetch({
+      'GET /auth/me': () => jsonResponse(backendUser),
+      'POST /auth/password/reset': () => emptyResponse(204)
+    })
+
+    renderRoute('/reset-password?token=reset-token')
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'a brand new passphrase' }
+    })
+    fireEvent.change(screen.getByLabelText('Confirm new password'), {
+      target: { value: 'a brand new passphrase' }
+    })
+    fireEvent.submit(screen.getByLabelText('New password').closest('form'))
+
+    expect(await screen.findByText('Password updated')).toBeTruthy()
+    expect(screen.getByText('Log in to Verasig')).toBeTruthy()
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull()
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:8000/auth/password/reset',
+      expect.objectContaining({
+        body: JSON.stringify({
+          token: 'reset-token',
+          password: 'a brand new passphrase'
+        })
+      })
+    )
+  })
+
   it('redirects unauthenticated app visits to login', async () => {
     renderRoute('/app')
     await waitFor(() => {

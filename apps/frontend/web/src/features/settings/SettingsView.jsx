@@ -4,9 +4,9 @@ import { Icon } from '@verasig/design-system'
 import {
   cancelEmailChange as cancelEmailChangeRequest,
   changeEmail,
-  requestPasswordReset,
   updateProfile
 } from '../../shared/api/userApi.js'
+import { forgotPassword } from '../../shared/api/authApi.js'
 import { createCheckout, openBillingPortal } from '../../shared/api/billingApi.js'
 import { normalizeAccountName, validateAccountName } from '../../shared/accountName.js'
 import { redirectTo } from '../../shared/navigation.js'
@@ -109,7 +109,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         onToast(
           'info',
           'Email change pending',
-          `${updated.pendingEmail} is waiting for confirmation. Email delivery is not available yet.`
+          `${updated.pendingEmail} is waiting for confirmation. Confirmation emails are not sent yet.`
         )
       }
     )
@@ -130,13 +130,13 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
   function sendReset() {
     if (resetState !== 'idle') return
     setResetState('sending')
-    requestPasswordReset(authToken)
+    forgotPassword(user.email)
       .then(() => {
         setResetState('sent')
         onToast(
           'verified',
-          'Reset requested',
-          'Your password reset request was recorded. Email delivery is not available yet.'
+          'Reset link sent',
+          `Check ${user.email} for a link to set a new password.`
         )
       })
       .catch((caughtError) => {
@@ -321,7 +321,7 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
         footer={
           <>
             <span className="vrs-help">
-              Reset requests are recorded. Email delivery is not available yet.
+              We email you a link to set a new password. It expires in 60 minutes.
             </span>
             <Button
               variant="secondary"
@@ -332,23 +332,22 @@ export function SettingsView({ authToken, user, onUpdateUser, onToast }) {
               iconLeft={resetState === 'idle' ? <Icon name="lock" size={15} /> : null}
             >
               {resetState === 'sent'
-                ? 'Reset requested'
+                ? 'Link sent'
                 : resetState === 'sending'
-                  ? 'Requesting…'
-                  : 'Request reset'}
+                  ? 'Sending…'
+                  : 'Email reset link'}
             </Button>
           </>
         }
       >
         {resetState === 'sent' ? (
-          <Banner tone="verified" title="Reset requested">
-            The request for <span className="vrs-mono">{user.email}</span> was recorded.
-            No reset link was sent because email delivery is not available yet.
+          <Banner tone="verified" title="Reset link sent">
+            Check <span className="vrs-mono">{user.email}</span> for a link to set a new
+            password.
           </Banner>
         ) : (
           <div className="vrs-set-pass">
             <span className="vrs-set-pass__dots vrs-mono">••••••••••••</span>
-            <span className="vrs-help">Last changed Feb 12, 2026</span>
           </div>
         )}
       </Card>
