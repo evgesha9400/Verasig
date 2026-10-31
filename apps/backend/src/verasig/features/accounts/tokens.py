@@ -1,3 +1,4 @@
+import hashlib
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -49,3 +50,24 @@ def issue_email_change_token(
 def read_email_change_token(token: str, secret: str) -> tuple[UUID, str]:
     claims = _read(token, "email-change", secret)
     return UUID(claims["sub"]), claims["new_email"]
+
+
+def password_fingerprint(password_hash: str) -> str:
+    # binds a reset token to the current password: any password change voids it.
+    return hashlib.sha256(password_hash.encode()).hexdigest()[:16]
+
+
+def issue_password_reset_token(
+    user_id: UUID, password_hash: str, secret: str, ttl: timedelta
+) -> str:
+    return _issue(
+        {"sub": str(user_id), "fp": password_fingerprint(password_hash)},
+        "password-reset",
+        secret,
+        ttl,
+    )
+
+
+def read_password_reset_token(token: str, secret: str) -> tuple[UUID, str]:
+    claims = _read(token, "password-reset", secret)
+    return UUID(claims["sub"]), claims["fp"]
