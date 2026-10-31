@@ -1,6 +1,75 @@
 import logging
+import smtplib
+from email.message import EmailMessage
+from html import escape
+from typing import Protocol
+
+from verasig.config import MailConfig
 
 logger = logging.getLogger(__name__)
+
+_SMTP_TIMEOUT_SECONDS = 10
+
+
+class Mailer(Protocol):
+    def send(self, message: EmailMessage) -> None: ...
+
+
+class SmtpMailer:
+    def __init__(self, config: MailConfig) -> None:
+        self._config = config
+
+    def send(self, message: EmailMessage) -> None:
+        config = self._config
+        if "From" not in message:
+            message["From"] = config.sender
+        smtp_class = smtplib.SMTP_SSL if config.tls == "ssl" else smtplib.SMTP
+        with smtp_class(
+            config.host, config.port, timeout=_SMTP_TIMEOUT_SECONDS
+        ) as smtp:
+            if config.tls == "starttls":
+                smtp.starttls()
+            if config.user:
+                smtp.login(config.user, config.password)
+            smtp.send_message(message)
+
+
+class LogMailer:
+    """Local fallback when no SMTP host is configured: logs, never sends."""
+
+    def send(self, message: EmailMessage) -> None:
+        # never log the body: it carries bearer links.
+        logger.info(
+            "email not sent (no SMTP host)",
+            extra={"email": message["To"], "subject": message["Subject"]},
+        )
+
+
+def create_mailer(config: MailConfig | None) -> Mailer:
+    return SmtpMailer(config) if config else LogMailer()
+
+
+def build_password_reset_email(to: str, reset_url: str) -> EmailMessage:
+    message = EmailMessage()
+    message["To"] = to
+    message["Subject"] = "Reset your Verasig password"
+    message.set_content(
+        "Someone asked to reset the password for your Verasig account.\n\n"
+        f"Set a new password here:\n{reset_url}\n\n"
+        "The link works once and expires in 60 minutes.\n\n"
+        "If you did not ask for this, ignore this email. "
+        "Your password stays the same.\n"
+    )
+    link = escape(reset_url, quote=True)
+    message.add_alternative(
+        "<p>Someone asked to reset the password for your Verasig account.</p>"
+        f'<p><a href="{link}">Set a new password</a></p>'
+        "<p>The link works once and expires in 60 minutes.</p>"
+        "<p>If you did not ask for this, ignore this email. "
+        "Your password stays the same.</p>",
+        subtype="html",
+    )
+    return message
 
 
 def send_email_confirm(email: str, token: str) -> None:

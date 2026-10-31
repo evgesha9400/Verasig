@@ -1,15 +1,27 @@
 import base64
 import binascii
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEV_KEY = bytes(32)
+_SMTP_TLS_MODES = ("none", "starttls", "ssl")
 
 
 class SettingsError(ValueError):
     """Raised when required runtime settings are missing or invalid."""
+
+
+@dataclass(frozen=True)
+class MailConfig:
+    host: str
+    port: int
+    user: str
+    password: str
+    tls: str
+    sender: str
 
 
 class Settings(BaseSettings):
@@ -39,6 +51,13 @@ class Settings(BaseSettings):
     stripe_price_trader_yearly: str = ""
     # Public origin of the web app: Checkout and the portal return here.
     site_url: str = "http://localhost:5173"
+    # Outgoing mail over SMTP. A blank host logs mail instead, locally only.
+    smtp_host: str = ""
+    smtp_port: int = 1025
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_tls: str = "none"
+    mail_from: str = "Verasig <no-reply@verasig.io>"
 
     @property
     def database_url(self) -> str:
@@ -104,6 +123,28 @@ class Settings(BaseSettings):
 
     def site_url_spec(self) -> str:
         return _required("VERASIG_SITE_URL", self.site_url).rstrip("/")
+
+    def mail_spec(self) -> MailConfig | None:
+        host = self.smtp_host.strip()
+        if not host:
+            if self._is_local():
+                return None
+            raise SettingsError(
+                "VERASIG_SMTP_HOST must be set outside local environments"
+            )
+        tls = self.smtp_tls.strip().lower()
+        if tls not in _SMTP_TLS_MODES:
+            raise SettingsError(
+                f"VERASIG_SMTP_TLS must be one of {', '.join(_SMTP_TLS_MODES)}"
+            )
+        return MailConfig(
+            host=host,
+            port=self.smtp_port,
+            user=self.smtp_user.strip(),
+            password=self.smtp_password.strip(),
+            tls=tls,
+            sender=self.mail_from.strip(),
+        )
 
     def _is_local(self) -> bool:
         return (self.env.strip().lower() or "local") == "local"

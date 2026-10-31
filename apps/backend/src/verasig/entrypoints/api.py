@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from verasig.config import Settings
 from verasig.features.accounts import auth_routes, user_routes
+from verasig.features.accounts.mailer import create_mailer
 from verasig.features.billing import routes as billing_routes
 from verasig.features.exchanges import routes as exchange_routes
 from verasig.features.feeds import routes as feed_routes
@@ -68,6 +69,7 @@ def create_app(
     app.state.telegram_auth = telegram_session
     app.state.exchange_verifier = verify_api_keys
     app.state.market_data_factory = BybitKlineClient
+    app.state.mailer = create_mailer(settings.mail_spec())
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

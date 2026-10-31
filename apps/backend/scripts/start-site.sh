@@ -4,7 +4,7 @@
 set -eu
 
 for name in VERASIG_JWT_SECRET VERASIG_SECRET_KEYS VERASIG_DB_PASSWORD \
-  VERASIG_STRIPE_SECRET_KEY VERASIG_STRIPE_WEBHOOK_SECRET; do
+  VERASIG_STRIPE_SECRET_KEY VERASIG_STRIPE_WEBHOOK_SECRET VERASIG_SMTP_PASSWORD; do
   file_var="${name}_FILE"
   eval "file_path=\${${file_var}:-}"
   if [ -n "${file_path}" ]; then
