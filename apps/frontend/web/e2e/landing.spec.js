@@ -34,3 +34,19 @@ test('pricing section lists the plans @smoke', async ({ page }) => {
     page.getByRole('banner').getByRole('link', { name: 'Pricing' })
   ).toHaveAttribute('href', '#pricing')
 })
+
+test.describe('signed out', () => {
+  test.use({ storageState: { cookies: [], origins: [] } })
+
+  // Opens the form only; never submits it on the live site.
+  test('forgot password form renders @smoke', async ({ page }) => {
+    await page.goto('/forgot-password')
+    await expect(
+      page.getByRole('heading', { name: 'Reset your password' })
+    ).toBeVisible()
+    await expect(page.getByLabel(/email/i)).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Email me a reset link' })
+    ).toBeVisible()
+  })
+})

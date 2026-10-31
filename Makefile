@@ -123,11 +123,11 @@ dev-frontend: ## Start unified frontend dev server
 
 # Runtime and database
 
-db-up: env ## Start Postgres
-	$(COMPOSE) up -d --wait db
+db-up: env ## Start Postgres and the Mailpit mail catcher (http://localhost:8025)
+	$(COMPOSE) up -d --wait db mailpit
 
-db-down: env ## Stop Postgres
-	$(COMPOSE) stop db
+db-down: env ## Stop Postgres and Mailpit
+	$(COMPOSE) stop db mailpit
 
 migrate: ## Run database migrations
 	$(MAKE) -C $(BACKEND_DIR) migrate

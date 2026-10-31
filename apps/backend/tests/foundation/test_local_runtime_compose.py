@@ -56,6 +56,18 @@ def test_compose_orders_db_migration_backend_and_frontend() -> None:
     assert "npm run dev --workspace verasig-web -- --host 0.0.0.0" in frontend_block
 
 
+def test_mailpit_catches_mail_for_dev_docker_and_site() -> None:
+    compose_text = read_compose_file()
+
+    assert "VERASIG_SMTP_HOST: mailpit" in compose_text.split("services:")[0]
+    for name in ("app", "site"):
+        block = service_block(compose_text, name)
+        assert "mailpit:\n        condition: service_started" in block
+    assert "VERASIG_SMTP_HOST: mailpit" in service_block(compose_text, "site")
+    assert '"127.0.0.1:8025:8025"' in service_block(compose_text, "mailpit")
+    assert "up -d --wait db mailpit" in make_dry_run("db-up")
+
+
 def test_make_up_starts_full_stack_from_frontend_entrypoint() -> None:
     dry_run = make_dry_run("up")
 
