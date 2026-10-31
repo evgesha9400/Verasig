@@ -298,4 +298,30 @@ describe('SettingsView', () => {
     expect(within(card).getByRole('button', { name: 'Upgrade to Trader' })).toBeTruthy()
     expect(within(card).queryByRole('button', { name: 'Start 7-day trial' })).toBeNull()
   })
+
+  it('emails a password reset link to the account address', async () => {
+    fetch.mockResolvedValueOnce(new Response(null, { status: 202 }))
+    const { onToast } = renderSettings()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Email reset link' }))
+
+    expect(await screen.findByText('Reset link sent')).toBeTruthy()
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8000/auth/password/forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ada@example.com' })
+    })
+    expect(onToast).toHaveBeenCalledWith(
+      'verified',
+      'Reset link sent',
+      expect.stringContaining('ada@example.com')
+    )
+  })
+
+  it('makes no claim about email delivery or a password change date', () => {
+    renderSettings()
+
+    expect(screen.queryByText(/Email delivery is not available yet/)).toBeNull()
+    expect(screen.queryByText(/Last changed/)).toBeNull()
+  })
 })

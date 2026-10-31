@@ -8,9 +8,18 @@ import {
 } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Banner, Button, Loader } from '@verasig/design-system'
+import { ForgotPasswordView } from '../features/auth/ForgotPasswordView.jsx'
 import { LoginView } from '../features/auth/LoginView.jsx'
 import { RegisterView } from '../features/auth/RegisterView.jsx'
-import { getCurrentUser, login, logout, register } from '../shared/api/authApi.js'
+import { ResetPasswordView } from '../features/auth/ResetPasswordView.jsx'
+import {
+  forgotPassword,
+  getCurrentUser,
+  login,
+  logout,
+  register,
+  resetPassword
+} from '../shared/api/authApi.js'
 import { createCheckout } from '../shared/api/billingApi.js'
 import { redirectTo } from '../shared/navigation.js'
 import { PLANS } from '../domain/plan/planCatalog.js'
@@ -157,8 +166,19 @@ export function AppRoutes() {
     }
   }
 
+  // A reset proves the new password once: drop any local session, then log in.
+  function clearSessionAndOpenLoginAfterReset() {
+    forgetAuthToken()
+    setSession({ status: 'anonymous', token: null, user: null })
+    navigate(`${ROUTES.login}?reset=1`, { replace: true })
+  }
+
   function openLogin() {
     navigate(ROUTES.login)
+  }
+
+  function openForgotPassword() {
+    navigate(ROUTES.forgotPassword)
   }
 
   function openSignup() {
@@ -179,7 +199,12 @@ export function AppRoutes() {
           ) : authenticated ? (
             <Navigate to={ROUTES.app} replace />
           ) : (
-            <LoginView onLogin={authenticateAndOpenProduct} onRegister={openSignup} />
+            <LoginView
+              onLogin={authenticateAndOpenProduct}
+              onRegister={openSignup}
+              onForgotPassword={openForgotPassword}
+              passwordReset={new URLSearchParams(location.search).get('reset') === '1'}
+            />
           )
         }
       />
@@ -193,6 +218,30 @@ export function AppRoutes() {
           ) : (
             <RegisterView onRegister={registerAndOpenProduct} onLogin={openLogin} />
           )
+        }
+      />
+      <Route
+        path={ROUTES.forgotPassword}
+        element={
+          checkingSession ? (
+            <SessionBoot />
+          ) : authenticated ? (
+            <Navigate to={ROUTES.app} replace />
+          ) : (
+            <ForgotPasswordView onSubmit={forgotPassword} onLogin={openLogin} />
+          )
+        }
+      />
+      {/* Open with or without a session: Settings mails this link to signed-in users. */}
+      <Route
+        path={ROUTES.resetPassword}
+        element={
+          <ResetPasswordView
+            token={new URLSearchParams(location.search).get('token') || ''}
+            onSubmit={resetPassword}
+            onDone={clearSessionAndOpenLoginAfterReset}
+            onRequestLink={openForgotPassword}
+          />
         }
       />
       <Route
