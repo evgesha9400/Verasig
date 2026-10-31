@@ -75,7 +75,3 @@ def build_password_reset_email(to: str, reset_url: str) -> EmailMessage:
 def send_email_confirm(email: str, token: str) -> None:
     # never log the token: it is a bearer credential that confirms the change.
     logger.info("email confirmation requested", extra={"email": email})
-
-
-def send_password_reset_requested(email: str) -> None:
-    logger.info("password reset requested", extra={"email": email})

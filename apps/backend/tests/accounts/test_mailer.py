@@ -64,16 +64,26 @@ class _FakeSsl(_FakeSmtp):
     pass
 
 
-def test_send_email_confirm_never_logs_the_token(caplog):
+@pytest.fixture
+def mail_logs(caplog):
+    # verasig.* loggers stop propagating once an app is built
+    # (configure_app_logging), so attach the capture handler directly.
+    logger = logging.getLogger(mailer_module.__name__)
+    logger.addHandler(caplog.handler)
+    with caplog.at_level(logging.INFO, logger=mailer_module.__name__):
+        yield caplog
+    logger.removeHandler(caplog.handler)
+
+
+def test_send_email_confirm_never_logs_the_token(mail_logs):
     # the email-change token is a bearer credential; it must not reach the logs.
-    with caplog.at_level(logging.INFO):
-        send_email_confirm("user@example.com", "secret-jwt-token")
+    send_email_confirm("user@example.com", "secret-jwt-token")
 
     record = next(
-        r for r in caplog.records if r.getMessage() == "email confirmation requested"
+        r for r in mail_logs.records if r.getMessage() == "email confirmation requested"
     )
     assert not hasattr(record, "token")
-    assert "secret-jwt-token" not in caplog.text
+    assert "secret-jwt-token" not in mail_logs.text
 
 
 def test_password_reset_email_carries_the_link_once_per_part():
@@ -130,13 +140,14 @@ def test_smtp_mailer_sends_plain_without_login_when_no_user(fake_smtp):
     assert len(smtp.sent) == 1
 
 
-def test_log_mailer_never_logs_the_link(caplog):
-    with caplog.at_level(logging.INFO):
-        LogMailer().send(build_password_reset_email("ada@example.com", RESET_URL))
+def test_log_mailer_never_logs_the_link(mail_logs):
+    LogMailer().send(build_password_reset_email("ada@example.com", RESET_URL))
 
-    (record,) = caplog.records
+    record = next(
+        r for r in mail_logs.records if r.getMessage().startswith("email not sent")
+    )
     assert record.email == "ada@example.com"
-    assert "secret-jwt-token" not in caplog.text
+    assert "secret-jwt-token" not in mail_logs.text
     assert "secret-jwt-token" not in str(vars(record))
 
 

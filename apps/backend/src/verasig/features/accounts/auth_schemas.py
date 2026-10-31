@@ -1,4 +1,12 @@
-from pydantic import EmailStr, Field, field_validator, model_validator
+from typing import Annotated
+
+from pydantic import (
+    AfterValidator,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from verasig.features.accounts.name_validation import (
     validate_account_name,
@@ -20,17 +28,19 @@ def _require_bcrypt_length(password: str) -> str:
     return password
 
 
+# reject over-length here so it 422s at the edge instead of 500ing in the hasher.
+NewPassword = Annotated[
+    str,
+    Field(min_length=8, max_length=BCRYPT_MAX_PASSWORD_BYTES),
+    AfterValidator(_require_bcrypt_length),
+]
+
+
 class RegisterIn(CamelModel):
     first_name: str
     last_name: str
     email: EmailStr
-    # reject over-length here so it 422s at the edge instead of 500ing in the hasher.
-    password: str = Field(min_length=8, max_length=BCRYPT_MAX_PASSWORD_BYTES)
-
-    @field_validator("password")
-    @classmethod
-    def _validate_password_bytes(cls, raw: str) -> str:
-        return _require_bcrypt_length(raw)
+    password: NewPassword
 
     @field_validator("first_name")
     @classmethod
@@ -57,6 +67,15 @@ class LoginIn(CamelModel):
     @classmethod
     def _validate_password_bytes(cls, raw: str) -> str:
         return _require_bcrypt_length(raw)
+
+
+class ForgotPasswordIn(CamelModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(CamelModel):
+    token: str
+    password: NewPassword
 
 
 class AuthOut(CamelModel):
