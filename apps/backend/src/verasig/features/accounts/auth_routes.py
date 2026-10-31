@@ -1,8 +1,8 @@
 import logging
 from datetime import timedelta
-from email.message import EmailMessage
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
+from starlette.datastructures import State
 
 from verasig.domain.account import UserAccount
 from verasig.features.accounts.auth_schemas import (
@@ -12,7 +12,7 @@ from verasig.features.accounts.auth_schemas import (
     RegisterIn,
     ResetPasswordIn,
 )
-from verasig.features.accounts.mailer import Mailer, build_password_reset_email
+from verasig.features.accounts.mailer import build_password_reset_email
 from verasig.features.accounts.tokens import (
     TokenInvalidError,
     issue_password_reset_token,
@@ -91,14 +91,22 @@ def me(user: UserAccount = Depends(get_current_user)) -> UserOut:
     return user_out(user)
 
 
-def _send_reset_email(mailer: Mailer, message: EmailMessage) -> None:
+def _mail_reset_link(state: State, account: UserAccount) -> None:
     try:
-        mailer.send(message)
+        token = issue_password_reset_token(
+            account.id, account.password_hash, state.jwt_secret, PASSWORD_RESET_TTL
+        )
+        site_url = state.settings.site_url_spec()
+        state.mailer.send(
+            build_password_reset_email(
+                account.email, f"{site_url}/reset-password?token={token}"
+            )
+        )
     except Exception as error:
         # never log the message or the error text: both may carry the reset link.
         logger.error(
             "password reset email failed",
-            extra={"email": message["To"], "error_type": type(error).__name__},
+            extra={"email": account.email, "error_type": type(error).__name__},
         )
 
 
@@ -106,21 +114,12 @@ def _send_reset_email(mailer: Mailer, message: EmailMessage) -> None:
 def forgot_password(
     request: Request, payload: ForgotPasswordIn, background_tasks: BackgroundTasks
 ) -> Response:
-    # same answer for known and unknown emails; mail goes out after the response.
+    # same answer and same request-time work for known and unknown emails: the
+    # token, the message and the send all happen after the response.
     with request.app.state.session_factory() as session:
         account = find_account(session, payload.email)
     if account is not None:
-        token = issue_password_reset_token(
-            account.id,
-            account.password_hash,
-            request.app.state.jwt_secret,
-            PASSWORD_RESET_TTL,
-        )
-        site_url = request.app.state.settings.site_url_spec()
-        message = build_password_reset_email(
-            account.email, f"{site_url}/reset-password?token={token}"
-        )
-        background_tasks.add_task(_send_reset_email, request.app.state.mailer, message)
+        background_tasks.add_task(_mail_reset_link, request.app.state, account)
     return Response(status_code=status.HTTP_202_ACCEPTED)
 
 

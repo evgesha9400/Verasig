@@ -1,5 +1,6 @@
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 from html import escape
 from typing import Protocol
@@ -23,12 +24,22 @@ class SmtpMailer:
         config = self._config
         if "From" not in message:
             message["From"] = config.sender
-        smtp_class = smtplib.SMTP_SSL if config.tls == "ssl" else smtplib.SMTP
-        with smtp_class(
-            config.host, config.port, timeout=_SMTP_TIMEOUT_SECONDS
-        ) as smtp:
+        # smtplib's default TLS context skips certificate and hostname checks.
+        context = ssl.create_default_context()
+        if config.tls == "ssl":
+            connection = smtplib.SMTP_SSL(
+                config.host,
+                config.port,
+                timeout=_SMTP_TIMEOUT_SECONDS,
+                context=context,
+            )
+        else:
+            connection = smtplib.SMTP(
+                config.host, config.port, timeout=_SMTP_TIMEOUT_SECONDS
+            )
+        with connection as smtp:
             if config.tls == "starttls":
-                smtp.starttls()
+                smtp.starttls(context=context)
             if config.user:
                 smtp.login(config.user, config.password)
             smtp.send_message(message)

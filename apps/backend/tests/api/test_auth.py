@@ -332,6 +332,21 @@ def test_forgot_password_still_accepts_when_mail_fails(client, app, caplog):
     assert "token" not in str(vars(record))
 
 
+def test_forgot_password_answers_the_same_when_the_site_url_is_missing(client, app):
+    # all per-account work happens after the response, so a broken mail setup
+    # cannot make a known email answer differently from an unknown one.
+    app.state.mailer = mailer = RecordingMailer()
+    app.state.settings = app.state.settings.model_copy(update={"site_url": " "})
+    _register(client)
+
+    known = _forgot(client, "ada@example.com")
+    unknown = _forgot(client, "nobody@example.com")
+
+    assert (known.status_code, known.content) == (202, b"")
+    assert (unknown.status_code, unknown.content) == (202, b"")
+    assert mailer.sent == []
+
+
 def test_reset_password_with_the_mailed_token_changes_the_password(client, app):
     app.state.mailer = mailer = RecordingMailer()
     _register(client)

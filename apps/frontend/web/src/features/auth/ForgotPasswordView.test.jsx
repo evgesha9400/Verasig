@@ -28,15 +28,16 @@ describe('ForgotPasswordView', () => {
     expect(onSubmit).toHaveBeenCalledWith('ada@example.com')
   })
 
-  it('confirms the same way when the API answers with an error', async () => {
+  it('shows an outage when the server answers 5xx', async () => {
     const onSubmit = vi
       .fn()
-      .mockRejectedValue(new ApiError({ status: 422, code: 'HTTP_422', message: 'x' }))
+      .mockRejectedValue(new ApiError({ status: 502, code: 'HTTP_502', message: 'x' }))
     render(<ForgotPasswordView onSubmit={onSubmit} onLogin={() => {}} />)
 
     submitEmail('ada@example.com')
 
-    expect(await screen.findByText(CONFIRMATION)).toBeTruthy()
+    expect(await screen.findByText("Can't reach Verasig")).toBeTruthy()
+    expect(screen.queryByText(CONFIRMATION)).toBeNull()
   })
 
   it('shows a network failure and lets the user retry', async () => {
@@ -46,6 +47,24 @@ describe('ForgotPasswordView', () => {
     submitEmail('ada@example.com')
 
     expect(await screen.findByText("Can't reach Verasig")).toBeTruthy()
+    expect(screen.queryByText(CONFIRMATION)).toBeNull()
+  })
+
+  it('shows a rejected address next to the form', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(
+      new ApiError({
+        status: 422,
+        code: 'HTTP_422',
+        message: 'Email: value is not a valid email address'
+      })
+    )
+    render(<ForgotPasswordView onSubmit={onSubmit} onLogin={() => {}} />)
+
+    submitEmail('ada@example')
+
+    expect(
+      await screen.findByText('Email: value is not a valid email address')
+    ).toBeTruthy()
     expect(screen.queryByText(CONFIRMATION)).toBeNull()
   })
 

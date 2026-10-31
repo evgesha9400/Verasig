@@ -4,28 +4,31 @@ import { Icon } from '@verasig/design-system'
 import { BrandPanel } from './BrandPanel.jsx'
 import './auth.css'
 
-// An ApiError carries an HTTP status; a fetch that never reached the API does not.
-function isNetworkFailure(error) {
-  return error?.status === undefined
+// No HTTP status means the fetch never reached the API; a 5xx means the API or
+// the proxy in front of it is down. Either way no reset link was sent.
+function isOutage(error) {
+  return error?.status === undefined || error.status >= 500
 }
 
 export function ForgotPasswordView({ onSubmit, onLogin }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [unreachable, setUnreachable] = useState(false)
+  const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   async function submitEmail() {
     setUnreachable(false)
+    setError(null)
     setSubmitting(true)
 
     try {
       await onSubmit(email.trim())
       setSent(true)
     } catch (caughtError) {
-      // The API answers the same for every address, so only an outage is news.
-      if (isNetworkFailure(caughtError)) setUnreachable(true)
-      else setSent(true)
+      // The API answers 202 for every valid address, so an error reveals nothing.
+      if (isOutage(caughtError)) setUnreachable(true)
+      else setError(caughtError.message)
     } finally {
       setSubmitting(false)
     }
@@ -68,6 +71,11 @@ export function ForgotPasswordView({ onSubmit, onLogin }) {
                 iconLeft={<Icon name="users" size={16} />}
                 placeholder="you@company.com"
               />
+              {error && (
+                <Banner tone="rejected" title="Check the address">
+                  {error}
+                </Banner>
+              )}
               {unreachable && (
                 <Banner tone="rejected" title="Can't reach Verasig">
                   Check your connection and try again.

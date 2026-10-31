@@ -1,4 +1,5 @@
 import logging
+import ssl
 from email.message import EmailMessage
 
 import pytest
@@ -30,8 +31,9 @@ def _config(tls: str) -> MailConfig:
 class _FakeSmtp:
     instances: list["_FakeSmtp"] = []
 
-    def __init__(self, host, port, timeout):
+    def __init__(self, host, port, timeout, context=None):
         self.address = (host, port)
+        self.context = context
         self.calls: list[str] = []
         self.sent: list[EmailMessage] = []
         _FakeSmtp.instances.append(self)
@@ -42,8 +44,9 @@ class _FakeSmtp:
     def __exit__(self, *exc):
         return False
 
-    def starttls(self):
+    def starttls(self, context=None):
         self.calls.append("starttls")
+        self.starttls_context = context
 
     def login(self, user, password):
         self.calls.append(f"login:{user}")
@@ -97,6 +100,28 @@ def test_password_reset_email_carries_the_link_once_per_part():
     assert html.count(RESET_URL) == 1
     assert "60 minutes" in text
     assert "ignore" in text.lower()
+
+
+def _verifies_server(context) -> bool:
+    return (
+        isinstance(context, ssl.SSLContext)
+        and context.verify_mode == ssl.CERT_REQUIRED
+        and context.check_hostname
+    )
+
+
+def test_smtp_mailer_verifies_the_server_certificate(fake_smtp):
+    # smtplib's own default context skips certificate and hostname checks.
+    SmtpMailer(_config("ssl")).send(
+        build_password_reset_email("ada@example.com", RESET_URL)
+    )
+    SmtpMailer(_config("starttls")).send(
+        build_password_reset_email("ada@example.com", RESET_URL)
+    )
+
+    ssl_smtp, starttls_smtp = fake_smtp.instances
+    assert _verifies_server(ssl_smtp.context)
+    assert _verifies_server(starttls_smtp.starttls_context)
 
 
 def test_smtp_mailer_uses_ssl_and_logs_in(fake_smtp):
